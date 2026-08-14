@@ -1,0 +1,74 @@
+import "server-only";
+import ExcelJS from "exceljs";
+
+export type CelulaValor = string | number | null;
+export type LinhaPlanilha = Record<string, CelulaValor>;
+
+export interface PlanilhaParseada {
+  cabecalhos: string[];
+  linhas: LinhaPlanilha[];
+}
+
+function normalizarCelula(valor: ExcelJS.CellValue): CelulaValor {
+  if (valor === null || valor === undefined) return null;
+  if (typeof valor === "number" || typeof valor === "string") return valor;
+  if (valor instanceof Date) return valor.toISOString().slice(0, 10);
+  if (typeof valor === "object") {
+    if ("result" in valor && valor.result !== undefined) {
+      return normalizarCelula(valor.result as ExcelJS.CellValue);
+    }
+    if ("text" in valor && typeof valor.text === "string") return valor.text;
+  }
+  return String(valor);
+}
+
+/**
+ * Lê a primeira planilha de um arquivo .xlsx/.csv e devolve os cabeçalhos
+ * (primeira linha) e as linhas como objetos. Não interpreta o significado das
+ * colunas — esse mapeamento é feito em mappers.ts e confirmado pelo usuário.
+ */
+export async function parsearPlanilha(
+  buffer: ArrayBuffer,
+  nomeArquivo: string,
+): Promise<PlanilhaParseada> {
+  const workbook = new ExcelJS.Workbook();
+
+  if (nomeArquivo.toLowerCase().endsWith(".csv")) {
+    const texto = new TextDecoder("utf-8").decode(buffer);
+    const { Readable } = await import("node:stream");
+    await workbook.csv.read(Readable.from([texto]));
+  } else {
+    await workbook.xlsx.load(buffer);
+  }
+
+  const sheet = workbook.worksheets[0];
+  if (!sheet) {
+    throw new Error("O arquivo não contém nenhuma planilha legível.");
+  }
+
+  const linhaCabecalho = sheet.getRow(1);
+  const cabecalhos: string[] = [];
+  linhaCabecalho.eachCell({ includeEmpty: false }, (cell, col) => {
+    cabecalhos[col - 1] = String(normalizarCelula(cell.value) ?? `Coluna ${col}`).trim();
+  });
+
+  if (cabecalhos.filter(Boolean).length === 0) {
+    throw new Error("A primeira linha da planilha deve conter os nomes das colunas.");
+  }
+
+  const linhas: LinhaPlanilha[] = [];
+  sheet.eachRow({ includeEmpty: false }, (row, numeroLinha) => {
+    if (numeroLinha === 1) return;
+    const registro: LinhaPlanilha = {};
+    let temConteudo = false;
+    cabecalhos.forEach((cabecalho, i) => {
+      if (!cabecalho) return;
+      const valor = normalizarCelula(row.getCell(i + 1).value);
+      registro[cabecalho] = valor;
+      if (valor !== null && valor !== "") temConteudo = true;
+    });
+    if (temConteudo) linhas.push(registro);
+  });
+
+  return { cabecalhos: cabecalhos.filter(Boolean), linhas };
+}

@@ -1,0 +1,229 @@
+@import "tailwindcss";
+
+:root {
+  /* Cores institucionais — Manual de Marca MSB (fev/2024) */
+  --brand-primary: #56a4bb; /* Azul Filtrado — cor primária */
+  --brand-primary-hover: #5f88a1; /* Azul Safira — usado como estado hover/pressed do primário */
+  --brand-accent: #9ce5ee; /* Azul Tecno */
+  --brand-surface: #d9e4e8; /* Cinza Cirúrgico */
+  --brand-neutral: #818286; /* Cinza Seguro */
+  --brand-white: #ffffff; /* Branco Estéril */
+
+  /* Tons derivados do primário, usados nas telas de módulo (headers escuros,
+     hover states, fundos de destaque). Não vêm do manual — são a mesma
+     rampa de azul do manual interpolada para uso em UI, mantida à parte dos
+     tokens oficiais acima para não confundir as duas fontes. */
+  --brand-primary-700: #3d8499;
+  --brand-primary-800: #2c6679;
+  --brand-primary-900: #1f4e5e;
+  --brand-primary-100: #e3f0f4;
+  --brand-primary-050: #f2f8fa;
+  --brand-dark-900: #33485a; /* fundo de cabeçalhos/paineis escuros (drawers, cards de destaque) */
+
+  /* O manual não define cor de texto/corpo para uso digital — usamos um
+     neutro escuro (fora da paleta oficial) apenas para legibilidade do corpo
+     de texto sobre fundo claro. Sinalizado como lacuna do manual. */
+  --background: var(--brand-white);
+  --foreground: #262626;
+  --foreground-muted: #5c5c5e;
+
+  /* Superfície de página (fundo cinza-azulado atrás dos cards, visto no
+     protótipo de design) e hairline de borda mais suave que --brand-surface,
+     usado em tabelas/inputs. Também extrapolações nossas. */
+  --surface-page: #eef2f4;
+  --hairline: #dbe6ea;
+
+  /* Cores de status — extraídas literalmente do protótipo de design
+     (dc.html) do Portal DP: mapa G/A/R/B/N de semântica de férias/folha,
+     reutilizado em badges, banners e cards de alerta. */
+  --status-success: #2f8f6b; /* G — gozada/concluída/validado */
+  --status-success-bg: #e4f3ed;
+  --status-warning: #8a6220; /* A — a vencer/pendente/encargos */
+  --status-warning-bg: #fdf7ea;
+  --status-warning-border: #ecd9ac;
+  --status-warning-icon: #a8762a;
+  --status-danger: #8f3a32; /* R — vencida/erro/dobra */
+  --status-danger-bg: #fbeceb;
+  --status-danger-border: #edc7c2;
+  --status-danger-icon: #a2453c;
+  --status-info: var(--brand-primary);
+  --status-info-bg: var(--brand-primary-100);
+  --status-emcurso: #2c6679; /* B — em curso/fracionada/em aberto */
+  --status-emcurso-bg: #e3f0f4;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 18px;
+  --radius-pill: 999px;
+
+  /* Sombras com matiz frio (nunca cinza/preto neutro) — requisito de marca. */
+  --shadow-card: 0 6px 18px rgba(51, 72, 90, 0.07);
+  --shadow-drawer: -16px 0 40px -12px rgba(51, 72, 90, 0.4);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-foreground-muted: var(--foreground-muted);
+  --color-surface-page: var(--surface-page);
+  --color-hairline: var(--hairline);
+
+  --color-brand-primary: var(--brand-primary);
+  --color-brand-primary-hover: var(--brand-primary-hover);
+  --color-brand-primary-700: var(--brand-primary-700);
+  --color-brand-primary-800: var(--brand-primary-800);
+  --color-brand-primary-900: var(--brand-primary-900);
+  --color-brand-primary-100: var(--brand-primary-100);
+  --color-brand-primary-050: var(--brand-primary-050);
+  --color-brand-dark-900: var(--brand-dark-900);
+  --color-brand-accent: var(--brand-accent);
+  --color-brand-surface: var(--brand-surface);
+  --color-brand-neutral: var(--brand-neutral);
+  --color-brand-white: var(--brand-white);
+
+  --color-status-success: var(--status-success);
+  --color-status-success-bg: var(--status-success-bg);
+  --color-status-warning: var(--status-warning);
+  --color-status-warning-bg: var(--status-warning-bg);
+  --color-status-warning-border: var(--status-warning-border);
+  --color-status-warning-icon: var(--status-warning-icon);
+  --color-status-danger: var(--status-danger);
+  --color-status-danger-bg: var(--status-danger-bg);
+  --color-status-danger-border: var(--status-danger-border);
+  --color-status-danger-icon: var(--status-danger-icon);
+  --color-status-info: var(--status-info);
+  --color-status-info-bg: var(--status-info-bg);
+  --color-status-emcurso: var(--status-emcurso);
+  --color-status-emcurso-bg: var(--status-emcurso-bg);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-pill: var(--radius-pill);
+
+  --shadow-card: var(--shadow-card);
+  --shadow-drawer: var(--shadow-drawer);
+
+  --font-sans: var(--font-brand);
+}
+
+/* O manual não especifica uma variante de tema escuro para uso digital
+   (só define positivo/negativo do LOGOTIPO para impressão/fotografia).
+   Este bloco é uma extrapolação nossa, não uma regra do manual. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #17191a;
+    --foreground: #f2f2f2;
+    --foreground-muted: #b7bcbe;
+    --brand-surface: #2a3336;
+    --surface-page: #14191b;
+    --hairline: #2a3336;
+  }
+}
+
+/* Estilos base ficam na layer "base" do Tailwind — sem isso, regras de
+   elemento (ex.: `a { color }`) escritas fora de qualquer @layer têm
+   prioridade incondicional sobre QUALQUER classe utilitária (ex.:
+   `text-brand-white`), independente de especificidade. */
+@layer base {
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  }
+
+  a {
+    color: var(--brand-primary);
+  }
+
+  a:hover {
+    color: var(--brand-primary-hover);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--brand-primary);
+    outline-offset: 2px;
+  }
+}
+
+/* Organograma em cascata (Colaboradores) — conectores pontilhados entre
+   caixas, técnica clássica de "CSS org chart" via pseudo-elementos em <li>.
+   Isolado por classe própria para não vazar para outras listas do app. */
+.organograma-tree,
+.organograma-tree ul,
+.organograma-tree li {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.organograma-tree {
+  display: flex;
+  justify-content: center;
+}
+
+.organograma-tree ul {
+  display: flex;
+  position: relative;
+  padding-top: 24px;
+}
+
+.organograma-tree li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 10px 0 10px;
+}
+
+.organograma-tree li::before,
+.organograma-tree li::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 50%;
+  width: 50%;
+  height: 24px;
+  border-top: 1.5px dashed #818286;
+}
+
+.organograma-tree li::after {
+  right: auto;
+  left: 50%;
+  border-left: 1.5px dashed #818286;
+}
+
+.organograma-tree li:only-child {
+  padding-top: 0;
+}
+
+.organograma-tree li:only-child::before,
+.organograma-tree li:only-child::after {
+  display: none;
+}
+
+.organograma-tree li:first-child::before,
+.organograma-tree li:last-child::after {
+  border: 0 none;
+}
+
+.organograma-tree li:last-child::before {
+  border-right: 1.5px dashed #818286;
+  border-radius: 0 6px 0 0;
+}
+
+.organograma-tree li:first-child::after {
+  border-radius: 6px 0 0 0;
+}
+
+.organograma-tree ul ul::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 0;
+  height: 24px;
+  border-left: 1.5px dashed #818286;
+}
