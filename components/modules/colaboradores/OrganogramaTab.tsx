@@ -27,12 +27,13 @@ const ORGANOGRAMA: DefinicaoCargo = {
   departamento: "Diretoria",
   lideranca: true,
   filhos: [
-    { rotulo: "KAM", cargo: "KAM", departamento: "Comercial" },
+    { rotulo: "KAM", cargo: "KAM", departamento: "Comercial", lideranca: true },
     {
       rotulo: "Supervisora",
       cargo: "Supervisora",
       departamento: "Operações de Vendas",
       lideranca: true,
+      filhos: [{ rotulo: "Assistente", cargo: "Assistente", departamento: "Operações de Vendas" }],
     },
     {
       rotulo: "Diretor",
@@ -45,12 +46,17 @@ const ORGANOGRAMA: DefinicaoCargo = {
           cargo: "Coordenadora",
           departamento: "Engenharia",
           lideranca: true,
+          filhos: [{ rotulo: "Analista", cargo: "Analista", departamento: "Engenharia" }],
         },
         {
           rotulo: "Gerente",
           cargo: "Gerente",
           departamento: "Industrial",
           lideranca: true,
+          filhos: [
+            { rotulo: "Supervisora", cargo: "Supervisora", departamento: "Produção", lideranca: true },
+            { rotulo: "Analista de PCP", cargo: "Analista", departamento: "Planejamento" },
+          ],
         },
       ],
     },
@@ -59,6 +65,10 @@ const ORGANOGRAMA: DefinicaoCargo = {
       cargo: "Coordenadora",
       departamento: "Garantia da Qualidade",
       lideranca: true,
+      filhos: [
+        { rotulo: "Analista", cargo: "Analista", departamento: "Garantia da Qualidade" },
+        { rotulo: "Serviços Gerais", cargo: "Auxiliar", departamento: "Serviços Gerais" },
+      ],
     },
   ],
 };
