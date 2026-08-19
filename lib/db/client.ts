@@ -75,6 +75,29 @@ const MIGRACOES: { tabela: string; coluna: string; definicao: string }[] = [
   { tabela: "colaboradores", coluna: "data_desligamento", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "motivo_desligamento", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "valor_rescisao", definicao: "REAL" },
+  // Dados pessoais
+  { tabela: "colaboradores", coluna: "pis", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "cidade_nascimento", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "uf_nascimento", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "nome_pai", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "nome_mae", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "telefone", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "sexo", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "email_pessoal", definicao: "TEXT" },
+  // Dados profissionais
+  { tabela: "colaboradores", coluna: "horario", definicao: "TEXT" },
+  // Dados bancários
+  { tabela: "colaboradores", coluna: "banco", definicao: "TEXT" },
+  // Endereço
+  { tabela: "colaboradores", coluna: "cep", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "estado", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "bairro", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "rua", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "numero", definicao: "TEXT" },
+  // Cônjuge (1:1 — diferente de dependentes, que são vários e vivem em tabela própria)
+  { tabela: "colaboradores", coluna: "conjuge_nome", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "conjuge_cpf", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "conjuge_nascimento", definicao: "TEXT" },
 ];
 
 /**

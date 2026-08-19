@@ -4,6 +4,7 @@ import { getDb } from "./client";
 export type Vinculo = "CLT" | "CLT-bio" | "PJ" | "EST" | "JÁ";
 export type TipoTransporte = "vt_diario" | "vm_fixo";
 export type StatusColaborador = "ativo" | "desligado";
+export type SexoColaborador = "M" | "F";
 
 export interface Colaborador {
   id: number;
@@ -31,6 +32,29 @@ export interface Colaborador {
   dataDesligamento: string | null;
   motivoDesligamento: string | null;
   valorRescisao: number | null;
+  // Dados pessoais
+  pis: string | null;
+  cidadeNascimento: string | null;
+  ufNascimento: string | null;
+  nomePai: string | null;
+  nomeMae: string | null;
+  telefone: string | null;
+  sexo: SexoColaborador | null;
+  emailPessoal: string | null;
+  // Dados profissionais
+  horario: string | null;
+  // Dados bancários
+  banco: string | null;
+  // Endereço
+  cep: string | null;
+  estado: string | null;
+  bairro: string | null;
+  rua: string | null;
+  numero: string | null;
+  // Cônjuge
+  conjugeNome: string | null;
+  conjugeCpf: string | null;
+  conjugeNascimento: string | null;
 }
 
 export interface ColaboradorInput {
@@ -57,6 +81,24 @@ export interface ColaboradorInput {
   dataDesligamento?: string | null;
   motivoDesligamento?: string | null;
   valorRescisao?: number | null;
+  pis?: string | null;
+  cidadeNascimento?: string | null;
+  ufNascimento?: string | null;
+  nomePai?: string | null;
+  nomeMae?: string | null;
+  telefone?: string | null;
+  sexo?: SexoColaborador | null;
+  emailPessoal?: string | null;
+  horario?: string | null;
+  banco?: string | null;
+  cep?: string | null;
+  estado?: string | null;
+  bairro?: string | null;
+  rua?: string | null;
+  numero?: string | null;
+  conjugeNome?: string | null;
+  conjugeCpf?: string | null;
+  conjugeNascimento?: string | null;
 }
 
 interface LinhaColaborador {
@@ -84,6 +126,24 @@ interface LinhaColaborador {
   data_desligamento: string | null;
   motivo_desligamento: string | null;
   valor_rescisao: number | null;
+  pis: string | null;
+  cidade_nascimento: string | null;
+  uf_nascimento: string | null;
+  nome_pai: string | null;
+  nome_mae: string | null;
+  telefone: string | null;
+  sexo: SexoColaborador | null;
+  email_pessoal: string | null;
+  horario: string | null;
+  banco: string | null;
+  cep: string | null;
+  estado: string | null;
+  bairro: string | null;
+  rua: string | null;
+  numero: string | null;
+  conjuge_nome: string | null;
+  conjuge_cpf: string | null;
+  conjuge_nascimento: string | null;
 }
 
 function paraColaborador(linha: LinhaColaborador): Colaborador {
@@ -112,6 +172,24 @@ function paraColaborador(linha: LinhaColaborador): Colaborador {
     dataDesligamento: linha.data_desligamento,
     motivoDesligamento: linha.motivo_desligamento,
     valorRescisao: linha.valor_rescisao,
+    pis: linha.pis,
+    cidadeNascimento: linha.cidade_nascimento,
+    ufNascimento: linha.uf_nascimento,
+    nomePai: linha.nome_pai,
+    nomeMae: linha.nome_mae,
+    telefone: linha.telefone,
+    sexo: linha.sexo,
+    emailPessoal: linha.email_pessoal,
+    horario: linha.horario,
+    banco: linha.banco,
+    cep: linha.cep,
+    estado: linha.estado,
+    bairro: linha.bairro,
+    rua: linha.rua,
+    numero: linha.numero,
+    conjugeNome: linha.conjuge_nome,
+    conjugeCpf: linha.conjuge_cpf,
+    conjugeNascimento: linha.conjuge_nascimento,
   };
 }
 
@@ -150,8 +228,9 @@ export async function criarColaborador(input: ColaboradorInput): Promise<Colabor
     sql: `INSERT INTO colaboradores
          (nome, data_admissao, salario_base, dependentes, cpf, email, cargo, departamento, gestor_id, cidade,
           vinculo, alimentacao_valor, data_nascimento, cbo, agencia, conta, tipo_transporte, valor_transporte_fixo,
-          lider_direto_nome, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          lider_direto_nome, status, pis, cidade_nascimento, uf_nascimento, nome_pai, nome_mae, telefone, sexo,
+          email_pessoal, horario, banco, cep, estado, bairro, rua, numero, conjuge_nome, conjuge_cpf, conjuge_nascimento)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       input.nome,
       input.dataAdmissao,
@@ -173,6 +252,24 @@ export async function criarColaborador(input: ColaboradorInput): Promise<Colabor
       input.valorTransporteFixo ?? null,
       input.liderDiretoNome ?? null,
       input.status ?? "ativo",
+      input.pis ?? null,
+      input.cidadeNascimento ?? null,
+      input.ufNascimento ?? null,
+      input.nomePai ?? null,
+      input.nomeMae ?? null,
+      input.telefone ?? null,
+      input.sexo ?? null,
+      input.emailPessoal ?? null,
+      input.horario ?? null,
+      input.banco ?? null,
+      input.cep ?? null,
+      input.estado ?? null,
+      input.bairro ?? null,
+      input.rua ?? null,
+      input.numero ?? null,
+      input.conjugeNome ?? null,
+      input.conjugeCpf ?? null,
+      input.conjugeNascimento ?? null,
     ],
   });
   return (await buscarColaborador(Number(info.lastInsertRowid)))!;
@@ -208,6 +305,24 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
     motivoDesligamento:
       input.motivoDesligamento !== undefined ? input.motivoDesligamento : atual.motivoDesligamento,
     valorRescisao: input.valorRescisao !== undefined ? input.valorRescisao : atual.valorRescisao,
+    pis: input.pis !== undefined ? input.pis : atual.pis,
+    cidadeNascimento: input.cidadeNascimento !== undefined ? input.cidadeNascimento : atual.cidadeNascimento,
+    ufNascimento: input.ufNascimento !== undefined ? input.ufNascimento : atual.ufNascimento,
+    nomePai: input.nomePai !== undefined ? input.nomePai : atual.nomePai,
+    nomeMae: input.nomeMae !== undefined ? input.nomeMae : atual.nomeMae,
+    telefone: input.telefone !== undefined ? input.telefone : atual.telefone,
+    sexo: input.sexo !== undefined ? input.sexo : atual.sexo,
+    emailPessoal: input.emailPessoal !== undefined ? input.emailPessoal : atual.emailPessoal,
+    horario: input.horario !== undefined ? input.horario : atual.horario,
+    banco: input.banco !== undefined ? input.banco : atual.banco,
+    cep: input.cep !== undefined ? input.cep : atual.cep,
+    estado: input.estado !== undefined ? input.estado : atual.estado,
+    bairro: input.bairro !== undefined ? input.bairro : atual.bairro,
+    rua: input.rua !== undefined ? input.rua : atual.rua,
+    numero: input.numero !== undefined ? input.numero : atual.numero,
+    conjugeNome: input.conjugeNome !== undefined ? input.conjugeNome : atual.conjugeNome,
+    conjugeCpf: input.conjugeCpf !== undefined ? input.conjugeCpf : atual.conjugeCpf,
+    conjugeNascimento: input.conjugeNascimento !== undefined ? input.conjugeNascimento : atual.conjugeNascimento,
   };
 
   const db = await getDb();
@@ -216,7 +331,10 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
        SET nome = ?, data_admissao = ?, salario_base = ?, dependentes = ?, cpf = ?, email = ?, cargo = ?,
            departamento = ?, gestor_id = ?, cidade = ?, vinculo = ?, alimentacao_valor = ?, data_nascimento = ?,
            cbo = ?, agencia = ?, conta = ?, tipo_transporte = ?, valor_transporte_fixo = ?, lider_direto_nome = ?,
-           status = ?, data_desligamento = ?, motivo_desligamento = ?, valor_rescisao = ?
+           status = ?, data_desligamento = ?, motivo_desligamento = ?, valor_rescisao = ?,
+           pis = ?, cidade_nascimento = ?, uf_nascimento = ?, nome_pai = ?, nome_mae = ?, telefone = ?, sexo = ?,
+           email_pessoal = ?, horario = ?, banco = ?, cep = ?, estado = ?, bairro = ?, rua = ?, numero = ?,
+           conjuge_nome = ?, conjuge_cpf = ?, conjuge_nascimento = ?
        WHERE id = ?`,
     args: [
       mesclado.nome,
@@ -242,6 +360,24 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
       mesclado.dataDesligamento ?? null,
       mesclado.motivoDesligamento ?? null,
       mesclado.valorRescisao ?? null,
+      mesclado.pis ?? null,
+      mesclado.cidadeNascimento ?? null,
+      mesclado.ufNascimento ?? null,
+      mesclado.nomePai ?? null,
+      mesclado.nomeMae ?? null,
+      mesclado.telefone ?? null,
+      mesclado.sexo ?? null,
+      mesclado.emailPessoal ?? null,
+      mesclado.horario ?? null,
+      mesclado.banco ?? null,
+      mesclado.cep ?? null,
+      mesclado.estado ?? null,
+      mesclado.bairro ?? null,
+      mesclado.rua ?? null,
+      mesclado.numero ?? null,
+      mesclado.conjugeNome ?? null,
+      mesclado.conjugeCpf ?? null,
+      mesclado.conjugeNascimento ?? null,
       id,
     ],
   });

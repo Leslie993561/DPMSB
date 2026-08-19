@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Colaborador, TipoTransporte, Vinculo } from "@/lib/db/colaboradores";
+import type { Colaborador, SexoColaborador, TipoTransporte, Vinculo } from "@/lib/db/colaboradores";
 import type { SexoDependente } from "@/lib/db/colaboradorDependentes";
 import { RiskCallout } from "@/components/shared/RiskCallout";
 import { cn } from "@/lib/cn";
@@ -46,6 +46,15 @@ function IconeLapis() {
   );
 }
 
+/** Divisor com rótulo em versalete, usado para separar o formulário em blocos temáticos. */
+function Secao({ titulo }: { titulo: string }) {
+  return (
+    <p className="mt-1 border-t border-hairline pt-2 text-[10px] font-semibold tracking-wide text-brand-primary-800 uppercase dark:border-brand-neutral/30">
+      {titulo}
+    </p>
+  );
+}
+
 interface Props {
   colaboradores: Colaborador[];
   /** Presente = edição de um colaborador existente; ausente = cadastro novo. */
@@ -56,27 +65,57 @@ interface Props {
 
 export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, onCancelar }: Props) {
   const editando = colaboradorEditando;
+
+  // Dados pessoais
   const [nome, setNome] = useState(editando?.nome ?? "");
-  const [dataAdmissao, setDataAdmissao] = useState(editando?.dataAdmissao ?? "");
-  const [dataNascimento, setDataNascimento] = useState(editando?.dataNascimento ?? "");
   const [cpf, setCpf] = useState(editando?.cpf ?? "");
+  const [pis, setPis] = useState(editando?.pis ?? "");
+  const [dataNascimento, setDataNascimento] = useState(editando?.dataNascimento ?? "");
+  const [cidadeNascimento, setCidadeNascimento] = useState(editando?.cidadeNascimento ?? "");
+  const [ufNascimento, setUfNascimento] = useState(editando?.ufNascimento ?? "");
+  const [nomePai, setNomePai] = useState(editando?.nomePai ?? "");
+  const [nomeMae, setNomeMae] = useState(editando?.nomeMae ?? "");
+  const [telefone, setTelefone] = useState(editando?.telefone ?? "");
+  const [sexo, setSexo] = useState<SexoColaborador | "">(editando?.sexo ?? "");
+  const [emailPessoal, setEmailPessoal] = useState(editando?.emailPessoal ?? "");
+
+  // Dados profissionais
   const [email, setEmail] = useState(editando?.email ?? "");
   const [cargo, setCargo] = useState(editando?.cargo ?? "");
   const [departamento, setDepartamento] = useState(editando?.departamento ?? "");
   const [vinculo, setVinculo] = useState<Vinculo | "">(editando?.vinculo ?? "CLT");
+  const [cbo, setCbo] = useState(editando?.cbo ?? "");
   const [gestorId, setGestorId] = useState(editando?.gestorId ? String(editando.gestorId) : "");
   const [salarioBase, setSalarioBase] = useState(editando ? String(editando.salarioBase) : "");
+  const [horario, setHorario] = useState(editando?.horario ?? "");
+  const [dataAdmissao, setDataAdmissao] = useState(editando?.dataAdmissao ?? "");
+
+  // Dados bancários
+  const [banco, setBanco] = useState(editando?.banco ?? "");
+  const [agencia, setAgencia] = useState(editando?.agencia ?? "");
+  const [conta, setConta] = useState(editando?.conta ?? "");
+
+  // Benefícios (VT/VM + VA)
   const [alimentacaoValor, setAlimentacaoValor] = useState(
     editando?.alimentacaoValor ? String(editando.alimentacaoValor) : "",
   );
-  const [cbo, setCbo] = useState(editando?.cbo ?? "");
-  const [cidade, setCidade] = useState(editando?.cidade ?? "");
-  const [agencia, setAgencia] = useState(editando?.agencia ?? "");
-  const [conta, setConta] = useState(editando?.conta ?? "");
   const [tipoTransporte, setTipoTransporte] = useState<TipoTransporte>(editando?.tipoTransporte ?? "vt_diario");
   const [valorTransporteFixo, setValorTransporteFixo] = useState(
     editando?.valorTransporteFixo ? String(editando.valorTransporteFixo) : "",
   );
+
+  // Endereço
+  const [cep, setCep] = useState(editando?.cep ?? "");
+  const [estado, setEstado] = useState(editando?.estado ?? "");
+  const [cidade, setCidade] = useState(editando?.cidade ?? "");
+  const [bairro, setBairro] = useState(editando?.bairro ?? "");
+  const [rua, setRua] = useState(editando?.rua ?? "");
+  const [numero, setNumero] = useState(editando?.numero ?? "");
+
+  // Cônjuge
+  const [conjugeNome, setConjugeNome] = useState(editando?.conjugeNome ?? "");
+  const [conjugeCpf, setConjugeCpf] = useState(editando?.conjugeCpf ?? "");
+  const [conjugeNascimento, setConjugeNascimento] = useState(editando?.conjugeNascimento ?? "");
 
   const desligado = editando?.status === "desligado";
   const [desligando, setDesligando] = useState(false);
@@ -157,22 +196,40 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
         : [];
       const payload = {
         nome: paraTitleCase(nome),
-        dataAdmissao,
-        dataNascimento: dataNascimento || null,
         cpf: cpf || null,
+        pis: pis || null,
+        dataNascimento: dataNascimento || null,
+        cidadeNascimento: cidadeNascimento || null,
+        ufNascimento: ufNascimento || null,
+        nomePai: nomePai ? paraTitleCase(nomePai) : null,
+        nomeMae: nomeMae ? paraTitleCase(nomeMae) : null,
+        telefone: telefone || null,
+        sexo: sexo || null,
+        emailPessoal: emailPessoal || null,
         email: email || null,
         cargo: cargo || null,
         departamento: departamento || null,
         vinculo: vinculo || null,
+        cbo: cbo || null,
         gestorId: gestorId ? Number(gestorId) : null,
         salarioBase: Number(salarioBase),
-        alimentacaoValor: alimentacaoValor ? Number(alimentacaoValor) : null,
-        cbo: cbo || null,
-        cidade: cidade || null,
+        horario: horario || null,
+        dataAdmissao,
+        banco: banco || null,
         agencia: agencia || null,
         conta: conta || null,
+        alimentacaoValor: alimentacaoValor ? Number(alimentacaoValor) : null,
         tipoTransporte,
         valorTransporteFixo: valorTransporteFixo ? Number(valorTransporteFixo) : null,
+        cep: cep || null,
+        estado: estado || null,
+        cidade: cidade || null,
+        bairro: bairro || null,
+        rua: rua || null,
+        numero: numero || null,
+        conjugeNome: conjugeNome ? paraTitleCase(conjugeNome) : null,
+        conjugeCpf: conjugeCpf || null,
+        conjugeNascimento: conjugeNascimento || null,
         dependentesLista,
         ...(desligado
           ? {
@@ -385,6 +442,8 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
         </div>
       )}
 
+      <Secao titulo="Dados pessoais" />
+
       <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
         Nome completo
         <input
@@ -400,30 +459,6 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
 
       <div className="grid grid-cols-2 gap-2">
         <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
-          Data de admissão
-          <input
-            type="date"
-            value={dataAdmissao}
-            onChange={(e) => setDataAdmissao(e.target.value)}
-            required
-            disabled={bloqueado}
-            className={INPUT_CLASS}
-          />
-        </label>
-        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
-          Nascimento
-          <input
-            type="date"
-            value={dataNascimento}
-            onChange={(e) => setDataNascimento(e.target.value)}
-            disabled={bloqueado}
-            className={INPUT_CLASS}
-          />
-        </label>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2">
-        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
           CPF
           <input
             value={cpf}
@@ -434,7 +469,119 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
           />
         </label>
         <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
-          E-mail
+          PIS
+          <input
+            value={pis}
+            onChange={(e) => setPis(e.target.value)}
+            placeholder="000.00000.00-0"
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Nascimento
+          <input
+            type="date"
+            value={dataNascimento}
+            onChange={(e) => setDataNascimento(e.target.value)}
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Cidade de nascimento
+          <input
+            value={cidadeNascimento}
+            onChange={(e) => setCidadeNascimento(e.target.value)}
+            placeholder="ex.: Salvador"
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          UF de nascimento
+          <input
+            value={ufNascimento}
+            onChange={(e) => setUfNascimento(e.target.value.toUpperCase())}
+            placeholder="BA"
+            maxLength={2}
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Sexo
+          <select
+            value={sexo}
+            onChange={(e) => setSexo(e.target.value as SexoColaborador)}
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          >
+            <option value="">—</option>
+            <option value="M">Masculino</option>
+            <option value="F">Feminino</option>
+          </select>
+        </label>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Nome do pai
+          <input
+            value={nomePai}
+            onChange={(e) => setNomePai(e.target.value)}
+            onBlur={(e) => setNomePai(paraTitleCase(e.target.value))}
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Nome da mãe
+          <input
+            value={nomeMae}
+            onChange={(e) => setNomeMae(e.target.value)}
+            onBlur={(e) => setNomeMae(paraTitleCase(e.target.value))}
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Telefone
+          <input
+            value={telefone}
+            onChange={(e) => setTelefone(e.target.value)}
+            placeholder="(00) 00000-0000"
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          E-mail pessoal
+          <input
+            type="email"
+            value={emailPessoal}
+            onChange={(e) => setEmailPessoal(e.target.value)}
+            placeholder="pessoal@exemplo.com"
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+      </div>
+
+      <Secao titulo="Dados profissionais" />
+
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          E-mail profissional
           <input
             type="email"
             value={email}
@@ -444,9 +591,6 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
             className={INPUT_CLASS}
           />
         </label>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2">
         <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
           Cargo
           <input
@@ -457,6 +601,9 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
             className={INPUT_CLASS}
           />
         </label>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
         <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
           Departamento
           <input
@@ -467,9 +614,6 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
             className={INPUT_CLASS}
           />
         </label>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2">
         <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
           Vínculo
           <select
@@ -484,6 +628,19 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
               </option>
             ))}
           </select>
+        </label>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          CBO
+          <input
+            value={cbo}
+            onChange={(e) => setCbo(e.target.value)}
+            placeholder="000000"
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
         </label>
         <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
           Líder direto
@@ -519,42 +676,41 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
           />
         </label>
         <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
-          Alimentação
+          Horário
           <input
-            type="number"
-            min={0}
-            step="0.01"
-            value={alimentacaoValor}
-            onChange={(e) => setAlimentacaoValor(e.target.value)}
-            placeholder="R$ 0,00"
+            value={horario}
+            onChange={(e) => setHorario(e.target.value)}
+            placeholder="ex.: 07h50-11h50 12h50-17h50"
             disabled={bloqueado}
             className={INPUT_CLASS}
           />
         </label>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
-          CBO
-          <input
-            value={cbo}
-            onChange={(e) => setCbo(e.target.value)}
-            placeholder="000000"
-            disabled={bloqueado}
-            className={INPUT_CLASS}
-          />
-        </label>
-        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
-          Cidade
-          <input
-            value={cidade}
-            onChange={(e) => setCidade(e.target.value)}
-            placeholder="ex.: Salvador"
-            disabled={bloqueado}
-            className={INPUT_CLASS}
-          />
-        </label>
-      </div>
+      <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+        Data de admissão
+        <input
+          type="date"
+          value={dataAdmissao}
+          onChange={(e) => setDataAdmissao(e.target.value)}
+          required
+          disabled={bloqueado}
+          className={INPUT_CLASS}
+        />
+      </label>
+
+      <Secao titulo="Dados bancários" />
+
+      <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+        Banco
+        <input
+          value={banco}
+          onChange={(e) => setBanco(e.target.value)}
+          placeholder="ex.: Itaú"
+          disabled={bloqueado}
+          className={INPUT_CLASS}
+        />
+      </label>
 
       <div className="grid grid-cols-2 gap-2">
         <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
@@ -578,6 +734,22 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
           />
         </label>
       </div>
+
+      <Secao titulo="Benefícios" />
+
+      <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+        Alimentação
+        <input
+          type="number"
+          min={0}
+          step="0.01"
+          value={alimentacaoValor}
+          onChange={(e) => setAlimentacaoValor(e.target.value)}
+          placeholder="R$ 0,00"
+          disabled={bloqueado}
+          className={INPUT_CLASS}
+        />
+      </label>
 
       <div className="grid grid-cols-2 gap-2">
         <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
@@ -622,6 +794,108 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
           />
         </label>
       </div>
+
+      <Secao titulo="Endereço" />
+
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          CEP
+          <input
+            value={cep}
+            onChange={(e) => setCep(e.target.value)}
+            placeholder="00000-000"
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Estado
+          <input
+            value={estado}
+            onChange={(e) => setEstado(e.target.value.toUpperCase())}
+            placeholder="BA"
+            maxLength={2}
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Cidade
+          <input
+            value={cidade}
+            onChange={(e) => setCidade(e.target.value)}
+            placeholder="ex.: Salvador"
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Bairro
+          <input
+            value={bairro}
+            onChange={(e) => setBairro(e.target.value)}
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Rua
+          <input value={rua} onChange={(e) => setRua(e.target.value)} disabled={bloqueado} className={INPUT_CLASS} />
+        </label>
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Número
+          <input
+            value={numero}
+            onChange={(e) => setNumero(e.target.value)}
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+      </div>
+
+      <Secao titulo="Cônjuge" />
+
+      <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+        Nome do cônjuge
+        <input
+          value={conjugeNome}
+          onChange={(e) => setConjugeNome(e.target.value)}
+          onBlur={(e) => setConjugeNome(paraTitleCase(e.target.value))}
+          disabled={bloqueado}
+          className={INPUT_CLASS}
+        />
+      </label>
+
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          CPF
+          <input
+            value={conjugeCpf}
+            onChange={(e) => setConjugeCpf(e.target.value)}
+            placeholder="000.000.000-00"
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Nascimento
+          <input
+            type="date"
+            value={conjugeNascimento}
+            onChange={(e) => setConjugeNascimento(e.target.value)}
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+      </div>
+
+      <Secao titulo="Dependentes" />
 
       <div className="flex flex-col gap-1.5">
         <span className="text-[10px] font-normal text-foreground-muted">Colaborador tem dependente(s)?</span>
@@ -688,6 +962,16 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
 
             <div className="grid grid-cols-2 gap-2">
               <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+                Nascimento
+                <input
+                  type="date"
+                  value={dep.dataNascimento}
+                  onChange={(e) => atualizarDependente(i, "dataNascimento", e.target.value)}
+                  disabled={bloqueado}
+                  className={INPUT_CLASS}
+                />
+              </label>
+              <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
                 CPF
                 <input
                   value={dep.cpf}
@@ -697,6 +981,9 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
                   className={INPUT_CLASS}
                 />
               </label>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
               <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
                 Sexo
                 <select
@@ -709,19 +996,6 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
                   <option value="M">M</option>
                   <option value="F">F</option>
                 </select>
-              </label>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
-                Data de nascimento
-                <input
-                  type="date"
-                  value={dep.dataNascimento}
-                  onChange={(e) => atualizarDependente(i, "dataNascimento", e.target.value)}
-                  disabled={bloqueado}
-                  className={INPUT_CLASS}
-                />
               </label>
               <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
                 Data de emissão da certidão
