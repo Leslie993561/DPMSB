@@ -27,100 +27,38 @@ const ORGANOGRAMA: DefinicaoCargo = {
   departamento: "Diretoria",
   lideranca: true,
   filhos: [
+    { rotulo: "KAM", cargo: "KAM", departamento: "Comercial" },
+    {
+      rotulo: "Supervisora",
+      cargo: "Supervisora",
+      departamento: "Operações de Vendas",
+      lideranca: true,
+    },
     {
       rotulo: "Diretor",
       cargo: "Diretor",
       departamento: "Diretoria",
       lideranca: true,
       filhos: [
-        { rotulo: "KAM", cargo: "KAM", departamento: "Comercial" },
-        { rotulo: "Analista", cargo: "Analista", departamento: "Financeiro" },
-        { rotulo: "Analista", cargo: "Analista", departamento: "Contábil" },
-        {
-          rotulo: "Analista",
-          cargo: "Analista",
-          departamento: "Administrativo",
-          filhos: [{ rotulo: "Jovem Aprendiz", cargo: "Jovem Ap.", departamento: "Administrativo" }],
-        },
-        {
-          rotulo: "Supervisora",
-          cargo: "Supervisora",
-          departamento: "Operações de Vendas",
-          lideranca: true,
-          filhos: [{ rotulo: "Assistente", cargo: "Assistente", departamento: "Operações de Vendas" }],
-        },
-        { rotulo: "Analista", cargo: "Analista", departamento: "Recursos Humanos" },
-        { rotulo: "Assistente", cargo: "Assistente", departamento: "Recursos Humanos" },
-        { rotulo: "Assistente", cargo: "Assistente", departamento: "Tecnologia da Informacao" },
         {
           rotulo: "Coordenadora",
           cargo: "Coordenadora",
           departamento: "Engenharia",
           lideranca: true,
-          filhos: [
-            { rotulo: "Analista", cargo: "Analista", departamento: "Engenharia" },
-            { rotulo: "Estagiário", cargo: "Estagiário", departamento: "Engenharia" },
-          ],
-        },
-        {
-          rotulo: "Coordenadora",
-          cargo: "Coordenadora",
-          departamento: "Garantia da Qualidade",
-          lideranca: true,
-          filhos: [
-            { rotulo: "Analista", cargo: "Analista", departamento: "Garantia da Qualidade" },
-            { rotulo: "Auxiliar", cargo: "Auxiliar", departamento: "Garantia da Qualidade" },
-          ],
         },
         {
           rotulo: "Gerente",
           cargo: "Gerente",
           departamento: "Industrial",
           lideranca: true,
-          filhos: [
-            {
-              rotulo: "Supervisora",
-              cargo: "Supervisora",
-              departamento: "Produção",
-              lideranca: true,
-              filhos: [
-                {
-                  rotulo: "Líder",
-                  cargo: "Lider",
-                  departamento: "Produção",
-                  lideranca: true,
-                  filhos: [{ rotulo: "Auxiliar", cargo: "Auxiliar", departamento: "Produção" }],
-                },
-              ],
-            },
-            {
-              rotulo: "Líder",
-              cargo: "Lider",
-              departamento: "Manutenção",
-              lideranca: true,
-              filhos: [{ rotulo: "Técnico", cargo: "Técnico", departamento: "Manutenção" }],
-            },
-            {
-              rotulo: "Analista",
-              cargo: "Analista",
-              departamento: "Planejamento",
-              filhos: [{ rotulo: "Assistente", cargo: "Assistente", departamento: "Planejamento" }],
-            },
-            {
-              rotulo: "Supervisora",
-              cargo: "Supervisora",
-              departamento: "Controle da Qualidade",
-              lideranca: true,
-              filhos: [
-                { rotulo: "Assistente", cargo: "Assistente", departamento: "Controle da Qualidade" },
-                { rotulo: "Inspetora", cargo: "Inspetora", departamento: "Controle da Qualidade" },
-                { rotulo: "Jovem Aprendiz", cargo: "Jovem Ap.", departamento: "Controle da Qualidade" },
-              ],
-            },
-            { rotulo: "Assistente", cargo: "Assistente", departamento: "Logística" },
-          ],
         },
       ],
+    },
+    {
+      rotulo: "Coordenadora",
+      cargo: "Coordenadora",
+      departamento: "Garantia da Qualidade",
+      lideranca: true,
     },
   ],
 };
