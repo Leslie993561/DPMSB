@@ -43,7 +43,7 @@ const schema = z.object({
 
 export async function GET(_request: Request, ctx: RouteContext<"/api/colaboradores/[id]">) {
   const { id } = await ctx.params;
-  const colaborador = buscarColaborador(Number(id));
+  const colaborador = await buscarColaborador(Number(id));
   if (!colaborador) return Response.json({ erro: "Colaborador não encontrado." }, { status: 404 });
   return Response.json({ colaborador });
 }
@@ -56,14 +56,14 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/colaborado
     return Response.json({ erro: "Dados inválidos", detalhes: parsed.error.issues }, { status: 400 });
   }
 
-  const existente = buscarColaborador(Number(id));
+  const existente = await buscarColaborador(Number(id));
   if (!existente) return Response.json({ erro: "Colaborador não encontrado." }, { status: 404 });
 
   const { dependentesLista, ...dadosColaborador } = parsed.data;
-  let colaborador = atualizarColaborador(Number(id), dadosColaborador);
+  let colaborador = await atualizarColaborador(Number(id), dadosColaborador);
   if (dependentesLista) {
-    substituirDependentes(colaborador.id, dependentesLista);
-    colaborador = atualizarColaborador(colaborador.id, { dependentes: dependentesLista.length });
+    await substituirDependentes(colaborador.id, dependentesLista);
+    colaborador = await atualizarColaborador(colaborador.id, { dependentes: dependentesLista.length });
   }
   return Response.json({ colaborador });
 }

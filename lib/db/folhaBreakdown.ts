@@ -61,12 +61,13 @@ interface LinhaExtras {
 }
 
 /** Extras importadas da competência, por colaborador — independem do mês estar fechado ou não. */
-export function obterExtras(competencia: string): Map<number, ExtrasImportadas> {
-  const linhas = getDb()
-    .prepare(
-      "SELECT colaborador_id, vm, odontologico, solides, flash, bonificacao, premiacao, outros_custos FROM folha_extras WHERE competencia = ?",
-    )
-    .all(competencia) as unknown as LinhaExtras[];
+export async function obterExtras(competencia: string): Promise<Map<number, ExtrasImportadas>> {
+  const db = await getDb();
+  const resultado = await db.execute({
+    sql: "SELECT colaborador_id, vm, odontologico, solides, flash, bonificacao, premiacao, outros_custos FROM folha_extras WHERE competencia = ?",
+    args: [competencia],
+  });
+  const linhas = resultado.rows as unknown as LinhaExtras[];
 
   return new Map(
     linhas.map((l) => [
@@ -89,16 +90,15 @@ export function obterExtras(competencia: string): Map<number, ExtrasImportadas> 
  * completo (não mescla com o que já existia). Cada importação representa o
  * estado inteiro daquele mês, igual ao "fechar mês" já faz para o núcleo.
  */
-export function upsertExtras(colaboradorId: number, competencia: string, extras: ExtrasImportadas): void {
-  getDb()
-    .prepare(
-      `INSERT INTO folha_extras (colaborador_id, competencia, vm, odontologico, solides, flash, bonificacao, premiacao, outros_custos)
+export async function upsertExtras(colaboradorId: number, competencia: string, extras: ExtrasImportadas): Promise<void> {
+  const db = await getDb();
+  await db.execute({
+    sql: `INSERT INTO folha_extras (colaborador_id, competencia, vm, odontologico, solides, flash, bonificacao, premiacao, outros_custos)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(colaborador_id, competencia) DO UPDATE SET
          vm = excluded.vm, odontologico = excluded.odontologico, solides = excluded.solides, flash = excluded.flash,
          bonificacao = excluded.bonificacao, premiacao = excluded.premiacao, outros_custos = excluded.outros_custos`,
-    )
-    .run(
+    args: [
       colaboradorId,
       competencia,
       extras.vm,
@@ -108,7 +108,8 @@ export function upsertExtras(colaboradorId: number, competencia: string, extras:
       extras.bonificacao,
       extras.premiacao,
       extras.outrosCustos,
-    );
+    ],
+  });
 }
 
 function competenciaParaAnoMes(competencia: string): { ano: number; mes: number } {
@@ -124,13 +125,14 @@ function competenciaParaAnoMes(competencia: string): { ano: number; mes: number 
  * interface para o operador ajustar manualmente antes de fechar o mês, caso
  * o módulo evolua para permitir edição.
  */
-export function gerarBreakdown(competencia: string, colaboradores: Colaborador[] = listarColaboradores()): VerbaColaborador[] {
+export async function gerarBreakdown(competencia: string, colaboradores?: Colaborador[]): Promise<VerbaColaborador[]> {
+  const listaColaboradores = colaboradores ?? (await listarColaboradores());
   const { ano, mes } = competenciaParaAnoMes(competencia);
-  const diasUteis = obterDiasUteis(ano, mes);
+  const diasUteis = await obterDiasUteis(ano, mes);
   const dataCompetencia = new Date(`${competencia}-01`);
-  const extrasPorColaborador = obterExtras(competencia);
+  const extrasPorColaborador = await obterExtras(competencia);
 
-  return colaboradores.map((c) => {
+  return listaColaboradores.map((c) => {
     // PJ é pessoa jurídica prestando serviço, não empregado CLT — não há FGTS,
     // provisão de 13º nem benefícios (VT/VA) estatutários sobre o valor pago a ela.
     const ehPj = c.vinculo === "PJ";
@@ -205,53 +207,56 @@ interface LinhaBreakdownPersistida {
 }
 
 /** Fecha o mês: grava um retrato do breakdown corrente, que passa a não mudar mais mesmo que o cadastro seja alterado depois. */
-export function fecharCompetencia(competencia: string): VerbaColaborador[] {
-  const colaboradores = listarColaboradores();
-  const linhas = gerarBreakdown(competencia, colaboradores);
-  const db = getDb();
+export async function fecharCompetencia(competencia: string): Promise<VerbaColaborador[]> {
+  const colaboradores = await listarColaboradores();
+  const linhas = await gerarBreakdown(competencia, colaboradores);
+  const db = await getDb();
 
-  const upsert = db.prepare(
-    `INSERT INTO folha_breakdown
+  await db.batch(
+    linhas.map((l) => ({
+      sql: `INSERT INTO folha_breakdown
        (colaborador_id, competencia, salario_base, inss, irrf, fgts, provisao_decimo_terceiro, vale_transporte, vale_alimentacao, outros_beneficios, premiacao, custo_total)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
      ON CONFLICT(colaborador_id, competencia) DO UPDATE SET
        salario_base = excluded.salario_base, inss = excluded.inss, irrf = excluded.irrf, fgts = excluded.fgts,
        provisao_decimo_terceiro = excluded.provisao_decimo_terceiro, vale_transporte = excluded.vale_transporte,
        vale_alimentacao = excluded.vale_alimentacao, premiacao = excluded.premiacao, custo_total = excluded.custo_total`,
+      args: [
+        l.colaboradorId,
+        competencia,
+        l.salarioBase,
+        l.inss,
+        l.irrf,
+        l.fgts,
+        l.provisaoDecimoTerceiro,
+        l.valeTransporte,
+        l.valeAlimentacao,
+        l.premiacao,
+        l.custoTotal,
+      ],
+    })),
+    "write",
   );
-
-  for (const l of linhas) {
-    upsert.run(
-      l.colaboradorId,
-      competencia,
-      l.salarioBase,
-      l.inss,
-      l.irrf,
-      l.fgts,
-      l.provisaoDecimoTerceiro,
-      l.valeTransporte,
-      l.valeAlimentacao,
-      l.premiacao,
-      l.custoTotal,
-    );
-  }
 
   return linhas;
 }
 
-export function competenciaFechada(competencia: string): boolean {
-  const linha = getDb()
-    .prepare("SELECT COUNT(*) as n FROM folha_breakdown WHERE competencia = ?")
-    .get(competencia) as { n: number };
+export async function competenciaFechada(competencia: string): Promise<boolean> {
+  const db = await getDb();
+  const resultado = await db.execute({
+    sql: "SELECT COUNT(*) as n FROM folha_breakdown WHERE competencia = ?",
+    args: [competencia],
+  });
+  const linha = resultado.rows[0] as unknown as { n: number };
   return linha.n > 0;
 }
 
-export function listarBreakdownPersistido(competencia: string): VerbaColaborador[] {
-  const colaboradoresPorId = new Map(listarColaboradores().map((c) => [c.id, c]));
-  const extrasPorColaborador = obterExtras(competencia);
-  const linhas = getDb()
-    .prepare("SELECT * FROM folha_breakdown WHERE competencia = ?")
-    .all(competencia) as unknown as LinhaBreakdownPersistida[];
+export async function listarBreakdownPersistido(competencia: string): Promise<VerbaColaborador[]> {
+  const colaboradoresPorId = new Map((await listarColaboradores()).map((c) => [c.id, c]));
+  const extrasPorColaborador = await obterExtras(competencia);
+  const db = await getDb();
+  const resultado = await db.execute({ sql: "SELECT * FROM folha_breakdown WHERE competencia = ?", args: [competencia] });
+  const linhas = resultado.rows as unknown as LinhaBreakdownPersistida[];
 
   return linhas.map((l) => {
     const colaborador = colaboradoresPorId.get(l.colaborador_id);
@@ -299,17 +304,17 @@ export function listarBreakdownPersistido(competencia: string): VerbaColaborador
 }
 
 /** Breakdown da competência: se o mês já foi fechado, retorna o retrato salvo; senão, uma prévia calculada ao vivo. */
-export function obterBreakdown(competencia: string): { linhas: VerbaColaborador[]; fechado: boolean } {
-  if (competenciaFechada(competencia)) {
-    return { linhas: listarBreakdownPersistido(competencia), fechado: true };
+export async function obterBreakdown(competencia: string): Promise<{ linhas: VerbaColaborador[]; fechado: boolean }> {
+  if (await competenciaFechada(competencia)) {
+    return { linhas: await listarBreakdownPersistido(competencia), fechado: true };
   }
-  return { linhas: gerarBreakdown(competencia), fechado: false };
+  return { linhas: await gerarBreakdown(competencia), fechado: false };
 }
 
-export function listarCompetenciasFechadas(): string[] {
-  const linhas = getDb()
-    .prepare("SELECT DISTINCT competencia FROM folha_breakdown ORDER BY competencia DESC")
-    .all() as unknown as { competencia: string }[];
+export async function listarCompetenciasFechadas(): Promise<string[]> {
+  const db = await getDb();
+  const resultado = await db.execute("SELECT DISTINCT competencia FROM folha_breakdown ORDER BY competencia DESC");
+  const linhas = resultado.rows as unknown as { competencia: string }[];
   return linhas.map((l) => l.competencia);
 }
 
@@ -335,36 +340,38 @@ const MESES_POR_TRIMESTRE: Record<1 | 2 | 3 | 4, number[]> = {
  * um número estimado à parte. `dias úteis` variam por mês (afeta VT), por
  * isso a projeção recalcula cada mês, em vez de multiplicar um mês por 3.
  */
-export function obterResumoTrimestral(ano: number): ResumoTrimestre[] {
-  return ([1, 2, 3, 4] as const).map((trimestre) => {
-    let custoTotal = 0;
-    let projecao = false;
-    const colaboradoresSet = new Set<number>();
-    const porVinculoMap = new Map<string, number>();
+export async function obterResumoTrimestral(ano: number): Promise<ResumoTrimestre[]> {
+  return Promise.all(
+    ([1, 2, 3, 4] as const).map(async (trimestre) => {
+      let custoTotal = 0;
+      let projecao = false;
+      const colaboradoresSet = new Set<number>();
+      const porVinculoMap = new Map<string, number>();
 
-    for (const mes of MESES_POR_TRIMESTRE[trimestre]) {
-      const competencia = `${ano}-${String(mes).padStart(2, "0")}`;
-      const { linhas, fechado } = obterBreakdown(competencia);
-      if (!fechado) projecao = true;
-      for (const l of linhas) {
-        custoTotal += l.custoTotal;
-        colaboradoresSet.add(l.colaboradorId);
-        const chave = l.vinculo ?? "Não informado";
-        porVinculoMap.set(chave, (porVinculoMap.get(chave) ?? 0) + l.custoTotal);
+      for (const mes of MESES_POR_TRIMESTRE[trimestre]) {
+        const competencia = `${ano}-${String(mes).padStart(2, "0")}`;
+        const { linhas, fechado } = await obterBreakdown(competencia);
+        if (!fechado) projecao = true;
+        for (const l of linhas) {
+          custoTotal += l.custoTotal;
+          colaboradoresSet.add(l.colaboradorId);
+          const chave = l.vinculo ?? "Não informado";
+          porVinculoMap.set(chave, (porVinculoMap.get(chave) ?? 0) + l.custoTotal);
+        }
       }
-    }
 
-    return {
-      trimestre,
-      custoTotal: arredondar(custoTotal),
-      colaboradores: colaboradoresSet.size,
-      projecao,
-      porVinculo: Array.from(porVinculoMap.entries()).map(([vinculo, custo]) => ({
-        vinculo,
-        custoTotal: arredondar(custo),
-      })),
-    };
-  });
+      return {
+        trimestre,
+        custoTotal: arredondar(custoTotal),
+        colaboradores: colaboradoresSet.size,
+        projecao,
+        porVinculo: Array.from(porVinculoMap.entries()).map(([vinculo, custo]) => ({
+          vinculo,
+          custoTotal: arredondar(custo),
+        })),
+      };
+    }),
+  );
 }
 
 export interface ResultadoImportacaoExtras {
@@ -377,15 +384,15 @@ export interface ResultadoImportacaoExtras {
  * premiação, outros custos) de uma planilha importada à competência —
  * casamento por código (se houver) e, senão, por nome do colaborador.
  */
-export function importarExtras(itens: LinhaExtrasImportada[], competencia: string): ResultadoImportacaoExtras {
-  const colaboradores = listarColaboradores();
+export async function importarExtras(itens: LinhaExtrasImportada[], competencia: string): Promise<ResultadoImportacaoExtras> {
+  const colaboradores = await listarColaboradores();
   const porCodigo = new Map(colaboradores.map((c) => [String(c.id), c]));
   const porNome = new Map(colaboradores.map((c) => [c.nome.trim().toLowerCase(), c]));
 
   let aplicadas = 0;
   const descartados: ResultadoImportacaoExtras["descartados"] = [];
 
-  itens.forEach((item, indice) => {
+  for (const [indice, item] of itens.entries()) {
     const linha = indice + 2;
     const colaborador =
       (item.codigo ? porCodigo.get(item.codigo.trim()) : undefined) ??
@@ -393,10 +400,10 @@ export function importarExtras(itens: LinhaExtrasImportada[], competencia: strin
 
     if (!colaborador) {
       descartados.push({ linha, motivo: `Colaborador "${item.nomeColaborador}" não encontrado no cadastro.` });
-      return;
+      continue;
     }
 
-    upsertExtras(colaborador.id, competencia, {
+    await upsertExtras(colaborador.id, competencia, {
       vm: item.vm,
       odontologico: item.odontologico,
       solides: item.solides,
@@ -406,7 +413,7 @@ export function importarExtras(itens: LinhaExtrasImportada[], competencia: strin
       outrosCustos: item.outrosCustos,
     });
     aplicadas++;
-  });
+  }
 
   return { aplicadas, descartados };
 }

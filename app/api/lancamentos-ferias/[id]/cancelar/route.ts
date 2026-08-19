@@ -17,7 +17,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/lancamentos
   }
 
   try {
-    const lancamento = cancelarLancamento(Number(id), parsed.data);
+    const lancamento = await cancelarLancamento(Number(id), parsed.data);
     return Response.json({ lancamento });
   } catch (err) {
     if (err instanceof ErroValidacaoFerias) {

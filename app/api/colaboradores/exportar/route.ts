@@ -25,7 +25,7 @@ const COLUNAS = [
 
 /** Exporta o quadro completo de colaboradores — mesmas colunas do modelo de importação, já preenchidas. */
 export async function GET() {
-  const colaboradores = listarColaboradores();
+  const colaboradores = await listarColaboradores();
   const colaboradoresPorId = new Map(colaboradores.map((c) => [c.id, c]));
 
   const workbook = new ExcelJS.Workbook();

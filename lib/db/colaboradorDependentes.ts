@@ -55,11 +55,13 @@ function paraDependente(linha: LinhaDependente): ColaboradorDependente {
   };
 }
 
-export function listarDependentes(colaboradorId: number): ColaboradorDependente[] {
-  const linhas = getDb()
-    .prepare("SELECT * FROM colaborador_dependentes WHERE colaborador_id = ? ORDER BY id")
-    .all(colaboradorId) as unknown as LinhaDependente[];
-  return linhas.map(paraDependente);
+export async function listarDependentes(colaboradorId: number): Promise<ColaboradorDependente[]> {
+  const db = await getDb();
+  const resultado = await db.execute({
+    sql: "SELECT * FROM colaborador_dependentes WHERE colaborador_id = ? ORDER BY id",
+    args: [colaboradorId],
+  });
+  return (resultado.rows as unknown as LinhaDependente[]).map(paraDependente);
 }
 
 /**
@@ -67,25 +69,31 @@ export function listarDependentes(colaboradorId: number): ColaboradorDependente[
  * O formulário sempre envia a lista completa (não deltas), então apagar e recriar
  * é mais simples e correto do que tentar casar itens existentes com editados.
  */
-export function substituirDependentes(colaboradorId: number, itens: ColaboradorDependenteInput[]): void {
-  const db = getDb();
-  db.prepare("DELETE FROM colaborador_dependentes WHERE colaborador_id = ?").run(colaboradorId);
-  const inserir = db.prepare(
-    `INSERT INTO colaborador_dependentes
+export async function substituirDependentes(
+  colaboradorId: number,
+  itens: ColaboradorDependenteInput[],
+): Promise<void> {
+  const db = await getDb();
+  await db.batch(
+    [
+      { sql: "DELETE FROM colaborador_dependentes WHERE colaborador_id = ?", args: [colaboradorId] },
+      ...itens.map((item) => ({
+        sql: `INSERT INTO colaborador_dependentes
        (colaborador_id, nome, cpf, sexo, data_nascimento, certidao_livro, certidao_folha, certidao_matricula, certidao_data_emissao)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [
+          colaboradorId,
+          item.nome,
+          item.cpf ?? null,
+          item.sexo ?? null,
+          item.dataNascimento ?? null,
+          item.certidaoLivro ?? null,
+          item.certidaoFolha ?? null,
+          item.certidaoMatricula ?? null,
+          item.certidaoDataEmissao ?? null,
+        ],
+      })),
+    ],
+    "write",
   );
-  for (const item of itens) {
-    inserir.run(
-      colaboradorId,
-      item.nome,
-      item.cpf ?? null,
-      item.sexo ?? null,
-      item.dataNascimento ?? null,
-      item.certidaoLivro ?? null,
-      item.certidaoFolha ?? null,
-      item.certidaoMatricula ?? null,
-      item.certidaoDataEmissao ?? null,
-    );
-  }
 }

@@ -41,12 +41,12 @@ function marcadorImportacao(nomeArquivo: string): string {
  * contribuição em vez de duplicar; lançamentos feitos manualmente no sistema
  * (sem essa marca) nunca são tocados.
  */
-export function importarProgramacaoFerias(
+export async function importarProgramacaoFerias(
   itens: LinhaImportacaoFerias[],
   nomeArquivo: string,
-): ResultadoImportacaoFerias {
-  const db = getDb();
-  const colaboradores = listarColaboradores();
+): Promise<ResultadoImportacaoFerias> {
+  const db = await getDb();
+  const colaboradores = await listarColaboradores();
   const porCodigo = new Map(colaboradores.map((c) => [String(c.id), c]));
   const porNome = new Map(colaboradores.map((c) => [c.nome.trim().toLowerCase(), c]));
   const marcador = marcadorImportacao(nomeArquivo);
@@ -55,7 +55,7 @@ export function importarProgramacaoFerias(
   let criados = 0;
   const descartados: ResultadoImportacaoFerias["descartados"] = [];
 
-  itens.forEach((item, indice) => {
+  for (const [indice, item] of itens.entries()) {
     const linha = indice + 2; // +1 pelo cabeçalho, +1 por índice base 1
     const colaborador =
       (item.codigo ? porCodigo.get(item.codigo.trim()) : undefined) ??
@@ -63,47 +63,50 @@ export function importarProgramacaoFerias(
 
     if (!colaborador) {
       descartados.push({ linha, motivo: `Colaborador "${item.nomeEmpregado}" não encontrado no cadastro.` });
-      return;
+      continue;
     }
     if (!item.aquisitivoInicio || !item.aquisitivoFim) {
       descartados.push({ linha, motivo: `Período aquisitivo incompleto para "${item.nomeEmpregado}".` });
-      return;
+      continue;
     }
 
-    const existente = db
-      .prepare("SELECT id FROM periodos_aquisitivos WHERE colaborador_id = ? AND data_inicio = ?")
-      .get(colaborador.id, item.aquisitivoInicio) as { id: number } | undefined;
+    const existenteResultado = await db.execute({
+      sql: "SELECT id FROM periodos_aquisitivos WHERE colaborador_id = ? AND data_inicio = ?",
+      args: [colaborador.id, item.aquisitivoInicio],
+    });
+    const existente = existenteResultado.rows[0] as unknown as { id: number } | undefined;
 
     let periodoId: number;
     if (existente) {
-      db.prepare(
-        "UPDATE periodos_aquisitivos SET data_fim = ?, dias_direito = ?, abono_utilizado = ? WHERE id = ?",
-      ).run(item.aquisitivoFim, item.diasDireito, item.abono ? 1 : 0, existente.id);
+      await db.execute({
+        sql: "UPDATE periodos_aquisitivos SET data_fim = ?, dias_direito = ?, abono_utilizado = ? WHERE id = ?",
+        args: [item.aquisitivoFim, item.diasDireito, item.abono ? 1 : 0, existente.id],
+      });
       periodoId = existente.id;
       atualizados++;
     } else {
-      const info = db
-        .prepare(
-          `INSERT INTO periodos_aquisitivos (colaborador_id, data_inicio, data_fim, dias_direito, abono_utilizado)
+      const info = await db.execute({
+        sql: `INSERT INTO periodos_aquisitivos (colaborador_id, data_inicio, data_fim, dias_direito, abono_utilizado)
            VALUES (?, ?, ?, ?, ?)`,
-        )
-        .run(colaborador.id, item.aquisitivoInicio, item.aquisitivoFim, item.diasDireito, item.abono ? 1 : 0);
+        args: [colaborador.id, item.aquisitivoInicio, item.aquisitivoFim, item.diasDireito, item.abono ? 1 : 0],
+      });
       periodoId = Number(info.lastInsertRowid);
       criados++;
     }
 
-    db.prepare("DELETE FROM lancamentos_ferias WHERE periodo_aquisitivo_id = ? AND observacao = ?").run(
-      periodoId,
-      marcador,
-    );
+    await db.execute({
+      sql: "DELETE FROM lancamentos_ferias WHERE periodo_aquisitivo_id = ? AND observacao = ?",
+      args: [periodoId, marcador],
+    });
     if (item.diasGozados > 0) {
-      db.prepare(
-        `INSERT INTO lancamentos_ferias
+      await db.execute({
+        sql: `INSERT INTO lancamentos_ferias
            (periodo_aquisitivo_id, origem, status, dias, data_inicio_gozo, data_fim_gozo, abono, dias_abono, observacao, criado_por)
          VALUES (?, 'manual', 'concluida', ?, ?, ?, 0, 0, ?, 'Importação de arquivo')`,
-      ).run(periodoId, item.diasGozados, item.aquisitivoFim, item.aquisitivoFim, marcador);
+        args: [periodoId, item.diasGozados, item.aquisitivoFim, item.aquisitivoFim, marcador],
+      });
     }
-  });
+  }
 
   return { atualizados, criados, descartados };
 }

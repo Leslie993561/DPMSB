@@ -76,21 +76,21 @@ interface LinhaProgramacao {
  * Planejamento preserva o histórico do trimestre em vez de fazer a linha
  * desaparecer.
  */
-export function listarProgramacaoFerias(): ItemProgramacaoFerias[] {
-  const colaboradores = listarColaboradores();
+export async function listarProgramacaoFerias(): Promise<ItemProgramacaoFerias[]> {
+  const colaboradores = await listarColaboradores();
   const colaboradoresPorId = new Map(colaboradores.map((c) => [c.id, c]));
 
-  const linhas = getDb()
-    .prepare(
-      `SELECT l.id, l.status, l.dias, l.abono, l.dias_abono,
+  const db = await getDb();
+  const resultado = await db.execute(
+    `SELECT l.id, l.status, l.dias, l.abono, l.dias_abono,
               l.data_inicio_prevista, l.data_inicio_gozo, l.data_retorno,
               p.id AS periodo_aquisitivo_id, p.data_inicio AS periodo_inicio, p.data_fim AS periodo_fim,
               p.dias_direito, p.colaborador_id
        FROM lancamentos_ferias l
        JOIN periodos_aquisitivos p ON p.id = l.periodo_aquisitivo_id
        WHERE l.status != 'cancelada'`,
-    )
-    .all() as unknown as LinhaProgramacao[];
+  );
+  const linhas = resultado.rows as unknown as LinhaProgramacao[];
 
   const itens: ItemProgramacaoFerias[] = [];
 

@@ -22,7 +22,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/lancamentos
   }
 
   try {
-    const lancamento = darBaixa(Number(id), {
+    const lancamento = await darBaixa(Number(id), {
       dataInicioReal: parsed.data.dataInicioReal,
       dataFimReal: parsed.data.dataFimReal,
       dataRetorno: parsed.data.dataRetorno,

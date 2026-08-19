@@ -12,7 +12,7 @@ const schemaPatch = z.object({
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const ano = Number(searchParams.get("ano")) || new Date().getFullYear();
-  return Response.json({ ano, meses: listarDiasUteisAno(ano) });
+  return Response.json({ ano, meses: await listarDiasUteisAno(ano) });
 }
 
 export async function PATCH(request: Request) {
@@ -22,6 +22,6 @@ export async function PATCH(request: Request) {
     return Response.json({ erro: "Dados inválidos", detalhes: parsed.error.issues }, { status: 400 });
   }
   const { ano, mes, diasUteis } = parsed.data;
-  definirDiasUteis(ano, mes, diasUteis);
-  return Response.json({ ano, meses: listarDiasUteisAno(ano) });
+  await definirDiasUteis(ano, mes, diasUteis);
+  return Response.json({ ano, meses: await listarDiasUteisAno(ano) });
 }

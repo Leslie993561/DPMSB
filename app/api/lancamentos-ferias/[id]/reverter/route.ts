@@ -17,7 +17,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/lancamentos
   }
 
   try {
-    const lancamento = reverterBaixa(Number(id), { operador: parsed.data.operador });
+    const lancamento = await reverterBaixa(Number(id), { operador: parsed.data.operador });
     return Response.json({ lancamento });
   } catch (err) {
     if (err instanceof ErroValidacaoFerias) {

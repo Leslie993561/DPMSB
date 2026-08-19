@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     return Response.json({ erro: "Informe ?competencia=AAAA-MM." }, { status: 400 });
   }
 
-  const { linhas } = obterBreakdown(parsed.data.competencia);
+  const { linhas } = await obterBreakdown(parsed.data.competencia);
   const filtradas = parsed.data.setor ? linhas.filter((l) => l.departamento === parsed.data.setor) : linhas;
 
   const workbook = new ExcelJS.Workbook();

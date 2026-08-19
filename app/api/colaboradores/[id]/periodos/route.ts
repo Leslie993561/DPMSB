@@ -8,9 +8,9 @@ export async function GET(
   ctx: RouteContext<"/api/colaboradores/[id]/periodos">,
 ) {
   const { id } = await ctx.params;
-  const colaborador = buscarColaborador(Number(id));
+  const colaborador = await buscarColaborador(Number(id));
   if (!colaborador) return Response.json({ erro: "Colaborador não encontrado." }, { status: 404 });
 
-  sincronizarPeriodos(colaborador.id, colaborador.dataAdmissao, new Date());
-  return Response.json({ periodos: listarPeriodosPorColaborador(colaborador.id) });
+  await sincronizarPeriodos(colaborador.id, colaborador.dataAdmissao, new Date());
+  return Response.json({ periodos: await listarPeriodosPorColaborador(colaborador.id) });
 }

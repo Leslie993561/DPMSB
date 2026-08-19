@@ -45,37 +45,40 @@ function paraPeriodo(linha: LinhaPeriodo): PeriodoAquisitivo {
  * Gera (idempotente, via UNIQUE + INSERT OR IGNORE) todos os ciclos de 12
  * meses entre a data de admissão do colaborador e hoje que ainda não existem.
  */
-export function sincronizarPeriodos(colaboradorId: number, dataAdmissao: string, hoje: Date): void {
-  const db = getDb();
-  const insert = db.prepare(
-    `INSERT OR IGNORE INTO periodos_aquisitivos (colaborador_id, data_inicio, data_fim) VALUES (?, ?, ?)`,
-  );
+export async function sincronizarPeriodos(colaboradorId: number, dataAdmissao: string, hoje: Date): Promise<void> {
+  const db = await getDb();
 
+  const ciclos: { inicio: string; fim: string }[] = [];
   let cicloInicio = new Date(dataAdmissao);
   while (cicloInicio <= hoje) {
     const cicloFim = new Date(cicloInicio);
     cicloFim.setMonth(cicloFim.getMonth() + 12);
-
-    insert.run(
-      colaboradorId,
-      cicloInicio.toISOString().slice(0, 10),
-      cicloFim.toISOString().slice(0, 10),
-    );
+    ciclos.push({ inicio: cicloInicio.toISOString().slice(0, 10), fim: cicloFim.toISOString().slice(0, 10) });
     cicloInicio = cicloFim;
   }
+
+  await db.batch(
+    ciclos.map((ciclo) => ({
+      sql: "INSERT OR IGNORE INTO periodos_aquisitivos (colaborador_id, data_inicio, data_fim) VALUES (?, ?, ?)",
+      args: [colaboradorId, ciclo.inicio, ciclo.fim],
+    })),
+    "write",
+  );
 }
 
-export function listarPeriodosPorColaborador(colaboradorId: number): PeriodoAquisitivo[] {
-  const linhas = getDb()
-    .prepare("SELECT * FROM periodos_aquisitivos WHERE colaborador_id = ? ORDER BY data_inicio")
-    .all(colaboradorId) as unknown as LinhaPeriodo[];
-  return linhas.map(paraPeriodo);
+export async function listarPeriodosPorColaborador(colaboradorId: number): Promise<PeriodoAquisitivo[]> {
+  const db = await getDb();
+  const resultado = await db.execute({
+    sql: "SELECT * FROM periodos_aquisitivos WHERE colaborador_id = ? ORDER BY data_inicio",
+    args: [colaboradorId],
+  });
+  return (resultado.rows as unknown as LinhaPeriodo[]).map(paraPeriodo);
 }
 
-export function buscarPeriodo(id: number): PeriodoAquisitivo | null {
-  const linha = getDb().prepare("SELECT * FROM periodos_aquisitivos WHERE id = ?").get(id) as
-    | LinhaPeriodo
-    | undefined;
+export async function buscarPeriodo(id: number): Promise<PeriodoAquisitivo | null> {
+  const db = await getDb();
+  const resultado = await db.execute({ sql: "SELECT * FROM periodos_aquisitivos WHERE id = ?", args: [id] });
+  const linha = resultado.rows[0] as unknown as LinhaPeriodo | undefined;
   return linha ? paraPeriodo(linha) : null;
 }
 
@@ -86,12 +89,13 @@ interface LinhaLancamentoResumo {
   data_inicio_gozo: string | null;
 }
 
-function buscarLancamentosAtivos(periodoId: number): LinhaLancamentoResumo[] {
-  return getDb()
-    .prepare(
-      "SELECT dias, status, data_inicio_prevista, data_inicio_gozo FROM lancamentos_ferias WHERE periodo_aquisitivo_id = ? AND status != 'cancelada'",
-    )
-    .all(periodoId) as unknown as LinhaLancamentoResumo[];
+async function buscarLancamentosAtivos(periodoId: number): Promise<LinhaLancamentoResumo[]> {
+  const db = await getDb();
+  const resultado = await db.execute({
+    sql: "SELECT dias, status, data_inicio_prevista, data_inicio_gozo FROM lancamentos_ferias WHERE periodo_aquisitivo_id = ? AND status != 'cancelada'",
+    args: [periodoId],
+  });
+  return resultado.rows as unknown as LinhaLancamentoResumo[];
 }
 
 export type SituacaoPeriodo = "vencida" | "a_vencer" | "programada";
@@ -119,8 +123,12 @@ export interface PeriodoAquisitivoAberto extends PeriodoAquisitivo {
 const DIAS_ALERTA_VENCIMENTO = 60;
 
 /** Calcula todos os campos derivados (estado, concessivo, vencimento, situação) de um período para um colaborador. */
-function enriquecerPeriodo(periodo: PeriodoAquisitivo, colaborador: Colaborador, hoje: Date): PeriodoAquisitivoAberto {
-  const lancamentosResumo = buscarLancamentosAtivos(periodo.id);
+async function enriquecerPeriodo(
+  periodo: PeriodoAquisitivo,
+  colaborador: Colaborador,
+  hoje: Date,
+): Promise<PeriodoAquisitivoAberto> {
+  const lancamentosResumo = await buscarLancamentosAtivos(periodo.id);
   // Só férias já confirmadas (concluída/alterada) contam como "gozadas" aqui — uma
   // programação futura ainda não confirmada (Confirmar gozo) não deve reduzir o
   // saldo restante do Controle de Férias, só reserva a data no Planejamento.
@@ -183,17 +191,17 @@ function enriquecerPeriodo(periodo: PeriodoAquisitivo, colaborador: Colaborador,
  *    colaborador é retornado — se houver saldo de um período ainda mais
  *    antigo, ele só volta a aparecer depois que o mais recente for resolvido.
  */
-export function listarPeriodosAbertos(): PeriodoAquisitivoAberto[] {
+export async function listarPeriodosAbertos(): Promise<PeriodoAquisitivoAberto[]> {
   const hoje = new Date();
-  const colaboradores = listarColaboradores();
+  const colaboradores = await listarColaboradores();
 
   for (const colaborador of colaboradores) {
-    sincronizarPeriodos(colaborador.id, colaborador.dataAdmissao, hoje);
+    await sincronizarPeriodos(colaborador.id, colaborador.dataAdmissao, hoje);
   }
 
-  const linhas = getDb()
-    .prepare("SELECT * FROM periodos_aquisitivos ORDER BY data_inicio")
-    .all() as unknown as LinhaPeriodo[];
+  const db = await getDb();
+  const resultado = await db.execute("SELECT * FROM periodos_aquisitivos ORDER BY data_inicio");
+  const linhas = resultado.rows as unknown as LinhaPeriodo[];
 
   const colaboradoresPorId = new Map(colaboradores.map((c) => [c.id, c]));
   const maisRecentePorColaborador = new Map<number, PeriodoAquisitivoAberto>();
@@ -206,7 +214,7 @@ export function listarPeriodosAbertos(): PeriodoAquisitivoAberto[] {
     // Ainda dentro do período aquisitivo (não fechou) — não conta como aberto/vencido ainda.
     if (new Date(periodo.dataFim) > hoje) continue;
 
-    const candidato = enriquecerPeriodo(periodo, colaborador, hoje);
+    const candidato = await enriquecerPeriodo(periodo, colaborador, hoje);
     if (candidato.diasATirar <= 0) continue;
 
     const existente = maisRecentePorColaborador.get(periodo.colaboradorId);
@@ -219,16 +227,19 @@ export function listarPeriodosAbertos(): PeriodoAquisitivoAberto[] {
 }
 
 /** Histórico completo (todos os períodos, resolvidos ou não) de um único colaborador — usado na exportação "por colaborador". */
-export function listarHistoricoColaborador(colaboradorId: number): PeriodoAquisitivoAberto[] {
+export async function listarHistoricoColaborador(colaboradorId: number): Promise<PeriodoAquisitivoAberto[]> {
   const hoje = new Date();
-  const colaborador = listarColaboradores().find((c) => c.id === colaboradorId);
+  const colaborador = (await listarColaboradores()).find((c) => c.id === colaboradorId);
   if (!colaborador) return [];
 
-  sincronizarPeriodos(colaborador.id, colaborador.dataAdmissao, hoje);
+  await sincronizarPeriodos(colaborador.id, colaborador.dataAdmissao, hoje);
 
-  const linhas = getDb()
-    .prepare("SELECT * FROM periodos_aquisitivos WHERE colaborador_id = ? ORDER BY data_inicio")
-    .all(colaboradorId) as unknown as LinhaPeriodo[];
+  const db = await getDb();
+  const resultado = await db.execute({
+    sql: "SELECT * FROM periodos_aquisitivos WHERE colaborador_id = ? ORDER BY data_inicio",
+    args: [colaboradorId],
+  });
+  const linhas = resultado.rows as unknown as LinhaPeriodo[];
 
-  return linhas.map((linha) => enriquecerPeriodo(paraPeriodo(linha), colaborador, hoje));
+  return Promise.all(linhas.map((linha) => enriquecerPeriodo(paraPeriodo(linha), colaborador, hoje)));
 }

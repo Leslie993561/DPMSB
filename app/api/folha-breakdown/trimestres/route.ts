@@ -13,6 +13,6 @@ export async function GET(request: Request) {
     return Response.json({ erro: "Informe ?ano=AAAA." }, { status: 400 });
   }
 
-  const trimestres = obterResumoTrimestral(parsed.data.ano);
+  const trimestres = await obterResumoTrimestral(parsed.data.ano);
   return Response.json({ trimestres });
 }

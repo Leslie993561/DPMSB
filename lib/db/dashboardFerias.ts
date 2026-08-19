@@ -113,9 +113,12 @@ interface EventoCalculado {
  * Nunca um número inventado: tudo vem de `lancamentos_ferias`/
  * `periodos_aquisitivos` reais passados pelas funções de `lib/calc`.
  */
-export function obterDashboardFerias(ano: number = new Date().getFullYear(), setor?: string | null): DashboardFerias {
+export async function obterDashboardFerias(
+  ano: number = new Date().getFullYear(),
+  setor?: string | null,
+): Promise<DashboardFerias> {
   const hoje = new Date();
-  const todosColaboradores = listarColaboradores();
+  const todosColaboradores = await listarColaboradores();
   const ativos = todosColaboradores.filter((c) => c.status !== "desligado");
   const setoresDisponiveis = Array.from(
     new Set(ativos.map((c) => c.departamento).filter((d): d is string => Boolean(d))),
@@ -127,7 +130,7 @@ export function obterDashboardFerias(ano: number = new Date().getFullYear(), set
   const semSalarioIds = new Set<number>();
 
   // --- Por trimestre: saldo ainda não lançado dos períodos em aberto ---
-  const periodos = listarPeriodosAbertos().filter((p) => idsFiltrados.has(p.colaboradorId));
+  const periodos = (await listarPeriodosAbertos()).filter((p) => idsFiltrados.has(p.colaboradorId));
   const trimestres = new Map<
     number,
     { colaboradores: Set<number>; valorPago: number; encargos: number; linhas: LinhaTrimestre[] }
@@ -196,15 +199,15 @@ export function obterDashboardFerias(ano: number = new Date().getFullYear(), set
   );
 
   // --- Lançamentos reais (já programados/concluídos) ---
-  const linhasLancamentos = getDb()
-    .prepare(
-      `SELECT l.status, l.dias, l.abono, l.data_inicio_prevista, l.data_inicio_gozo,
+  const db = await getDb();
+  const resultadoLancamentos = await db.execute(
+    `SELECT l.status, l.dias, l.abono, l.data_inicio_prevista, l.data_inicio_gozo,
               p.colaborador_id, p.dias_direito
        FROM lancamentos_ferias l
        JOIN periodos_aquisitivos p ON p.id = l.periodo_aquisitivo_id
        WHERE l.status != 'cancelada'`,
-    )
-    .all() as unknown as LinhaLancamentoResumo[];
+  );
+  const linhasLancamentos = resultadoLancamentos.rows as unknown as LinhaLancamentoResumo[];
 
   function calcularEvento(l: LinhaLancamentoResumo): EventoCalculado | null {
     if (!idsFiltrados.has(l.colaborador_id)) return null;
@@ -301,9 +304,8 @@ export function obterDashboardFerias(ano: number = new Date().getFullYear(), set
   );
   for (const id of idsComLancamento) colaboradoresSemProgramacao.delete(id);
 
-  const dataBaseRelatorio = getDb().prepare("SELECT MAX(criado_em) as m FROM folha_breakdown").get() as {
-    m: string | null;
-  };
+  const resultadoDataBase = await db.execute("SELECT MAX(criado_em) as m FROM folha_breakdown");
+  const dataBaseRelatorio = resultadoDataBase.rows[0] as unknown as { m: string | null };
 
   // --- Controle: situação dos períodos/lançamentos no ano ---
   const periodosDoAno = periodos.filter((p) => Number(p.concessivoFim.slice(0, 4)) === ano);

@@ -7,5 +7,5 @@ export async function GET(request: Request) {
   const anoParam = searchParams.get("ano");
   const ano = anoParam ? Number(anoParam) : undefined;
   const setor = searchParams.get("setor");
-  return Response.json(obterDashboardFerias(ano && Number.isFinite(ano) ? ano : undefined, setor));
+  return Response.json(await obterDashboardFerias(ano && Number.isFinite(ano) ? ano : undefined, setor));
 }

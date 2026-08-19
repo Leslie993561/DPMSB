@@ -25,7 +25,7 @@ export async function POST(
   }
 
   try {
-    const lancamento = criarLancamentoManual({
+    const lancamento = await criarLancamentoManual({
       periodoAquisitivoId: Number(id),
       diasGozados: parsed.data.diasGozados,
       dataInicioGozo: parsed.data.dataInicioGozo,

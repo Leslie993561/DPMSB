@@ -22,7 +22,7 @@ export async function POST(
   }
 
   try {
-    const lancamento = criarLancamentoCalculado({
+    const lancamento = await criarLancamentoCalculado({
       periodoAquisitivoId: Number(id),
       diasSolicitados: parsed.data.diasSolicitados,
       dataInicioPrevista: parsed.data.dataInicioPrevista,

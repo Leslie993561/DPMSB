@@ -1,13 +1,9 @@
 import "server-only";
-import { DatabaseSync } from "node:sqlite";
-import { mkdirSync } from "node:fs";
-import { join } from "node:path";
-
-const CAMINHO_DB = join(process.cwd(), "data", "portal-dp.db");
+import { Pool, type PoolClient } from "pg";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS colaboradores (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   nome TEXT NOT NULL,
   data_admissao TEXT NOT NULL,
   salario_base REAL NOT NULL,
@@ -16,11 +12,11 @@ CREATE TABLE IF NOT EXISTS colaboradores (
   email TEXT,
   cargo TEXT,
   departamento TEXT,
-  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+  criado_em TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')
 );
 
 CREATE TABLE IF NOT EXISTS periodos_aquisitivos (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   colaborador_id INTEGER NOT NULL REFERENCES colaboradores(id),
   data_inicio TEXT NOT NULL,
   data_fim TEXT NOT NULL,
@@ -31,7 +27,7 @@ CREATE TABLE IF NOT EXISTS periodos_aquisitivos (
 );
 
 CREATE TABLE IF NOT EXISTS lancamentos_ferias (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   periodo_aquisitivo_id INTEGER NOT NULL REFERENCES periodos_aquisitivos(id),
   origem TEXT NOT NULL CHECK (origem IN ('calculado','manual')),
   dias INTEGER NOT NULL,
@@ -41,20 +37,20 @@ CREATE TABLE IF NOT EXISTS lancamentos_ferias (
   dias_abono INTEGER NOT NULL DEFAULT 0,
   observacao TEXT,
   criado_por TEXT NOT NULL,
-  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+  criado_em TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')
 );
 `;
 
 /**
  * Colunas adicionadas depois da criação inicial das tabelas. `CREATE TABLE IF
  * NOT EXISTS` não altera tabelas já existentes — por isso migramos via
- * `ALTER TABLE ADD COLUMN`, verificando antes (por `PRAGMA table_info`) se a
+ * `ALTER TABLE ADD COLUMN`, verificando antes (via `information_schema`) se a
  * coluna já existe, para a migração poder rodar em toda inicialização sem
  * falhar num banco que já foi migrado.
  *
  * Os valores permitidos de `status` são validados na camada de aplicação
  * (lib/db/lancamentosFerias.ts, lib/db/periodosAquisitivos.ts), não via CHECK
- * — evita depender de detalhes de versão do SQLite para ALTER TABLE + CHECK.
+ * — evita depender de detalhes de versão do banco para ALTER TABLE + CHECK.
  */
 const MIGRACOES: { tabela: string; coluna: string; definicao: string }[] = [
   { tabela: "lancamentos_ferias", coluna: "status", definicao: "TEXT NOT NULL DEFAULT 'concluida'" },
@@ -88,7 +84,7 @@ const MIGRACOES: { tabela: string; coluna: string; definicao: string }[] = [
  */
 const SCHEMA_EXTRA = `
 CREATE TABLE IF NOT EXISTS folha_breakdown (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   colaborador_id INTEGER NOT NULL REFERENCES colaboradores(id),
   competencia TEXT NOT NULL,
   salario_base REAL NOT NULL,
@@ -101,12 +97,12 @@ CREATE TABLE IF NOT EXISTS folha_breakdown (
   outros_beneficios REAL NOT NULL DEFAULT 0,
   premiacao REAL NOT NULL DEFAULT 0,
   custo_total REAL NOT NULL,
-  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  criado_em TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS'),
   UNIQUE(colaborador_id, competencia)
 );
 
 CREATE TABLE IF NOT EXISTS folha_extras (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   colaborador_id INTEGER NOT NULL REFERENCES colaboradores(id),
   competencia TEXT NOT NULL,
   vm REAL,
@@ -116,29 +112,29 @@ CREATE TABLE IF NOT EXISTS folha_extras (
   bonificacao REAL,
   premiacao REAL,
   outros_custos REAL,
-  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  criado_em TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS'),
   UNIQUE(colaborador_id, competencia)
 );
 
 CREATE TABLE IF NOT EXISTS beneficios_rateio_extras (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   colaborador_id INTEGER NOT NULL REFERENCES colaboradores(id),
   competencia TEXT NOT NULL,
   vale_transporte REAL,
   vale_alimentacao REAL,
-  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  criado_em TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS'),
   UNIQUE(colaborador_id, competencia)
 );
 
 CREATE TABLE IF NOT EXISTS beneficios_variaveis (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   colaborador_id INTEGER NOT NULL REFERENCES colaboradores(id),
   competencia TEXT NOT NULL,
   categoria TEXT NOT NULL CHECK (categoria IN ('transporte','mobilidade','alimentacao')),
   valor REAL NOT NULL,
   motivo TEXT,
   arquivo TEXT,
-  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+  criado_em TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')
 );
 
 CREATE TABLE IF NOT EXISTS beneficios_dias_uteis (
@@ -149,7 +145,7 @@ CREATE TABLE IF NOT EXISTS beneficios_dias_uteis (
 );
 
 CREATE TABLE IF NOT EXISTS colaborador_dependentes (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   colaborador_id INTEGER NOT NULL REFERENCES colaboradores(id),
   nome TEXT NOT NULL,
   cpf TEXT,
@@ -159,35 +155,138 @@ CREATE TABLE IF NOT EXISTS colaborador_dependentes (
   certidao_folha TEXT,
   certidao_matricula TEXT,
   certidao_data_emissao TEXT,
-  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+  criado_em TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')
 );
 `;
 
-function migrar(database: DatabaseSync): void {
-  for (const { tabela, coluna, definicao } of MIGRACOES) {
-    const colunas = database.prepare(`PRAGMA table_info(${tabela})`).all() as unknown as {
-      name: string;
-    }[];
-    const jaExiste = colunas.some((c) => c.name === coluna);
-    if (!jaExiste) {
-      database.exec(`ALTER TABLE ${tabela} ADD COLUMN ${coluna} ${definicao}`);
+/**
+ * Camada de compatibilidade com a API usada por todo o resto de `lib/db/*.ts`
+ * (`execute`/`executeMultiple`/`batch` no estilo libSQL) — evita reescrever as
+ * ~13 outras camadas de acesso ao banco só por causa da troca de driver.
+ */
+export interface ResultSetLike {
+  rows: Record<string, unknown>[];
+  rowsAffected: number;
+  lastInsertRowid: number | undefined;
+}
+
+interface StatementLike {
+  sql: string;
+  args?: unknown[];
+}
+
+export interface ClientLike {
+  execute(stmt: StatementLike | string): Promise<ResultSetLike>;
+  executeMultiple(sql: string): Promise<void>;
+  batch(stmts: (StatementLike | string)[], mode?: string): Promise<ResultSetLike[]>;
+}
+
+/** SQLite/libSQL usa `?` posicional; o driver `pg` exige `$1, $2, ...`. */
+function paraPlaceholdersPg(sql: string): string {
+  let indice = 0;
+  return sql.replace(/\?/g, () => `$${++indice}`);
+}
+
+function normalizarStmt(stmt: StatementLike | string): { sql: string; args: unknown[] } {
+  if (typeof stmt === "string") return { sql: stmt, args: [] };
+  return { sql: stmt.sql, args: stmt.args ?? [] };
+}
+
+/** Toda tabela desse schema usa `id` como chave primária — INSERTs sem RETURNING não têm como devolver o id gerado. */
+function precisaRetornarId(sql: string): boolean {
+  return /^\s*insert\s+into/i.test(sql) && !/\breturning\b/i.test(sql);
+}
+
+interface Queryable {
+  query(sql: string, args?: unknown[]): Promise<{ rows: Record<string, unknown>[]; rowCount: number | null }>;
+}
+
+async function executarUm(conexao: Queryable, stmt: StatementLike | string): Promise<ResultSetLike> {
+  const { sql, args } = normalizarStmt(stmt);
+  const comRetorno = precisaRetornarId(sql) ? `${sql} RETURNING id` : sql;
+  const resultado = await conexao.query(paraPlaceholdersPg(comRetorno), args);
+  return {
+    rows: resultado.rows,
+    rowsAffected: resultado.rowCount ?? 0,
+    lastInsertRowid: comRetorno !== sql ? Number(resultado.rows[0]?.id) : undefined,
+  };
+}
+
+class ClientPostgres implements ClientLike {
+  constructor(private pool: Pool) {}
+
+  async execute(stmt: StatementLike | string): Promise<ResultSetLike> {
+    return executarUm(this.pool, stmt);
+  }
+
+  /** Statements crus separados por `;` (scripts de schema/migração) — protocolo simples do Postgres já executa todos numa chamada. */
+  async executeMultiple(sql: string): Promise<void> {
+    await this.pool.query(sql);
+  }
+
+  /** Sem suporte nativo a batch atômico no `pg` — abre uma transação manual (BEGIN/COMMIT/ROLLBACK). */
+  async batch(stmts: (StatementLike | string)[]): Promise<ResultSetLike[]> {
+    const conexao: PoolClient = await this.pool.connect();
+    try {
+      await conexao.query("BEGIN");
+      const resultados: ResultSetLike[] = [];
+      for (const stmt of stmts) {
+        resultados.push(await executarUm(conexao, stmt));
+      }
+      await conexao.query("COMMIT");
+      return resultados;
+    } catch (erro) {
+      await conexao.query("ROLLBACK");
+      throw erro;
+    } finally {
+      conexao.release();
     }
   }
 }
 
-let db: DatabaseSync | null = null;
+async function colunaExiste(pool: Pool, tabela: string, coluna: string): Promise<boolean> {
+  const resultado = await pool.query(
+    "SELECT 1 FROM information_schema.columns WHERE table_name = $1 AND column_name = $2",
+    [tabela, coluna],
+  );
+  return (resultado.rowCount ?? 0) > 0;
+}
 
-/**
- * Conexão SQLite singleton via `node:sqlite` (nativo do Node 22.5+, sem
- * dependência externa nem passo de build). O arquivo fica em `data/`,
- * ignorado pelo git — é estado local, não código.
- */
-export function getDb(): DatabaseSync {
-  if (db) return db;
-  mkdirSync(join(process.cwd(), "data"), { recursive: true });
-  db = new DatabaseSync(CAMINHO_DB);
-  db.exec(SCHEMA);
-  migrar(db);
-  db.exec(SCHEMA_EXTRA);
-  return db;
+async function migrar(pool: Pool): Promise<void> {
+  for (const { tabela, coluna, definicao } of MIGRACOES) {
+    if (!(await colunaExiste(pool, tabela, coluna))) {
+      await pool.query(`ALTER TABLE ${tabela} ADD COLUMN ${coluna} ${definicao}`);
+    }
+  }
+}
+
+/** Connection string do Postgres (Supabase) — obrigatória em qualquer ambiente, inclusive dev local. */
+function resolverConnectionString(): string {
+  const url = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+  if (!url) {
+    throw new Error(
+      "Defina DATABASE_URL (connection string do Postgres/Supabase) no .env.local — veja .env.example.",
+    );
+  }
+  return url;
+}
+
+let client: ClientLike | null = null;
+let inicializando: Promise<ClientLike> | null = null;
+
+/** Cliente Postgres singleton, com a mesma API (`execute`/`executeMultiple`/`batch`) usada por todo o resto de lib/db. */
+export async function getDb(): Promise<ClientLike> {
+  if (client) return client;
+  if (!inicializando) {
+    inicializando = (async () => {
+      const pool = new Pool({ connectionString: resolverConnectionString(), ssl: { rejectUnauthorized: false } });
+      await pool.query(SCHEMA);
+      await migrar(pool);
+      await pool.query(SCHEMA_EXTRA);
+      const novoClient = new ClientPostgres(pool);
+      client = novoClient;
+      return novoClient;
+    })();
+  }
+  return inicializando;
 }

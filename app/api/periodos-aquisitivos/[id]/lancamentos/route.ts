@@ -7,5 +7,5 @@ export async function GET(
   ctx: RouteContext<"/api/periodos-aquisitivos/[id]/lancamentos">,
 ) {
   const { id } = await ctx.params;
-  return Response.json({ lancamentos: listarPorPeriodo(Number(id)) });
+  return Response.json({ lancamentos: await listarPorPeriodo(Number(id)) });
 }

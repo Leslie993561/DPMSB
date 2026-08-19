@@ -32,7 +32,7 @@ export async function POST(request: Request) {
       : await parsearPlanilha(buffer, arquivo.name);
 
     const conversao = converterExtrasImportadas(cabecalhos, linhas);
-    const resultado = importarExtras(conversao.itens, parsed.data.competencia);
+    const resultado = await importarExtras(conversao.itens, parsed.data.competencia);
 
     return Response.json({
       aplicadas: resultado.aplicadas,

@@ -37,7 +37,7 @@ const schema = z.object({
 });
 
 export async function GET() {
-  return Response.json({ colaboradores: listarColaboradores() });
+  return Response.json({ colaboradores: await listarColaboradores() });
 }
 
 export async function POST(request: Request) {
@@ -47,10 +47,10 @@ export async function POST(request: Request) {
     return Response.json({ erro: "Dados inválidos", detalhes: parsed.error.issues }, { status: 400 });
   }
   const { dependentesLista, ...dadosColaborador } = parsed.data;
-  let colaborador = criarColaborador(dadosColaborador);
+  let colaborador = await criarColaborador(dadosColaborador);
   if (dependentesLista) {
-    substituirDependentes(colaborador.id, dependentesLista);
-    colaborador = atualizarColaborador(colaborador.id, { dependentes: dependentesLista.length });
+    await substituirDependentes(colaborador.id, dependentesLista);
+    colaborador = await atualizarColaborador(colaborador.id, { dependentes: dependentesLista.length });
   }
   return Response.json({ colaborador }, { status: 201 });
 }

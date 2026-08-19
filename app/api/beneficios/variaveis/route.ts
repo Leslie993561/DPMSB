@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     const buffer = await arquivo.arrayBuffer();
     const { cabecalhos, linhas } = await parsearPlanilha(buffer, arquivo.name);
     const conversao = converterVariaveisImportadas(cabecalhos, linhas);
-    const resultado = importarVariaveis(conversao.itens, parsed.data.competencia, arquivo.name);
+    const resultado = await importarVariaveis(conversao.itens, parsed.data.competencia, arquivo.name);
 
     return Response.json({
       aplicadas: resultado.aplicadas,

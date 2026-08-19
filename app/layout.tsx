@@ -21,12 +21,12 @@ export const metadata: Metadata = {
   description: "Assistente de DP com motor de cálculo determinístico e IA para interpretação e riscos.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const counts = obterNavCounts();
+  const counts = await obterNavCounts();
 
   return (
     <html lang="pt-BR" className={`${poppins.variable} h-full antialiased`}>

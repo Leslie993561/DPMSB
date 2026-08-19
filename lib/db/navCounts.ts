@@ -9,11 +9,11 @@ export interface NavCounts {
 }
 
 /** Contagens exibidas como badge nos itens da sidebar — sempre derivadas do banco, nunca fixas. */
-export function obterNavCounts(): NavCounts {
-  const colaboradores = listarColaboradores();
+export async function obterNavCounts(): Promise<NavCounts> {
+  const colaboradores = await listarColaboradores();
   return {
     colaboradores: colaboradores.length,
-    feriasEmAberto: listarPeriodosAbertos().length,
+    feriasEmAberto: (await listarPeriodosAbertos()).length,
     folha: colaboradores.length,
   };
 }

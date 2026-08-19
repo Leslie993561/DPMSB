@@ -115,41 +115,44 @@ function paraColaborador(linha: LinhaColaborador): Colaborador {
   };
 }
 
-export function listarColaboradores(): Colaborador[] {
-  const linhas = getDb()
+export async function listarColaboradores(): Promise<Colaborador[]> {
+  const db = await getDb();
+  const resultado = await db.execute(
     // COLLATE NOCASE: sem isso, "ANA" (tudo maiúsculo, vindo de importação em lote) e "Bruno"
     // (Título, cadastro manual) ordenam por valor de byte — maiúsculas antes de minúsculas —
     // e não pela ordem alfabética que um humano espera.
-    .prepare("SELECT * FROM colaboradores ORDER BY nome COLLATE NOCASE")
-    .all() as unknown as LinhaColaborador[];
-  return linhas.map(paraColaborador);
+    "SELECT * FROM colaboradores ORDER BY nome COLLATE NOCASE",
+  );
+  return (resultado.rows as unknown as LinhaColaborador[]).map(paraColaborador);
 }
 
-export function buscarColaborador(id: number): Colaborador | null {
-  const linha = getDb().prepare("SELECT * FROM colaboradores WHERE id = ?").get(id) as
-    | LinhaColaborador
-    | undefined;
+export async function buscarColaborador(id: number): Promise<Colaborador | null> {
+  const db = await getDb();
+  const resultado = await db.execute({ sql: "SELECT * FROM colaboradores WHERE id = ?", args: [id] });
+  const linha = resultado.rows[0] as unknown as LinhaColaborador | undefined;
   return linha ? paraColaborador(linha) : null;
 }
 
 /** Busca por nome (usado para resolver "líder direto" vindo de planilha, sem depender de IDs). */
-export function buscarColaboradorPorNome(nome: string): Colaborador | null {
-  const linha = getDb()
-    .prepare("SELECT * FROM colaboradores WHERE lower(nome) = lower(?)")
-    .get(nome.trim()) as LinhaColaborador | undefined;
+export async function buscarColaboradorPorNome(nome: string): Promise<Colaborador | null> {
+  const db = await getDb();
+  const resultado = await db.execute({
+    sql: "SELECT * FROM colaboradores WHERE lower(nome) = lower(?)",
+    args: [nome.trim()],
+  });
+  const linha = resultado.rows[0] as unknown as LinhaColaborador | undefined;
   return linha ? paraColaborador(linha) : null;
 }
 
-export function criarColaborador(input: ColaboradorInput): Colaborador {
-  const info = getDb()
-    .prepare(
-      `INSERT INTO colaboradores
+export async function criarColaborador(input: ColaboradorInput): Promise<Colaborador> {
+  const db = await getDb();
+  const info = await db.execute({
+    sql: `INSERT INTO colaboradores
          (nome, data_admissao, salario_base, dependentes, cpf, email, cargo, departamento, gestor_id, cidade,
           vinculo, alimentacao_valor, data_nascimento, cbo, agencia, conta, tipo_transporte, valor_transporte_fixo,
           lider_direto_nome, status)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .run(
+    args: [
       input.nome,
       input.dataAdmissao,
       input.salarioBase,
@@ -170,12 +173,13 @@ export function criarColaborador(input: ColaboradorInput): Colaborador {
       input.valorTransporteFixo ?? null,
       input.liderDiretoNome ?? null,
       input.status ?? "ativo",
-    );
-  return buscarColaborador(Number(info.lastInsertRowid))!;
+    ],
+  });
+  return (await buscarColaborador(Number(info.lastInsertRowid)))!;
 }
 
-export function atualizarColaborador(id: number, input: Partial<ColaboradorInput>): Colaborador {
-  const atual = buscarColaborador(id);
+export async function atualizarColaborador(id: number, input: Partial<ColaboradorInput>): Promise<Colaborador> {
+  const atual = await buscarColaborador(id);
   if (!atual) throw new Error(`Colaborador ${id} não encontrado.`);
 
   const mesclado: Required<Omit<ColaboradorInput, "dependentes">> & { dependentes: number } = {
@@ -206,16 +210,15 @@ export function atualizarColaborador(id: number, input: Partial<ColaboradorInput
     valorRescisao: input.valorRescisao !== undefined ? input.valorRescisao : atual.valorRescisao,
   };
 
-  getDb()
-    .prepare(
-      `UPDATE colaboradores
+  const db = await getDb();
+  await db.execute({
+    sql: `UPDATE colaboradores
        SET nome = ?, data_admissao = ?, salario_base = ?, dependentes = ?, cpf = ?, email = ?, cargo = ?,
            departamento = ?, gestor_id = ?, cidade = ?, vinculo = ?, alimentacao_valor = ?, data_nascimento = ?,
            cbo = ?, agencia = ?, conta = ?, tipo_transporte = ?, valor_transporte_fixo = ?, lider_direto_nome = ?,
            status = ?, data_desligamento = ?, motivo_desligamento = ?, valor_rescisao = ?
        WHERE id = ?`,
-    )
-    .run(
+    args: [
       mesclado.nome,
       mesclado.dataAdmissao,
       mesclado.salarioBase,
@@ -240,8 +243,9 @@ export function atualizarColaborador(id: number, input: Partial<ColaboradorInput
       mesclado.motivoDesligamento ?? null,
       mesclado.valorRescisao ?? null,
       id,
-    );
-  return buscarColaborador(id)!;
+    ],
+  });
+  return (await buscarColaborador(id))!;
 }
 
 export interface ImportacaoColaboradores {
@@ -250,10 +254,10 @@ export interface ImportacaoColaboradores {
 }
 
 /** Insere um lote de colaboradores (vindo da importação de planilha). */
-export function importarColaboradores(itens: ColaboradorInput[]): ImportacaoColaboradores {
+export async function importarColaboradores(itens: ColaboradorInput[]): Promise<ImportacaoColaboradores> {
   let criados = 0;
   for (const item of itens) {
-    criarColaborador(item);
+    await criarColaborador(item);
     criados++;
   }
   return { criados, descartados: [] };

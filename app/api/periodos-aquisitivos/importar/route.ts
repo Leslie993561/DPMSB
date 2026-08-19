@@ -39,7 +39,7 @@ export async function POST(request: Request) {
     }
 
     const conversao = converterProgramacaoFerias(cabecalhos, linhas);
-    const resultado = importarProgramacaoFerias(conversao.itens, arquivo.name);
+    const resultado = await importarProgramacaoFerias(conversao.itens, arquivo.name);
 
     return Response.json({
       atualizados: resultado.atualizados,

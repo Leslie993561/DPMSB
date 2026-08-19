@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     const buffer = await arquivo.arrayBuffer();
     const { cabecalhos, linhas } = await parsearPlanilha(buffer, arquivo.name);
     const conversao = converterProgramacaoAnual(cabecalhos, linhas);
-    const resultado = importarProgramacaoAnual(conversao.itens, arquivo.name);
+    const resultado = await importarProgramacaoAnual(conversao.itens, arquivo.name);
 
     return Response.json({
       lancados: resultado.lancados,

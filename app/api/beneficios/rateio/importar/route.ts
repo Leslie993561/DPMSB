@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     const buffer = await arquivo.arrayBuffer();
     const { cabecalhos, linhas } = await parsearPlanilha(buffer, arquivo.name);
     const conversao = converterRateioImportado(cabecalhos, linhas);
-    const resultado = importarRateio(conversao.itens, parsed.data.competencia);
+    const resultado = await importarRateio(conversao.itens, parsed.data.competencia);
 
     return Response.json({
       aplicadas: resultado.aplicadas,

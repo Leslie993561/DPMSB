@@ -76,48 +76,53 @@ function paraLancamento(linha: LinhaLancamento): LancamentoFerias {
 }
 
 /** Histórico completo do período — inclui todos os status, nunca some nada. */
-export function listarPorPeriodo(periodoAquisitivoId: number): LancamentoFerias[] {
-  const linhas = getDb()
-    .prepare("SELECT * FROM lancamentos_ferias WHERE periodo_aquisitivo_id = ? ORDER BY criado_em")
-    .all(periodoAquisitivoId) as unknown as LinhaLancamento[];
-  return linhas.map(paraLancamento);
+export async function listarPorPeriodo(periodoAquisitivoId: number): Promise<LancamentoFerias[]> {
+  const db = await getDb();
+  const resultado = await db.execute({
+    sql: "SELECT * FROM lancamentos_ferias WHERE periodo_aquisitivo_id = ? ORDER BY criado_em",
+    args: [periodoAquisitivoId],
+  });
+  return (resultado.rows as unknown as LinhaLancamento[]).map(paraLancamento);
 }
 
 /** Lançamentos que contam para o saldo do período — tudo exceto cancelados. */
-function listarAtivosPorPeriodo(periodoAquisitivoId: number): LancamentoFerias[] {
-  return listarPorPeriodo(periodoAquisitivoId).filter((l) => l.status !== "cancelada");
+async function listarAtivosPorPeriodo(periodoAquisitivoId: number): Promise<LancamentoFerias[]> {
+  return (await listarPorPeriodo(periodoAquisitivoId)).filter((l) => l.status !== "cancelada");
 }
 
-function buscarPeriodoOuFalhar(periodoAquisitivoId: number): PeriodoAquisitivo {
-  const periodo = buscarPeriodo(periodoAquisitivoId);
+async function buscarPeriodoOuFalhar(periodoAquisitivoId: number): Promise<PeriodoAquisitivo> {
+  const periodo = await buscarPeriodo(periodoAquisitivoId);
   if (!periodo) throw new ErroValidacaoFerias("Período aquisitivo não encontrado.");
   return periodo;
 }
 
-function buscarLancamento(id: number): LancamentoFerias | null {
-  const linha = getDb().prepare("SELECT * FROM lancamentos_ferias WHERE id = ?").get(id) as
-    | LinhaLancamento
-    | undefined;
+async function buscarLancamento(id: number): Promise<LancamentoFerias | null> {
+  const db = await getDb();
+  const resultado = await db.execute({ sql: "SELECT * FROM lancamentos_ferias WHERE id = ?", args: [id] });
+  const linha = resultado.rows[0] as unknown as LinhaLancamento | undefined;
   return linha ? paraLancamento(linha) : null;
 }
 
-function marcarAbonoUtilizado(periodoId: number, diasAbono: number): void {
-  getDb()
-    .prepare("UPDATE periodos_aquisitivos SET abono_utilizado = 1, dias_abono = ? WHERE id = ?")
-    .run(diasAbono, periodoId);
+async function marcarAbonoUtilizado(periodoId: number, diasAbono: number): Promise<void> {
+  const db = await getDb();
+  await db.execute({
+    sql: "UPDATE periodos_aquisitivos SET abono_utilizado = 1, dias_abono = ? WHERE id = ?",
+    args: [diasAbono, periodoId],
+  });
 }
 
 /** Recalcula o saldo do período (a partir dos lançamentos ativos) e ajusta seu status. */
-function atualizarStatusPeriodo(periodoId: number): void {
-  const periodo = buscarPeriodo(periodoId);
+async function atualizarStatusPeriodo(periodoId: number): Promise<void> {
+  const periodo = await buscarPeriodo(periodoId);
   if (!periodo) return;
-  const ativos: LancamentoInfo[] = listarAtivosPorPeriodo(periodoId);
+  const ativos: LancamentoInfo[] = await listarAtivosPorPeriodo(periodoId);
   const estado = calcularEstadoPeriodo(periodo, ativos);
   const novoStatus = estado.diasATirar <= 0 ? "concluido" : "aberto";
-  getDb().prepare("UPDATE periodos_aquisitivos SET status = ? WHERE id = ?").run(novoStatus, periodoId);
+  const db = await getDb();
+  await db.execute({ sql: "UPDATE periodos_aquisitivos SET status = ? WHERE id = ?", args: [novoStatus, periodoId] });
 }
 
-function inserirLancamento(params: {
+async function inserirLancamento(params: {
   periodoAquisitivoId: number;
   origem: "calculado" | "manual";
   status: StatusLancamento;
@@ -129,14 +134,13 @@ function inserirLancamento(params: {
   diasAbono: number;
   observacao: string | null;
   criadoPor: string;
-}): LancamentoFerias {
-  const info = getDb()
-    .prepare(
-      `INSERT INTO lancamentos_ferias
+}): Promise<LancamentoFerias> {
+  const db = await getDb();
+  const info = await db.execute({
+    sql: `INSERT INTO lancamentos_ferias
          (periodo_aquisitivo_id, origem, status, dias, data_inicio_prevista, data_inicio_gozo, data_fim_gozo, abono, dias_abono, observacao, criado_por)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .run(
+    args: [
       params.periodoAquisitivoId,
       params.origem,
       params.status,
@@ -148,9 +152,10 @@ function inserirLancamento(params: {
       params.diasAbono,
       params.observacao,
       params.criadoPor,
-    );
+    ],
+  });
 
-  return buscarLancamento(Number(info.lastInsertRowid))!;
+  return (await buscarLancamento(Number(info.lastInsertRowid)))!;
 }
 
 export interface CriarLancamentoCalculadoInput {
@@ -166,9 +171,9 @@ export interface CriarLancamentoCalculadoInput {
  * todas as validações de fracionamento/abono. Nasce com status "programada"
  * — só vira "concluída" quando a baixa for confirmada.
  */
-export function criarLancamentoCalculado(input: CriarLancamentoCalculadoInput): LancamentoFerias {
-  const periodo = buscarPeriodoOuFalhar(input.periodoAquisitivoId);
-  const ativos = listarAtivosPorPeriodo(periodo.id);
+export async function criarLancamentoCalculado(input: CriarLancamentoCalculadoInput): Promise<LancamentoFerias> {
+  const periodo = await buscarPeriodoOuFalhar(input.periodoAquisitivoId);
+  const ativos = await listarAtivosPorPeriodo(periodo.id);
   const estado = calcularEstadoPeriodo(periodo, ativos);
 
   const resultado = validarNovoLancamentoCalculado(
@@ -180,7 +185,7 @@ export function criarLancamentoCalculado(input: CriarLancamentoCalculadoInput): 
   if (!resultado.ok) throw new ErroValidacaoFerias(resultado.erro);
 
   const diasAbono = input.abonoSolicitado ? tetoAbono(periodo.diasDireito) : 0;
-  const lancamento = inserirLancamento({
+  const lancamento = await inserirLancamento({
     periodoAquisitivoId: periodo.id,
     origem: "calculado",
     status: "programada",
@@ -194,8 +199,8 @@ export function criarLancamentoCalculado(input: CriarLancamentoCalculadoInput): 
     criadoPor: input.operador,
   });
 
-  if (input.abonoSolicitado) marcarAbonoUtilizado(periodo.id, diasAbono);
-  atualizarStatusPeriodo(periodo.id);
+  if (input.abonoSolicitado) await marcarAbonoUtilizado(periodo.id, diasAbono);
+  await atualizarStatusPeriodo(periodo.id);
   return lancamento;
 }
 
@@ -214,9 +219,9 @@ export interface CriarLancamentoManualInput {
  * Registra um lançamento histórico/manual (período já usufruído antes do
  * sistema) — nasce direto como "concluída", sem passar por programação/baixa.
  */
-export function criarLancamentoManual(input: CriarLancamentoManualInput): LancamentoFerias {
-  const periodo = buscarPeriodoOuFalhar(input.periodoAquisitivoId);
-  const ativos = listarAtivosPorPeriodo(periodo.id);
+export async function criarLancamentoManual(input: CriarLancamentoManualInput): Promise<LancamentoFerias> {
+  const periodo = await buscarPeriodoOuFalhar(input.periodoAquisitivoId);
+  const ativos = await listarAtivosPorPeriodo(periodo.id);
   const estado = calcularEstadoPeriodo(periodo, ativos);
 
   const resultado = validarLancamentoManual(
@@ -228,7 +233,7 @@ export function criarLancamentoManual(input: CriarLancamentoManualInput): Lancam
   );
   if (!resultado.ok) throw new ErroValidacaoFerias(resultado.erro);
 
-  const lancamento = inserirLancamento({
+  const lancamento = await inserirLancamento({
     periodoAquisitivoId: periodo.id,
     origem: "manual",
     status: "concluida",
@@ -242,8 +247,8 @@ export function criarLancamentoManual(input: CriarLancamentoManualInput): Lancam
     criadoPor: input.operador,
   });
 
-  if (input.abono) marcarAbonoUtilizado(periodo.id, input.diasVendidos);
-  atualizarStatusPeriodo(periodo.id);
+  if (input.abono) await marcarAbonoUtilizado(periodo.id, input.diasVendidos);
+  await atualizarStatusPeriodo(periodo.id);
   return lancamento;
 }
 
@@ -264,8 +269,8 @@ export interface DarBaixaInput {
  * "concluída" se os dados batem com a programação original, ou "alterada" se
  * a quantidade de dias efetivamente gozados for diferente.
  */
-export function darBaixa(lancamentoId: number, input: DarBaixaInput): LancamentoFerias {
-  const lancamento = buscarLancamento(lancamentoId);
+export async function darBaixa(lancamentoId: number, input: DarBaixaInput): Promise<LancamentoFerias> {
+  const lancamento = await buscarLancamento(lancamentoId);
   if (!lancamento) throw new ErroValidacaoFerias("Lançamento não encontrado.");
   if (lancamento.status !== "programada") {
     throw new ErroValidacaoFerias("Só é possível dar baixa em férias com status Programada.");
@@ -274,8 +279,8 @@ export function darBaixa(lancamentoId: number, input: DarBaixaInput): Lancamento
     throw new ErroValidacaoFerias("Informe uma quantidade de dias gozados maior que zero.");
   }
 
-  const periodo = buscarPeriodoOuFalhar(lancamento.periodoAquisitivoId);
-  const outrosAtivos = listarAtivosPorPeriodo(periodo.id).filter((l) => l.id !== lancamentoId);
+  const periodo = await buscarPeriodoOuFalhar(lancamento.periodoAquisitivoId);
+  const outrosAtivos = (await listarAtivosPorPeriodo(periodo.id)).filter((l) => l.id !== lancamentoId);
   const estadoSemEste = calcularEstadoPeriodo(periodo, outrosAtivos);
 
   if (estadoSemEste.diasTirados + input.diasGozadosReal > estadoSemEste.diasDireitoEfetivo) {
@@ -286,14 +291,13 @@ export function darBaixa(lancamentoId: number, input: DarBaixaInput): Lancamento
 
   const status: StatusLancamento = input.diasGozadosReal === lancamento.dias ? "concluida" : "alterada";
 
-  getDb()
-    .prepare(
-      `UPDATE lancamentos_ferias
+  const db = await getDb();
+  await db.execute({
+    sql: `UPDATE lancamentos_ferias
        SET status = ?, dias = ?, data_inicio_gozo = ?, data_fim_gozo = ?, data_retorno = ?,
            data_baixa = datetime('now'), observacao_baixa = ?, anexo_nome = ?, criado_por = ?
        WHERE id = ?`,
-    )
-    .run(
+    args: [
       status,
       input.diasGozadosReal,
       input.dataInicioReal,
@@ -303,10 +307,11 @@ export function darBaixa(lancamentoId: number, input: DarBaixaInput): Lancamento
       input.anexoNome,
       input.operador,
       lancamentoId,
-    );
+    ],
+  });
 
-  atualizarStatusPeriodo(periodo.id);
-  return buscarLancamento(lancamentoId)!;
+  await atualizarStatusPeriodo(periodo.id);
+  return (await buscarLancamento(lancamentoId))!;
 }
 
 export interface ReverterBaixaInput {
@@ -319,8 +324,8 @@ export interface ReverterBaixaInput {
  * Planejamento) e limpa os dados de gozo real, mantendo a data prevista
  * original para reabrir "Confirmar gozo".
  */
-export function reverterBaixa(lancamentoId: number, input: ReverterBaixaInput): LancamentoFerias {
-  const lancamento = buscarLancamento(lancamentoId);
+export async function reverterBaixa(lancamentoId: number, input: ReverterBaixaInput): Promise<LancamentoFerias> {
+  const lancamento = await buscarLancamento(lancamentoId);
   if (!lancamento) throw new ErroValidacaoFerias("Lançamento não encontrado.");
   if (lancamento.status !== "concluida" && lancamento.status !== "alterada") {
     throw new ErroValidacaoFerias("Só é possível desfazer a baixa de férias já confirmadas.");
@@ -332,17 +337,17 @@ export function reverterBaixa(lancamentoId: number, input: ReverterBaixaInput): 
   // vira a nova data prevista.
   const dataInicioPrevista = lancamento.dataInicioPrevista ?? lancamento.dataInicioGozo;
 
-  getDb()
-    .prepare(
-      `UPDATE lancamentos_ferias
+  const db = await getDb();
+  await db.execute({
+    sql: `UPDATE lancamentos_ferias
        SET status = 'programada', data_inicio_prevista = ?, data_inicio_gozo = NULL, data_fim_gozo = NULL,
            data_retorno = NULL, data_baixa = NULL, observacao_baixa = NULL, anexo_nome = NULL, criado_por = ?
        WHERE id = ?`,
-    )
-    .run(dataInicioPrevista, input.operador, lancamentoId);
+    args: [dataInicioPrevista, input.operador, lancamentoId],
+  });
 
-  atualizarStatusPeriodo(lancamento.periodoAquisitivoId);
-  return buscarLancamento(lancamentoId)!;
+  await atualizarStatusPeriodo(lancamento.periodoAquisitivoId);
+  return (await buscarLancamento(lancamentoId))!;
 }
 
 export interface CancelarLancamentoInput {
@@ -355,23 +360,23 @@ export interface CancelarLancamentoInput {
  * Só se aplica a lançamentos ainda "programada" — algo já concluído é fato
  * consumado e não deve ser cancelado por aqui.
  */
-export function cancelarLancamento(lancamentoId: number, input: CancelarLancamentoInput): LancamentoFerias {
-  const lancamento = buscarLancamento(lancamentoId);
+export async function cancelarLancamento(lancamentoId: number, input: CancelarLancamentoInput): Promise<LancamentoFerias> {
+  const lancamento = await buscarLancamento(lancamentoId);
   if (!lancamento) throw new ErroValidacaoFerias("Lançamento não encontrado.");
   if (lancamento.status !== "programada") {
     throw new ErroValidacaoFerias("Só é possível cancelar férias com status Programada.");
   }
 
-  getDb()
-    .prepare(
-      `UPDATE lancamentos_ferias
+  const db = await getDb();
+  await db.execute({
+    sql: `UPDATE lancamentos_ferias
        SET status = 'cancelada', data_baixa = datetime('now'), observacao_baixa = ?, criado_por = ?
        WHERE id = ?`,
-    )
-    .run(`Cancelado: ${input.motivo}`, input.operador, lancamentoId);
+    args: [`Cancelado: ${input.motivo}`, input.operador, lancamentoId],
+  });
 
-  atualizarStatusPeriodo(lancamento.periodoAquisitivoId);
-  return buscarLancamento(lancamentoId)!;
+  await atualizarStatusPeriodo(lancamento.periodoAquisitivoId);
+  return (await buscarLancamento(lancamentoId))!;
 }
 
 export interface LancamentoComContexto {
@@ -385,17 +390,17 @@ export interface LancamentoComContexto {
  * — usado pelos Alertas Inteligentes (programações pendentes de baixa e
  * conflitos de agenda por setor). Evita N+1 fazendo o join em uma query só.
  */
-export function listarLancamentosAtivosComContexto(): LancamentoComContexto[] {
-  const linhas = getDb()
-    .prepare(
-      `SELECT l.*, c.nome AS colaborador_nome, c.departamento AS colaborador_departamento
+export async function listarLancamentosAtivosComContexto(): Promise<LancamentoComContexto[]> {
+  const db = await getDb();
+  const resultado = await db.execute(
+    `SELECT l.*, c.nome AS colaborador_nome, c.departamento AS colaborador_departamento
        FROM lancamentos_ferias l
        JOIN periodos_aquisitivos p ON p.id = l.periodo_aquisitivo_id
        JOIN colaboradores c ON c.id = p.colaborador_id
        WHERE l.status != 'cancelada'
        ORDER BY l.data_inicio_prevista, l.data_inicio_gozo`,
-    )
-    .all() as unknown as (LinhaLancamento & {
+  );
+  const linhas = resultado.rows as unknown as (LinhaLancamento & {
     colaborador_nome: string;
     colaborador_departamento: string | null;
   })[];

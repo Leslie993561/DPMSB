@@ -26,10 +26,10 @@ export async function GET(request: Request) {
 
   if (tipo === "colaborador") {
     const colaboradorId = Number(searchParams.get("colaboradorId"));
-    const colaborador = listarColaboradores().find((c) => c.id === colaboradorId);
+    const colaborador = (await listarColaboradores()).find((c) => c.id === colaboradorId);
     if (!colaborador) return Response.json({ erro: "Colaborador não encontrado." }, { status: 404 });
 
-    const historico = listarHistoricoColaborador(colaboradorId);
+    const historico = await listarHistoricoColaborador(colaboradorId);
     const sheet = workbook.addWorksheet("Histórico");
     sheet.columns = [
       { header: "Período aquisitivo", key: "aquisitivo", width: 24 },
@@ -59,13 +59,13 @@ export async function GET(request: Request) {
     nomeArquivo = `ferias-${colaborador.nome.replace(/\s+/g, "-").toLowerCase()}.xlsx`;
   } else if (tipo === "setor") {
     const setor = searchParams.get("setor") ?? "";
-    const linhas = listarPeriodosAbertos().filter((p) => p.colaboradorDepartamento === setor);
+    const linhas = (await listarPeriodosAbertos()).filter((p) => p.colaboradorDepartamento === setor);
     montarPlanilhaResumo(workbook, linhas);
     nomeArquivo = `ferias-${setor.replace(/\s+/g, "-").toLowerCase()}.xlsx`;
   } else if (tipo === "trimestre") {
     const trimestre = Number(searchParams.get("trimestre"));
     const ano = Number(searchParams.get("ano")) || new Date().getFullYear();
-    const linhas = listarPeriodosAbertos().filter(
+    const linhas = (await listarPeriodosAbertos()).filter(
       (p) =>
         Number(p.concessivoFim.slice(0, 4)) === ano &&
         Math.ceil(Number(p.concessivoFim.slice(5, 7)) / 3) === trimestre,
@@ -85,7 +85,7 @@ export async function GET(request: Request) {
   });
 }
 
-function montarPlanilhaResumo(workbook: ExcelJS.Workbook, linhas: ReturnType<typeof listarPeriodosAbertos>) {
+function montarPlanilhaResumo(workbook: ExcelJS.Workbook, linhas: Awaited<ReturnType<typeof listarPeriodosAbertos>>) {
   const sheet = workbook.addWorksheet("Resumo");
   sheet.columns = [
     { header: "Nome", key: "nome", width: 30 },

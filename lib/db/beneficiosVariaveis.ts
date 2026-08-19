@@ -26,12 +26,13 @@ interface LinhaVariavel {
 }
 
 /** Variáveis lançadas na competência, por colaborador — cada importação SOMA linhas novas, nunca substitui as anteriores. */
-export function obterVariaveis(competencia: string): Map<number, VariaveisColaborador> {
-  const linhas = getDb()
-    .prepare(
-      "SELECT colaborador_id, categoria, valor, motivo, arquivo FROM beneficios_variaveis WHERE competencia = ? ORDER BY criado_em",
-    )
-    .all(competencia) as unknown as LinhaVariavel[];
+export async function obterVariaveis(competencia: string): Promise<Map<number, VariaveisColaborador>> {
+  const db = await getDb();
+  const resultado = await db.execute({
+    sql: "SELECT colaborador_id, categoria, valor, motivo, arquivo FROM beneficios_variaveis WHERE competencia = ? ORDER BY criado_em",
+    args: [competencia],
+  });
+  const linhas = resultado.rows as unknown as LinhaVariavel[];
 
   const mapa = new Map<number, VariaveisColaborador>();
   for (const l of linhas) {
@@ -58,22 +59,19 @@ export interface ResultadoImportacaoVariaveis {
 }
 
 /** Cada linha da planilha vira uma ou mais linhas novas em `beneficios_variaveis` — soma com o que já existia, nunca sobrescreve. */
-export function importarVariaveis(
+export async function importarVariaveis(
   itens: LinhaImportacaoVariavel[],
   competencia: string,
   nomeArquivo: string,
-): ResultadoImportacaoVariaveis {
-  const colaboradores = listarColaboradores();
+): Promise<ResultadoImportacaoVariaveis> {
+  const colaboradores = await listarColaboradores();
   const porCodigo = new Map(colaboradores.map((c) => [String(c.id), c]));
   const porNome = new Map(colaboradores.map((c) => [c.nome.trim().toLowerCase(), c]));
-  const db = getDb();
-  const inserir = db.prepare(
-    `INSERT INTO beneficios_variaveis (colaborador_id, competencia, categoria, valor, motivo, arquivo)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-  );
+  const db = await getDb();
 
   let aplicadas = 0;
   const descartados: ResultadoImportacaoVariaveis["descartados"] = [];
+  const inserts: { sql: string; args: (string | number | null)[] }[] = [];
 
   itens.forEach((item, indice) => {
     const linha = indice + 2;
@@ -94,7 +92,11 @@ export function importarVariaveis(
     let algumaAplicada = false;
     for (const { categoria, valor } of categorias) {
       if (valor === null || valor === 0) continue;
-      inserir.run(colaborador.id, competencia, categoria, valor, item.motivo, nomeArquivo);
+      inserts.push({
+        sql: `INSERT INTO beneficios_variaveis (colaborador_id, competencia, categoria, valor, motivo, arquivo)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+        args: [colaborador.id, competencia, categoria, valor, item.motivo, nomeArquivo],
+      });
       algumaAplicada = true;
     }
 
@@ -104,6 +106,8 @@ export function importarVariaveis(
     }
     aplicadas++;
   });
+
+  if (inserts.length > 0) await db.batch(inserts, "write");
 
   return { aplicadas, descartados };
 }

@@ -43,10 +43,13 @@ interface LinhaExtrasRateio {
   vale_alimentacao: number | null;
 }
 
-function obterExtrasRateio(competencia: string): Map<number, ExtrasRateio> {
-  const linhas = getDb()
-    .prepare("SELECT colaborador_id, vale_transporte, vale_alimentacao FROM beneficios_rateio_extras WHERE competencia = ?")
-    .all(competencia) as unknown as LinhaExtrasRateio[];
+async function obterExtrasRateio(competencia: string): Promise<Map<number, ExtrasRateio>> {
+  const db = await getDb();
+  const resultado = await db.execute({
+    sql: "SELECT colaborador_id, vale_transporte, vale_alimentacao FROM beneficios_rateio_extras WHERE competencia = ?",
+    args: [competencia],
+  });
+  const linhas = resultado.rows as unknown as LinhaExtrasRateio[];
   return new Map(linhas.map((l) => [l.colaborador_id, { valeTransporte: l.vale_transporte, valeAlimentacao: l.vale_alimentacao }]));
 }
 
@@ -55,14 +58,14 @@ function obterExtrasRateio(competencia: string): Map<number, ExtrasRateio> {
  * única de verdade), com override opcional por planilha importada (Importar
  * rateio) para casos em que o valor real do mês diverge do calculado.
  */
-export function gerarRateio(competencia: string): { linhas: LinhaRateio[]; diasUteis: number } {
+export async function gerarRateio(competencia: string): Promise<{ linhas: LinhaRateio[]; diasUteis: number }> {
   const { ano, mes } = competenciaParaAnoMes(competencia);
-  const diasUteis = obterDiasUteis(ano, mes);
-  const extras = obterExtrasRateio(competencia);
-  const extrasFolha = obterExtras(competencia);
-  const variaveis = obterVariaveis(competencia);
+  const diasUteis = await obterDiasUteis(ano, mes);
+  const extras = await obterExtrasRateio(competencia);
+  const extrasFolha = await obterExtras(competencia);
+  const variaveis = await obterVariaveis(competencia);
 
-  const linhas: LinhaRateio[] = listarColaboradores().map((c) => {
+  const linhas: LinhaRateio[] = (await listarColaboradores()).map((c) => {
     const calculado =
       c.tipoTransporte === "vm_fixo"
         ? (c.valorTransporteFixo ?? 0)
@@ -105,46 +108,48 @@ export interface ResumoMensalBeneficios {
 }
 
 /** Custo de benefícios por mês do ano — real, a partir do mesmo cadastro/extras usados no rateio e no Breakdown de Folha. */
-export function obterResumoAnualBeneficios(ano: number): ResumoMensalBeneficios[] {
-  return Array.from({ length: 12 }, (_, i) => {
-    const mes = i + 1;
-    const competencia = `${ano}-${String(mes).padStart(2, "0")}`;
-    const { linhas } = gerarRateio(competencia);
+export async function obterResumoAnualBeneficios(ano: number): Promise<ResumoMensalBeneficios[]> {
+  return Promise.all(
+    Array.from({ length: 12 }, async (_, i) => {
+      const mes = i + 1;
+      const competencia = `${ano}-${String(mes).padStart(2, "0")}`;
+      const { linhas } = await gerarRateio(competencia);
 
-    let vt = 0;
-    let va = 0;
-    let odontoPlataformas = 0;
-    let brindes = 0;
-    let variaveis = 0;
-    for (const l of linhas) {
-      vt += l.valeTransporte;
-      va += l.valeAlimentacao;
-      odontoPlataformas += (l.odontologico ?? 0) + (l.solides ?? 0) + (l.flash ?? 0);
-      brindes += (l.bonificacao ?? 0) + (l.outrosCustos ?? 0);
-      variaveis += l.variaveis;
-    }
+      let vt = 0;
+      let va = 0;
+      let odontoPlataformas = 0;
+      let brindes = 0;
+      let variaveis = 0;
+      for (const l of linhas) {
+        vt += l.valeTransporte;
+        va += l.valeAlimentacao;
+        odontoPlataformas += (l.odontologico ?? 0) + (l.solides ?? 0) + (l.flash ?? 0);
+        brindes += (l.bonificacao ?? 0) + (l.outrosCustos ?? 0);
+        variaveis += l.variaveis;
+      }
 
-    return {
-      mes,
-      vt: arredondar(vt),
-      va: arredondar(va),
-      odontoPlataformas: arredondar(odontoPlataformas),
-      brindes: arredondar(brindes),
-      variaveis: arredondar(variaveis),
-      total: arredondar(vt + va + odontoPlataformas + brindes + variaveis),
-    };
-  });
+      return {
+        mes,
+        vt: arredondar(vt),
+        va: arredondar(va),
+        odontoPlataformas: arredondar(odontoPlataformas),
+        brindes: arredondar(brindes),
+        variaveis: arredondar(variaveis),
+        total: arredondar(vt + va + odontoPlataformas + brindes + variaveis),
+      };
+    }),
+  );
 }
 
-export function upsertExtrasRateio(colaboradorId: number, competencia: string, extras: ExtrasRateio): void {
-  getDb()
-    .prepare(
-      `INSERT INTO beneficios_rateio_extras (colaborador_id, competencia, vale_transporte, vale_alimentacao)
+export async function upsertExtrasRateio(colaboradorId: number, competencia: string, extras: ExtrasRateio): Promise<void> {
+  const db = await getDb();
+  await db.execute({
+    sql: `INSERT INTO beneficios_rateio_extras (colaborador_id, competencia, vale_transporte, vale_alimentacao)
        VALUES (?, ?, ?, ?)
        ON CONFLICT(colaborador_id, competencia) DO UPDATE SET
          vale_transporte = excluded.vale_transporte, vale_alimentacao = excluded.vale_alimentacao`,
-    )
-    .run(colaboradorId, competencia, extras.valeTransporte, extras.valeAlimentacao);
+    args: [colaboradorId, competencia, extras.valeTransporte, extras.valeAlimentacao],
+  });
 }
 
 export interface LinhaImportacaoRateio {
@@ -160,15 +165,15 @@ export interface ResultadoImportacaoRateio {
 }
 
 /** Aplica VT/VA importados de planilha à competência — casamento por código (se houver) e, senão, por nome. */
-export function importarRateio(itens: LinhaImportacaoRateio[], competencia: string): ResultadoImportacaoRateio {
-  const colaboradores = listarColaboradores();
+export async function importarRateio(itens: LinhaImportacaoRateio[], competencia: string): Promise<ResultadoImportacaoRateio> {
+  const colaboradores = await listarColaboradores();
   const porCodigo = new Map(colaboradores.map((c) => [String(c.id), c]));
   const porNome = new Map(colaboradores.map((c) => [c.nome.trim().toLowerCase(), c]));
 
   let aplicadas = 0;
   const descartados: ResultadoImportacaoRateio["descartados"] = [];
 
-  itens.forEach((item, indice) => {
+  for (const [indice, item] of itens.entries()) {
     const linha = indice + 2;
     const colaborador =
       (item.codigo ? porCodigo.get(item.codigo.trim()) : undefined) ??
@@ -176,15 +181,15 @@ export function importarRateio(itens: LinhaImportacaoRateio[], competencia: stri
 
     if (!colaborador) {
       descartados.push({ linha, motivo: `Colaborador "${item.nomeColaborador}" não encontrado no cadastro.` });
-      return;
+      continue;
     }
 
-    upsertExtrasRateio(colaborador.id, competencia, {
+    await upsertExtrasRateio(colaborador.id, competencia, {
       valeTransporte: item.valeTransporte,
       valeAlimentacao: item.valeAlimentacao,
     });
     aplicadas++;
-  });
+  }
 
   return { aplicadas, descartados };
 }

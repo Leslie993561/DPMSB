@@ -87,7 +87,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const resultado = importarColaboradores(
+  const resultado = await importarColaboradores(
     conversao.colaboradores.map((c) => ({ ...c, vinculo: c.vinculo as Vinculo | null })),
   );
   return Response.json({
