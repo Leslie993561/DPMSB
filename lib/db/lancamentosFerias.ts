@@ -295,7 +295,7 @@ export async function darBaixa(lancamentoId: number, input: DarBaixaInput): Prom
   await db.execute({
     sql: `UPDATE lancamentos_ferias
        SET status = ?, dias = ?, data_inicio_gozo = ?, data_fim_gozo = ?, data_retorno = ?,
-           data_baixa = datetime('now'), observacao_baixa = ?, anexo_nome = ?, criado_por = ?
+           data_baixa = to_char(now(), 'YYYY-MM-DD HH24:MI:SS'), observacao_baixa = ?, anexo_nome = ?, criado_por = ?
        WHERE id = ?`,
     args: [
       status,
@@ -370,7 +370,7 @@ export async function cancelarLancamento(lancamentoId: number, input: CancelarLa
   const db = await getDb();
   await db.execute({
     sql: `UPDATE lancamentos_ferias
-       SET status = 'cancelada', data_baixa = datetime('now'), observacao_baixa = ?, criado_por = ?
+       SET status = 'cancelada', data_baixa = to_char(now(), 'YYYY-MM-DD HH24:MI:SS'), observacao_baixa = ?, criado_por = ?
        WHERE id = ?`,
     args: [`Cancelado: ${input.motivo}`, input.operador, lancamentoId],
   });

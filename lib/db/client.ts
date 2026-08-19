@@ -224,15 +224,18 @@ class ClientPostgres implements ClientLike {
     await this.pool.query(sql);
   }
 
-  /** Sem suporte nativo a batch atômico no `pg` — abre uma transação manual (BEGIN/COMMIT/ROLLBACK). */
+  /**
+   * Sem suporte nativo a batch atômico no `pg` — abre uma transação manual
+   * (BEGIN/COMMIT/ROLLBACK). Os statements são disparados sem `await` entre
+   * eles (`Promise.all`) para ficarem em pipeline na mesma conexão — em vez
+   * de pagar uma ida-e-volta de rede por statement (relevante com dezenas ou
+   * centenas deles contra um banco remoto), paga uma só para o lote inteiro.
+   */
   async batch(stmts: (StatementLike | string)[]): Promise<ResultSetLike[]> {
     const conexao: PoolClient = await this.pool.connect();
     try {
       await conexao.query("BEGIN");
-      const resultados: ResultSetLike[] = [];
-      for (const stmt of stmts) {
-        resultados.push(await executarUm(conexao, stmt));
-      }
+      const resultados = await Promise.all(stmts.map((stmt) => executarUm(conexao, stmt)));
       await conexao.query("COMMIT");
       return resultados;
     } catch (erro) {

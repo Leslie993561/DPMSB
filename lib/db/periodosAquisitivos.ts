@@ -41,13 +41,7 @@ function paraPeriodo(linha: LinhaPeriodo): PeriodoAquisitivo {
   };
 }
 
-/**
- * Gera (idempotente, via UNIQUE + INSERT OR IGNORE) todos os ciclos de 12
- * meses entre a data de admissão do colaborador e hoje que ainda não existem.
- */
-export async function sincronizarPeriodos(colaboradorId: number, dataAdmissao: string, hoje: Date): Promise<void> {
-  const db = await getDb();
-
+function calcularCiclos(dataAdmissao: string, hoje: Date): { inicio: string; fim: string }[] {
   const ciclos: { inicio: string; fim: string }[] = [];
   let cicloInicio = new Date(dataAdmissao);
   while (cicloInicio <= hoje) {
@@ -56,14 +50,48 @@ export async function sincronizarPeriodos(colaboradorId: number, dataAdmissao: s
     ciclos.push({ inicio: cicloInicio.toISOString().slice(0, 10), fim: cicloFim.toISOString().slice(0, 10) });
     cicloInicio = cicloFim;
   }
+  return ciclos;
+}
 
-  await db.batch(
-    ciclos.map((ciclo) => ({
-      sql: "INSERT OR IGNORE INTO periodos_aquisitivos (colaborador_id, data_inicio, data_fim) VALUES (?, ?, ?)",
-      args: [colaboradorId, ciclo.inicio, ciclo.fim],
-    })),
-    "write",
+/**
+ * Insere várias linhas (colaborador_id, data_inicio, data_fim) num só
+ * `INSERT ... VALUES (...), (...), ...` — contra um banco remoto, uma query
+ * com N grupos de valores custa uma ida-e-volta de rede; N queries separadas
+ * (mesmo em uma transação) custam N idas-e-voltas, uma por statement.
+ */
+async function inserirCiclosEmLote(linhas: { colaboradorId: number; inicio: string; fim: string }[]): Promise<void> {
+  if (linhas.length === 0) return;
+  const db = await getDb();
+  const grupos = linhas.map(() => "(?, ?, ?)").join(", ");
+  const args = linhas.flatMap((l) => [l.colaboradorId, l.inicio, l.fim]);
+  await db.execute({
+    sql: `INSERT INTO periodos_aquisitivos (colaborador_id, data_inicio, data_fim) VALUES ${grupos} ON CONFLICT (colaborador_id, data_inicio) DO NOTHING`,
+    args,
+  });
+}
+
+/**
+ * Gera (idempotente, via UNIQUE + ON CONFLICT DO NOTHING) todos os ciclos de
+ * 12 meses entre a data de admissão do colaborador e hoje que ainda não existem.
+ */
+export async function sincronizarPeriodos(colaboradorId: number, dataAdmissao: string, hoje: Date): Promise<void> {
+  const ciclos = calcularCiclos(dataAdmissao, hoje);
+  await inserirCiclosEmLote(ciclos.map((c) => ({ colaboradorId, inicio: c.inicio, fim: c.fim })));
+}
+
+/**
+ * Mesma sincronização de `sincronizarPeriodos`, mas para vários colaboradores
+ * de uma vez, numa única query — evita N idas-e-voltas sequenciais ao banco
+ * (relevante com um banco remoto; em SQLite local a diferença nem aparecia).
+ */
+async function sincronizarPeriodosEmLote(
+  colaboradores: { id: number; dataAdmissao: string }[],
+  hoje: Date,
+): Promise<void> {
+  const linhas = colaboradores.flatMap((c) =>
+    calcularCiclos(c.dataAdmissao, hoje).map((ciclo) => ({ colaboradorId: c.id, inicio: ciclo.inicio, fim: ciclo.fim })),
   );
+  await inserirCiclosEmLote(linhas);
 }
 
 export async function listarPeriodosPorColaborador(colaboradorId: number): Promise<PeriodoAquisitivo[]> {
@@ -83,19 +111,30 @@ export async function buscarPeriodo(id: number): Promise<PeriodoAquisitivo | nul
 }
 
 interface LinhaLancamentoResumo {
+  periodo_aquisitivo_id: number;
   dias: number;
   status: "programada" | "concluida" | "cancelada" | "alterada";
   data_inicio_prevista: string | null;
   data_inicio_gozo: string | null;
 }
 
-async function buscarLancamentosAtivos(periodoId: number): Promise<LinhaLancamentoResumo[]> {
+/**
+ * Todos os lançamentos ativos (não cancelados), de TODOS os períodos, numa
+ * query só — evita N+1 (uma query por período) ao montar `listarPeriodosAbertos`.
+ */
+async function buscarTodosLancamentosAtivos(): Promise<Map<number, LinhaLancamentoResumo[]>> {
   const db = await getDb();
-  const resultado = await db.execute({
-    sql: "SELECT dias, status, data_inicio_prevista, data_inicio_gozo FROM lancamentos_ferias WHERE periodo_aquisitivo_id = ? AND status != 'cancelada'",
-    args: [periodoId],
-  });
-  return resultado.rows as unknown as LinhaLancamentoResumo[];
+  const resultado = await db.execute(
+    "SELECT periodo_aquisitivo_id, dias, status, data_inicio_prevista, data_inicio_gozo FROM lancamentos_ferias WHERE status != 'cancelada'",
+  );
+  const linhas = resultado.rows as unknown as LinhaLancamentoResumo[];
+  const porPeriodo = new Map<number, LinhaLancamentoResumo[]>();
+  for (const l of linhas) {
+    const lista = porPeriodo.get(l.periodo_aquisitivo_id) ?? [];
+    lista.push(l);
+    porPeriodo.set(l.periodo_aquisitivo_id, lista);
+  }
+  return porPeriodo;
 }
 
 export type SituacaoPeriodo = "vencida" | "a_vencer" | "programada";
@@ -123,12 +162,12 @@ export interface PeriodoAquisitivoAberto extends PeriodoAquisitivo {
 const DIAS_ALERTA_VENCIMENTO = 60;
 
 /** Calcula todos os campos derivados (estado, concessivo, vencimento, situação) de um período para um colaborador. */
-async function enriquecerPeriodo(
+function enriquecerPeriodo(
   periodo: PeriodoAquisitivo,
   colaborador: Colaborador,
   hoje: Date,
-): Promise<PeriodoAquisitivoAberto> {
-  const lancamentosResumo = await buscarLancamentosAtivos(periodo.id);
+  lancamentosResumo: LinhaLancamentoResumo[],
+): PeriodoAquisitivoAberto {
   // Só férias já confirmadas (concluída/alterada) contam como "gozadas" aqui — uma
   // programação futura ainda não confirmada (Confirmar gozo) não deve reduzir o
   // saldo restante do Controle de Férias, só reserva a data no Planejamento.
@@ -195,12 +234,13 @@ export async function listarPeriodosAbertos(): Promise<PeriodoAquisitivoAberto[]
   const hoje = new Date();
   const colaboradores = await listarColaboradores();
 
-  for (const colaborador of colaboradores) {
-    await sincronizarPeriodos(colaborador.id, colaborador.dataAdmissao, hoje);
-  }
+  await sincronizarPeriodosEmLote(colaboradores, hoje);
 
   const db = await getDb();
-  const resultado = await db.execute("SELECT * FROM periodos_aquisitivos ORDER BY data_inicio");
+  const [resultado, lancamentosPorPeriodo] = await Promise.all([
+    db.execute("SELECT * FROM periodos_aquisitivos ORDER BY data_inicio"),
+    buscarTodosLancamentosAtivos(),
+  ]);
   const linhas = resultado.rows as unknown as LinhaPeriodo[];
 
   const colaboradoresPorId = new Map(colaboradores.map((c) => [c.id, c]));
@@ -214,7 +254,7 @@ export async function listarPeriodosAbertos(): Promise<PeriodoAquisitivoAberto[]
     // Ainda dentro do período aquisitivo (não fechou) — não conta como aberto/vencido ainda.
     if (new Date(periodo.dataFim) > hoje) continue;
 
-    const candidato = await enriquecerPeriodo(periodo, colaborador, hoje);
+    const candidato = enriquecerPeriodo(periodo, colaborador, hoje, lancamentosPorPeriodo.get(periodo.id) ?? []);
     if (candidato.diasATirar <= 0) continue;
 
     const existente = maisRecentePorColaborador.get(periodo.colaboradorId);
@@ -235,11 +275,17 @@ export async function listarHistoricoColaborador(colaboradorId: number): Promise
   await sincronizarPeriodos(colaborador.id, colaborador.dataAdmissao, hoje);
 
   const db = await getDb();
-  const resultado = await db.execute({
-    sql: "SELECT * FROM periodos_aquisitivos WHERE colaborador_id = ? ORDER BY data_inicio",
-    args: [colaboradorId],
-  });
+  const [resultado, lancamentosPorPeriodo] = await Promise.all([
+    db.execute({
+      sql: "SELECT * FROM periodos_aquisitivos WHERE colaborador_id = ? ORDER BY data_inicio",
+      args: [colaboradorId],
+    }),
+    buscarTodosLancamentosAtivos(),
+  ]);
   const linhas = resultado.rows as unknown as LinhaPeriodo[];
 
-  return Promise.all(linhas.map((linha) => enriquecerPeriodo(paraPeriodo(linha), colaborador, hoje)));
+  return linhas.map((linha) => {
+    const periodo = paraPeriodo(linha);
+    return enriquecerPeriodo(periodo, colaborador, hoje, lancamentosPorPeriodo.get(periodo.id) ?? []);
+  });
 }

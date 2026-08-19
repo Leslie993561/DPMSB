@@ -212,31 +212,34 @@ export async function fecharCompetencia(competencia: string): Promise<VerbaColab
   const linhas = await gerarBreakdown(competencia, colaboradores);
   const db = await getDb();
 
-  await db.batch(
-    linhas.map((l) => ({
+  if (linhas.length > 0) {
+    // Um único INSERT multi-linha (em vez de um por colaborador) — contra um
+    // banco remoto, N statements separados custam N idas-e-voltas de rede.
+    const grupos = linhas.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)").join(", ");
+    const args = linhas.flatMap((l) => [
+      l.colaboradorId,
+      competencia,
+      l.salarioBase,
+      l.inss,
+      l.irrf,
+      l.fgts,
+      l.provisaoDecimoTerceiro,
+      l.valeTransporte,
+      l.valeAlimentacao,
+      l.premiacao,
+      l.custoTotal,
+    ]);
+    await db.execute({
       sql: `INSERT INTO folha_breakdown
        (colaborador_id, competencia, salario_base, inss, irrf, fgts, provisao_decimo_terceiro, vale_transporte, vale_alimentacao, outros_beneficios, premiacao, custo_total)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+     VALUES ${grupos}
      ON CONFLICT(colaborador_id, competencia) DO UPDATE SET
        salario_base = excluded.salario_base, inss = excluded.inss, irrf = excluded.irrf, fgts = excluded.fgts,
        provisao_decimo_terceiro = excluded.provisao_decimo_terceiro, vale_transporte = excluded.vale_transporte,
        vale_alimentacao = excluded.vale_alimentacao, premiacao = excluded.premiacao, custo_total = excluded.custo_total`,
-      args: [
-        l.colaboradorId,
-        competencia,
-        l.salarioBase,
-        l.inss,
-        l.irrf,
-        l.fgts,
-        l.provisaoDecimoTerceiro,
-        l.valeTransporte,
-        l.valeAlimentacao,
-        l.premiacao,
-        l.custoTotal,
-      ],
-    })),
-    "write",
-  );
+      args,
+    });
+  }
 
   return linhas;
 }

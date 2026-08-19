@@ -118,10 +118,10 @@ function paraColaborador(linha: LinhaColaborador): Colaborador {
 export async function listarColaboradores(): Promise<Colaborador[]> {
   const db = await getDb();
   const resultado = await db.execute(
-    // COLLATE NOCASE: sem isso, "ANA" (tudo maiúsculo, vindo de importação em lote) e "Bruno"
+    // lower(nome): sem isso, "ANA" (tudo maiúsculo, vindo de importação em lote) e "Bruno"
     // (Título, cadastro manual) ordenam por valor de byte — maiúsculas antes de minúsculas —
     // e não pela ordem alfabética que um humano espera.
-    "SELECT * FROM colaboradores ORDER BY nome COLLATE NOCASE",
+    "SELECT * FROM colaboradores ORDER BY lower(nome)",
   );
   return (resultado.rows as unknown as LinhaColaborador[]).map(paraColaborador);
 }
