@@ -182,18 +182,24 @@ function enriquecerPeriodo(
 }
 
 /**
- * Retorna, por colaborador, o período aquisitivo "em aberto" (dias a tirar > 0)
- * mais relevante — já com o estado calculado e o destaque de vencimento
+ * Retorna TODOS os períodos aquisitivos já fechados que ainda têm saldo (dias
+ * a tirar > 0), com o estado calculado e o destaque de vencimento
  * próximo/vencido/risco de dobro.
  *
- * Duas regras restringem o que conta como "em aberto":
- * 1. Um período AINDA EM CURSO (`dataFim` no futuro — os 12 meses de
- *    aquisição ainda não se completaram) nunca aparece aqui, mesmo que
- *    `diasDireito` já esteja cadastrado com o valor cheio (30) — o direito só
- *    é considerado vencido quando o período efetivamente fecha.
- * 2. Só o período JÁ FECHADO mais recente (maior `dataFim`) de cada
- *    colaborador é retornado — se houver saldo de um período ainda mais
- *    antigo, ele só volta a aparecer depois que o mais recente for resolvido.
+ * Uma regra restringe o que conta como "em aberto": um período AINDA EM CURSO
+ * (`dataFim` no futuro — os 12 meses de aquisição não se completaram) não
+ * aparece aqui, mesmo que `diasDireito` já esteja com o valor cheio (30) — o
+ * direito só é exigível quando o período efetivamente fecha.
+ *
+ * Antes havia uma segunda regra: só o período fechado MAIS RECENTE de cada
+ * colaborador aparecia. Ela existia porque os períodos eram gerados
+ * automaticamente pelo aniversário de admissão, e cada pessoa acumulava vários
+ * períodos fantasma com 30 dias de saldo — mostrar todos inundava a tela. Com
+ * os períodos vindos do relatório do DP isso se inverteu: um colaborador pode
+ * legitimamente ter dois períodos com saldo, e o ANTIGO é justamente o que
+ * corre risco de dobra. O Iago, por exemplo, tem 20 dias de um período cujo
+ * limite para gozo venceu — era exatamente essa linha que a regra escondia,
+ * e ela também não entrava na contagem de "Férias vencidas".
  */
 export async function listarPeriodosAbertos(): Promise<PeriodoAquisitivoAberto[]> {
   const hoje = new Date();
@@ -207,7 +213,7 @@ export async function listarPeriodosAbertos(): Promise<PeriodoAquisitivoAberto[]
   const linhas = resultado.rows as unknown as LinhaPeriodo[];
 
   const colaboradoresPorId = new Map(colaboradores.map((c) => [c.id, c]));
-  const maisRecentePorColaborador = new Map<number, PeriodoAquisitivoAberto>();
+  const abertos: PeriodoAquisitivoAberto[] = [];
 
   for (const linha of linhas) {
     const periodo = paraPeriodo(linha);
@@ -220,13 +226,10 @@ export async function listarPeriodosAbertos(): Promise<PeriodoAquisitivoAberto[]
     const candidato = enriquecerPeriodo(periodo, colaborador, hoje, lancamentosPorPeriodo.get(periodo.id) ?? []);
     if (candidato.diasATirar <= 0) continue;
 
-    const existente = maisRecentePorColaborador.get(periodo.colaboradorId);
-    if (!existente || periodo.dataFim > existente.dataFim) {
-      maisRecentePorColaborador.set(periodo.colaboradorId, candidato);
-    }
+    abertos.push(candidato);
   }
 
-  return Array.from(maisRecentePorColaborador.values());
+  return abertos;
 }
 
 /** Histórico completo (todos os períodos, resolvidos ou não) de um único colaborador — usado na exportação "por colaborador". */
