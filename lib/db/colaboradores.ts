@@ -1,5 +1,6 @@
 import "server-only";
 import { getDb } from "./client";
+import { substituirDependentes } from "./colaboradorDependentes";
 
 export type Vinculo = "CLT" | "CLT-bio" | "PJ" | "EST" | "JÁ";
 export type TipoTransporte = "vt_diario" | "vm_fixo";
@@ -389,11 +390,25 @@ export interface ImportacaoColaboradores {
   descartados: { linha: number; motivo: string }[];
 }
 
-/** Insere um lote de colaboradores (vindo da importação de planilha). */
-export async function importarColaboradores(itens: ColaboradorInput[]): Promise<ImportacaoColaboradores> {
+/** Dependentes vindos da mesma linha da planilha do colaborador (colunas "Dependente N — ..."). */
+export interface ColaboradorInputComDependentes extends ColaboradorInput {
+  dependentesLista?: { nome: string; dataNascimento?: string | null; cpf?: string | null }[];
+}
+
+/** Insere um lote de colaboradores (vindo da importação de planilha), com seus dependentes. */
+export async function importarColaboradores(
+  itens: ColaboradorInputComDependentes[],
+): Promise<ImportacaoColaboradores> {
   let criados = 0;
   for (const item of itens) {
-    await criarColaborador(item);
+    const { dependentesLista, ...dadosColaborador } = item;
+    const colaborador = await criarColaborador({
+      ...dadosColaborador,
+      dependentes: dependentesLista?.length ?? dadosColaborador.dependentes ?? 0,
+    });
+    if (dependentesLista && dependentesLista.length > 0) {
+      await substituirDependentes(colaborador.id, dependentesLista);
+    }
     criados++;
   }
   return { criados, descartados: [] };

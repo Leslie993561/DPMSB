@@ -1,58 +1,78 @@
 import ExcelJS from "exceljs";
 import { listarColaboradores } from "@/lib/db/colaboradores";
+import { listarDependentesPorColaborador } from "@/lib/db/colaboradorDependentes";
+import { COLUNAS_COLABORADOR, colunasDependentes } from "@/lib/planilhas/colunasColaborador";
 
 export const runtime = "nodejs";
 
-const COLUNAS = [
-  { header: "Nome completo", key: "nome", width: 30 },
-  { header: "Data de admissão", key: "dataAdmissao", width: 16 },
-  { header: "Nascimento", key: "dataNascimento", width: 14 },
-  { header: "CPF", key: "cpf", width: 16 },
-  { header: "E-mail", key: "email", width: 28 },
-  { header: "Cargo", key: "cargo", width: 20 },
-  { header: "Departamento", key: "departamento", width: 22 },
-  { header: "Vínculo", key: "vinculo", width: 10 },
-  { header: "Líder direto", key: "liderDireto", width: 22 },
-  { header: "Salário", key: "salarioBase", width: 12 },
-  { header: "Alimentação", key: "alimentacaoValor", width: 12 },
-  { header: "CBO", key: "cbo", width: 10 },
-  { header: "Cidade", key: "cidade", width: 18 },
-  { header: "Agência", key: "agencia", width: 10 },
-  { header: "Conta", key: "conta", width: 14 },
-  { header: "Tipo de transporte", key: "tipoTransporte", width: 16 },
-  { header: "Valor do transporte", key: "valorTransporteFixo", width: 16 },
-];
+const ROTULO_SEXO: Record<string, string> = { M: "Masculino", F: "Feminino" };
 
-/** Exporta o quadro completo de colaboradores — mesmas colunas do modelo de importação, já preenchidas. */
+/** Exporta o quadro completo de colaboradores — todos os campos da ficha, na mesma ordem dos blocos. */
 export async function GET() {
-  const colaboradores = await listarColaboradores();
+  const [colaboradores, dependentesPorColaborador] = await Promise.all([
+    listarColaboradores(),
+    listarDependentesPorColaborador(),
+  ]);
   const colaboradoresPorId = new Map(colaboradores.map((c) => [c.id, c]));
+  const maiorQuantidadeDependentes = colaboradores.reduce(
+    (maior, c) => Math.max(maior, dependentesPorColaborador.get(c.id)?.length ?? 0),
+    0,
+  );
 
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Colaboradores");
-  sheet.columns = COLUNAS;
+  sheet.columns = [...COLUNAS_COLABORADOR, ...colunasDependentes(maiorQuantidadeDependentes)];
   sheet.getRow(1).font = { bold: true };
 
   for (const c of colaboradores) {
     const lider = c.gestorId ? colaboradoresPorId.get(c.gestorId)?.nome : c.liderDiretoNome;
+    const dependentes = dependentesPorColaborador.get(c.id) ?? [];
+    const colunasDep: Record<string, string> = {};
+    dependentes.forEach((d, i) => {
+      const n = i + 1;
+      colunasDep[`dep${n}Nome`] = d.nome;
+      colunasDep[`dep${n}Nascimento`] = d.dataNascimento ?? "";
+      colunasDep[`dep${n}Cpf`] = d.cpf ?? "";
+    });
+
     sheet.addRow({
       nome: c.nome,
-      dataAdmissao: c.dataAdmissao,
-      dataNascimento: c.dataNascimento ?? "",
       cpf: c.cpf ?? "",
+      pis: c.pis ?? "",
+      dataNascimento: c.dataNascimento ?? "",
+      cidadeNascimento: c.cidadeNascimento ?? "",
+      ufNascimento: c.ufNascimento ?? "",
+      nomePai: c.nomePai ?? "",
+      nomeMae: c.nomeMae ?? "",
+      telefone: c.telefone ?? "",
+      sexo: c.sexo ? ROTULO_SEXO[c.sexo] : "",
+      emailPessoal: c.emailPessoal ?? "",
       email: c.email ?? "",
       cargo: c.cargo ?? "",
       departamento: c.departamento ?? "",
       vinculo: c.vinculo ?? "",
+      cbo: c.cbo ?? "",
       liderDireto: lider ?? "",
       salarioBase: c.salarioBase,
-      alimentacaoValor: c.alimentacaoValor ?? "",
-      cbo: c.cbo ?? "",
-      cidade: c.cidade ?? "",
+      horario: c.horario ?? "",
+      dataAdmissao: c.dataAdmissao,
+      dataDesligamento: c.dataDesligamento ?? "",
+      banco: c.banco ?? "",
       agencia: c.agencia ?? "",
       conta: c.conta ?? "",
+      alimentacaoValor: c.alimentacaoValor ?? "",
       tipoTransporte: c.tipoTransporte === "vm_fixo" ? "VM - fixo mensal" : "VT - por dia útil",
       valorTransporteFixo: c.valorTransporteFixo ?? "",
+      cep: c.cep ?? "",
+      estado: c.estado ?? "",
+      cidade: c.cidade ?? "",
+      bairro: c.bairro ?? "",
+      rua: c.rua ?? "",
+      numero: c.numero ?? "",
+      conjugeNome: c.conjugeNome ?? "",
+      conjugeCpf: c.conjugeCpf ?? "",
+      conjugeNascimento: c.conjugeNascimento ?? "",
+      ...colunasDep,
     });
   }
 

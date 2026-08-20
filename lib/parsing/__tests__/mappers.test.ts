@@ -87,6 +87,66 @@ describe("sugerirMapeamentoColaborador", () => {
     expect(s.find((x) => x.campo === "salarioBase")?.obrigatorio).toBe(true);
     expect(s.find((x) => x.campo === "cpf")?.obrigatorio).toBe(false);
   });
+
+  /**
+   * A planilha de colaboradores tem colunas que disputam o mesmo termo (dois
+   * e-mails, duas cidades, três CPFs, três "nascimento"). Estes casos travam o
+   * comportamento correto: o campo específico fica com a coluna específica.
+   */
+  it("não confunde colunas homônimas dos blocos da ficha", () => {
+    const cabecalhos = [
+      "Nome completo",
+      "CPF",
+      "Nascimento",
+      "Cidade de nascimento",
+      "UF de nascimento",
+      "Nome do pai",
+      "Nome da mãe",
+      "E-mail pessoal",
+      "E-mail profissional",
+      "Estado",
+      "Cidade",
+      "Número",
+      "Cônjuge — Nome",
+      "Cônjuge — CPF",
+      "Cônjuge — Nascimento",
+    ];
+    const mapa = Object.fromEntries(
+      sugerirMapeamentoColaborador(cabecalhos).map((s) => [s.campo, s.coluna]),
+    );
+
+    expect(mapa.nome).toBe("Nome completo");
+    expect(mapa.cpf).toBe("CPF");
+    expect(mapa.dataNascimento).toBe("Nascimento");
+    expect(mapa.cidade).toBe("Cidade");
+    expect(mapa.cidadeNascimento).toBe("Cidade de nascimento");
+    expect(mapa.estado).toBe("Estado");
+    expect(mapa.ufNascimento).toBe("UF de nascimento");
+    expect(mapa.email).toBe("E-mail profissional");
+    expect(mapa.emailPessoal).toBe("E-mail pessoal");
+    expect(mapa.nomePai).toBe("Nome do pai");
+    expect(mapa.nomeMae).toBe("Nome da mãe");
+    expect(mapa.conjugeNome).toBe("Cônjuge — Nome");
+    expect(mapa.conjugeCpf).toBe("Cônjuge — CPF");
+    expect(mapa.conjugeNascimento).toBe("Cônjuge — Nascimento");
+  });
+
+  it('não sugere "Número" (do endereço) nem "Dependente 1 — Nome" como quantidade de dependentes', () => {
+    const s = sugerirMapeamentoColaborador([
+      "Nome completo",
+      "Número",
+      "Rua",
+      "Dependente 1 — Nome",
+      "Dependente 1 — CPF",
+    ]);
+    expect(s.find((x) => x.campo === "dependentes")?.coluna).toBeNull();
+    expect(s.find((x) => x.campo === "numero")?.coluna).toBe("Número");
+  });
+
+  it('ainda reconhece "Número de dependentes" como quantidade de dependentes', () => {
+    const s = sugerirMapeamentoColaborador(["Nome completo", "Número de dependentes"]);
+    expect(s.find((x) => x.campo === "dependentes")?.coluna).toBe("Número de dependentes");
+  });
 });
 
 describe("converterParaColaboradoresCadastro", () => {
@@ -150,5 +210,68 @@ describe("converterParaColaboradoresCadastro", () => {
     expect(() =>
       converterParaColaboradoresCadastro([], { nome: "Nome", salarioBase: "Salário" }),
     ).toThrow(/admissão/i);
+  });
+
+  it("normaliza sexo por extenso e ignora valor desconhecido", () => {
+    const r = converterParaColaboradoresCadastro(
+      [
+        { Nome: "Ana", Admissão: "15/09/2025", Salário: 1621, Sexo: "Feminino" },
+        { Nome: "Bruno", Admissão: "15/09/2025", Salário: 1621, Sexo: "m" },
+        { Nome: "Ciro", Admissão: "15/09/2025", Salário: 1621, Sexo: "outro" },
+      ],
+      { ...mapeamento, sexo: "Sexo" },
+    );
+    expect(r.colaboradores[0].sexo).toBe("F");
+    expect(r.colaboradores[1].sexo).toBe("M");
+    expect(r.colaboradores[2].sexo).toBeNull();
+  });
+
+  it("lê dependentes das colunas 'Dependente N — ...' e usa a lista como contagem", () => {
+    const r = converterParaColaboradoresCadastro(
+      [
+        {
+          Nome: "Ana",
+          Admissão: "15/09/2025",
+          Salário: 1621,
+          "Dependente 1 — Nome": "Filho Um",
+          "Dependente 1 — Nascimento": "10/03/2015",
+          "Dependente 1 — CPF": "111.111.111-11",
+          "Dependente 2 — Nome": "Filha Dois",
+          "Dependente 2 — Nascimento": "2018-07-22",
+          "Dependente 2 — CPF": null,
+        },
+      ],
+      mapeamento,
+    );
+    const c = r.colaboradores[0];
+    expect(c.dependentesLista).toHaveLength(2);
+    expect(c.dependentesLista[0]).toEqual({
+      nome: "Filho Um",
+      dataNascimento: "2015-03-10",
+      cpf: "111.111.111-11",
+    });
+    expect(c.dependentesLista[1]).toEqual({
+      nome: "Filha Dois",
+      dataNascimento: "2018-07-22",
+      cpf: null,
+    });
+    expect(c.dependentes).toBe(2);
+  });
+
+  it("ignora dependente sem nome, mesmo com outras colunas preenchidas", () => {
+    const r = converterParaColaboradoresCadastro(
+      [
+        {
+          Nome: "Ana",
+          Admissão: "15/09/2025",
+          Salário: 1621,
+          "Dependente 1 — Nome": "",
+          "Dependente 1 — CPF": "111.111.111-11",
+        },
+      ],
+      mapeamento,
+    );
+    expect(r.colaboradores[0].dependentesLista).toHaveLength(0);
+    expect(r.colaboradores[0].dependentes).toBe(0);
   });
 });

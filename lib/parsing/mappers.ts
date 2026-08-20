@@ -161,16 +161,46 @@ export type CampoColaborador =
   | "cbo"
   | "cidade"
   | "agencia"
-  | "conta";
+  | "conta"
+  | "pis"
+  | "cidadeNascimento"
+  | "ufNascimento"
+  | "nomePai"
+  | "nomeMae"
+  | "telefone"
+  | "sexo"
+  | "emailPessoal"
+  | "horario"
+  | "banco"
+  | "cep"
+  | "estado"
+  | "bairro"
+  | "rua"
+  | "numero"
+  | "conjugeNome"
+  | "conjugeCpf"
+  | "conjugeNascimento";
 
+/**
+ * Os sinônimos de campos que disputam o mesmo termo (dois e-mails, duas
+ * cidades, dois CPFs, duas datas de nascimento) listam PRIMEIRO a forma
+ * completa e específica do cabeçalho — o motor tenta casamento exato em todos
+ * os cabeçalhos antes de cair no parcial, então a forma específica ganha e
+ * "E-mail pessoal" não é confundido com "E-mail profissional".
+ */
 const SINONIMOS_COLABORADOR: Record<CampoColaborador, string[]> = {
-  nome: ["nome", "colaborador", "funcionario", "empregado", "nome completo"],
+  nome: ["nome completo", "nome", "colaborador", "funcionario", "empregado"],
   dataAdmissao: ["admissao", "data admissao", "data de admissao", "dt admissao"],
   dataNascimento: ["nascimento", "data nascimento", "data de nascimento", "dt nascimento"],
   salarioBase: ["salario", "salario base", "salario-base", "vencimento", "remuneracao"],
-  dependentes: ["dependentes", "dependente", "qtd dependentes", "numero de dependentes", "deps"],
+  // Só as formas no plural, e sem "numero de dependentes". O casamento parcial
+  // é bidirecional, então: "numero de dependentes" fazia a coluna "Número" (do
+  // endereço) virar quantidade de dependentes, e o singular "dependente" fazia
+  // "Dependente 1 — Nome" virar quantidade. "Número de dependentes" continua
+  // casando por conter "dependentes".
+  dependentes: ["dependentes", "qtd dependentes", "deps"],
   cpf: ["cpf"],
-  email: ["email", "e mail", "e-mail"],
+  email: ["e mail profissional", "email profissional", "email", "e mail"],
   cargo: ["cargo", "cod cargo", "codigo cargo", "funcao"],
   departamento: ["departamento", "setor", "area"],
   vinculo: ["vinculo", "tipo de vinculo", "contrato"],
@@ -180,6 +210,24 @@ const SINONIMOS_COLABORADOR: Record<CampoColaborador, string[]> = {
   cidade: ["cidade", "municipio"],
   agencia: ["agencia"],
   conta: ["conta", "conta corrente"],
+  pis: ["pis", "pis pasep", "nit"],
+  cidadeNascimento: ["cidade de nascimento", "cidade nascimento", "naturalidade", "cid nasc"],
+  ufNascimento: ["uf de nascimento", "uf nascimento", "uf nasc"],
+  nomePai: ["nome do pai", "nome pai", "pai", "nom pai"],
+  nomeMae: ["nome da mae", "nome mae", "mae", "nom mae"],
+  telefone: ["telefone", "celular", "tell", "tel", "fone"],
+  sexo: ["sexo", "genero"],
+  emailPessoal: ["e mail pessoal", "email pessoal"],
+  horario: ["horario", "jornada", "horario jornada"],
+  banco: ["banco"],
+  cep: ["cep"],
+  estado: ["estado", "uf"],
+  bairro: ["bairro"],
+  rua: ["rua", "logradouro", "endereco"],
+  numero: ["numero", "num", "nro"],
+  conjugeNome: ["conjuge nome", "nome do conjuge", "conjuge"],
+  conjugeCpf: ["conjuge cpf", "cpf do conjuge"],
+  conjugeNascimento: ["conjuge nascimento", "nascimento do conjuge"],
 };
 
 const OBRIGATORIOS_COLABORADOR: Record<CampoColaborador, boolean> = {
@@ -199,10 +247,34 @@ const OBRIGATORIOS_COLABORADOR: Record<CampoColaborador, boolean> = {
   cidade: false,
   agencia: false,
   conta: false,
+  pis: false,
+  cidadeNascimento: false,
+  ufNascimento: false,
+  nomePai: false,
+  nomeMae: false,
+  telefone: false,
+  sexo: false,
+  emailPessoal: false,
+  horario: false,
+  banco: false,
+  cep: false,
+  estado: false,
+  bairro: false,
+  rua: false,
+  numero: false,
+  conjugeNome: false,
+  conjugeCpf: false,
+  conjugeNascimento: false,
 };
 
 export function sugerirMapeamentoColaborador(cabecalhos: string[]): SugestaoColuna<CampoColaborador>[] {
   return sugerirMapeamentoGenerico(cabecalhos, SINONIMOS_COLABORADOR, OBRIGATORIOS_COLABORADOR);
+}
+
+export interface DependenteImportado {
+  nome: string;
+  dataNascimento: string | null; // ISO
+  cpf: string | null;
 }
 
 export interface ColaboradorImportado {
@@ -223,6 +295,26 @@ export interface ColaboradorImportado {
   cidade: string | null;
   agencia: string | null;
   conta: string | null;
+  pis: string | null;
+  cidadeNascimento: string | null;
+  ufNascimento: string | null;
+  nomePai: string | null;
+  nomeMae: string | null;
+  telefone: string | null;
+  sexo: "M" | "F" | null;
+  emailPessoal: string | null;
+  horario: string | null;
+  banco: string | null;
+  cep: string | null;
+  estado: string | null;
+  bairro: string | null;
+  rua: string | null;
+  numero: string | null;
+  conjugeNome: string | null;
+  conjugeCpf: string | null;
+  conjugeNascimento: string | null;
+  /** Lidos das colunas "Dependente N — Nome/Nascimento/CPF" (padrão do modelo/exportação), não do mapeamento manual. */
+  dependentesLista: DependenteImportado[];
 }
 
 export interface ConversaoColaboradores {
@@ -311,12 +403,21 @@ export function converterParaColaboradoresCadastro(
         ? null
         : Number(typeof alimentacaoBruta === "number" ? alimentacaoBruta : String(alimentacaoBruta).replace(",", "."));
 
+    const dependentesLista = lerDependentesDaLinha(linha);
+
     colaboradores.push({
       nome: nome || `Linha ${numeroLinha}`,
       dataAdmissao,
       dataNascimento: mapeamento.dataNascimento ? parseDataAdmissao(linha[mapeamento.dataNascimento]) : null,
       salarioBase,
-      dependentes: Number.isFinite(dependentes) && dependentes > 0 ? Math.floor(dependentes) : 0,
+      // A contagem vale a lista de dependentes lida da planilha quando ela
+      // existe — o número solto só é usado se não houver dependente detalhado.
+      dependentes:
+        dependentesLista.length > 0
+          ? dependentesLista.length
+          : Number.isFinite(dependentes) && dependentes > 0
+            ? Math.floor(dependentes)
+            : 0,
       cpf: opcional("cpf"),
       email: opcional("email"),
       cargo: opcional("cargo"),
@@ -328,8 +429,70 @@ export function converterParaColaboradoresCadastro(
       cidade: opcional("cidade"),
       agencia: opcional("agencia"),
       conta: opcional("conta"),
+      pis: opcional("pis"),
+      cidadeNascimento: opcional("cidadeNascimento"),
+      ufNascimento: opcional("ufNascimento"),
+      nomePai: opcional("nomePai"),
+      nomeMae: opcional("nomeMae"),
+      telefone: opcional("telefone"),
+      sexo: normalizarSexo(opcional("sexo")),
+      emailPessoal: opcional("emailPessoal"),
+      horario: opcional("horario"),
+      banco: opcional("banco"),
+      cep: opcional("cep"),
+      estado: opcional("estado"),
+      bairro: opcional("bairro"),
+      rua: opcional("rua"),
+      numero: opcional("numero"),
+      conjugeNome: opcional("conjugeNome"),
+      conjugeCpf: opcional("conjugeCpf"),
+      conjugeNascimento: mapeamento.conjugeNascimento
+        ? parseDataAdmissao(linha[mapeamento.conjugeNascimento])
+        : null,
+      dependentesLista,
     });
   });
 
   return { colaboradores, descartadas };
+}
+
+/** "Masculino"/"m" → "M"; "Feminino"/"f" → "F"; qualquer outra coisa → null (nunca adivinha). */
+function normalizarSexo(valor: string | null): "M" | "F" | null {
+  if (!valor) return null;
+  const inicial = normalizar(valor).charAt(0);
+  if (inicial === "m") return "M";
+  if (inicial === "f") return "F";
+  return null;
+}
+
+/**
+ * Lê os dependentes das colunas "Dependente N — Nome/Nascimento/CPF" (o padrão
+ * que o modelo e a exportação geram), em vez do mapeamento manual — são
+ * colunas repetidas e variáveis em quantidade, que não caberiam num
+ * mapeamento campo→coluna único. Dependente sem nome é ignorado.
+ */
+function lerDependentesDaLinha(linha: LinhaPlanilha): DependenteImportado[] {
+  const porIndice = new Map<number, { nome?: string; nascimento?: string | null; cpf?: string }>();
+
+  for (const [cabecalho, valor] of Object.entries(linha)) {
+    const norm = normalizar(cabecalho);
+    const casamento = norm.match(/^dependente (\d+)\s+(nome|nascimento|cpf)$/);
+    if (!casamento) continue;
+
+    const indice = Number(casamento[1]);
+    const campo = casamento[2];
+    const atual = porIndice.get(indice) ?? {};
+    const texto = valor === null || valor === "" ? "" : String(valor).trim();
+
+    if (campo === "nome") atual.nome = texto;
+    else if (campo === "cpf") atual.cpf = texto;
+    else atual.nascimento = parseDataAdmissao(valor);
+
+    porIndice.set(indice, atual);
+  }
+
+  return Array.from(porIndice.entries())
+    .sort(([a], [b]) => a - b)
+    .filter(([, d]) => d.nome)
+    .map(([, d]) => ({ nome: d.nome!, dataNascimento: d.nascimento ?? null, cpf: d.cpf || null }));
 }

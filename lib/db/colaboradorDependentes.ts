@@ -65,6 +65,23 @@ export async function listarDependentes(colaboradorId: number): Promise<Colabora
 }
 
 /**
+ * Todos os dependentes de todos os colaboradores, agrupados por colaborador —
+ * uma query só, para a exportação não pagar uma ida ao banco por colaborador.
+ */
+export async function listarDependentesPorColaborador(): Promise<Map<number, ColaboradorDependente[]>> {
+  const db = await getDb();
+  const resultado = await db.execute("SELECT * FROM colaborador_dependentes ORDER BY colaborador_id, id");
+  const mapa = new Map<number, ColaboradorDependente[]>();
+  for (const linha of resultado.rows as unknown as LinhaDependente[]) {
+    const dependente = paraDependente(linha);
+    const lista = mapa.get(dependente.colaboradorId) ?? [];
+    lista.push(dependente);
+    mapa.set(dependente.colaboradorId, lista);
+  }
+  return mapa;
+}
+
+/**
  * Substitui todos os dependentes cadastrados do colaborador pela lista informada.
  * O formulário sempre envia a lista completa (não deltas), então apagar e recriar
  * é mais simples e correto do que tentar casar itens existentes com editados.
