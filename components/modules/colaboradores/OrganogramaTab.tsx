@@ -54,10 +54,33 @@ const ORGANOGRAMA: DefinicaoCargo = {
           departamento: "Industrial",
           lideranca: true,
           filhos: [
-            { rotulo: "Supervisora", cargo: "Supervisora", departamento: "Produção", lideranca: true },
-            { rotulo: "Analista de PCP", cargo: "Analista", departamento: "Planejamento" },
+            {
+              rotulo: "Supervisora",
+              cargo: "Supervisora",
+              departamento: "Produção",
+              lideranca: true,
+              filhos: [{ rotulo: "Auxiliar", cargo: "Auxiliar", departamento: "Produção" }],
+            },
+            {
+              rotulo: "Supervisora",
+              cargo: "Supervisora",
+              departamento: "Controle da Qualidade",
+              lideranca: true,
+              filhos: [
+                { rotulo: "Analista", cargo: "Analista", departamento: "Controle da Qualidade" },
+                { rotulo: "Inspetora", cargo: "Inspetora", departamento: "Controle da Qualidade" },
+              ],
+            },
+            {
+              rotulo: "Analista de PCP",
+              cargo: "Analista",
+              departamento: "Planejamento",
+              filhos: [{ rotulo: "Assistente de PCP", cargo: "Assistente", departamento: "Planejamento" }],
+            },
           ],
         },
+        { rotulo: "Analista", cargo: "Analista", departamento: "Recursos Humanos" },
+        { rotulo: "Assistente", cargo: "Assistente", departamento: "Recursos Humanos" },
       ],
     },
     {
@@ -78,6 +101,8 @@ const COR_LIDERANCA = "#579EB4";
 const COR_BORDA_EQUIPE = "#579EB4";
 const COR_BADGE_BG = "#9FD4DE";
 const COR_BADGE_TEXTO = "#1F3A44";
+const COR_BADGE_VAGO_BG = "#E4E7E9";
+const COR_BADGE_VAGO_TEXTO = "#6B7280";
 const COR_CONECTOR = "#818286";
 
 function contarColaboradores(colaboradores: Colaborador[], def: DefinicaoCargo): number {
@@ -109,10 +134,18 @@ function CaixaCargo({ def, qtd, raiz = false }: { def: DefinicaoCargo; qtd: numb
           {def.departamento}
         </p>
       </div>
-      {qtd > 1 && (
+      {/* Sem badge quando é exatamente 1 (a própria caixa já significa uma pessoa).
+          Com 0, mostra "0" em cinza — a posição existe no organograma mas está
+          vaga, e omitir o número faria parecer que há alguém nela. */}
+      {qtd !== 1 && (
         <span
           className="absolute -top-2 -right-2 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-bold shadow-card"
-          style={{ background: COR_BADGE_BG, color: COR_BADGE_TEXTO }}
+          style={
+            qtd === 0
+              ? { background: COR_BADGE_VAGO_BG, color: COR_BADGE_VAGO_TEXTO }
+              : { background: COR_BADGE_BG, color: COR_BADGE_TEXTO }
+          }
+          title={qtd === 0 ? "Nenhum colaborador cadastrado nesta posição" : `${qtd} colaboradores`}
         >
           {qtd}
         </span>
@@ -123,18 +156,13 @@ function CaixaCargo({ def, qtd, raiz = false }: { def: DefinicaoCargo; qtd: numb
 
 function NoOrganograma({ def, colaboradores }: { def: DefinicaoCargo; colaboradores: Colaborador[] }) {
   const qtd = contarColaboradores(colaboradores, def);
-  const filhosVisiveis = (def.filhos ?? []).filter(
-    (f) => contarColaboradores(colaboradores, f) > 0 || (f.filhos?.length ?? 0) > 0,
-  );
-
-  if (qtd === 0 && filhosVisiveis.length === 0) return null;
 
   return (
     <li>
       <CaixaCargo def={def} qtd={qtd} />
-      {filhosVisiveis.length > 0 && (
+      {(def.filhos?.length ?? 0) > 0 && (
         <ul>
-          {filhosVisiveis.map((filho, i) => (
+          {def.filhos!.map((filho, i) => (
             <NoOrganograma key={`${filho.rotulo}-${i}`} def={filho} colaboradores={colaboradores} />
           ))}
         </ul>
@@ -157,8 +185,8 @@ export function OrganogramaTab({ colaboradores }: { colaboradores: Colaborador[]
   return (
     <div className="space-y-3">
       <p className="text-xs text-foreground-muted">
-        Estrutura de liderança da MSB, por cargo — sem nomes, só posições e o número de pessoas em cada uma
-        (contado ao vivo no cadastro atual).
+        Estrutura da MSB, por cargo — sem nomes, só posições e o número de pessoas em cada uma (contado ao vivo no
+        cadastro atual). Caixa sem número = uma pessoa; <strong>0</strong> em cinza = posição sem ninguém cadastrado.
       </p>
 
       <h2
