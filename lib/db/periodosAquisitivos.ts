@@ -41,58 +41,24 @@ function paraPeriodo(linha: LinhaPeriodo): PeriodoAquisitivo {
   };
 }
 
-function calcularCiclos(dataAdmissao: string, hoje: Date): { inicio: string; fim: string }[] {
-  const ciclos: { inicio: string; fim: string }[] = [];
-  let cicloInicio = new Date(dataAdmissao);
-  while (cicloInicio <= hoje) {
-    const cicloFim = new Date(cicloInicio);
-    cicloFim.setMonth(cicloFim.getMonth() + 12);
-    ciclos.push({ inicio: cicloInicio.toISOString().slice(0, 10), fim: cicloFim.toISOString().slice(0, 10) });
-    cicloInicio = cicloFim;
-  }
-  return ciclos;
-}
-
-/**
- * Insere várias linhas (colaborador_id, data_inicio, data_fim) num só
- * `INSERT ... VALUES (...), (...), ...` — contra um banco remoto, uma query
- * com N grupos de valores custa uma ida-e-volta de rede; N queries separadas
- * (mesmo em uma transação) custam N idas-e-voltas, uma por statement.
+/*
+ * NÃO existe mais geração automática de períodos aquisitivos.
+ *
+ * Antes, os períodos eram criados de 12 em 12 meses a partir da data de
+ * admissão, a cada leitura da tela. Isso brigava com o relatório
+ * "Programação de Férias" do DP, que é a fonte oficial: nele os períodos
+ * podem estar deslocados do aniversário de admissão, porque afastamento e
+ * licença suspendem a aquisição (a Janete, por exemplo, foi admitida em
+ * 01/04/2015 e tem período aquisitivo começando em 07/12/2025). O resultado
+ * eram dois conjuntos de períodos para a mesma pessoa e a mesma férias
+ * contada duas vezes no Controle de Férias.
+ *
+ * Agora período aquisitivo entra no sistema só por importação do relatório
+ * do DP (Controle de Férias → "Importar arquivo") ou pelo assistente de
+ * Programação Anual. Colaborador que ainda não apareceu em nenhum relatório
+ * fica sem período até a próxima importação — de propósito: é melhor não
+ * mostrar nada do que mostrar um período que o DP não reconhece.
  */
-async function inserirCiclosEmLote(linhas: { colaboradorId: number; inicio: string; fim: string }[]): Promise<void> {
-  if (linhas.length === 0) return;
-  const db = await getDb();
-  const grupos = linhas.map(() => "(?, ?, ?)").join(", ");
-  const args = linhas.flatMap((l) => [l.colaboradorId, l.inicio, l.fim]);
-  await db.execute({
-    sql: `INSERT INTO periodos_aquisitivos (colaborador_id, data_inicio, data_fim) VALUES ${grupos} ON CONFLICT (colaborador_id, data_inicio) DO NOTHING`,
-    args,
-  });
-}
-
-/**
- * Gera (idempotente, via UNIQUE + ON CONFLICT DO NOTHING) todos os ciclos de
- * 12 meses entre a data de admissão do colaborador e hoje que ainda não existem.
- */
-export async function sincronizarPeriodos(colaboradorId: number, dataAdmissao: string, hoje: Date): Promise<void> {
-  const ciclos = calcularCiclos(dataAdmissao, hoje);
-  await inserirCiclosEmLote(ciclos.map((c) => ({ colaboradorId, inicio: c.inicio, fim: c.fim })));
-}
-
-/**
- * Mesma sincronização de `sincronizarPeriodos`, mas para vários colaboradores
- * de uma vez, numa única query — evita N idas-e-voltas sequenciais ao banco
- * (relevante com um banco remoto; em SQLite local a diferença nem aparecia).
- */
-async function sincronizarPeriodosEmLote(
-  colaboradores: { id: number; dataAdmissao: string }[],
-  hoje: Date,
-): Promise<void> {
-  const linhas = colaboradores.flatMap((c) =>
-    calcularCiclos(c.dataAdmissao, hoje).map((ciclo) => ({ colaboradorId: c.id, inicio: ciclo.inicio, fim: ciclo.fim })),
-  );
-  await inserirCiclosEmLote(linhas);
-}
 
 export async function listarPeriodosPorColaborador(colaboradorId: number): Promise<PeriodoAquisitivo[]> {
   const db = await getDb();
@@ -216,9 +182,8 @@ function enriquecerPeriodo(
 }
 
 /**
- * Sincroniza os períodos de todos os colaboradores e retorna, por
- * colaborador, o período aquisitivo "em aberto" (dias a tirar > 0) mais
- * relevante — já com o estado calculado e o destaque de vencimento
+ * Retorna, por colaborador, o período aquisitivo "em aberto" (dias a tirar > 0)
+ * mais relevante — já com o estado calculado e o destaque de vencimento
  * próximo/vencido/risco de dobro.
  *
  * Duas regras restringem o que conta como "em aberto":
@@ -233,8 +198,6 @@ function enriquecerPeriodo(
 export async function listarPeriodosAbertos(): Promise<PeriodoAquisitivoAberto[]> {
   const hoje = new Date();
   const colaboradores = await listarColaboradores();
-
-  await sincronizarPeriodosEmLote(colaboradores, hoje);
 
   const db = await getDb();
   const [resultado, lancamentosPorPeriodo] = await Promise.all([
@@ -271,8 +234,6 @@ export async function listarHistoricoColaborador(colaboradorId: number): Promise
   const hoje = new Date();
   const colaborador = (await listarColaboradores()).find((c) => c.id === colaboradorId);
   if (!colaborador) return [];
-
-  await sincronizarPeriodos(colaborador.id, colaborador.dataAdmissao, hoje);
 
   const db = await getDb();
   const [resultado, lancamentosPorPeriodo] = await Promise.all([
