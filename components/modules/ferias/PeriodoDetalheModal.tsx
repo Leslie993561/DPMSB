@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react";
 import type { PeriodoAquisitivoAberto } from "@/lib/db/periodosAquisitivos";
-import type { LancamentoFerias, StatusLancamento } from "@/lib/db/lancamentosFerias";
+import type { StatusLancamento } from "@/lib/db/lancamentosFerias";
+import type { PeriodoDoHistorico } from "@/lib/db/historicoFerias";
 import { useOperador } from "@/lib/currentUser";
 import { RiskCallout } from "@/components/shared/RiskCallout";
 import { Badge, type CorBadge } from "@/components/shared/Badge";
 import { Modal } from "@/components/shared/Modal";
 import { formatarDataBr } from "@/lib/format";
+import { cn } from "@/lib/cn";
 
 const INPUT_CLASS =
   "w-full rounded-md border border-brand-surface bg-background px-3 py-2 text-sm text-foreground dark:border-brand-neutral/30";
@@ -31,24 +33,25 @@ export function PeriodoDetalheModal({
   onAtualizado: () => void;
 }) {
   const { operador } = useOperador();
-  const [lancamentos, setLancamentos] = useState<LancamentoFerias[]>([]);
+  const [historico, setHistorico] = useState<PeriodoDoHistorico[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [modo, setModo] = useState<Modo>("lista");
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
+  /** Histórico do COLABORADOR (todos os períodos), não só do período clicado. */
   async function recarregarLancamentos() {
-    const res = await fetch(`/api/periodos-aquisitivos/${periodo.id}/lancamentos`);
+    const res = await fetch(`/api/colaboradores/${periodo.colaboradorId}/historico-ferias`);
     const data = await res.json();
-    setLancamentos(data.lancamentos ?? []);
+    setHistorico(data.periodos ?? []);
     setCarregando(false);
   }
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- busca de dados ao montar/trocar de período; setState só ocorre após o await do fetch
     void recarregarLancamentos();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- só depende do id do período, que não muda
-  }, [periodo.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só depende do colaborador, que não muda enquanto o modal está aberto
+  }, [periodo.colaboradorId]);
 
   function exigirOperador(): boolean {
     if (!operador.trim()) {
@@ -94,62 +97,108 @@ export function PeriodoDetalheModal({
           <p className="text-sm text-foreground-muted">Carregando histórico...</p>
         ) : (
           <div className="overflow-x-auto rounded-lg border border-brand-surface dark:border-brand-neutral/30">
-            <table className="w-full min-w-[560px] text-sm">
+            <table className="w-full min-w-[720px] text-sm">
               <thead>
-                <tr className="border-b border-brand-surface text-left text-xs uppercase text-foreground-muted dark:border-brand-neutral/30">
-                  <th className="px-3 py-2">Origem</th>
-                  <th className="px-3 py-2">Status</th>
+                <tr className="border-b border-brand-surface text-left text-[10.5px] font-semibold tracking-wide text-foreground-muted uppercase dark:border-brand-neutral/30">
+                  <th className="px-3 py-2">Período aquisitivo</th>
+                  <th className="px-3 py-2">Período concessivo</th>
+                  <th className="px-3 py-2">Período de férias</th>
                   <th className="px-3 py-2 text-right">Dias</th>
-                  <th className="px-3 py-2">Datas</th>
+                  <th className="px-3 py-2">Situação</th>
                   <th className="px-3 py-2" />
                 </tr>
               </thead>
               <tbody>
-                {lancamentos.length === 0 ? (
+                {historico.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-3 py-3 text-center text-foreground-muted">
-                      Nenhum lançamento ainda.
+                    <td colSpan={6} className="px-3 py-3 text-center text-foreground-muted">
+                      Nenhum período aquisitivo cadastrado.
                     </td>
                   </tr>
                 ) : (
-                  lancamentos.map((l) => (
-                    <tr key={l.id} className="border-b border-brand-surface/60 last:border-0 dark:border-brand-neutral/20">
-                      <td className="px-3 py-2 text-foreground-muted">
-                        {l.origem === "manual" ? "Manual" : "Calculado"}
-                      </td>
-                      <td className="px-3 py-2">
-                        <Badge cor={ROTULO_STATUS[l.status].cor}>{ROTULO_STATUS[l.status].label}</Badge>
-                      </td>
-                      <td className="px-3 py-2 text-right text-foreground">
-                        {l.dias}
-                        {l.abono ? ` (+${l.diasAbono} abono)` : ""}
-                      </td>
-                      <td className="px-3 py-2 text-foreground-muted">
-                        {l.dataInicioGozo ?? l.dataInicioPrevista ? formatarDataBr((l.dataInicioGozo ?? l.dataInicioPrevista)!) : "—"}
-                        {l.dataFimGozo ? ` a ${formatarDataBr(l.dataFimGozo)}` : ""}
-                      </td>
-                      <td className="px-3 py-2 text-right whitespace-nowrap">
-                        {l.status === "programada" && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => setModo({ tipo: "baixa", lancamentoId: l.id })}
-                              className="mr-2 text-xs font-medium text-brand-primary hover:underline"
-                            >
-                              Dar baixa
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setModo({ tipo: "cancelar", lancamentoId: l.id })}
-                              className="text-xs font-medium text-red-600 hover:underline dark:text-red-400"
-                            >
-                              Cancelar
-                            </button>
-                          </>
+                  historico.flatMap((per) => {
+                    const aquisitivo = `${formatarDataBr(per.aquisitivoInicio)} – ${formatarDataBr(per.aquisitivoFim)}`;
+                    const concessivo = `${formatarDataBr(per.concessivoInicio)} – ${formatarDataBr(per.concessivoFim)}`;
+                    const destaque = per.periodoId === periodo.id;
+
+                    // Período sem nenhuma férias lançada ainda: uma linha só, para
+                    // o aquisitivo/concessivo aparecerem mesmo sem gozo.
+                    if (per.ferias.length === 0) {
+                      return [
+                        <tr
+                          key={`p${per.periodoId}`}
+                          className={cn(
+                            "border-b border-brand-surface/60 last:border-0 dark:border-brand-neutral/20",
+                            destaque && "bg-brand-primary-100/40",
+                          )}
+                        >
+                          <td className="px-3 py-2 whitespace-nowrap text-foreground">{aquisitivo}</td>
+                          <td className="px-3 py-2 whitespace-nowrap text-foreground-muted">{concessivo}</td>
+                          <td className="px-3 py-2 text-foreground-muted">—</td>
+                          <td className="px-3 py-2 text-right text-foreground-muted">—</td>
+                          <td className="px-3 py-2">
+                            <Badge cor="neutro">Sem gozo</Badge>
+                          </td>
+                          <td className="px-3 py-2" />
+                        </tr>,
+                      ];
+                    }
+
+                    return per.ferias.map((f, i) => (
+                      <tr
+                        key={f.lancamentoId}
+                        className={cn(
+                          "border-b border-brand-surface/60 last:border-0 dark:border-brand-neutral/20",
+                          destaque && "bg-brand-primary-100/40",
                         )}
-                      </td>
-                    </tr>
-                  ))
+                      >
+                        {/* Aquisitivo/concessivo só na primeira linha do período, para não repetir a mesma data em cada gozo */}
+                        <td className="px-3 py-2 whitespace-nowrap text-foreground">{i === 0 ? aquisitivo : ""}</td>
+                        <td className="px-3 py-2 whitespace-nowrap text-foreground-muted">
+                          {i === 0 ? concessivo : ""}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap text-foreground">
+                          {f.inicio ? formatarDataBr(f.inicio) : "—"}
+                          {f.fim ? ` – ${formatarDataBr(f.fim)}` : ""}
+                          {f.abonoInicio && (
+                            <span className="block text-[10px] text-foreground-muted">
+                              abono {formatarDataBr(f.abonoInicio)}
+                              {f.abonoFim ? ` – ${formatarDataBr(f.abonoFim)}` : ""}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-right whitespace-nowrap text-foreground">
+                          {f.dias}
+                          {f.diasAbono > 0 && (
+                            <span className="block text-[10px] text-foreground-muted">+{f.diasAbono} abono</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          <Badge cor={ROTULO_STATUS[f.status].cor}>{ROTULO_STATUS[f.status].label}</Badge>
+                        </td>
+                        <td className="px-3 py-2 text-right whitespace-nowrap">
+                          {f.status === "programada" && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => setModo({ tipo: "baixa", lancamentoId: f.lancamentoId })}
+                                className="mr-2 text-xs font-medium text-brand-primary hover:underline"
+                              >
+                                Dar baixa
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setModo({ tipo: "cancelar", lancamentoId: f.lancamentoId })}
+                                className="text-xs font-medium text-red-600 hover:underline dark:text-red-400"
+                              >
+                                Cancelar
+                              </button>
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    ));
+                  })
                 )}
               </tbody>
             </table>

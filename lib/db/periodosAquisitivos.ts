@@ -223,6 +223,14 @@ export async function listarPeriodosAbertos(): Promise<PeriodoAquisitivoAberto[]
     // Ainda dentro do período aquisitivo (não fechou) — não conta como aberto/vencido ainda.
     if (new Date(periodo.dataFim) > hoje) continue;
 
+    // Período que o DP já deu por encerrado. Necessário porque o histórico
+    // ("Relação de Férias Calculadas") traz períodos antigos em que a soma dos
+    // dias lançados não fecha os 30 — sem esta regra, o resto viraria saldo em
+    // aberto e apareceria como "vencida" mesmo o DP não cobrando mais nada.
+    // Quem manda é o relatório de programação: período que não está lá está
+    // resolvido, e entra no banco com status 'concluido'.
+    if (periodo.status === "concluido") continue;
+
     const candidato = enriquecerPeriodo(periodo, colaborador, hoje, lancamentosPorPeriodo.get(periodo.id) ?? []);
     if (candidato.diasATirar <= 0) continue;
 

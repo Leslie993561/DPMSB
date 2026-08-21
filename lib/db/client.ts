@@ -59,6 +59,12 @@ const MIGRACOES: { tabela: string; coluna: string; definicao: string }[] = [
   { tabela: "lancamentos_ferias", coluna: "data_baixa", definicao: "TEXT" },
   { tabela: "lancamentos_ferias", coluna: "observacao_baixa", definicao: "TEXT" },
   { tabela: "lancamentos_ferias", coluna: "anexo_nome", definicao: "TEXT" },
+  // Datas do abono pecuniário. O relatório "Relação de Férias Calculadas" traz
+  // o abono como um intervalo próprio, separado do intervalo de gozo — sem
+  // estas colunas só a quantidade de dias caberia, e o histórico perderia
+  // quando o abono foi pago.
+  { tabela: "lancamentos_ferias", coluna: "abono_inicio", definicao: "TEXT" },
+  { tabela: "lancamentos_ferias", coluna: "abono_fim", definicao: "TEXT" },
   { tabela: "periodos_aquisitivos", coluna: "status", definicao: "TEXT NOT NULL DEFAULT 'aberto'" },
   { tabela: "colaboradores", coluna: "gestor_id", definicao: "INTEGER REFERENCES colaboradores(id)" },
   { tabela: "colaboradores", coluna: "cidade", definicao: "TEXT" },
