@@ -23,15 +23,24 @@ const ROTULO_STATUS: Record<StatusLancamento, { label: string; cor: CorBadge }> 
 
 type Modo = "lista" | "programar" | { tipo: "baixa" | "cancelar"; lancamentoId: number };
 
+export interface AlvoHistorico {
+  colaboradorId: number;
+  colaboradorNome: string;
+  colaboradorDepartamento: string | null;
+  /** Período em aberto clicado. Ausente para quem está em dia: aí o modal é só o histórico. */
+  periodo: PeriodoAquisitivoAberto | null;
+}
+
 export function PeriodoDetalheModal({
-  periodo,
+  alvo,
   onFechar,
   onAtualizado,
 }: {
-  periodo: PeriodoAquisitivoAberto;
+  alvo: AlvoHistorico;
   onFechar: () => void;
   onAtualizado: () => void;
 }) {
+  const periodo = alvo.periodo;
   const { operador } = useOperador();
   const [historico, setHistorico] = useState<PeriodoDoHistorico[]>([]);
   const [carregando, setCarregando] = useState(true);
@@ -41,7 +50,7 @@ export function PeriodoDetalheModal({
 
   /** Histórico do COLABORADOR (todos os períodos), não só do período clicado. */
   async function recarregarLancamentos() {
-    const res = await fetch(`/api/colaboradores/${periodo.colaboradorId}/historico-ferias`);
+    const res = await fetch(`/api/colaboradores/${alvo.colaboradorId}/historico-ferias`);
     const data = await res.json();
     setHistorico(data.periodos ?? []);
     setCarregando(false);
@@ -51,7 +60,7 @@ export function PeriodoDetalheModal({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- busca de dados ao montar/trocar de período; setState só ocorre após o await do fetch
     void recarregarLancamentos();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- só depende do colaborador, que não muda enquanto o modal está aberto
-  }, [periodo.colaboradorId]);
+  }, [alvo.colaboradorId]);
 
   function exigirOperador(): boolean {
     if (!operador.trim()) {
@@ -66,12 +75,16 @@ export function PeriodoDetalheModal({
       aberto
       onFechar={onFechar}
       eyebrow="Histórico de férias"
-      titulo={periodo.colaboradorNome}
-      subtitulo={`Aquisitivo ${formatarDataBr(periodo.dataInicio)} a ${formatarDataBr(periodo.dataFim)} · ${periodo.diasSemLancamento} dia(s) livre(s) para programar · ${periodo.fracionamentos}/3 fracionamentos usados`}
+      titulo={alvo.colaboradorNome}
+      subtitulo={
+        periodo
+          ? `Aquisitivo ${formatarDataBr(periodo.dataInicio)} a ${formatarDataBr(periodo.dataFim)} · ${periodo.diasSemLancamento} dia(s) livre(s) para programar · ${periodo.fracionamentos}/3 fracionamentos usados`
+          : "Sem período aquisitivo em aberto — nada pendente para programar"
+      }
       largura="52rem"
       rodape={
         <>
-          <span className="text-xs text-foreground-muted">Colaborador · {periodo.colaboradorDepartamento ?? "—"}</span>
+          <span className="text-xs text-foreground-muted">Colaborador · {alvo.colaboradorDepartamento ?? "—"}</span>
           <span className="flex-1" />
           <button
             type="button"
@@ -84,7 +97,7 @@ export function PeriodoDetalheModal({
       }
     >
       <div className="space-y-4">
-        {periodo.riscoDobro && (
+        {periodo?.riscoDobro && (
           <RiskCallout nivel="critico">
             Risco de pagamento em dobro (Art. 137 CLT) — o período já venceu ou a data de início prevista
             é posterior ao limite de concessão ({formatarDataBr(periodo.concessivoFim)}).
@@ -119,7 +132,7 @@ export function PeriodoDetalheModal({
                   historico.flatMap((per) => {
                     const aquisitivo = `${formatarDataBr(per.aquisitivoInicio)} – ${formatarDataBr(per.aquisitivoFim)}`;
                     const concessivo = `${formatarDataBr(per.concessivoInicio)} – ${formatarDataBr(per.concessivoFim)}`;
-                    const destaque = per.periodoId === periodo.id;
+                    const destaque = periodo !== null && per.periodoId === periodo.id;
 
                     // Período sem nenhuma férias lançada ainda: uma linha só, para
                     // o aquisitivo/concessivo aparecerem mesmo sem gozo.
@@ -205,7 +218,7 @@ export function PeriodoDetalheModal({
           </div>
         )}
 
-        {modo === "lista" && periodo.diasSemLancamento > 0 && (
+        {modo === "lista" && periodo !== null && periodo.diasSemLancamento > 0 && (
           <button
             type="button"
             onClick={() => setModo("programar")}
@@ -215,7 +228,7 @@ export function PeriodoDetalheModal({
           </button>
         )}
 
-        {modo === "programar" && (
+        {modo === "programar" && periodo !== null && (
           <FormularioProgramar
             periodo={periodo}
             operador={operador}

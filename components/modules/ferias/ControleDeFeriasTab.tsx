@@ -8,13 +8,23 @@ import { cn } from "@/lib/cn";
 import { Badge, type CorBadge } from "@/components/shared/Badge";
 import { Card } from "@/components/shared/Card";
 import { FilterChip } from "@/components/shared/FilterChip";
-import { PeriodoDetalheModal } from "./PeriodoDetalheModal";
+import { PeriodoDetalheModal, type AlvoHistorico } from "./PeriodoDetalheModal";
 
 const ROTULO_SITUACAO: Record<SituacaoPeriodo, { label: string; cor: CorBadge }> = {
   vencida: { label: "Vencido", cor: "vermelho" },
   a_vencer: { label: "Em aberto", cor: "amarelo" },
   programada: { label: "Programada", cor: "azul" },
 };
+
+/**
+ * A tabela mistura duas coisas: períodos aquisitivos com saldo e colaboradores
+ * sem nada pendente. São tipos diferentes de propósito — quem está em dia não
+ * tem período para exibir, e inventar datas para preencher as colunas seria
+ * pior do que deixá-las vazias.
+ */
+type LinhaControle =
+  | { chave: string; nome: string; tipo: "periodo"; periodo: PeriodoAquisitivoAberto }
+  | { chave: string; nome: string; tipo: "emDia"; colaborador: Colaborador };
 
 type FiltroStatus = "todos" | "vencidas" | "a_vencer";
 type CategoriaExportar = "colaborador" | "setor" | "trimestre";
@@ -28,14 +38,21 @@ const FAIXA_TRIMESTRE: Record<1 | 2 | 3 | 4, string> = {
   4: "out-dez",
 };
 
-export function ControleDeFeriasTab() {
+/** O botão que abre a importação fica no cabeçalho da página, daí o estado vir de fora. */
+export function ControleDeFeriasTab({
+  importarAberto,
+  onFecharImportar,
+}: {
+  importarAberto: boolean;
+  onFecharImportar: () => void;
+}) {
   const [periodos, setPeriodos] = useState<PeriodoAquisitivoAberto[]>([]);
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [busca, setBusca] = useState("");
   const [departamento, setDepartamento] = useState("");
   const [filtroStatus, setFiltroStatus] = useState<FiltroStatus>("todos");
-  const [periodoSelecionado, setPeriodoSelecionado] = useState<PeriodoAquisitivoAberto | null>(null);
+  const [alvoHistorico, setAlvoHistorico] = useState<AlvoHistorico | null>(null);
 
   const [exportarAberto, setExportarAberto] = useState(false);
   const [categoriaExportar, setCategoriaExportar] = useState<CategoriaExportar | null>(null);
@@ -81,7 +98,6 @@ export function ControleDeFeriasTab() {
     return `/api/periodos-aquisitivos/exportar?tipo=trimestre&trimestre=${trimestreExportar}&ano=${anoExportar}`;
   }
 
-  const [importarAberto, setImportarAberto] = useState(false);
   const [arquivoImportar, setArquivoImportar] = useState<File | null>(null);
   const [importando, setImportando] = useState(false);
   const [erroImportar, setErroImportar] = useState<string | null>(null);
@@ -92,7 +108,7 @@ export function ControleDeFeriasTab() {
   } | null>(null);
 
   function fecharImportar() {
-    setImportarAberto(false);
+    onFecharImportar();
     setArquivoImportar(null);
     setErroImportar(null);
     setResultadoImportar(null);
@@ -120,9 +136,21 @@ export function ControleDeFeriasTab() {
     }
   }
 
+  /**
+   * Setores do CADASTRO, não só dos períodos em aberto — senão um setor cujo
+   * pessoal está todo em dia desaparece do filtro, e parece que ele não existe.
+   */
   const departamentos = useMemo(
-    () => Array.from(new Set(periodos.map((p) => p.colaboradorDepartamento).filter((d): d is string => Boolean(d)))).sort(),
-    [periodos],
+    () =>
+      Array.from(
+        new Set(
+          colaboradores
+            .filter((c) => c.status !== "desligado")
+            .map((c) => c.departamento)
+            .filter((d): d is string => Boolean(d)),
+        ),
+      ).sort(),
+    [colaboradores],
   );
 
   const vencidas = useMemo(() => periodos.filter((p) => p.vencida), [periodos]);
@@ -134,25 +162,49 @@ export function ControleDeFeriasTab() {
   const aVencer60 = aVencer90.filter((p) => p.diasParaVencer > 30 && p.diasParaVencer <= 60).length;
   const aVencer90Only = aVencer90.filter((p) => p.diasParaVencer > 60).length;
 
+  /**
+   * A tabela lista TODOS os colaboradores ativos, não só os que têm período em
+   * aberto — assim o Controle serve para consultar qualquer pessoa, e um setor
+   * inteiro em dia não desaparece da tela. Quem não tem saldo entra como linha
+   * "Em dia", com as colunas de período vazias em vez de datas inventadas; o ⋮
+   * abre o histórico completo dessa pessoa do mesmo jeito.
+   */
+  const linhas = useMemo((): LinhaControle[] => {
+    const comPeriodo = periodos.map(
+      (p): LinhaControle => ({ chave: `p${p.id}`, nome: p.colaboradorNome, tipo: "periodo", periodo: p }),
+    );
+    const idsComPeriodo = new Set(periodos.map((p) => p.colaboradorId));
+    const emDia = colaboradores
+      .filter((c) => c.status !== "desligado" && !idsComPeriodo.has(c.id))
+      .map((c): LinhaControle => ({ chave: `c${c.id}`, nome: c.nome, tipo: "emDia", colaborador: c }));
+    return [...comPeriodo, ...emDia];
+  }, [periodos, colaboradores]);
+
   const filtrados = useMemo(() => {
     const buscaNorm = busca.trim().toLowerCase();
-    return periodos.filter((p) => {
+    return linhas.filter((l) => {
+      const nome = l.nome;
+      const cpf = l.tipo === "periodo" ? l.periodo.colaboradorCpf : l.colaborador.cpf;
+      const depto = l.tipo === "periodo" ? l.periodo.colaboradorDepartamento : l.colaborador.departamento;
+
       const bateBusca =
-        !buscaNorm ||
-        p.colaboradorNome.toLowerCase().includes(buscaNorm) ||
-        (p.colaboradorCpf ?? "").toLowerCase().includes(buscaNorm);
-      const bateDepartamento = !departamento || p.colaboradorDepartamento === departamento;
+        !buscaNorm || nome.toLowerCase().includes(buscaNorm) || (cpf ?? "").toLowerCase().includes(buscaNorm);
+      const bateDepartamento = !departamento || depto === departamento;
+      // "Vencidas" e "A vencer" falam de saldo — quem está em dia só aparece em "Todos".
       const bateStatus =
-        filtroStatus === "todos" ||
-        (filtroStatus === "vencidas" && p.vencida) ||
-        (filtroStatus === "a_vencer" && !p.vencida && p.situacao === "a_vencer");
+        filtroStatus === "todos"
+          ? true
+          : l.tipo === "periodo" &&
+            (filtroStatus === "vencidas"
+              ? l.periodo.vencida
+              : !l.periodo.vencida && l.periodo.situacao === "a_vencer");
       return bateBusca && bateDepartamento && bateStatus;
     });
-  }, [periodos, busca, departamento, filtroStatus]);
+  }, [linhas, busca, departamento, filtroStatus]);
 
   /** Lista única, sem separação por setor — cargo/setor aparecem como legenda abaixo do nome. */
   const ordenados = useMemo(
-    () => [...filtrados].sort((a, b) => a.colaboradorNome.localeCompare(b.colaboradorNome)),
+    () => [...filtrados].sort((a, b) => a.nome.localeCompare(b.nome)),
     [filtrados],
   );
 
@@ -160,15 +212,6 @@ export function ControleDeFeriasTab() {
 
   return (
     <div className="space-y-5">
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={() => setImportarAberto(true)}
-          className="flex items-center gap-1.5 rounded bg-brand-primary px-3 py-1.5 text-[12.5px] font-medium text-brand-white shadow-card transition-colors hover:bg-brand-primary-hover"
-        >
-          <span aria-hidden>↑</span> Importar arquivo
-        </button>
-      </div>
 
       <div className="grid gap-2.5 sm:grid-cols-2">
         <Card className="border-status-danger-border bg-status-danger-bg px-3 py-2">
@@ -393,7 +436,7 @@ export function ControleDeFeriasTab() {
         </div>
 
         {filtrados.length === 0 ? (
-          <p className="p-8 text-center text-sm text-foreground-muted">Nenhum período aquisitivo em aberto para os filtros atuais.</p>
+          <p className="p-8 text-center text-sm text-foreground-muted">Nenhum colaborador para os filtros atuais.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[980px] text-[11.5px]">
@@ -412,9 +455,35 @@ export function ControleDeFeriasTab() {
                 </tr>
               </thead>
               <tbody>
-                {ordenados.map((p) => (
-                  <LinhaPeriodo key={p.id} periodo={p} onAbrir={setPeriodoSelecionado} />
-                ))}
+                {ordenados.map((l) =>
+                  l.tipo === "periodo" ? (
+                    <LinhaPeriodo
+                      key={l.chave}
+                      periodo={l.periodo}
+                      onAbrir={(p) =>
+                        setAlvoHistorico({
+                          colaboradorId: p.colaboradorId,
+                          colaboradorNome: p.colaboradorNome,
+                          colaboradorDepartamento: p.colaboradorDepartamento,
+                          periodo: p,
+                        })
+                      }
+                    />
+                  ) : (
+                    <LinhaEmDia
+                      key={l.chave}
+                      colaborador={l.colaborador}
+                      onAbrir={(c) =>
+                        setAlvoHistorico({
+                          colaboradorId: c.id,
+                          colaboradorNome: c.nome,
+                          colaboradorDepartamento: c.departamento,
+                          periodo: null,
+                        })
+                      }
+                    />
+                  ),
+                )}
               </tbody>
             </table>
           </div>
@@ -426,12 +495,12 @@ export function ControleDeFeriasTab() {
         </div>
       </Card>
 
-      {periodoSelecionado && (
+      {alvoHistorico && (
         <PeriodoDetalheModal
-          periodo={periodoSelecionado}
-          onFechar={() => setPeriodoSelecionado(null)}
+          alvo={alvoHistorico}
+          onFechar={() => setAlvoHistorico(null)}
           onAtualizado={() => {
-            setPeriodoSelecionado(null);
+            setAlvoHistorico(null);
             void recarregar();
           }}
         />
@@ -579,6 +648,46 @@ function LinhaPeriodo({
       </td>
       <td className="px-3 py-2">
         <Badge cor={ROTULO_SITUACAO[p.situacao].cor}>{ROTULO_SITUACAO[p.situacao].label}</Badge>
+      </td>
+    </tr>
+  );
+}
+
+/**
+ * Colaborador sem período aquisitivo com saldo. As colunas de período ficam
+ * vazias porque não há período a mostrar — o ⋮ continua abrindo o histórico
+ * completo, que é onde as férias já gozadas dele aparecem.
+ */
+function LinhaEmDia({
+  colaborador: c,
+  onAbrir,
+}: {
+  colaborador: Colaborador;
+  onAbrir: (c: Colaborador) => void;
+}) {
+  return (
+    <tr className="border-b border-hairline/60 last:border-0 hover:bg-surface-page/60">
+      <td className="px-3 py-2 text-[10px] text-foreground-muted/70">#{c.id}</td>
+      <td className="px-3 py-2">
+        <button type="button" onClick={() => onAbrir(c)} className="flex items-center gap-1.5 text-left hover:text-brand-primary-800">
+          <span aria-hidden className="text-foreground-muted">⋮</span>
+          <span>
+            <span className="block font-medium text-foreground uppercase">{c.nome}</span>
+            <span className="block text-[10px] font-normal text-foreground-muted normal-case">
+              {c.cargo ?? "—"} · {c.departamento ?? "—"}
+            </span>
+          </span>
+        </button>
+      </td>
+      <td className="px-3 py-2 text-foreground-muted">{formatarDataBr(c.dataAdmissao)}</td>
+      <td className="px-3 py-2 text-foreground-muted/50">—</td>
+      <td className="px-3 py-2 text-foreground-muted/50">—</td>
+      <td className="px-3 py-2 text-right text-foreground-muted/50">—</td>
+      <td className="px-3 py-2 text-right text-foreground-muted/50">—</td>
+      <td className="px-3 py-2 text-right text-foreground-muted/50">—</td>
+      <td className="px-3 py-2 text-foreground-muted/50">—</td>
+      <td className="px-3 py-2">
+        <Badge cor="verde">Em dia</Badge>
       </td>
     </tr>
   );

@@ -26,6 +26,7 @@ export function FeriasPageClient() {
   const [simuladorAberto, setSimuladorAberto] = useState(false);
   const [ano, setAno] = useState(ANO_ATUAL);
   const [lancarAberto, setLancarAberto] = useState(false);
+  const [importarAberto, setImportarAberto] = useState(false);
 
   return (
     <div className="space-y-5">
@@ -34,7 +35,15 @@ export function FeriasPageClient() {
         titulo={INFO[aba].titulo}
         subtitulo={INFO[aba].subtitulo}
         acao={
-          aba === "planejamento" ? (
+          aba === "controle" ? (
+            <button
+              type="button"
+              onClick={() => setImportarAberto(true)}
+              className="flex items-center gap-1.5 rounded bg-brand-primary px-3 py-1.5 text-[12.5px] font-medium text-brand-white shadow-card transition-colors hover:bg-brand-primary-hover"
+            >
+              <span aria-hidden>↑</span> Importar arquivo
+            </button>
+          ) : aba === "planejamento" ? (
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
@@ -66,7 +75,12 @@ export function FeriasPageClient() {
         }
       />
 
-      {aba === "controle" && <ControleDeFeriasTab />}
+      {aba === "controle" && (
+        <ControleDeFeriasTab
+          importarAberto={importarAberto}
+          onFecharImportar={() => setImportarAberto(false)}
+        />
+      )}
       {aba === "planejamento" && (
         <PlanejamentoDeFeriasTab
           simuladorAberto={simuladorAberto}
