@@ -13,6 +13,7 @@ import { SimuladorFeriasTab } from "./SimuladorFeriasTab";
 import { ValidadorCltPanel } from "./ValidadorCltPanel";
 import { DetalheCalculoModal } from "./DetalheCalculoModal";
 import { LancarProgramacaoModal } from "./LancarProgramacaoModal";
+import { LancarManualmenteModal } from "./LancarManualmenteModal";
 
 const FAIXA_TRIMESTRE: Record<1 | 2 | 3 | 4, string> = {
   1: "jan · fev · mar",
@@ -60,6 +61,7 @@ export function PlanejamentoDeFeriasTab({
   const [revertendoId, setRevertendoId] = useState<number | null>(null);
   const [confirmandoId, setConfirmandoId] = useState<number | null>(null);
   const [erroAcao, setErroAcao] = useState<string | null>(null);
+  const [manualAberto, setManualAberto] = useState(false);
 
   async function recarregar() {
     try {
@@ -432,9 +434,22 @@ export function PlanejamentoDeFeriasTab({
       {lancarAberto && (
         <LancarProgramacaoModal
           onFechar={onFecharLancar}
-          onLancarManualmente={onFecharLancar}
+          onLancarManualmente={() => {
+            onFecharLancar();
+            setManualAberto(true);
+          }}
           onSucesso={() => {
             onFecharLancar();
+            void recarregar();
+          }}
+        />
+      )}
+
+      {manualAberto && (
+        <LancarManualmenteModal
+          onFechar={() => setManualAberto(false)}
+          onSucesso={() => {
+            setManualAberto(false);
             void recarregar();
           }}
         />

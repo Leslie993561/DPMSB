@@ -43,6 +43,8 @@ export interface ItemProgramacaoFerias {
   ano: number;
   custoPrevisto: number;
   semSalario: boolean;
+  /** true quando a data das férias é anterior à tabela legal mais antiga — custo não apurável, não estimado. */
+  semTabelaLegal: boolean;
   vencida: boolean;
   diasParaVencer: number;
   detalhe: DetalheCalculoFerias;
@@ -104,23 +106,49 @@ export async function listarProgramacaoFerias(): Promise<ItemProgramacaoFerias[]
     const dataRef = new Date(dataInicio);
     const semSalario = !colaborador.salarioBase || colaborador.salarioBase <= 0;
 
-    const resultado = calcularFerias({
-      salarioBase: colaborador.salarioBase,
-      diasDireito: linha.dias_direito,
-      diasGozados: linha.dias,
-      abonoPecuniario: Boolean(linha.abono),
-      dependentes: colaborador.dependentes,
-      competencia: dataRef,
-    });
-    const bruto = arredondar(
-      resultado.detalhe.valorGozado +
-        resultado.detalhe.tercoConstitucional +
-        resultado.detalhe.abono +
-        resultado.detalhe.tercoAbono,
-    );
-    const fgts = calcularFGTS(bruto, dataRef).valor;
-    const patronal = calcularInssPatronal(bruto, dataRef).valor;
-    const custoPrevisto = arredondar(bruto + fgts + patronal);
+    // Férias históricas (importadas da "Relação de Férias Calculadas") podem
+    // ser anteriores à tabela legal mais antiga que o app tem — nesse caso
+    // `calcularFerias` recusa, e com razão: sem a tabela do ano não há como
+    // apurar INSS/IRRF. Como essas férias já foram pagas, o custo não precisa
+    // ser recalculado; a linha entra sem valor, marcada com `semTabelaLegal`,
+    // em vez de derrubar a listagem inteira. Nada é estimado.
+    let calculo: ReturnType<typeof calcularFerias> | null = null;
+    try {
+      calculo = calcularFerias({
+        salarioBase: colaborador.salarioBase,
+        diasDireito: linha.dias_direito,
+        diasGozados: linha.dias,
+        abonoPecuniario: Boolean(linha.abono),
+        dependentes: colaborador.dependentes,
+        competencia: dataRef,
+      });
+    } catch {
+      calculo = null;
+    }
+    const semTabelaLegal = calculo === null;
+
+    const bruto = calculo
+      ? arredondar(
+          calculo.detalhe.valorGozado +
+            calculo.detalhe.tercoConstitucional +
+            calculo.detalhe.abono +
+            calculo.detalhe.tercoAbono,
+        )
+      : 0;
+    const fgts = calculo ? calcularFGTS(bruto, dataRef).valor : 0;
+    const patronal = calculo ? calcularInssPatronal(bruto, dataRef).valor : 0;
+    const custoPrevisto = calculo ? arredondar(bruto + fgts + patronal) : 0;
+    const resultado = calculo ?? {
+      detalhe: {
+        valorGozado: 0,
+        tercoConstitucional: 0,
+        abono: 0,
+        tercoAbono: 0,
+        inss: 0,
+        irrf: 0,
+        valorLiquido: 0,
+      },
+    };
 
     const prazo = avaliarPrazoConcessao(new Date(linha.periodo_fim), dataRef);
     const hoje = new Date();
@@ -153,6 +181,7 @@ export async function listarProgramacaoFerias(): Promise<ItemProgramacaoFerias[]
       ano: dataRef.getFullYear(),
       custoPrevisto,
       semSalario,
+      semTabelaLegal,
       vencida: prazo.vencida,
       diasParaVencer,
       detalhe: {

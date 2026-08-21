@@ -27,6 +27,9 @@ export interface PeriodoDoHistorico {
   status: string;
   diasGozados: number;
   diasRestantes: number;
+  /** Abono pecuniário do período — só pode ser pedido uma vez, daí precisar saber se já foi. */
+  abonoUtilizado: boolean;
+  diasAbono: number;
   ferias: FeriasDoHistorico[];
 }
 
@@ -36,6 +39,8 @@ interface LinhaHistorico {
   data_fim: string;
   dias_direito: number;
   periodo_status: string;
+  abono_utilizado: number;
+  periodo_dias_abono: number;
   lancamento_id: number | null;
   lancamento_status: StatusLancamento | null;
   dias: number | null;
@@ -58,6 +63,7 @@ export async function listarHistoricoFerias(colaboradorId: number): Promise<Peri
   const db = await getDb();
   const resultado = await db.execute({
     sql: `SELECT p.id AS periodo_id, p.data_inicio, p.data_fim, p.dias_direito, p.status AS periodo_status,
+                 p.abono_utilizado, p.dias_abono AS periodo_dias_abono,
                  l.id AS lancamento_id, l.status AS lancamento_status, l.dias, l.dias_abono,
                  l.data_inicio_gozo, l.data_fim_gozo, l.data_inicio_prevista,
                  l.abono_inicio, l.abono_fim, l.observacao
@@ -83,6 +89,8 @@ export async function listarHistoricoFerias(colaboradorId: number): Promise<Peri
         status: l.periodo_status,
         diasGozados: 0,
         diasRestantes: l.dias_direito,
+        abonoUtilizado: Boolean(l.abono_utilizado),
+        diasAbono: l.periodo_dias_abono ?? 0,
         ferias: [],
       };
       porPeriodo.set(l.periodo_id, periodo);
