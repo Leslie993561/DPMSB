@@ -17,7 +17,8 @@ function retornoEstimado(item: ItemProgramacaoFerias): string {
 
 export function DetalheCalculoModal({ item, onFechar }: { item: ItemProgramacaoFerias; onFechar: () => void }) {
   const d = item.detalhe;
-  const brutoMaisEncargos = d.bruto + d.fgts + d.inssPatronal;
+  // A dobra entra no desembolso, mas não na base de encargos — ver lib/calc/ferias.ts.
+  const brutoMaisEncargos = d.bruto + d.dobra + d.fgts + d.inssPatronal;
   const retorno = retornoEstimado(item);
 
   return (
@@ -68,7 +69,8 @@ export function DetalheCalculoModal({ item, onFechar }: { item: ItemProgramacaoF
               <LinhaValor label={`Férias · ${item.dias} dias`} valor={d.valorGozado} />
               <LinhaValor label="1/3 constitucional" valor={d.tercoConstitucional} />
               <LinhaValor label="Abono pecuniário" valor={item.abono ? d.abono + d.tercoAbono : null} />
-              <LinhaValor label="Bruto das férias" valor={d.bruto} destaque />
+              {d.dobra > 0 && <LinhaValor label="Dobra — Art. 137 CLT (fora do prazo)" valor={d.dobra} />}
+              <LinhaValor label="Bruto das férias" valor={d.bruto + d.dobra} destaque />
               <LinhaValor label="(–) INSS" valor={-d.inss || 0} negativo />
               <LinhaValor label="(–) IRRF" valor={-d.irrf || 0} negativo />
               <LinhaValor label="Líquido a receber" valor={d.liquido} destaque cor="text-status-success" />
@@ -95,14 +97,16 @@ export function DetalheCalculoModal({ item, onFechar }: { item: ItemProgramacaoF
 
           {item.vencida ? (
             <div className="rounded border border-status-danger-border bg-status-danger-bg px-2.5 py-1.5 text-[11px] text-status-danger">
-              <span aria-hidden>▲</span> Período vencido: o limite p/ gozo era {formatarDataBr(item.concessivoFim)} e restam{" "}
-              {item.diasDireito - item.dias} dias — conceder de imediato. Descontos calculados sobre férias + 1/3; abono não
-              integra a base de INSS e IRRF.
+              <span aria-hidden>▲</span> Período vencido: para caber no concessivo (até{" "}
+              {formatarDataBr(item.concessivoFim)}), estes {item.dias} dias teriam que começar até{" "}
+              {formatarDataBr(item.limiteGozo)}. {item.diasEmDobro} dia(s) ficam fora do prazo e entram em dobro (Art. 137
+              CLT). Descontos calculados sobre férias + 1/3; abono e dobra não integram a base de INSS e IRRF.
             </div>
           ) : (
             <div className="rounded border border-status-info-bg bg-status-info-bg px-2.5 py-1.5 text-[11px] text-brand-primary-800">
-              <span aria-hidden>ⓘ</span> Limite p/ gozo em {formatarDataBr(item.concessivoFim)}. Descontos calculados sobre
-              férias + 1/3; abono não integra a base de INSS e IRRF.
+              <span aria-hidden>ⓘ</span> Limite p/ gozo em {formatarDataBr(item.limiteGozo)} (concessivo até{" "}
+              {formatarDataBr(item.concessivoFim)}). Descontos calculados sobre férias + 1/3; abono não integra a base de
+              INSS e IRRF.
             </div>
           )}
 

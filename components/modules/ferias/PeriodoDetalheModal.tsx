@@ -29,6 +29,12 @@ export interface AlvoHistorico {
   colaboradorDepartamento: string | null;
   /** Período em aberto clicado. Ausente para quem está em dia: aí o modal é só o histórico. */
   periodo: PeriodoAquisitivoAberto | null;
+  /**
+   * Vem de "Cancelar lançamento" no menu ⋮ da tabela: abre o modal já no
+   * formulário de cancelamento quando existe uma única programação. Com mais de
+   * uma, o modal fica na lista, porque é lá que se escolhe qual cancelar.
+   */
+  acaoInicial?: "cancelar";
 }
 
 export function PeriodoDetalheModal({
@@ -52,7 +58,16 @@ export function PeriodoDetalheModal({
   async function recarregarLancamentos() {
     const res = await fetch(`/api/colaboradores/${alvo.colaboradorId}/historico-ferias`);
     const data = await res.json();
-    setHistorico(data.periodos ?? []);
+    const periodos: PeriodoDoHistorico[] = data.periodos ?? [];
+    setHistorico(periodos);
+    // Atalho do menu ⋮: só pula direto para o cancelamento se não houver
+    // ambiguidade sobre QUAL lançamento cancelar.
+    if (alvo.acaoInicial === "cancelar") {
+      const programadas = periodos.flatMap((per) => per.ferias.filter((f) => f.status === "programada"));
+      if (programadas.length === 1) {
+        setModo({ tipo: "cancelar", lancamentoId: programadas[0].lancamentoId });
+      }
+    }
     setCarregando(false);
   }
 

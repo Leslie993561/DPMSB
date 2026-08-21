@@ -13,6 +13,13 @@ export interface FeriasInput {
   abonoPecuniario: boolean;
   dependentes: number;
   competencia: Date;
+  /**
+   * Dias de gozo que caem fora do período concessivo e por isso são pagos em
+   * dobro (Art. 137 CLT). Use `avaliarPrazoConcessao().diasEmDobro`; aqui não
+   * é inferido, para o chamador dizer explicitamente que está pagando em
+   * atraso. Zero (o default) = férias no prazo.
+   */
+  diasEmDobro?: number;
 }
 
 export interface DetalheFerias {
@@ -21,6 +28,12 @@ export interface DetalheFerias {
   diasVendidos: number;
   abono: number;
   tercoAbono: number;
+  /**
+   * Acréscimo do Art. 137 (a "segunda" remuneração), zero quando as férias
+   * saem no prazo. Fica em campo próprio, e não somado a `valorGozado`, para a
+   * multa aparecer destacada no relatório em vez de virar férias comum.
+   */
+  dobra: number;
   inss: number;
   irrf: number;
   valorLiquido: number;
@@ -32,6 +45,7 @@ export interface DetalheFerias {
  */
 export function calcularFerias(input: FeriasInput): CalculoResult<DetalheFerias> {
   const { salarioBase, diasDireito, diasGozados, abonoPecuniario, dependentes, competencia } = input;
+  const diasEmDobro = Math.min(diasGozados, Math.max(0, input.diasEmDobro ?? 0));
   const tabela = getLegalTable(competencia);
 
   const valorDiario = salarioBase / 30;
@@ -58,15 +72,34 @@ export function calcularFerias(input: FeriasInput): CalculoResult<DetalheFerias>
     memoriaCalculo.push({ label: "1/3 sobre o abono", valor: tercoAbono });
   }
 
+  // Art. 137 CLT: os dias concedidos fora do período concessivo são pagos em
+  // dobro. Dobra-se a remuneração desses dias (valor do dia + 1/3); o abono
+  // pecuniário não entra, por ser indenização de natureza distinta (Art. 143).
+  let dobra = 0;
+  if (diasEmDobro > 0) {
+    const remuneracaoAtrasada = arredondar(valorDiario * diasEmDobro);
+    dobra = arredondar(remuneracaoAtrasada + remuneracaoAtrasada / 3);
+    memoriaCalculo.push({
+      label: `Dobra de ${diasEmDobro} dia(s) fora do prazo (Art. 137 CLT)`,
+      formula: "remuneração dos dias em atraso + 1/3",
+      valor: dobra,
+    });
+  }
+
+  // A dobra fica FORA da base de INSS/IRRF: é penalidade ao empregador, de
+  // natureza indenizatória, não contraprestação de trabalho. O tratamento
+  // tributário do acréscimo é controverso — se a contabilidade da empresa
+  // entender que incide, o valor está destacado em `detalhe.dobra` para ser
+  // reprocessado sem precisar recalcular o resto.
   const baseTributavel = arredondar(valorGozado + tercoConstitucional);
   const inss = calcularINSS(baseTributavel, competencia);
-  memoriaCalculo.push({ label: "INSS sobre férias + 1/3 (abono não é tributável)", valor: inss.valor });
+  memoriaCalculo.push({ label: "INSS sobre férias + 1/3 (abono e dobra não entram na base)", valor: inss.valor });
 
   const irrf = calcularIRRF(baseTributavel - inss.valor, dependentes, competencia);
   memoriaCalculo.push({ label: "IRRF sobre férias + 1/3", valor: irrf.valor });
 
   const valorLiquido = arredondar(
-    valorGozado + tercoConstitucional + abono + tercoAbono - inss.valor - irrf.valor,
+    valorGozado + tercoConstitucional + abono + tercoAbono + dobra - inss.valor - irrf.valor,
   );
   memoriaCalculo.push({ label: "Valor líquido a receber", valor: valorLiquido });
 
@@ -80,6 +113,7 @@ export function calcularFerias(input: FeriasInput): CalculoResult<DetalheFerias>
       diasVendidos,
       abono,
       tercoAbono,
+      dobra,
       inss: inss.valor,
       irrf: irrf.valor,
       valorLiquido,
@@ -90,29 +124,52 @@ export function calcularFerias(input: FeriasInput): CalculoResult<DetalheFerias>
 export interface PrazoConcessaoFerias {
   vencida: boolean;
   diasAtraso: number;
+  /** Fim do período concessivo: 12 meses após o fim do aquisitivo (Art. 134 CLT). */
   limiteConcessao: string;
+  /**
+   * Última data em que as férias ainda podem COMEÇAR e terminar dentro do
+   * período concessivo — é a coluna "Limite p/ gozo" do relatório de
+   * Programação de Férias, e depende de quantos dias serão gozados.
+   */
+  limiteInicio: string;
+  /**
+   * Dias de gozo que caem depois do fim do concessivo. É a base da dobra do
+   * Art. 137: se as férias começam dentro do prazo e "vazam" para fora, só o
+   * excedente é pago em dobro; se começam já fora, todos os dias entram.
+   */
+  diasEmDobro: number;
 }
 
 /**
  * O período concessivo de férias vai até 12 meses após o fim do período
- * aquisitivo (Art. 134 CLT). Concedidas após esse prazo, as férias são
- * consideradas vencidas e devem ser pagas em dobro (Art. 137 CLT).
+ * aquisitivo (Art. 134 CLT). As férias precisam CABER dentro dele — por isso o
+ * limite para iniciar o gozo recua conforme o número de dias a gozar. Dias
+ * concedidos além desse prazo são pagos em dobro (Art. 137 CLT).
+ *
+ * `diasGozados` tem default 1 para quem só quer saber o fim do concessivo.
  */
 export function avaliarPrazoConcessao(
   periodoAquisitivoFim: Date,
   dataConcessao: Date,
+  diasGozados = 1,
 ): PrazoConcessaoFerias {
   const limite = new Date(periodoAquisitivoFim);
   limite.setMonth(limite.getMonth() + 12);
 
+  const dias = Math.max(1, Math.round(diasGozados));
+  const limiteInicio = new Date(limite);
+  limiteInicio.setDate(limiteInicio.getDate() - (dias - 1));
+
   const diasAtraso = Math.max(
     0,
-    Math.floor((dataConcessao.getTime() - limite.getTime()) / (1000 * 60 * 60 * 24)),
+    Math.floor((dataConcessao.getTime() - limiteInicio.getTime()) / (1000 * 60 * 60 * 24)),
   );
 
   return {
     vencida: diasAtraso > 0,
     diasAtraso,
     limiteConcessao: limite.toISOString().slice(0, 10),
+    limiteInicio: limiteInicio.toISOString().slice(0, 10),
+    diasEmDobro: Math.min(dias, diasAtraso),
   };
 }

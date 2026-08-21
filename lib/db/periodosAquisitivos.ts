@@ -118,6 +118,12 @@ export interface PeriodoAquisitivoAberto extends PeriodoAquisitivo {
   fracionamentos: number;
   concessivoInicio: string;
   concessivoFim: string;
+  /**
+   * Coluna "Limite p/ gozo" do relatório de Programação de Férias: última
+   * data em que o SALDO deste período ainda pode começar a ser gozado e
+   * terminar dentro do concessivo. Recua conforme os dias restantes.
+   */
+  limiteGozo: string;
   diasParaVencer: number;
   vencida: boolean;
   alerta: boolean;
@@ -147,9 +153,13 @@ function enriquecerPeriodo(
     lancamentosResumo.map((l): LancamentoInfo => ({ dias: l.dias })),
   );
 
-  const prazo = avaliarPrazoConcessao(new Date(periodo.dataFim), hoje);
-  const limiteConcessao = new Date(prazo.limiteConcessao);
-  const diasParaVencer = Math.round((limiteConcessao.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+  // O prazo é avaliado com o SALDO do período (dias a tirar), porque as férias
+  // precisam terminar dentro do concessivo: quem tem 20 dias a gozar precisa
+  // começar 19 dias antes do fim. É essa a data que o relatório do DP imprime
+  // como "Limite p/ gozo", e é contra ela que se mede o atraso.
+  const prazo = avaliarPrazoConcessao(new Date(periodo.dataFim), hoje, estado.diasATirar);
+  const limiteGozo = new Date(prazo.limiteInicio);
+  const diasParaVencer = Math.round((limiteGozo.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
 
   const temProgramacao = lancamentosResumo.some((l) => l.status === "programada");
   const situacao: SituacaoPeriodo = temProgramacao ? "programada" : prazo.vencida ? "vencida" : "a_vencer";
@@ -158,7 +168,7 @@ function enriquecerPeriodo(
     .map((l) => l.data_inicio_gozo ?? l.data_inicio_prevista)
     .filter((d): d is string => Boolean(d))
     .sort()[0];
-  const riscoDobro = avaliarRiscoDobro(limiteConcessao, proximaDataInicio ? new Date(proximaDataInicio) : null, hoje);
+  const riscoDobro = avaliarRiscoDobro(limiteGozo, proximaDataInicio ? new Date(proximaDataInicio) : null, hoje);
 
   return {
     ...periodo,
@@ -173,6 +183,7 @@ function enriquecerPeriodo(
     fracionamentos: estado.fracionamentos,
     concessivoInicio: periodo.dataFim,
     concessivoFim: prazo.limiteConcessao,
+    limiteGozo: prazo.limiteInicio,
     diasParaVencer,
     vencida: prazo.vencida,
     alerta: diasParaVencer < DIAS_ALERTA_VENCIMENTO,

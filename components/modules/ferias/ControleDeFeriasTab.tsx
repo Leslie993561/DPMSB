@@ -460,12 +460,13 @@ export function ControleDeFeriasTab({
                     <LinhaPeriodo
                       key={l.chave}
                       periodo={l.periodo}
-                      onAbrir={(p) =>
+                      onAbrir={(p, acao) =>
                         setAlvoHistorico({
                           colaboradorId: p.colaboradorId,
                           colaboradorNome: p.colaboradorNome,
                           colaboradorDepartamento: p.colaboradorDepartamento,
                           periodo: p,
+                          acaoInicial: acao,
                         })
                       }
                     />
@@ -610,26 +611,99 @@ export function ControleDeFeriasTab({
   );
 }
 
+/**
+ * Menu suspenso do ⋮ na lateral do nome. Abre o histórico de férias e, quando
+ * há programação em aberto, oferece o cancelamento direto — o cancelamento em
+ * si acontece no modal, que é onde se escolhe QUAL lançamento cancelar quando
+ * existe mais de um.
+ */
+function MenuLinha({
+  temProgramacao,
+  onHistorico,
+  onCancelar,
+}: {
+  temProgramacao: boolean;
+  onHistorico: () => void;
+  onCancelar: () => void;
+}) {
+  const [aberto, setAberto] = useState(false);
+
+  return (
+    <span className="relative inline-flex">
+      <button
+        type="button"
+        aria-label="Ações do colaborador"
+        aria-expanded={aberto}
+        onClick={() => setAberto((v) => !v)}
+        className="rounded px-1 leading-none text-foreground-muted hover:bg-brand-surface hover:text-foreground"
+      >
+        <span aria-hidden>⋮</span>
+      </button>
+
+      {aberto && (
+        <>
+          {/* Camada de fechamento: qualquer clique fora recolhe o menu. */}
+          <button
+            type="button"
+            aria-hidden
+            tabIndex={-1}
+            onClick={() => setAberto(false)}
+            className="fixed inset-0 z-30 cursor-default"
+          />
+          <span className="absolute top-full left-0 z-40 mt-1 flex w-52 flex-col overflow-hidden rounded-md border border-hairline bg-background py-1 shadow-drawer">
+            <button
+              type="button"
+              onClick={() => {
+                setAberto(false);
+                onHistorico();
+              }}
+              className="px-3 py-1.5 text-left text-[12px] font-normal text-foreground normal-case hover:bg-surface-page"
+            >
+              Ver histórico de férias
+            </button>
+            <button
+              type="button"
+              disabled={!temProgramacao}
+              onClick={() => {
+                setAberto(false);
+                onCancelar();
+              }}
+              title={temProgramacao ? undefined : "Nenhum lançamento programado para cancelar"}
+              className="px-3 py-1.5 text-left text-[12px] font-normal normal-case text-red-600 hover:bg-surface-page disabled:cursor-not-allowed disabled:text-foreground-muted/50 disabled:hover:bg-transparent dark:text-red-400"
+            >
+              Cancelar lançamento
+            </button>
+          </span>
+        </>
+      )}
+    </span>
+  );
+}
+
 function LinhaPeriodo({
   periodo: p,
   onAbrir,
 }: {
   periodo: PeriodoAquisitivoAberto;
-  onAbrir: (p: PeriodoAquisitivoAberto) => void;
+  onAbrir: (p: PeriodoAquisitivoAberto, acao?: "cancelar") => void;
 }) {
   return (
     <tr className={cn("border-b border-hairline/60 last:border-0 hover:bg-surface-page/60", p.alerta && "bg-status-danger-bg/40")}>
       <td className="px-3 py-2 text-[10px] text-foreground-muted/70">#{p.colaboradorId}</td>
       <td className="px-3 py-2">
-        <button type="button" onClick={() => onAbrir(p)} className="flex items-center gap-1.5 text-left hover:text-brand-primary-800">
-          <span aria-hidden className="text-foreground-muted">⋮</span>
-          <span>
+        <span className="flex items-center gap-1.5">
+          <MenuLinha
+            temProgramacao={p.situacao === "programada"}
+            onHistorico={() => onAbrir(p)}
+            onCancelar={() => onAbrir(p, "cancelar")}
+          />
+          <button type="button" onClick={() => onAbrir(p)} className="text-left hover:text-brand-primary-800">
             <span className="block font-medium text-foreground uppercase">{p.colaboradorNome}</span>
             <span className="block text-[10px] font-normal text-foreground-muted normal-case">
               {p.colaboradorCargo ?? "—"} · {p.colaboradorDepartamento ?? "—"}
             </span>
-          </span>
-        </button>
+          </button>
+        </span>
       </td>
       <td className="px-3 py-2 text-foreground-muted">{formatarDataBr(p.colaboradorAdmissao)}</td>
       <td className="px-3 py-2 text-foreground-muted">
@@ -643,8 +717,13 @@ function LinhaPeriodo({
         {p.diasTirados}
       </td>
       <td className="px-3 py-2 text-right font-semibold text-foreground">{p.diasATirar}</td>
-      <td className={cn("px-3 py-2 text-foreground-muted", p.vencida && "font-bold text-status-danger")}>
-        {formatarDataBr(p.concessivoFim)}
+      {/* Mesma coluna do relatório do DP: última data para INICIAR o gozo do
+          saldo, que recua conforme os dias restantes — não o fim do concessivo. */}
+      <td
+        className={cn("px-3 py-2 text-foreground-muted", p.vencida && "font-bold text-status-danger")}
+        title={`Concessivo até ${formatarDataBr(p.concessivoFim)} — ${p.diasATirar} dia(s) a gozar`}
+      >
+        {formatarDataBr(p.limiteGozo)}
       </td>
       <td className="px-3 py-2">
         <Badge cor={ROTULO_SITUACAO[p.situacao].cor}>{ROTULO_SITUACAO[p.situacao].label}</Badge>
@@ -669,15 +748,15 @@ function LinhaEmDia({
     <tr className="border-b border-hairline/60 last:border-0 hover:bg-surface-page/60">
       <td className="px-3 py-2 text-[10px] text-foreground-muted/70">#{c.id}</td>
       <td className="px-3 py-2">
-        <button type="button" onClick={() => onAbrir(c)} className="flex items-center gap-1.5 text-left hover:text-brand-primary-800">
-          <span aria-hidden className="text-foreground-muted">⋮</span>
-          <span>
+        <span className="flex items-center gap-1.5">
+          <MenuLinha temProgramacao={false} onHistorico={() => onAbrir(c)} onCancelar={() => onAbrir(c)} />
+          <button type="button" onClick={() => onAbrir(c)} className="text-left hover:text-brand-primary-800">
             <span className="block font-medium text-foreground uppercase">{c.nome}</span>
             <span className="block text-[10px] font-normal text-foreground-muted normal-case">
               {c.cargo ?? "—"} · {c.departamento ?? "—"}
             </span>
-          </span>
-        </button>
+          </button>
+        </span>
       </td>
       <td className="px-3 py-2 text-foreground-muted">{formatarDataBr(c.dataAdmissao)}</td>
       <td className="px-3 py-2 text-foreground-muted/50">—</td>

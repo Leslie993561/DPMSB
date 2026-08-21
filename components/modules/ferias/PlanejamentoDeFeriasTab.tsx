@@ -62,6 +62,7 @@ export function PlanejamentoDeFeriasTab({
   const [confirmandoId, setConfirmandoId] = useState<number | null>(null);
   const [erroAcao, setErroAcao] = useState<string | null>(null);
   const [manualAberto, setManualAberto] = useState(false);
+  const [cancelando, setCancelando] = useState<ItemProgramacaoFerias | null>(null);
 
   async function recarregar() {
     try {
@@ -103,6 +104,35 @@ export function PlanejamentoDeFeriasTab({
       await recarregar();
     } finally {
       setRevertendoId(null);
+    }
+  }
+
+  /**
+   * Cancela a programação. Só vale para lançamento ainda programado: uma vez
+   * baixado, o caminho é "Desfazer baixa" e depois cancelar — a API recusa o
+   * cancelamento direto de férias já gozadas, e é bom que recuse.
+   */
+  async function cancelarLancamento(item: ItemProgramacaoFerias, motivo: string) {
+    if (!operador.trim()) {
+      setErroAcao("Informe o nome do operador (campo no cabeçalho) antes de continuar.");
+      return;
+    }
+    setErroAcao(null);
+    try {
+      const res = await fetch(`/api/lancamentos-ferias/${item.lancamentoId}/cancelar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ motivo, operador }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setErroAcao(data.erro ?? "Erro ao cancelar o lançamento.");
+        return;
+      }
+      setCancelando(null);
+      await recarregar();
+    } catch {
+      setErroAcao("Falha de comunicação com o servidor.");
     }
   }
 
@@ -328,15 +358,18 @@ export function PlanejamentoDeFeriasTab({
                 {itensTrimestre.map((item) => (
                   <tr key={item.lancamentoId} className="border-b border-hairline/60 last:border-0 hover:bg-surface-page/60">
                     <td className="px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <MenuLancamento
+                          podeCancelar={item.status === "programada"}
+                          onDetalhe={() => setItemDetalhe(item)}
+                          onCancelar={() => setCancelando(item)}
+                        />
                       <button
                         type="button"
                         onClick={() => setItemDetalhe(item)}
                         title="Ver cálculo das férias"
                         className="flex items-center gap-2 text-left hover:text-brand-primary-800"
                       >
-                        <span aria-hidden className="text-foreground-muted">
-                          ⋮
-                        </span>
                         <div className="min-w-0">
                           <div className="flex items-center gap-1 truncate font-medium text-foreground uppercase">
                             {item.colaboradorNome}
@@ -351,6 +384,7 @@ export function PlanejamentoDeFeriasTab({
                           </div>
                         </div>
                       </button>
+                      </div>
                     </td>
                     <td className="px-3 py-2 text-foreground-muted">{formatarDataBr(item.colaboradorAdmissao)}</td>
                     <td className="px-3 py-2 text-[10.5px] text-foreground-muted">
@@ -431,6 +465,15 @@ export function PlanejamentoDeFeriasTab({
 
       {itemDetalhe && <DetalheCalculoModal item={itemDetalhe} onFechar={() => setItemDetalhe(null)} />}
 
+      {cancelando && (
+        <CancelarLancamentoModal
+          item={cancelando}
+          erro={erroAcao}
+          onFechar={() => setCancelando(null)}
+          onConfirmar={(motivo) => void cancelarLancamento(cancelando, motivo)}
+        />
+      )}
+
       {lancarAberto && (
         <LancarProgramacaoModal
           onFechar={onFecharLancar}
@@ -454,6 +497,131 @@ export function PlanejamentoDeFeriasTab({
           }}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * Menu suspenso do ⋮ na lateral do nome. Além do cálculo, oferece o
+ * cancelamento do lançamento — só habilitado enquanto ele está apenas
+ * programado, porque férias já baixadas precisam antes ter a baixa desfeita.
+ */
+function MenuLancamento({
+  podeCancelar,
+  onDetalhe,
+  onCancelar,
+}: {
+  podeCancelar: boolean;
+  onDetalhe: () => void;
+  onCancelar: () => void;
+}) {
+  const [aberto, setAberto] = useState(false);
+
+  return (
+    <span className="relative inline-flex">
+      <button
+        type="button"
+        aria-label="Ações do lançamento"
+        aria-expanded={aberto}
+        onClick={() => setAberto((v) => !v)}
+        className="rounded px-1 leading-none text-foreground-muted hover:bg-brand-surface hover:text-foreground"
+      >
+        <span aria-hidden>⋮</span>
+      </button>
+
+      {aberto && (
+        <>
+          {/* Camada de fechamento: qualquer clique fora recolhe o menu. */}
+          <button
+            type="button"
+            aria-hidden
+            tabIndex={-1}
+            onClick={() => setAberto(false)}
+            className="fixed inset-0 z-30 cursor-default"
+          />
+          <span className="absolute top-full left-0 z-40 mt-1 flex w-52 flex-col overflow-hidden rounded-md border border-hairline bg-background py-1 shadow-drawer">
+            <button
+              type="button"
+              onClick={() => {
+                setAberto(false);
+                onDetalhe();
+              }}
+              className="px-3 py-1.5 text-left text-[12px] font-normal text-foreground normal-case hover:bg-surface-page"
+            >
+              Ver cálculo das férias
+            </button>
+            <button
+              type="button"
+              disabled={!podeCancelar}
+              onClick={() => {
+                setAberto(false);
+                onCancelar();
+              }}
+              title={podeCancelar ? undefined : "Desfaça a baixa antes de cancelar"}
+              className="px-3 py-1.5 text-left text-[12px] font-normal text-red-600 normal-case hover:bg-surface-page disabled:cursor-not-allowed disabled:text-foreground-muted/50 disabled:hover:bg-transparent dark:text-red-400"
+            >
+              Cancelar lançamento
+            </button>
+          </span>
+        </>
+      )}
+    </span>
+  );
+}
+
+/** O motivo é obrigatório: é o que sobra no histórico explicando por que a programação caiu. */
+function CancelarLancamentoModal({
+  item,
+  erro,
+  onFechar,
+  onConfirmar,
+}: {
+  item: ItemProgramacaoFerias;
+  erro: string | null;
+  onFechar: () => void;
+  onConfirmar: (motivo: string) => void;
+}) {
+  const [motivo, setMotivo] = useState("");
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4">
+      <div className="w-full max-w-md rounded-md border border-hairline bg-background p-4 shadow-drawer">
+        <h3 className="text-[13.5px] font-semibold text-foreground">Cancelar lançamento</h3>
+        <p className="mt-1 text-[11.5px] text-foreground-muted">
+          {item.colaboradorNome} · {item.dias} dia(s) a partir de {formatarDataBr(item.dataInicio)}. Os dias voltam para
+          o saldo do período aquisitivo.
+        </p>
+
+        <label className="mt-3 block text-[11px] font-semibold tracking-wide text-foreground-muted uppercase">
+          Motivo do cancelamento
+        </label>
+        <textarea
+          value={motivo}
+          onChange={(e) => setMotivo(e.target.value)}
+          rows={3}
+          className="mt-1 w-full rounded-md border border-brand-surface bg-background px-3 py-2 text-sm text-foreground dark:border-brand-neutral/30"
+        />
+
+        {erro && <p className="mt-2 text-[11.5px] text-status-danger">{erro}</p>}
+
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onFechar}
+            className="rounded-md border border-brand-surface px-4 py-2 text-sm text-foreground-muted hover:bg-brand-surface dark:border-brand-neutral/30"
+          >
+            Voltar
+          </button>
+          <button
+            type="button"
+            disabled={!motivo.trim()}
+            onClick={() => onConfirmar(motivo)}
+            className="rounded-md bg-status-danger px-4 py-2 text-sm font-medium text-brand-white transition-colors hover:opacity-90 disabled:opacity-50"
+          >
+            Confirmar cancelamento
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

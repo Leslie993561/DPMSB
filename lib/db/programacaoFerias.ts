@@ -11,6 +11,8 @@ export interface DetalheCalculoFerias {
   tercoConstitucional: number;
   abono: number;
   tercoAbono: number;
+  /** Acréscimo do Art. 137 CLT quando as férias saem fora do prazo; 0 quando no prazo. */
+  dobra: number;
   bruto: number;
   inss: number;
   irrf: number;
@@ -32,6 +34,10 @@ export interface ItemProgramacaoFerias {
   aquisitivoFim: string;
   concessivoInicio: string;
   concessivoFim: string;
+  /** Última data possível para iniciar estes dias de gozo ("Limite p/ gozo"). */
+  limiteGozo: string;
+  /** Dias deste lançamento que caem fora do concessivo e entram em dobro. */
+  diasEmDobro: number;
   diasDireito: number;
   status: StatusLancamento;
   dias: number;
@@ -106,6 +112,11 @@ export async function listarProgramacaoFerias(): Promise<ItemProgramacaoFerias[]
     const dataRef = new Date(dataInicio);
     const semSalario = !colaborador.salarioBase || colaborador.salarioBase <= 0;
 
+    // Avaliado ANTES do cálculo: se as férias saem depois do fim do período
+    // concessivo, a remuneração é paga em dobro (Art. 137 CLT) e isso muda o
+    // valor. `vencida` aqui olha a data de início destas férias, não "hoje".
+    const prazo = avaliarPrazoConcessao(new Date(linha.periodo_fim), dataRef, linha.dias);
+
     // Férias históricas (importadas da "Relação de Férias Calculadas") podem
     // ser anteriores à tabela legal mais antiga que o app tem — nesse caso
     // `calcularFerias` recusa, e com razão: sem a tabela do ano não há como
@@ -121,12 +132,15 @@ export async function listarProgramacaoFerias(): Promise<ItemProgramacaoFerias[]
         abonoPecuniario: Boolean(linha.abono),
         dependentes: colaborador.dependentes,
         competencia: dataRef,
+        diasEmDobro: prazo.diasEmDobro,
       });
     } catch {
       calculo = null;
     }
     const semTabelaLegal = calculo === null;
 
+    // Base de encargos: a dobra fica fora (é penalidade, não contraprestação),
+    // mas entra no custo total, que é o desembolso real da empresa.
     const bruto = calculo
       ? arredondar(
           calculo.detalhe.valorGozado +
@@ -135,22 +149,23 @@ export async function listarProgramacaoFerias(): Promise<ItemProgramacaoFerias[]
             calculo.detalhe.tercoAbono,
         )
       : 0;
+    const dobra = calculo?.detalhe.dobra ?? 0;
     const fgts = calculo ? calcularFGTS(bruto, dataRef).valor : 0;
     const patronal = calculo ? calcularInssPatronal(bruto, dataRef).valor : 0;
-    const custoPrevisto = calculo ? arredondar(bruto + fgts + patronal) : 0;
+    const custoPrevisto = calculo ? arredondar(bruto + dobra + fgts + patronal) : 0;
     const resultado = calculo ?? {
       detalhe: {
         valorGozado: 0,
         tercoConstitucional: 0,
         abono: 0,
         tercoAbono: 0,
+        dobra: 0,
         inss: 0,
         irrf: 0,
         valorLiquido: 0,
       },
     };
 
-    const prazo = avaliarPrazoConcessao(new Date(linha.periodo_fim), dataRef);
     const hoje = new Date();
     const limiteConcessao = new Date(prazo.limiteConcessao);
     const diasParaVencer = Math.round((limiteConcessao.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
@@ -170,6 +185,8 @@ export async function listarProgramacaoFerias(): Promise<ItemProgramacaoFerias[]
       aquisitivoFim: linha.periodo_fim,
       concessivoInicio: linha.periodo_fim,
       concessivoFim: prazo.limiteConcessao,
+      limiteGozo: prazo.limiteInicio,
+      diasEmDobro: prazo.diasEmDobro,
       diasDireito: linha.dias_direito,
       status: linha.status,
       dias: linha.dias,
@@ -191,6 +208,7 @@ export async function listarProgramacaoFerias(): Promise<ItemProgramacaoFerias[]
         tercoConstitucional: resultado.detalhe.tercoConstitucional,
         abono: resultado.detalhe.abono,
         tercoAbono: resultado.detalhe.tercoAbono,
+        dobra,
         bruto,
         inss: resultado.detalhe.inss,
         irrf: resultado.detalhe.irrf,

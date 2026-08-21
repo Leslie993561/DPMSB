@@ -31,6 +31,11 @@ export async function POST(request: Request) {
   }
 
   const dataPagamentoDate = new Date(dataPagamento);
+
+  // O prazo é avaliado antes do cálculo porque os dias que ficam fora do
+  // período concessivo mudam o valor: são pagos em dobro (Art. 137 CLT).
+  const prazo = avaliarPrazoConcessao(new Date(periodoAquisitivoFim), dataPagamentoDate, diasGozados);
+
   const resultado = calcularFerias({
     salarioBase,
     diasDireito,
@@ -38,9 +43,8 @@ export async function POST(request: Request) {
     abonoPecuniario,
     dependentes,
     competencia: dataPagamentoDate,
+    diasEmDobro: prazo.diasEmDobro,
   });
-
-  const prazo = avaliarPrazoConcessao(new Date(periodoAquisitivoFim), dataPagamentoDate);
 
   return Response.json({ resultado, prazo });
 }
