@@ -184,7 +184,8 @@ export async function criarLancamentoCalculado(input: CriarLancamentoCalculadoIn
   );
   if (!resultado.ok) throw new ErroValidacaoFerias(resultado.erro);
 
-  const diasAbono = input.abonoSolicitado ? tetoAbono(periodo.diasDireito) : 0;
+  // 1/3 do que ainda há para tirar, não do direito cheio — ver `tetoAbono`.
+  const diasAbono = input.abonoSolicitado ? tetoAbono(estado.diasATirar) : 0;
   const lancamento = await inserirLancamento({
     periodoAquisitivoId: periodo.id,
     origem: "calculado",

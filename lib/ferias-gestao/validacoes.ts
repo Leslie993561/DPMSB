@@ -15,6 +15,12 @@ export interface EstadoPeriodo {
   diasDireitoEfetivo: number;
   diasATirar: number;
   fracionamentos: number;
+  /**
+   * Dias de cada período já lançado, na ordem em que foram lançados. Necessário
+   * porque a regra do "um dos períodos com ao menos 14 dias" olha o conjunto,
+   * não a posição — ver `validarNovoLancamentoCalculado`.
+   */
+  partes: number[];
 }
 
 export type ResultadoValidacao = { ok: true } | { ok: false; erro: string };
@@ -41,12 +47,19 @@ export function calcularEstadoPeriodo(
     diasDireitoEfetivo,
     diasATirar: diasDireitoEfetivo - diasTirados,
     fracionamentos: lancamentos.length,
+    partes: lancamentos.map((l) => l.dias),
   };
 }
 
-/** Teto de dias de abono pecuniário: piso(dias de direito ÷ 3). */
-export function tetoAbono(diasDireito: number): number {
-  return Math.floor(diasDireito / 3);
+/**
+ * Teto de dias de abono pecuniário: piso(dias que ainda há para tirar ÷ 3).
+ *
+ * A base é o SALDO do período, não os 30 dias de direito: quem já gozou 15 dos
+ * 30 pode vender 5 (1/3 de 15), não 10. Vender 1/3 do direito cheio quando
+ * parte dele já foi gozada passaria do que resta.
+ */
+export function tetoAbono(diasATirar: number): number {
+  return Math.max(0, Math.floor(diasATirar / 3));
 }
 
 /**
@@ -79,8 +92,16 @@ function verificarTeto(
 
 /**
  * Valida uma nova solicitação feita pelo modal de cálculo (fluxo normal do
- * sistema). Aplica o limite de 3 fracionamentos e os mínimos de dias por
- * posição (1º ≥ 14 dias, 2º/3º ≥ 5 dias — Art. 134, §1º CLT).
+ * sistema), aplicando o Art. 134, §1º CLT: no máximo 3 períodos, nenhum abaixo
+ * de 5 dias, e UM deles com ao menos 14 dias.
+ *
+ * A ORDEM DOS PEDIDOS NÃO IMPORTA. A lei exige que "um dos quais" tenha 14+
+ * dias, não que seja o primeiro solicitado — então pedir 5 dias antes dos 14 é
+ * legítimo. Em vez de cobrar 14 dias do primeiro pedido, esta função verifica
+ * se o período com 14+ dias AINDA É POSSÍVEL depois deste lançamento: se já
+ * existe um, está satisfeito; se não, tem de sobrar vaga (das 3) e saldo
+ * suficiente para ele. Só é recusado o pedido que torna a regra inalcançável —
+ * por exemplo o 3º pedido de 5 dias quando nenhum dos outros dois chegou a 14.
  */
 export function validarNovoLancamentoCalculado(
   periodo: PeriodoAquisitivoInfo,
@@ -99,18 +120,6 @@ export function validarNovoLancamentoCalculado(
     };
   }
 
-  const ordinal = estado.fracionamentos + 1;
-  const minimoDias = ordinal === 1 ? MIN_DIAS_PRIMEIRO_PERIODO : MIN_DIAS_DEMAIS_PERIODOS;
-  if (diasSolicitados < minimoDias) {
-    return {
-      ok: false,
-      erro:
-        ordinal === 1
-          ? `O 1º período fracionado exige no mínimo ${MIN_DIAS_PRIMEIRO_PERIODO} dias (Art. 134, §1º CLT).`
-          : `O 2º e o 3º período fracionado exigem no mínimo ${MIN_DIAS_DEMAIS_PERIODOS} dias cada (Art. 134, §1º CLT).`,
-    };
-  }
-
   if (abonoSolicitado && periodo.abonoUtilizado) {
     return {
       ok: false,
@@ -118,8 +127,45 @@ export function validarNovoLancamentoCalculado(
     };
   }
 
-  const diasAbono = tetoAbono(periodo.diasDireito);
-  return verificarTeto(periodo, estado, diasSolicitados, abonoSolicitado, diasAbono);
+  const diasAbono = tetoAbono(estado.diasATirar);
+  const teto = verificarTeto(periodo, estado, diasSolicitados, abonoSolicitado, diasAbono);
+  if (!teto.ok) return teto;
+
+  // Saldo total do período depois de descontar o abono desta solicitação.
+  const reducaoAbonoNovo = !periodo.abonoUtilizado && abonoSolicitado ? diasAbono : 0;
+  const limite = estado.diasDireitoEfetivo - reducaoAbonoNovo;
+
+  // Nenhum período pode ficar abaixo de 5 dias — vale para qualquer posição.
+  // Só não se aplica quando o próprio saldo do período já é menor que isso,
+  // caso em que nenhum lançamento seria possível.
+  if (limite >= MIN_DIAS_DEMAIS_PERIODOS && diasSolicitados < MIN_DIAS_DEMAIS_PERIODOS) {
+    return {
+      ok: false,
+      erro: `Nenhum período pode ter menos de ${MIN_DIAS_DEMAIS_PERIODOS} dias (Art. 134, §1º CLT).`,
+    };
+  }
+
+  const partesDepois = [...estado.partes, diasSolicitados];
+  const jaTemPeriodoLongo = partesDepois.some((d) => d >= MIN_DIAS_PRIMEIRO_PERIODO);
+
+  // Só cobra o período de 14+ dias se o saldo do período permitir um.
+  if (limite >= MIN_DIAS_PRIMEIRO_PERIODO && !jaTemPeriodoLongo) {
+    const saldoRestante = limite - partesDepois.reduce((s, d) => s + d, 0);
+    const vagasRestantes = MAX_FRACIONAMENTOS - partesDepois.length;
+    const aindaCabeUmLongo = vagasRestantes >= 1 && saldoRestante >= MIN_DIAS_PRIMEIRO_PERIODO;
+
+    if (!aindaCabeUmLongo) {
+      return {
+        ok: false,
+        erro:
+          `Um dos períodos precisa ter no mínimo ${MIN_DIAS_PRIMEIRO_PERIODO} dias (Art. 134, §1º CLT), ` +
+          `e com este lançamento não sobra saldo nem período para ele. ` +
+          `Sobrariam ${saldoRestante} dia(s) em ${vagasRestantes} período(s).`,
+      };
+    }
+  }
+
+  return { ok: true };
 }
 
 /**
@@ -149,11 +195,11 @@ export function validarLancamentoManual(
     if (diasVendidos <= 0) {
       return { ok: false, erro: "Informe a quantidade de dias vendidos no abono." };
     }
-    const teto = tetoAbono(periodo.diasDireito);
+    const teto = tetoAbono(estado.diasATirar);
     if (diasVendidos > teto) {
       return {
         ok: false,
-        erro: `O abono não pode exceder ${teto} dia(s) (piso de dias de direito ÷ 3).`,
+        erro: `O abono não pode exceder ${teto} dia(s) — 1/3 dos ${estado.diasATirar} dia(s) que restam no período.`,
       };
     }
   }

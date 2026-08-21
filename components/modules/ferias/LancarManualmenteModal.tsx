@@ -31,7 +31,7 @@ export function LancarManualmenteModal({
   onFechar: () => void;
   onSucesso: () => void;
 }) {
-  const { operador } = useOperador();
+  const { operador, setOperador } = useOperador();
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [colaboradorId, setColaboradorId] = useState("");
   const [periodos, setPeriodos] = useState<PeriodoDoHistorico[]>([]);
@@ -93,7 +93,8 @@ export function LancarManualmenteModal({
 
   const diasNum = Number(dias);
   const dataRetorno = periodo ? calcularRetorno(dataInicio, diasNum) : null;
-  const diasAbonoPrevisto = periodo ? tetoAbono(periodo.diasDireito) : 0;
+  // 1/3 do saldo do período, não do direito cheio: 30 restantes → 10, 15 → 5.
+  const diasAbonoPrevisto = periodo ? tetoAbono(periodo.diasRestantes) : 0;
 
   /**
    * Mesma função que a API usa para decidir (lib/ferias-gestao/validacoes) —
@@ -123,7 +124,7 @@ export function LancarManualmenteModal({
   async function lancar() {
     if (!periodo) return;
     if (!operador.trim()) {
-      setErro("Informe o nome do operador (campo no cabeçalho) antes de continuar.");
+      setErro("Informe quem está lançando (campo abaixo) antes de continuar.");
       return;
     }
     setErro(null);
@@ -262,20 +263,45 @@ export function LancarManualmenteModal({
               )}
 
               {!periodo.abonoUtilizado && diasAbonoPrevisto > 0 && (
-                <label className="flex items-center gap-2 text-[11.5px] text-foreground">
-                  <input
-                    type="checkbox"
-                    checked={abono}
-                    onChange={(e) => setAbono(e.target.checked)}
-                    className="accent-brand-primary"
-                  />
-                  Vender abono pecuniário ({diasAbonoPrevisto} dias)
-                </label>
+                <div>
+                  <label className="flex items-center gap-2 text-[11.5px] text-foreground">
+                    <input
+                      type="checkbox"
+                      checked={abono}
+                      onChange={(e) => setAbono(e.target.checked)}
+                      className="accent-brand-primary"
+                    />
+                    Vender abono pecuniário ({diasAbonoPrevisto} dias)
+                  </label>
+                  {abono && (
+                    <p className="mt-1 rounded border border-brand-primary/40 bg-brand-primary-100/50 px-2 py-1.5 text-[11px] text-brand-primary-800">
+                      Vendendo <strong>{diasAbonoPrevisto} dias</strong> — 1/3 dos{" "}
+                      <strong>{periodo.diasRestantes} dias</strong> que restam a tirar. Sobram{" "}
+                      <strong>{periodo.diasRestantes - diasAbonoPrevisto} dias</strong> de férias para gozar neste
+                      período.
+                    </p>
+                  )}
+                </div>
               )}
 
               {/* A observação que impede a ação: dias acima do disponível, período
                   abaixo do mínimo legal ou mais de 3 fracionamentos. */}
               {validacao && !validacao.ok && <RiskCallout nivel="critico">{validacao.erro}</RiskCallout>}
+
+              {/* Quem está lançando — fica aqui, e não só no cabeçalho, para o
+                  lançamento não travar sem que se saiba onde preencher. */}
+              <label className="block text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">
+                Quem está lançando
+                <input
+                  value={operador}
+                  onChange={(e) => {
+                    setOperador(e.target.value);
+                    setErro(null);
+                  }}
+                  placeholder="Seu nome — fica registrado no lançamento"
+                  className={`mt-1 font-normal normal-case ${INPUT_CLASS}`}
+                />
+              </label>
             </>
           )}
 

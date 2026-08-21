@@ -27,33 +27,91 @@ describe("calcularEstadoPeriodo", () => {
 });
 
 describe("tetoAbono", () => {
-  it("arredonda para baixo (30 dias -> 10)", () => {
+  it("é 1/3 dos dias que restam a tirar (30 -> 10)", () => {
     expect(tetoAbono(30)).toBe(10);
   });
-  it("arredonda para baixo em valores não múltiplos de 3 (20 dias -> 6)", () => {
+  it("acompanha o saldo, não o direito cheio (15 restantes -> 5)", () => {
+    expect(tetoAbono(15)).toBe(5);
+  });
+  it("arredonda para baixo em valores não múltiplos de 3 (20 -> 6)", () => {
     expect(tetoAbono(20)).toBe(6);
+  });
+  it("não devolve negativo quando não há saldo", () => {
+    expect(tetoAbono(0)).toBe(0);
+    expect(tetoAbono(-5)).toBe(0);
   });
 });
 
 describe("validarNovoLancamentoCalculado", () => {
-  it("rejeita o 1º período fracionado com menos de 14 dias", () => {
-    const estado = calcularEstadoPeriodo(periodoNovo, []);
-    const r = validarNovoLancamentoCalculado(periodoNovo, estado, 10, false);
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.erro).toMatch(/14 dias/);
-  });
-
   it("aceita o 1º período fracionado com exatamente 14 dias", () => {
     const estado = calcularEstadoPeriodo(periodoNovo, []);
     const r = validarNovoLancamentoCalculado(periodoNovo, estado, 14, false);
     expect(r.ok).toBe(true);
   });
 
-  it("rejeita o 2º período fracionado com menos de 5 dias", () => {
+  it("rejeita qualquer período com menos de 5 dias", () => {
     const estado = calcularEstadoPeriodo(periodoNovo, [{ dias: 14 }]);
     const r = validarNovoLancamentoCalculado(periodoNovo, estado, 4, false);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.erro).toMatch(/5 dias/);
+  });
+
+  /**
+   * A ordem dos pedidos não importa: a CLT exige que UM dos períodos tenha 14+
+   * dias, não que seja o primeiro solicitado. Estes casos travam isso.
+   */
+  describe("regra do período de 14+ dias, independente da ordem", () => {
+    it("aceita um 1º período curto quando ainda cabe um de 14 dias depois", () => {
+      const estado = calcularEstadoPeriodo(periodoNovo, []);
+      const r = validarNovoLancamentoCalculado(periodoNovo, estado, 5, false);
+      expect(r.ok).toBe(true); // sobram 25 dias e 2 vagas — o de 14 ainda cabe
+    });
+
+    it("aceita 5 + 5 e depois exige que o 3º feche a regra", () => {
+      const doisCurtos = calcularEstadoPeriodo(periodoNovo, [{ dias: 5 }, { dias: 5 }]);
+      // sobram 20 dias e 1 vaga: um 3º de 14+ ainda é possível
+      expect(validarNovoLancamentoCalculado(periodoNovo, doisCurtos, 20, false).ok).toBe(true);
+      expect(validarNovoLancamentoCalculado(periodoNovo, doisCurtos, 14, false).ok).toBe(true);
+    });
+
+    it("rejeita o 3º período curto quando nenhum dos outros chegou a 14 dias", () => {
+      const doisCurtos = calcularEstadoPeriodo(periodoNovo, [{ dias: 5 }, { dias: 5 }]);
+      const r = validarNovoLancamentoCalculado(periodoNovo, doisCurtos, 5, false);
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.erro).toMatch(/14 dias/);
+    });
+
+    it("aceita períodos curtos à vontade depois que um já tem 14+ dias", () => {
+      const comLongo = calcularEstadoPeriodo(periodoNovo, [{ dias: 20 }]);
+      expect(validarNovoLancamentoCalculado(periodoNovo, comLongo, 5, false).ok).toBe(true);
+      const comLongoEUmCurto = calcularEstadoPeriodo(periodoNovo, [{ dias: 20 }, { dias: 5 }]);
+      expect(validarNovoLancamentoCalculado(periodoNovo, comLongoEUmCurto, 5, false).ok).toBe(true);
+    });
+
+    it("rejeita um 2º período que consome o saldo e impede o de 14 dias", () => {
+      // 8 já lançados + 12 agora = 20, sobrando 10 em 1 vaga: nunca dá 14
+      const estado = calcularEstadoPeriodo(periodoNovo, [{ dias: 8 }]);
+      const r = validarNovoLancamentoCalculado(periodoNovo, estado, 12, false);
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.erro).toMatch(/14 dias/);
+    });
+  });
+
+  describe("abono sobre o saldo do período", () => {
+    it("com 15 dias restantes, o abono é 5 e o gozo cabe em 10", () => {
+      const estado = calcularEstadoPeriodo(periodoNovo, [{ dias: 15 }]);
+      expect(estado.diasATirar).toBe(15);
+      // 15 gozados + 5 de abono + 10 agora = 30
+      expect(validarNovoLancamentoCalculado(periodoNovo, estado, 10, true).ok).toBe(true);
+      // 11 não cabe: passaria dos 30
+      expect(validarNovoLancamentoCalculado(periodoNovo, estado, 11, true).ok).toBe(false);
+    });
+
+    it("com o período inteiro livre, o abono é 10 e o gozo cabe em 20", () => {
+      const estado = calcularEstadoPeriodo(periodoNovo, []);
+      expect(validarNovoLancamentoCalculado(periodoNovo, estado, 20, true).ok).toBe(true);
+      expect(validarNovoLancamentoCalculado(periodoNovo, estado, 21, true).ok).toBe(false);
+    });
   });
 
   it("aceita o 2º período fracionado com exatamente 5 dias", () => {
