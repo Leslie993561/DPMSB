@@ -436,17 +436,18 @@ function ExportarPopover({
       {aberto && (
         <>
           <div className="fixed inset-0 z-20" onClick={onFechar} />
-          <div className="absolute bottom-full right-0 z-30 mb-1.5 w-[320px] rounded-md border border-hairline bg-background p-4 shadow-drawer">
+          {/* Abre para BAIXO: o botão fica no topo da página e, aberto para cima, o painel saía da área visível. */}
+          <div className="absolute top-full right-0 z-30 mt-1.5 max-h-[70vh] w-[320px] overflow-y-auto rounded-md border border-hairline bg-background p-4 shadow-drawer">
             <div className="flex items-start justify-between gap-2">
               <p className="text-[12.5px] font-bold text-foreground">Opção 1 · Exportar planilha</p>
               <span className="shrink-0 rounded-full bg-brand-primary-100 px-2 py-0.5 text-[9.5px] font-bold text-brand-primary-800">
-                Excel · 20 colunas
+                Excel · 25 colunas
               </span>
             </div>
             <p className="mt-2 text-[11px] leading-relaxed text-foreground-muted">
               Gera um arquivo .xlsx com uma linha por colaborador e uma coluna para cada verba: salário base, INSS,
-              FGTS, provisão de 13º, total de encargos, VT, VA, VM, odontológico, Sólides, Flash, premiação,
-              bonificação e custo total.
+              FGTS, provisão de 13º, total de encargos, VT, VA, VM, odontológico, salário família, Sólides, Flash,
+              hora extra 50% e 100%, desconto de horas, hora noturna, premiação, bonificação e custo total.
             </p>
 
             <label className="mt-3 block text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">
@@ -550,7 +551,8 @@ function ImportarPopover({
       {aberto && (
         <>
           <div className="fixed inset-0 z-20" onClick={onFechar} />
-          <div className="absolute bottom-full right-0 z-30 mb-1.5 w-[340px] rounded-md border border-hairline bg-background p-4 shadow-drawer">
+          {/* Para baixo, pelo mesmo motivo do popover de exportar. */}
+          <div className="absolute top-full right-0 z-30 mt-1.5 max-h-[70vh] w-[340px] overflow-y-auto rounded-md border border-hairline bg-background p-4 shadow-drawer">
             <div className="flex items-start justify-between gap-2">
               <p className="text-[12.5px] font-bold text-foreground">Opção 2 · Importar planilha</p>
               <a

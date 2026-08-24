@@ -318,22 +318,50 @@ function resolverConnectionString(): string {
   return url;
 }
 
-let client: ClientLike | null = null;
-let inicializando: Promise<ClientLike> | null = null;
+/**
+ * O singleton mora no `globalThis`, e não em um módulo. Em desenvolvimento o
+ * hot-reload reavalia este arquivo a cada alteração salva, e um singleton de
+ * módulo criaria um Pool novo em cada reavaliação sem fechar o anterior — as
+ * conexões vazam até estourar o limite do pooler do Supabase (15 clientes),
+ * e aí a aplicação inteira passa a responder 500 até reiniciar o servidor.
+ */
+interface CacheDb {
+  client: ClientLike | null;
+  inicializando: Promise<ClientLike> | null;
+}
+
+const globalDb = globalThis as typeof globalThis & { __portalDpDb?: CacheDb };
+const cache: CacheDb = (globalDb.__portalDpDb ??= { client: null, inicializando: null });
 
 /** Cliente Postgres singleton, com a mesma API (`execute`/`executeMultiple`/`batch`) usada por todo o resto de lib/db. */
 export async function getDb(): Promise<ClientLike> {
-  if (client) return client;
-  if (!inicializando) {
-    inicializando = (async () => {
-      const pool = new Pool({ connectionString: resolverConnectionString(), ssl: { rejectUnauthorized: false } });
-      await pool.query(SCHEMA);
-      await migrar(pool);
-      await pool.query(SCHEMA_EXTRA);
+  if (cache.client) return cache.client;
+  if (!cache.inicializando) {
+    cache.inicializando = (async () => {
+      const pool = new Pool({
+        connectionString: resolverConnectionString(),
+        ssl: { rejectUnauthorized: false },
+        // Teto por instância. O pooler do Supabase aceita 15 clientes no total,
+        // e a aplicação divide esse número com qualquer outra coisa conectada
+        // ao mesmo banco — pedir menos evita derrubar todo mundo em um pico.
+        max: 8,
+        idleTimeoutMillis: 30_000,
+      });
+      try {
+        await pool.query(SCHEMA);
+        await migrar(pool);
+        await pool.query(SCHEMA_EXTRA);
+      } catch (erro) {
+        // Sem isto, uma falha na inicialização deixaria a promessa rejeitada
+        // em cache e toda chamada seguinte falharia com o mesmo erro antigo.
+        cache.inicializando = null;
+        await pool.end().catch(() => {});
+        throw erro;
+      }
       const novoClient = new ClientPostgres(pool);
-      client = novoClient;
+      cache.client = novoClient;
       return novoClient;
     })();
   }
-  return inicializando;
+  return cache.inicializando;
 }

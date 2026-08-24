@@ -421,7 +421,12 @@ export async function listarPeriodosEmCurso(base?: BaseControle): Promise<Period
   const hoje = new Date();
   const dados = base ?? (await carregarBase());
   const { colaboradores, periodos: linhas, lancamentosPorPeriodo } = dados;
-  const comPeriodoAberto = new Set((await listarPeriodosAbertos(dados)).map((p) => p.colaboradorId));
+  // Só conta quem tem período com SALDO. Um período apenas "Concluído" não
+  // dispensa a linha do período seguinte: depois de gozar os 30 dias, o que
+  // interessa ver é justamente o que está sendo adquirido agora.
+  const comPeriodoAberto = new Set(
+    (await listarPeriodosAbertos(dados)).filter((p) => p.situacao !== "concluido").map((p) => p.colaboradorId),
+  );
 
   const emCurso: PeriodoEmCurso[] = [];
 
