@@ -27,6 +27,7 @@ export function FeriasPageClient() {
   const [ano, setAno] = useState(ANO_ATUAL);
   const [lancarAberto, setLancarAberto] = useState(false);
   const [importarAberto, setImportarAberto] = useState(false);
+  const [exportarAberto, setExportarAberto] = useState(false);
 
   return (
     <div className="space-y-5">
@@ -36,13 +37,24 @@ export function FeriasPageClient() {
         subtitulo={INFO[aba].subtitulo}
         acao={
           aba === "controle" ? (
-            <button
-              type="button"
-              onClick={() => setImportarAberto(true)}
-              className="flex items-center gap-1.5 rounded bg-brand-primary px-3 py-1.5 text-[12.5px] font-medium text-brand-white shadow-card transition-colors hover:bg-brand-primary-hover"
-            >
-              <span aria-hidden>↑</span> Importar arquivo
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setExportarAberto(true)}
+                className="flex items-center gap-1.5 rounded bg-brand-primary px-3 py-1.5 text-[12.5px] font-medium text-brand-white shadow-card transition-colors hover:bg-brand-primary-hover"
+              >
+                <span aria-hidden>↓</span> Exportar arquivo
+              </button>
+              {/* A importação do relatório do DP continua aqui, em segundo plano:
+                  é ela que alimenta os períodos que a exportação depois publica. */}
+              <button
+                type="button"
+                onClick={() => setImportarAberto(true)}
+                className="flex items-center gap-1.5 rounded border border-hairline px-3 py-1.5 text-[12.5px] font-medium text-foreground-muted transition-colors hover:bg-surface-page"
+              >
+                <span aria-hidden>↑</span> Importar arquivo
+              </button>
+            </div>
           ) : aba === "planejamento" ? (
             <div className="flex flex-wrap items-center gap-2">
               <button
@@ -79,6 +91,8 @@ export function FeriasPageClient() {
         <ControleDeFeriasTab
           importarAberto={importarAberto}
           onFecharImportar={() => setImportarAberto(false)}
+          exportarAberto={exportarAberto}
+          onFecharExportar={() => setExportarAberto(false)}
         />
       )}
       {aba === "planejamento" && (

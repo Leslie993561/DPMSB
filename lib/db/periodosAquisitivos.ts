@@ -212,22 +212,36 @@ function enriquecerPeriodo(
  * limite para gozo venceu — era exatamente essa linha que a regra escondia,
  * e ela também não entrava na contagem de "Férias vencidas".
  */
-export async function listarPeriodosAbertos(): Promise<PeriodoAquisitivoAberto[]> {
-  const hoje = new Date();
+/**
+ * Um único carregamento do que o Controle de Férias precisa. Existe porque
+ * `listarPeriodosAbertos` e `listarPeriodosEmCurso` liam exatamente as mesmas
+ * três coisas: chamar as duas dobrava as idas ao banco e, com o pooler do
+ * Supabase limitado a 15 conexões, isso derrubava a página inteira.
+ */
+async function carregarBase() {
   const colaboradores = await listarColaboradores();
-
   const db = await getDb();
   const [resultado, lancamentosPorPeriodo] = await Promise.all([
     db.execute("SELECT * FROM periodos_aquisitivos ORDER BY data_inicio"),
     buscarTodosLancamentosAtivos(),
   ]);
-  const linhas = resultado.rows as unknown as LinhaPeriodo[];
+  return {
+    colaboradores,
+    periodos: (resultado.rows as unknown as LinhaPeriodo[]).map(paraPeriodo),
+    lancamentosPorPeriodo,
+  };
+}
+
+type BaseControle = Awaited<ReturnType<typeof carregarBase>>;
+
+export async function listarPeriodosAbertos(base?: BaseControle): Promise<PeriodoAquisitivoAberto[]> {
+  const hoje = new Date();
+  const { colaboradores, periodos, lancamentosPorPeriodo } = base ?? (await carregarBase());
 
   const colaboradoresPorId = new Map(colaboradores.map((c) => [c.id, c]));
   const abertos: PeriodoAquisitivoAberto[] = [];
 
-  for (const linha of linhas) {
-    const periodo = paraPeriodo(linha);
+  for (const periodo of periodos) {
     const colaborador = colaboradoresPorId.get(periodo.colaboradorId);
     if (!colaborador) continue;
 
@@ -271,4 +285,143 @@ export async function listarHistoricoColaborador(colaboradorId: number): Promise
     const periodo = paraPeriodo(linha);
     return enriquecerPeriodo(periodo, colaborador, hoje, lancamentosPorPeriodo.get(periodo.id) ?? []);
   });
+}
+
+/**
+ * Período aquisitivo AINDA EM CURSO — usado nas linhas "Em dia" do Controle de
+ * Férias, para que elas mostrem aquisitivo, concessivo e limite p/ gozo em vez
+ * de traços. Não é um período "em aberto": o direito ainda não é exigível,
+ * e por isso ele não entra em `listarPeriodosAbertos()` nem nos alertas.
+ */
+export interface PeriodoEmCurso {
+  colaboradorId: number;
+  colaboradorNome: string;
+  colaboradorCargo: string | null;
+  colaboradorDepartamento: string | null;
+  colaboradorCpf: string | null;
+  colaboradorAdmissao: string;
+  aquisitivoInicio: string;
+  aquisitivoFim: string;
+  concessivoInicio: string;
+  concessivoFim: string;
+  limiteGozo: string;
+  diasDireito: number;
+  diasTirados: number;
+  diasATirar: number;
+  /** Dias já acumulados: 1/12 do direito por mês completo trabalhado, sem descontar faltas. */
+  diasAcumulados: number;
+  /**
+   * true = o período foi calculado a partir da data de admissão porque o
+   * colaborador ainda não apareceu em nenhum relatório do DP. Vale menos que um
+   * período importado (afastamento e licença deslocam a aquisição), então a
+   * tela marca a diferença em vez de fingir que as duas origens são iguais.
+   */
+  derivado: boolean;
+}
+
+function somarMeses(data: string, meses: number): Date {
+  const d = new Date(data);
+  d.setMonth(d.getMonth() + meses);
+  return d;
+}
+
+/** Período aquisitivo vigente contado da admissão, em blocos de 12 meses. */
+function derivarPeriodoEmCurso(dataAdmissao: string, hoje: Date): { inicio: string; fim: string } {
+  let inicio = new Date(dataAdmissao);
+  // Limite de segurança: 60 voltas cobre 60 anos de casa e evita laço infinito
+  // se a data de admissão vier inválida do cadastro.
+  for (let i = 0; i < 60; i++) {
+    const fim = new Date(inicio);
+    fim.setMonth(fim.getMonth() + 12);
+    fim.setDate(fim.getDate() - 1);
+    if (fim > hoje) return { inicio: inicio.toISOString().slice(0, 10), fim: fim.toISOString().slice(0, 10) };
+    inicio = somarMeses(inicio.toISOString().slice(0, 10), 12);
+  }
+  const fim = somarMeses(inicio.toISOString().slice(0, 10), 12);
+  fim.setDate(fim.getDate() - 1);
+  return { inicio: inicio.toISOString().slice(0, 10), fim: fim.toISOString().slice(0, 10) };
+}
+
+/** Meses completos entre duas datas — a fração de 1/12 que o período já acumulou. */
+function mesesCompletos(inicio: string, hoje: Date): number {
+  const i = new Date(inicio);
+  if (hoje <= i) return 0;
+  let meses = (hoje.getFullYear() - i.getFullYear()) * 12 + (hoje.getMonth() - i.getMonth());
+  if (hoje.getDate() < i.getDate()) meses--;
+  return Math.max(0, Math.min(12, meses));
+}
+
+/**
+ * Um registro por colaborador ativo que NÃO tem período em aberto — quem
+ * aparece como "Em dia" na tabela. Usa o período em curso importado do
+ * relatório do DP quando ele existe; só cai para o cálculo pela admissão
+ * quando a pessoa ainda não apareceu em relatório nenhum.
+ */
+export async function listarPeriodosEmCurso(base?: BaseControle): Promise<PeriodoEmCurso[]> {
+  const hoje = new Date();
+  const dados = base ?? (await carregarBase());
+  const { colaboradores, periodos: linhas, lancamentosPorPeriodo } = dados;
+  const comPeriodoAberto = new Set((await listarPeriodosAbertos(dados)).map((p) => p.colaboradorId));
+
+  const emCurso: PeriodoEmCurso[] = [];
+
+  for (const colaborador of colaboradores) {
+    if (colaborador.status === "desligado") continue;
+    if (comPeriodoAberto.has(colaborador.id)) continue;
+
+    // O PRIMEIRO que ainda não fechou — é o que está sendo adquirido agora.
+    // Pegar o mais recente daria o período seguinte, que nem começou: a Alice
+    // tem 2025-09-15..2026-09-14 correndo e 2026-09-15..2027-09-14 na fila, e
+    // o relatório do DP mostra o primeiro.
+    const doDp = linhas
+      .filter((p) => p.colaboradorId === colaborador.id && new Date(p.dataFim) > hoje)
+      .sort((a, z) => a.dataInicio.localeCompare(z.dataInicio))[0];
+
+    const derivado = !doDp;
+    const janela = doDp
+      ? { inicio: doDp.dataInicio, fim: doDp.dataFim }
+      : derivarPeriodoEmCurso(colaborador.dataAdmissao, hoje);
+
+    const diasDireito = doDp?.diasDireito ?? 30;
+    const confirmados = (doDp ? (lancamentosPorPeriodo.get(doDp.id) ?? []) : []).filter(
+      (l) => l.status === "concluida" || l.status === "alterada",
+    );
+    const diasTirados = confirmados.reduce((s, l) => s + l.dias, 0);
+    const diasATirar = Math.max(0, diasDireito - diasTirados);
+
+    // O limite p/ gozo do relatório: recua conforme os dias que ainda faltam gozar.
+    const prazo = avaliarPrazoConcessao(new Date(janela.fim), hoje, diasATirar);
+
+    emCurso.push({
+      colaboradorId: colaborador.id,
+      colaboradorNome: colaborador.nome,
+      colaboradorCargo: colaborador.cargo,
+      colaboradorDepartamento: colaborador.departamento,
+      colaboradorCpf: colaborador.cpf,
+      colaboradorAdmissao: colaborador.dataAdmissao,
+      aquisitivoInicio: janela.inicio,
+      aquisitivoFim: janela.fim,
+      concessivoInicio: janela.fim,
+      concessivoFim: prazo.limiteConcessao,
+      limiteGozo: prazo.limiteInicio,
+      diasDireito,
+      diasTirados,
+      diasATirar,
+      diasAcumulados: Math.round((mesesCompletos(janela.inicio, hoje) / 12) * diasDireito * 10) / 10,
+      derivado,
+    });
+  }
+
+  return emCurso;
+}
+
+/** As duas listas do Controle de Férias com um único carregamento do banco. */
+export async function listarControleDeFerias(): Promise<{
+  periodos: PeriodoAquisitivoAberto[];
+  emCurso: PeriodoEmCurso[];
+}> {
+  const base = await carregarBase();
+  const periodos = await listarPeriodosAbertos(base);
+  const emCurso = await listarPeriodosEmCurso(base);
+  return { periodos, emCurso };
 }

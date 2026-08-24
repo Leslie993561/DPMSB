@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { PeriodoAquisitivoAberto, SituacaoPeriodo } from "@/lib/db/periodosAquisitivos";
+import type { PeriodoAquisitivoAberto, PeriodoEmCurso, SituacaoPeriodo } from "@/lib/db/periodosAquisitivos";
 import type { Colaborador } from "@/lib/db/colaboradores";
 import { formatarDataBr } from "@/lib/format";
 import { cn } from "@/lib/cn";
@@ -24,7 +24,7 @@ const ROTULO_SITUACAO: Record<SituacaoPeriodo, { label: string; cor: CorBadge }>
  */
 type LinhaControle =
   | { chave: string; nome: string; tipo: "periodo"; periodo: PeriodoAquisitivoAberto }
-  | { chave: string; nome: string; tipo: "emDia"; colaborador: Colaborador };
+  | { chave: string; nome: string; tipo: "emDia"; emCurso: PeriodoEmCurso };
 
 type FiltroStatus = "todos" | "vencidas" | "a_vencer";
 type CategoriaExportar = "colaborador" | "setor" | "trimestre";
@@ -38,16 +38,24 @@ const FAIXA_TRIMESTRE: Record<1 | 2 | 3 | 4, string> = {
   4: "out-dez",
 };
 
-/** O botão que abre a importação fica no cabeçalho da página, daí o estado vir de fora. */
+/** Os botões de importar e exportar ficam no cabeçalho da página, daí o estado vir de fora. */
 export function ControleDeFeriasTab({
   importarAberto,
   onFecharImportar,
+  exportarAberto: exportarArquivoAberto,
+  onFecharExportar,
 }: {
   importarAberto: boolean;
   onFecharImportar: () => void;
+  exportarAberto: boolean;
+  onFecharExportar: () => void;
 }) {
+  /** "individual" precisa saber de quem; "situacao" exporta a tabela inteira. */
+  const [modoArquivo, setModoArquivo] = useState<"individual" | "situacao">("situacao");
+  const [colaboradorArquivo, setColaboradorArquivo] = useState("");
   const [periodos, setPeriodos] = useState<PeriodoAquisitivoAberto[]>([]);
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
+  const [emCurso, setEmCurso] = useState<PeriodoEmCurso[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [busca, setBusca] = useState("");
   const [departamento, setDepartamento] = useState("");
@@ -66,6 +74,7 @@ export function ControleDeFeriasTab({
       const [pRes, cRes] = await Promise.all([fetch("/api/periodos-aquisitivos"), fetch("/api/colaboradores")]);
       const [pData, cData] = await Promise.all([pRes.json(), cRes.json()]);
       setPeriodos(pData.periodos ?? []);
+      setEmCurso(pData.emCurso ?? []);
       setColaboradores(cData.colaboradores ?? []);
     } finally {
       setCarregando(false);
@@ -173,19 +182,18 @@ export function ControleDeFeriasTab({
     const comPeriodo = periodos.map(
       (p): LinhaControle => ({ chave: `p${p.id}`, nome: p.colaboradorNome, tipo: "periodo", periodo: p }),
     );
-    const idsComPeriodo = new Set(periodos.map((p) => p.colaboradorId));
-    const emDia = colaboradores
-      .filter((c) => c.status !== "desligado" && !idsComPeriodo.has(c.id))
-      .map((c): LinhaControle => ({ chave: `c${c.id}`, nome: c.nome, tipo: "emDia", colaborador: c }));
+    const emDia = emCurso.map(
+      (e): LinhaControle => ({ chave: `c${e.colaboradorId}`, nome: e.colaboradorNome, tipo: "emDia", emCurso: e }),
+    );
     return [...comPeriodo, ...emDia];
-  }, [periodos, colaboradores]);
+  }, [periodos, emCurso]);
 
   const filtrados = useMemo(() => {
     const buscaNorm = busca.trim().toLowerCase();
     return linhas.filter((l) => {
       const nome = l.nome;
-      const cpf = l.tipo === "periodo" ? l.periodo.colaboradorCpf : l.colaborador.cpf;
-      const depto = l.tipo === "periodo" ? l.periodo.colaboradorDepartamento : l.colaborador.departamento;
+      const cpf = l.tipo === "periodo" ? l.periodo.colaboradorCpf : l.emCurso.colaboradorCpf;
+      const depto = l.tipo === "periodo" ? l.periodo.colaboradorDepartamento : l.emCurso.colaboradorDepartamento;
 
       const bateBusca =
         !buscaNorm || nome.toLowerCase().includes(buscaNorm) || (cpf ?? "").toLowerCase().includes(buscaNorm);
@@ -473,12 +481,12 @@ export function ControleDeFeriasTab({
                   ) : (
                     <LinhaEmDia
                       key={l.chave}
-                      colaborador={l.colaborador}
-                      onAbrir={(c) =>
+                      emCurso={l.emCurso}
+                      onAbrir={(e) =>
                         setAlvoHistorico({
-                          colaboradorId: c.id,
-                          colaboradorNome: c.nome,
-                          colaboradorDepartamento: c.departamento,
+                          colaboradorId: e.colaboradorId,
+                          colaboradorNome: e.colaboradorNome,
+                          colaboradorDepartamento: e.colaboradorDepartamento,
                           periodo: null,
                         })
                       }
@@ -505,6 +513,104 @@ export function ControleDeFeriasTab({
             void recarregar();
           }}
         />
+      )}
+
+      {exportarArquivoAberto && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4">
+          <div className="w-full max-w-lg rounded-md border border-hairline bg-background shadow-drawer">
+            <div className="flex items-center justify-between border-b border-hairline px-4 py-3">
+              <div>
+                <p className="text-[10px] font-semibold tracking-wide text-brand-primary-800 uppercase">Férias</p>
+                <h3 className="text-[13.5px] font-semibold text-foreground">Exportar arquivo</h3>
+              </div>
+              <button type="button" onClick={onFecharExportar} className="text-foreground-muted hover:text-foreground">
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 p-4">
+              <button
+                type="button"
+                onClick={() => setModoArquivo("individual")}
+                className={cn(
+                  "w-full rounded-md border px-3 py-2.5 text-left transition-colors",
+                  modoArquivo === "individual"
+                    ? "border-brand-primary bg-brand-primary-050"
+                    : "border-hairline hover:bg-surface-page",
+                )}
+              >
+                <span className="block text-[12.5px] font-semibold text-foreground">Relatório completo individual</span>
+                <span className="block text-[11px] text-foreground-muted">
+                  Planilha com todos os períodos de férias que a pessoa já gozou — datas e dias — mais a situação atual
+                  dela.
+                </span>
+              </button>
+
+              {modoArquivo === "individual" && (
+                <select
+                  value={colaboradorArquivo}
+                  onChange={(ev) => setColaboradorArquivo(ev.target.value)}
+                  className="w-full rounded-md border border-hairline bg-background px-2.5 py-2 text-[12.5px] text-foreground dark:border-brand-neutral/30"
+                >
+                  <option value="">Selecione o colaborador…</option>
+                  {colaboradores
+                    .filter((c) => c.status !== "desligado")
+                    .slice()
+                    .sort((a, z) => a.nome.localeCompare(z.nome, "pt-BR"))
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nome}
+                      </option>
+                    ))}
+                </select>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setModoArquivo("situacao")}
+                className={cn(
+                  "w-full rounded-md border px-3 py-2.5 text-left transition-colors",
+                  modoArquivo === "situacao"
+                    ? "border-brand-primary bg-brand-primary-050"
+                    : "border-hairline hover:bg-surface-page",
+                )}
+              >
+                <span className="block text-[12.5px] font-semibold text-foreground">Somente a situação atual</span>
+                <span className="block text-[11px] text-foreground-muted">
+                  Em Excel, as mesmas linhas desta aba: aquisitivo, concessivo, dir/goz/rest, limite p/ gozo e situação.
+                </span>
+              </button>
+            </div>
+
+            <div className="flex justify-end gap-2 border-t border-hairline px-4 py-3">
+              <button
+                type="button"
+                onClick={onFecharExportar}
+                className="rounded-md border border-hairline px-4 py-2 text-[12.5px] text-foreground-muted hover:bg-surface-page"
+              >
+                Fechar
+              </button>
+              <a
+                href={
+                  modoArquivo === "individual"
+                    ? `/api/periodos-aquisitivos/exportar?tipo=individual&colaboradorId=${colaboradorArquivo}`
+                    : "/api/periodos-aquisitivos/exportar?tipo=situacao"
+                }
+                onClick={(ev) => {
+                  if (modoArquivo === "individual" && !colaboradorArquivo) ev.preventDefault();
+                  else onFecharExportar();
+                }}
+                aria-disabled={modoArquivo === "individual" && !colaboradorArquivo}
+                className={cn(
+                  "rounded-md bg-brand-primary px-4 py-2 text-[12.5px] font-medium text-brand-white transition-colors hover:bg-brand-primary-hover",
+                  modoArquivo === "individual" && !colaboradorArquivo && "pointer-events-none opacity-50",
+                )}
+              >
+                ↓ Baixar planilha
+              </a>
+            </div>
+          </div>
+        </div>
       )}
 
       {importarAberto && (
@@ -733,38 +839,63 @@ function LinhaPeriodo({
 }
 
 /**
- * Colaborador sem período aquisitivo com saldo. As colunas de período ficam
- * vazias porque não há período a mostrar — o ⋮ continua abrindo o histórico
- * completo, que é onde as férias já gozadas dele aparecem.
+ * Colaborador sem saldo exigível. Mostra o período aquisitivo EM CURSO — o que
+ * ainda não fechou — com concessivo e limite p/ gozo já projetados, para a
+ * linha não ficar só de traços. DIR/GOZ/REST são do período em curso; o número
+ * pequeno abaixo de DIR é quanto ele já acumulou (1/12 por mês trabalhado).
  */
 function LinhaEmDia({
-  colaborador: c,
+  emCurso: e,
   onAbrir,
 }: {
-  colaborador: Colaborador;
-  onAbrir: (c: Colaborador) => void;
+  emCurso: PeriodoEmCurso;
+  onAbrir: (e: PeriodoEmCurso) => void;
 }) {
   return (
     <tr className="border-b border-hairline/60 last:border-0 hover:bg-surface-page/60">
-      <td className="px-3 py-2 text-[10px] text-foreground-muted/70">#{c.id}</td>
+      <td className="px-3 py-2 text-[10px] text-foreground-muted/70">#{e.colaboradorId}</td>
       <td className="px-3 py-2">
         <span className="flex items-center gap-1.5">
-          <MenuLinha temProgramacao={false} onHistorico={() => onAbrir(c)} onCancelar={() => onAbrir(c)} />
-          <button type="button" onClick={() => onAbrir(c)} className="text-left hover:text-brand-primary-800">
-            <span className="block font-medium text-foreground uppercase">{c.nome}</span>
+          <MenuLinha temProgramacao={false} onHistorico={() => onAbrir(e)} onCancelar={() => onAbrir(e)} />
+          <button type="button" onClick={() => onAbrir(e)} className="text-left hover:text-brand-primary-800">
+            <span className="block font-medium text-foreground uppercase">{e.colaboradorNome}</span>
             <span className="block text-[10px] font-normal text-foreground-muted normal-case">
-              {c.cargo ?? "—"} · {c.departamento ?? "—"}
+              {e.colaboradorCargo ?? "—"} · {e.colaboradorDepartamento ?? "—"}
             </span>
           </button>
         </span>
       </td>
-      <td className="px-3 py-2 text-foreground-muted">{formatarDataBr(c.dataAdmissao)}</td>
-      <td className="px-3 py-2 text-foreground-muted/50">—</td>
-      <td className="px-3 py-2 text-foreground-muted/50">—</td>
-      <td className="px-3 py-2 text-right text-foreground-muted/50">—</td>
-      <td className="px-3 py-2 text-right text-foreground-muted/50">—</td>
-      <td className="px-3 py-2 text-right text-foreground-muted/50">—</td>
-      <td className="px-3 py-2 text-foreground-muted/50">—</td>
+      <td className="px-3 py-2 text-foreground-muted">{formatarDataBr(e.colaboradorAdmissao)}</td>
+      <td className="px-3 py-2 text-foreground-muted">
+        {formatarDataBr(e.aquisitivoInicio)} – {formatarDataBr(e.aquisitivoFim)}
+        {e.derivado && (
+          <span
+            className="ml-1 text-[9px] text-status-warning"
+            title="Período calculado pela data de admissão: este colaborador ainda não apareceu em nenhum relatório do DP."
+          >
+             estimado
+          </span>
+        )}
+      </td>
+      <td className="px-3 py-2 text-foreground-muted">
+        {formatarDataBr(e.concessivoInicio)} – {formatarDataBr(e.concessivoFim)}
+      </td>
+      <td className="px-3 py-2 text-right text-foreground-muted">
+        {e.diasDireito}
+        <span className="block text-[9px] text-foreground-muted/70" title="Dias já acumulados: 1/12 por mês completo">
+          {e.diasAcumulados} acum.
+        </span>
+      </td>
+      <td
+        className={cn(
+          "px-3 py-2 text-right font-semibold",
+          e.diasTirados > 0 ? "text-status-success" : "font-normal text-foreground-muted/60",
+        )}
+      >
+        {e.diasTirados}
+      </td>
+      <td className="px-3 py-2 text-right font-semibold text-foreground">{e.diasATirar}</td>
+      <td className="px-3 py-2 text-foreground-muted">{formatarDataBr(e.limiteGozo)}</td>
       <td className="px-3 py-2">
         <Badge cor="verde">Em dia</Badge>
       </td>

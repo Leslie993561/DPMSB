@@ -56,7 +56,7 @@ export function calcularHorasExtras(input: HorasExtrasInput): CalculoResult<Deta
   if (incluirDSR) {
     dsr = arredondar((valorTotalExtras / diasUteisMes) * diasRepousoMes);
     memoriaCalculo.push({
-      label: `DSR sobre horas extras (estimativa: ${diasUteisMes} dias úteis / ${diasRepousoMes} dias de repouso)`,
+      label: `DSR sobre horas extras (${diasUteisMes} dias úteis / ${diasRepousoMes} dias de repouso)`,
       formula: `(R$ ${valorTotalExtras.toFixed(2)} ÷ ${diasUteisMes}) × ${diasRepousoMes}`,
       valor: dsr,
     });
