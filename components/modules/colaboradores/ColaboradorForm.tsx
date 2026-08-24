@@ -117,6 +117,18 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
   const [conjugeCpf, setConjugeCpf] = useState(editando?.conjugeCpf ?? "");
   const [conjugeNascimento, setConjugeNascimento] = useState(editando?.conjugeNascimento ?? "");
 
+  // Adicionais
+  const [periculosidade, setPericulosidade] = useState(
+    editando?.periculosidadePercentual != null ? String(editando.periculosidadePercentual) : "",
+  );
+  const [insalubridade, setInsalubridade] = useState(
+    editando?.insalubridadePercentual != null ? String(editando.insalubridadePercentual) : "",
+  );
+  const [adicionalFixo, setAdicionalFixo] = useState(
+    editando?.adicionalFixo != null ? String(editando.adicionalFixo) : "",
+  );
+  const [adicionalFixoDescricao, setAdicionalFixoDescricao] = useState(editando?.adicionalFixoDescricao ?? "");
+
   const desligado = editando?.status === "desligado";
   const [desligando, setDesligando] = useState(false);
   const [dataDesligamento, setDataDesligamento] = useState(editando?.dataDesligamento ?? "");
@@ -230,6 +242,10 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
         conjugeNome: conjugeNome ? paraTitleCase(conjugeNome) : null,
         conjugeCpf: conjugeCpf || null,
         conjugeNascimento: conjugeNascimento || null,
+        periculosidadePercentual: periculosidade ? Number(periculosidade) : null,
+        insalubridadePercentual: insalubridade ? Number(insalubridade) : null,
+        adicionalFixo: adicionalFixo ? Number(adicionalFixo) : null,
+        adicionalFixoDescricao: adicionalFixoDescricao || null,
         dependentesLista,
         ...(desligado
           ? {
@@ -794,6 +810,76 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
           />
         </label>
       </div>
+
+      <Secao titulo="Adicionais" />
+
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Periculosidade
+          <select
+            value={periculosidade}
+            onChange={(e) => setPericulosidade(e.target.value)}
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          >
+            <option value="">Não recebe</option>
+            <option value="30">30% — grau único (Art. 193 CLT)</option>
+          </select>
+          <span className="mt-0.5 text-[9.5px] font-light text-foreground-muted/80">Incide sobre o salário base.</span>
+        </label>
+
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Insalubridade
+          <select
+            value={insalubridade}
+            onChange={(e) => setInsalubridade(e.target.value)}
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          >
+            <option value="">Não recebe</option>
+            <option value="10">10% — grau mínimo</option>
+            <option value="20">20% — grau médio</option>
+            <option value="40">40% — grau máximo</option>
+          </select>
+          <span className="mt-0.5 text-[9.5px] font-light text-foreground-muted/80">
+            Incide sobre o salário mínimo (Art. 192).
+          </span>
+        </label>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Adicional fixo
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            value={adicionalFixo}
+            onChange={(e) => setAdicionalFixo(e.target.value)}
+            placeholder="R$ 0,00"
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Descrição do adicional
+          <input
+            value={adicionalFixoDescricao}
+            onChange={(e) => setAdicionalFixoDescricao(e.target.value)}
+            placeholder="ex.: quebra de caixa"
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+      </div>
+
+      {periculosidade && insalubridade && (
+        <p className="rounded border border-status-warning-border bg-status-warning-bg px-2 py-1.5 text-[10.5px] text-status-warning">
+          Periculosidade e insalubridade não se acumulam: o empregado opta por um dos dois (Art. 193 §2º CLT). Confirme
+          qual foi a opção antes de salvar.
+        </p>
+      )}
 
       <Secao titulo="Endereço" />
 

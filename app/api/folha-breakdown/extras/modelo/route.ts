@@ -11,6 +11,10 @@ const COLUNAS = [
   { header: "Flash", key: "flash", width: 12 },
   { header: "Bonificação", key: "bonificacao", width: 14 },
   { header: "Premiação", key: "premiacao", width: 14 },
+  { header: "Hora extra 50%", key: "horaExtra50", width: 15 },
+  { header: "Hora extra 100%", key: "horaExtra100", width: 16 },
+  { header: "Desconto de horas", key: "descontoHoras", width: 17 },
+  { header: "Hora noturna", key: "horaNoturna", width: 14 },
 ];
 
 /** Modelo baixável para a importação de verbas extras do Relatório detalhado (Breakdown de Folha). */
@@ -28,6 +32,10 @@ export async function GET() {
     flash: 0,
     bonificacao: 0,
     premiacao: 0,
+    horaExtra50: 0,
+    horaExtra100: 0,
+    descontoHoras: 0,
+    horaNoturna: 0,
   });
   sheet.addRow({
     codigo: "64",
@@ -38,6 +46,10 @@ export async function GET() {
     flash: 0,
     bonificacao: 0,
     premiacao: 0,
+    horaExtra50: 0,
+    horaExtra100: 0,
+    descontoHoras: 0,
+    horaNoturna: 0,
   });
 
   const buffer = await workbook.xlsx.writeBuffer();

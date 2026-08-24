@@ -22,10 +22,27 @@ export interface LinhaExtrasImportada {
   flash: number | null;
   bonificacao: number | null;
   premiacao: number | null;
+  horaExtra50: number | null;
+  horaExtra100: number | null;
+  /** Horas descontadas: entra positivo na planilha e SUBTRAI do custo. */
+  descontoHoras: number | null;
+  horaNoturna: number | null;
   outrosCustos: number | null;
 }
 
-type CampoExtra = "codigo" | "nomeColaborador" | "vm" | "odontologico" | "solides" | "flash" | "bonificacao" | "premiacao";
+type CampoExtra =
+  | "codigo"
+  | "nomeColaborador"
+  | "vm"
+  | "odontologico"
+  | "solides"
+  | "flash"
+  | "bonificacao"
+  | "premiacao"
+  | "horaExtra50"
+  | "horaExtra100"
+  | "descontoHoras"
+  | "horaNoturna";
 
 const SINONIMOS: Record<CampoExtra, string[]> = {
   codigo: ["codigo", "cod", "matricula", "id"],
@@ -36,6 +53,12 @@ const SINONIMOS: Record<CampoExtra, string[]> = {
   flash: ["flash"],
   bonificacao: ["bonificacao", "bonificacao fixa"],
   premiacao: ["premiacao", "premiacao do mes", "premio"],
+  // Os sinônimos de 100% vêm antes na busca por casarem com o texto mais
+  // específico; "hora extra" sozinho ficaria ambíguo entre os dois percentuais.
+  horaExtra100: ["hora extra 100", "horas extras 100", "he 100", "hora extra 100%", "extra 100"],
+  horaExtra50: ["hora extra 50", "horas extras 50", "he 50", "hora extra 50%", "extra 50", "hora extra", "horas extras"],
+  descontoHoras: ["desconto de horas", "desconto horas", "horas descontadas", "desc horas", "faltas horas"],
+  horaNoturna: ["hora noturna", "horas noturnas", "adicional noturno", "ad noturno"],
 };
 
 // Colunas que fazem parte do núcleo calculado (nunca vêm de planilha importada) — ignoradas ao
@@ -131,6 +154,10 @@ export function converterExtrasImportadas(cabecalhos: string[], linhas: LinhaPla
       flash: mapa.flash ? paraNumeroOuNulo(linha[mapa.flash]) : null,
       bonificacao: mapa.bonificacao ? paraNumeroOuNulo(linha[mapa.bonificacao]) : null,
       premiacao: mapa.premiacao ? paraNumeroOuNulo(linha[mapa.premiacao]) : null,
+      horaExtra50: mapa.horaExtra50 ? paraNumeroOuNulo(linha[mapa.horaExtra50]) : null,
+      horaExtra100: mapa.horaExtra100 ? paraNumeroOuNulo(linha[mapa.horaExtra100]) : null,
+      descontoHoras: mapa.descontoHoras ? paraNumeroOuNulo(linha[mapa.descontoHoras]) : null,
+      horaNoturna: mapa.horaNoturna ? paraNumeroOuNulo(linha[mapa.horaNoturna]) : null,
       outrosCustos: temOutros ? outrosCustosSoma : null,
     });
   });

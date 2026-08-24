@@ -4,6 +4,8 @@ import { listarColaboradores, type Colaborador } from "./colaboradores";
 import { obterDiasUteis } from "./beneficiosDiasUteis";
 import { calcularINSS, calcularIRRF, calcularFGTS, calcularValeTransporte, tarifaVtPorCidade, arredondar } from "@/lib/calc";
 import type { LinhaExtrasImportada } from "@/lib/parsing/folhaExtras";
+import { calcularSalarioFamilia } from "@/lib/calc";
+import { listarDependentesPorColaborador } from "./colaboradorDependentes";
 
 export interface VerbaColaborador {
   colaboradorId: number;
@@ -26,6 +28,20 @@ export interface VerbaColaborador {
   bonificacao: number | null;
   outrosCustos: number | null;
   premiacao: number;
+  /** Hora extra e afins — importados da planilha do mês, nunca calculados aqui. */
+  horaExtra50: number | null;
+  horaExtra100: number | null;
+  descontoHoras: number | null;
+  horaNoturna: number | null;
+  /**
+   * Salário família (Lei 8.213/91 Art. 65): cota por filho menor de 14 anos
+   * para quem ganha até o teto do ano. Sai das datas de nascimento dos
+   * dependentes cadastrados — sem data de nascimento não há como saber a idade,
+   * e a cota não é presumida.
+   */
+  salarioFamilia: number;
+  /** Filhos que geraram a cota. Zero também quando falta a data de nascimento no cadastro. */
+  dependentesSalarioFamilia: number;
   custoTotal: number;
 }
 
@@ -36,6 +52,10 @@ export interface ExtrasImportadas {
   flash: number | null;
   bonificacao: number | null;
   premiacao: number | null;
+  horaExtra50: number | null;
+  horaExtra100: number | null;
+  descontoHoras: number | null;
+  horaNoturna: number | null;
   outrosCustos: number | null;
 }
 
@@ -46,6 +66,10 @@ const EXTRAS_VAZIAS: ExtrasImportadas = {
   flash: null,
   bonificacao: null,
   premiacao: null,
+  horaExtra50: null,
+  horaExtra100: null,
+  descontoHoras: null,
+  horaNoturna: null,
   outrosCustos: null,
 };
 
@@ -57,6 +81,10 @@ interface LinhaExtras {
   flash: number | null;
   bonificacao: number | null;
   premiacao: number | null;
+  hora_extra_50: number | null;
+  hora_extra_100: number | null;
+  desconto_horas: number | null;
+  hora_noturna: number | null;
   outros_custos: number | null;
 }
 
@@ -64,7 +92,9 @@ interface LinhaExtras {
 export async function obterExtras(competencia: string): Promise<Map<number, ExtrasImportadas>> {
   const db = await getDb();
   const resultado = await db.execute({
-    sql: "SELECT colaborador_id, vm, odontologico, solides, flash, bonificacao, premiacao, outros_custos FROM folha_extras WHERE competencia = ?",
+    sql: `SELECT colaborador_id, vm, odontologico, solides, flash, bonificacao, premiacao, outros_custos,
+                 hora_extra_50, hora_extra_100, desconto_horas, hora_noturna
+          FROM folha_extras WHERE competencia = ?`,
     args: [competencia],
   });
   const linhas = resultado.rows as unknown as LinhaExtras[];
@@ -75,6 +105,10 @@ export async function obterExtras(competencia: string): Promise<Map<number, Extr
       {
         vm: l.vm,
         odontologico: l.odontologico,
+        horaExtra50: l.hora_extra_50,
+        horaExtra100: l.hora_extra_100,
+        descontoHoras: l.desconto_horas,
+        horaNoturna: l.hora_noturna,
         solides: l.solides,
         flash: l.flash,
         bonificacao: l.bonificacao,
@@ -93,11 +127,14 @@ export async function obterExtras(competencia: string): Promise<Map<number, Extr
 export async function upsertExtras(colaboradorId: number, competencia: string, extras: ExtrasImportadas): Promise<void> {
   const db = await getDb();
   await db.execute({
-    sql: `INSERT INTO folha_extras (colaborador_id, competencia, vm, odontologico, solides, flash, bonificacao, premiacao, outros_custos)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    sql: `INSERT INTO folha_extras (colaborador_id, competencia, vm, odontologico, solides, flash, bonificacao,
+                                 premiacao, outros_custos, hora_extra_50, hora_extra_100, desconto_horas, hora_noturna)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(colaborador_id, competencia) DO UPDATE SET
          vm = excluded.vm, odontologico = excluded.odontologico, solides = excluded.solides, flash = excluded.flash,
-         bonificacao = excluded.bonificacao, premiacao = excluded.premiacao, outros_custos = excluded.outros_custos`,
+         bonificacao = excluded.bonificacao, premiacao = excluded.premiacao, outros_custos = excluded.outros_custos,
+         hora_extra_50 = excluded.hora_extra_50, hora_extra_100 = excluded.hora_extra_100,
+         desconto_horas = excluded.desconto_horas, hora_noturna = excluded.hora_noturna`,
     args: [
       colaboradorId,
       competencia,
@@ -108,6 +145,10 @@ export async function upsertExtras(colaboradorId: number, competencia: string, e
       extras.bonificacao,
       extras.premiacao,
       extras.outrosCustos,
+      extras.horaExtra50,
+      extras.horaExtra100,
+      extras.descontoHoras,
+      extras.horaNoturna,
     ],
   });
 }
@@ -130,7 +171,10 @@ export async function gerarBreakdown(competencia: string, colaboradores?: Colabo
   const { ano, mes } = competenciaParaAnoMes(competencia);
   const diasUteis = await obterDiasUteis(ano, mes);
   const dataCompetencia = new Date(`${competencia}-01`);
-  const extrasPorColaborador = await obterExtras(competencia);
+  const [extrasPorColaborador, dependentesPorColaborador] = await Promise.all([
+    obterExtras(competencia),
+    listarDependentesPorColaborador(),
+  ]);
 
   return listaColaboradores.map((c) => {
     // PJ é pessoa jurídica prestando serviço, não empregado CLT — não há FGTS,
@@ -151,6 +195,15 @@ export async function gerarBreakdown(competencia: string, colaboradores?: Colabo
     const extras = extrasPorColaborador.get(c.id) ?? EXTRAS_VAZIAS;
     const premiacao = extras.premiacao ?? 0;
 
+    // Salário família é adiantado pelo empregador e compensado na guia do INSS,
+    // então NÃO entra no custo total — aparece na tabela como informação de
+    // folha, não como despesa. PJ não tem direito.
+    const familia = ehPj
+      ? { valor: 0, filhosComCota: 0 }
+      : calcularSalarioFamilia(c.salarioBase, dependentesPorColaborador.get(c.id) ?? [], dataCompetencia);
+
+    // Hora extra soma; desconto de horas subtrai. É a única extra negativa, e
+    // vem positiva na planilha justamente porque o DP a informa como desconto.
     const custoTotal = arredondar(
       c.salarioBase +
         fgts.valor +
@@ -163,7 +216,11 @@ export async function gerarBreakdown(competencia: string, colaboradores?: Colabo
         (extras.solides ?? 0) +
         (extras.flash ?? 0) +
         (extras.bonificacao ?? 0) +
-        (extras.outrosCustos ?? 0),
+        (extras.outrosCustos ?? 0) +
+        (extras.horaExtra50 ?? 0) +
+        (extras.horaExtra100 ?? 0) +
+        (extras.horaNoturna ?? 0) -
+        (extras.descontoHoras ?? 0),
     );
 
     return {
@@ -186,6 +243,12 @@ export async function gerarBreakdown(competencia: string, colaboradores?: Colabo
       bonificacao: extras.bonificacao,
       outrosCustos: extras.outrosCustos,
       premiacao,
+      horaExtra50: extras.horaExtra50,
+      horaExtra100: extras.horaExtra100,
+      descontoHoras: extras.descontoHoras,
+      horaNoturna: extras.horaNoturna,
+      salarioFamilia: familia.valor,
+      dependentesSalarioFamilia: familia.filhosComCota,
       custoTotal,
     };
   });
@@ -256,7 +319,11 @@ export async function competenciaFechada(competencia: string): Promise<boolean> 
 
 export async function listarBreakdownPersistido(competencia: string): Promise<VerbaColaborador[]> {
   const colaboradoresPorId = new Map((await listarColaboradores()).map((c) => [c.id, c]));
-  const extrasPorColaborador = await obterExtras(competencia);
+  const dataCompetencia = new Date(`${competencia}-01`);
+  const [extrasPorColaborador, dependentesPorColaborador] = await Promise.all([
+    obterExtras(competencia),
+    listarDependentesPorColaborador(),
+  ]);
   const db = await getDb();
   const resultado = await db.execute({ sql: "SELECT * FROM folha_breakdown WHERE competencia = ?", args: [competencia] });
   const linhas = resultado.rows as unknown as LinhaBreakdownPersistida[];
@@ -270,6 +337,14 @@ export async function listarBreakdownPersistido(competencia: string): Promise<Ve
     );
     const extras = extrasPorColaborador.get(l.colaborador_id) ?? EXTRAS_VAZIAS;
     const premiacao = extras.premiacao ?? 0;
+    const familia =
+      colaborador && colaborador.vinculo !== "PJ"
+        ? calcularSalarioFamilia(
+            colaborador.salarioBase,
+            dependentesPorColaborador.get(l.colaborador_id) ?? [],
+            dataCompetencia,
+          )
+        : { valor: 0, filhosComCota: 0 };
     const custoTotal = arredondar(
       nucleoCongelado +
         premiacao +
@@ -278,7 +353,11 @@ export async function listarBreakdownPersistido(competencia: string): Promise<Ve
         (extras.solides ?? 0) +
         (extras.flash ?? 0) +
         (extras.bonificacao ?? 0) +
-        (extras.outrosCustos ?? 0),
+        (extras.outrosCustos ?? 0) +
+        (extras.horaExtra50 ?? 0) +
+        (extras.horaExtra100 ?? 0) +
+        (extras.horaNoturna ?? 0) -
+        (extras.descontoHoras ?? 0),
     );
 
     return {
@@ -301,6 +380,12 @@ export async function listarBreakdownPersistido(competencia: string): Promise<Ve
       bonificacao: extras.bonificacao,
       outrosCustos: extras.outrosCustos,
       premiacao,
+      horaExtra50: extras.horaExtra50,
+      horaExtra100: extras.horaExtra100,
+      descontoHoras: extras.descontoHoras,
+      horaNoturna: extras.horaNoturna,
+      salarioFamilia: familia.valor,
+      dependentesSalarioFamilia: familia.filhosComCota,
       custoTotal,
     };
   });
@@ -413,6 +498,10 @@ export async function importarExtras(itens: LinhaExtrasImportada[], competencia:
       flash: item.flash,
       bonificacao: item.bonificacao,
       premiacao: item.premiacao,
+      horaExtra50: item.horaExtra50,
+      horaExtra100: item.horaExtra100,
+      descontoHoras: item.descontoHoras,
+      horaNoturna: item.horaNoturna,
       outrosCustos: item.outrosCustos,
     });
     aplicadas++;

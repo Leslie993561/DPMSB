@@ -7,5 +7,6 @@ export * from "./avisoPrevio";
 export * from "./decimoTerceiro";
 export * from "./ferias";
 export * from "./horasExtras";
+export * from "./salarioFamilia";
 export * from "./rescisao";
 export * from "./beneficios";

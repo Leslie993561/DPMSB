@@ -36,6 +36,12 @@ export const legalTable2025: LegalTable = {
     aliquota: 0.08,
     multaRescisoria: 0.4,
   },
+  salarioFamilia: {
+    // CONFERIR na portaria vigente: a cota e o teto mudam todo ano junto com o
+    // reajuste do INSS, e um valor desatualizado aqui vira erro de folha.
+    cotaPorFilho: 65.0,
+    tetoRemuneracao: 1906.04,
+  },
   inssPatronal: {
     // Alíquota básica do art. 22, I da Lei 8.212/91 — não considera RAT/FAP nem
     // enquadramento no Simples Nacional (que substitui essa contribuição).

@@ -26,6 +26,12 @@ interface VerbaColaborador {
   bonificacao: number | null;
   outrosCustos: number | null;
   premiacao: number;
+  horaExtra50: number | null;
+  horaExtra100: number | null;
+  descontoHoras: number | null;
+  horaNoturna: number | null;
+  salarioFamilia: number;
+  dependentesSalarioFamilia: number;
   custoTotal: number;
 }
 
@@ -74,6 +80,7 @@ const GRUPO_ENCARGOS = "bg-status-warning-bg";
 const GRUPO_BENEFICIOS = "bg-brand-primary-100";
 const GRUPO_PLATAFORMAS = "bg-[#EAF1F3]";
 const GRUPO_OUTROS = "bg-[#E9EEF1]";
+const GRUPO_HORAS = "bg-[#F0EDF6]";
 const DIVISOR = "border-l-2 border-hairline";
 
 export function RelatorioDetalhadoTab() {
@@ -126,9 +133,19 @@ export function RelatorioDetalhadoTab() {
           flash: acc.flash + (l.flash ?? 0),
           premiacao: acc.premiacao + l.premiacao,
           bonificacao: acc.bonificacao + (l.bonificacao ?? 0),
+          salarioFamilia: acc.salarioFamilia + l.salarioFamilia,
+          horaExtra50: acc.horaExtra50 + (l.horaExtra50 ?? 0),
+          horaExtra100: acc.horaExtra100 + (l.horaExtra100 ?? 0),
+          descontoHoras: acc.descontoHoras + (l.descontoHoras ?? 0),
+          horaNoturna: acc.horaNoturna + (l.horaNoturna ?? 0),
           custoTotal: acc.custoTotal + l.custoTotal,
         }),
         {
+          salarioFamilia: 0,
+          horaExtra50: 0,
+          horaExtra100: 0,
+          descontoHoras: 0,
+          horaNoturna: 0,
           salarioBase: 0,
           inss: 0,
           fgts: 0,
@@ -257,11 +274,14 @@ export function RelatorioDetalhadoTab() {
                   <th colSpan={4} className={cn(TH_GRUPO, DIVISOR, "border-b border-hairline", GRUPO_ENCARGOS, "text-status-warning")}>
                     Encargos
                   </th>
-                  <th colSpan={4} className={cn(TH_GRUPO, DIVISOR, "border-b border-hairline", GRUPO_BENEFICIOS, "text-brand-primary-800")}>
+                  <th colSpan={5} className={cn(TH_GRUPO, DIVISOR, "border-b border-hairline", GRUPO_BENEFICIOS, "text-brand-primary-800")}>
                     Benefícios
                   </th>
                   <th colSpan={2} className={cn(TH_GRUPO, DIVISOR, "border-b border-hairline", GRUPO_PLATAFORMAS, "text-brand-primary-800")}>
                     Plataformas
+                  </th>
+                  <th colSpan={4} className={cn(TH_GRUPO, DIVISOR, "border-b border-hairline", GRUPO_HORAS, "text-foreground-muted")}>
+                    Hora extra
                   </th>
                   <th colSpan={2} className={cn(TH_GRUPO, DIVISOR, "border-b border-hairline", GRUPO_OUTROS, "text-foreground-muted")}>
                     Outros
@@ -279,8 +299,20 @@ export function RelatorioDetalhadoTab() {
                   <th className={cn(TH_COL, GRUPO_BENEFICIOS, "text-brand-primary-800")}>VA</th>
                   <th className={cn(TH_COL, GRUPO_BENEFICIOS, "text-brand-primary-800")}>VM</th>
                   <th className={cn(TH_COL, GRUPO_BENEFICIOS, "text-brand-primary-800")}>Odontológico</th>
+                  <th
+                    className={cn(TH_COL, GRUPO_BENEFICIOS, "text-brand-primary-800")}
+                    title="Cota por filho menor de 14 anos (Lei 8.213/91). Adiantado pelo empregador e compensado na guia do INSS — por isso não entra no total do colaborador."
+                  >
+                    Salário família
+                  </th>
                   <th className={cn(TH_COL, DIVISOR, GRUPO_PLATAFORMAS, "text-brand-primary-800")}>Sólides</th>
                   <th className={cn(TH_COL, GRUPO_PLATAFORMAS, "text-brand-primary-800")}>Flash</th>
+                  <th className={cn(TH_COL, DIVISOR, GRUPO_HORAS, "text-foreground-muted")}>Hora extra 50%</th>
+                  <th className={cn(TH_COL, GRUPO_HORAS, "text-foreground-muted")}>Hora extra 100%</th>
+                  <th className={cn(TH_COL, GRUPO_HORAS, "text-foreground-muted")} title="Subtrai do total do colaborador">
+                    Desconto de horas
+                  </th>
+                  <th className={cn(TH_COL, GRUPO_HORAS, "text-foreground-muted")}>Hora noturna</th>
                   <th className={cn(TH_COL, DIVISOR, GRUPO_OUTROS, "text-foreground-muted")}>Premiação</th>
                   <th className={cn(TH_COL, GRUPO_OUTROS, "text-foreground-muted")}>Bonificação</th>
                 </tr>
@@ -305,8 +337,24 @@ export function RelatorioDetalhadoTab() {
                     <td className={cn(TD_NUM, GRUPO_BENEFICIOS)}>{formatarNumero(l.valeAlimentacao)}</td>
                     <td className={cn(TD_NUM, GRUPO_BENEFICIOS)}>{formatarNumeroOuTraco(l.vm)}</td>
                     <td className={cn(TD_NUM, GRUPO_BENEFICIOS)}>{formatarNumeroOuTraco(l.odontologico)}</td>
+                    <td
+                      className={cn(TD_NUM, GRUPO_BENEFICIOS)}
+                      title={
+                        l.dependentesSalarioFamilia > 0
+                          ? `${l.dependentesSalarioFamilia} filho(s) menor(es) de 14 anos`
+                          : "Nenhum filho menor de 14 anos com data de nascimento no cadastro"
+                      }
+                    >
+                      {formatarNumero(l.salarioFamilia)}
+                    </td>
                     <td className={cn(TD_NUM, DIVISOR, GRUPO_PLATAFORMAS)}>{formatarNumeroOuTraco(l.solides)}</td>
                     <td className={cn(TD_NUM, GRUPO_PLATAFORMAS)}>{formatarNumeroOuTraco(l.flash)}</td>
+                    <td className={cn(TD_NUM, DIVISOR, GRUPO_HORAS)}>{formatarNumeroOuTraco(l.horaExtra50)}</td>
+                    <td className={cn(TD_NUM, GRUPO_HORAS)}>{formatarNumeroOuTraco(l.horaExtra100)}</td>
+                    <td className={cn(TD_NUM, GRUPO_HORAS, l.descontoHoras ? "text-status-danger" : undefined)}>
+                      {l.descontoHoras ? `-${formatarNumero(l.descontoHoras)}` : "—"}
+                    </td>
+                    <td className={cn(TD_NUM, GRUPO_HORAS)}>{formatarNumeroOuTraco(l.horaNoturna)}</td>
                     <td className={cn(TD_NUM, DIVISOR, GRUPO_OUTROS)}>{formatarNumero(l.premiacao)}</td>
                     <td className={cn(TD_NUM, GRUPO_OUTROS)}>{formatarNumeroOuTraco(l.bonificacao)}</td>
                     <td className={cn(DIVISOR, "bg-brand-dark-900/5 px-3 py-1 text-right text-[11px] font-bold tabular-nums text-foreground", FONTE_NUMERO)}>
@@ -331,8 +379,15 @@ export function RelatorioDetalhadoTab() {
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.va)}</td>
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.vm)}</td>
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.odontologico)}</td>
+                  <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.salarioFamilia)}</td>
                   <td className={cn(TD_NUM, DIVISOR, "bg-surface-page")}>{formatarNumero(totais.solides)}</td>
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.flash)}</td>
+                  <td className={cn(TD_NUM, DIVISOR, "bg-surface-page")}>{formatarNumero(totais.horaExtra50)}</td>
+                  <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.horaExtra100)}</td>
+                  <td className={cn(TD_NUM, "bg-surface-page", totais.descontoHoras ? "text-status-danger" : undefined)}>
+                    {totais.descontoHoras ? `-${formatarNumero(totais.descontoHoras)}` : "0,00"}
+                  </td>
+                  <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.horaNoturna)}</td>
                   <td className={cn(TD_NUM, DIVISOR, "bg-surface-page")}>{formatarNumero(totais.premiacao)}</td>
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.bonificacao)}</td>
                   <td className={cn(DIVISOR, "bg-brand-dark-900 px-3 py-1 text-right text-[11px] tabular-nums text-white", FONTE_NUMERO)}>

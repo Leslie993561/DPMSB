@@ -28,6 +28,15 @@ export interface LegalTable {
     aliquota: number;
     multaRescisoria: number;
   };
+  /**
+   * Salário família (Lei 8.213/91 Art. 65): cota fixa por filho menor de 14
+   * anos, devida a quem tem remuneração até o teto. Valores anuais, reajustados
+   * pela mesma portaria do INSS.
+   */
+  salarioFamilia: {
+    cotaPorFilho: number;
+    tetoRemuneracao: number;
+  };
   inssPatronal: {
     /** Contribuição previdenciária patronal básica (Lei 8.212/91, art. 22, I) — 20% sobre a folha, sem RAT/terceiros. */
     aliquota: number;

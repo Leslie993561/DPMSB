@@ -104,6 +104,21 @@ const MIGRACOES: { tabela: string; coluna: string; definicao: string }[] = [
   { tabela: "colaboradores", coluna: "conjuge_nome", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "conjuge_cpf", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "conjuge_nascimento", definicao: "TEXT" },
+  // Adicionais de salário. Percentuais e não valores: periculosidade incide
+  // sobre o salário base (Art. 193 §1º) e insalubridade sobre o salário mínimo
+  // (Art. 192) — guardar o valor calculado congelaria um número que muda com
+  // dissídio e com o mínimo do ano.
+  { tabela: "colaboradores", coluna: "periculosidade_percentual", definicao: "REAL" },
+  { tabela: "colaboradores", coluna: "insalubridade_percentual", definicao: "REAL" },
+  { tabela: "colaboradores", coluna: "adicional_fixo", definicao: "REAL" },
+  { tabela: "colaboradores", coluna: "adicional_fixo_descricao", definicao: "TEXT" },
+  // Hora extra e afins do Relatório detalhado. Vão em MIGRACOES e não no
+  // CREATE TABLE porque folha_extras já existe em produção — o IF NOT EXISTS
+  // não acrescenta coluna a uma tabela criada antes.
+  { tabela: "folha_extras", coluna: "hora_extra_50", definicao: "REAL" },
+  { tabela: "folha_extras", coluna: "hora_extra_100", definicao: "REAL" },
+  { tabela: "folha_extras", coluna: "desconto_horas", definicao: "REAL" },
+  { tabela: "folha_extras", coluna: "hora_noturna", definicao: "REAL" },
 ];
 
 /**

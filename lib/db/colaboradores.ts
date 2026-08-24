@@ -56,6 +56,17 @@ export interface Colaborador {
   conjugeNome: string | null;
   conjugeCpf: string | null;
   conjugeNascimento: string | null;
+  /**
+   * Adicionais guardados como PERCENTUAL, não como valor: periculosidade incide
+   * sobre o salário base (Art. 193 §1º CLT) e insalubridade sobre o salário
+   * mínimo (Art. 192). Congelar o valor calculado deixaria o cadastro errado a
+   * cada dissídio e a cada mínimo novo.
+   */
+  periculosidadePercentual: number | null;
+  insalubridadePercentual: number | null;
+  /** Adicional em reais que não segue percentual — quebra de caixa, ajuda de custo fixa etc. */
+  adicionalFixo: number | null;
+  adicionalFixoDescricao: string | null;
 }
 
 export interface ColaboradorInput {
@@ -100,6 +111,10 @@ export interface ColaboradorInput {
   conjugeNome?: string | null;
   conjugeCpf?: string | null;
   conjugeNascimento?: string | null;
+  periculosidadePercentual?: number | null;
+  insalubridadePercentual?: number | null;
+  adicionalFixo?: number | null;
+  adicionalFixoDescricao?: string | null;
 }
 
 interface LinhaColaborador {
@@ -142,6 +157,10 @@ interface LinhaColaborador {
   bairro: string | null;
   rua: string | null;
   numero: string | null;
+  periculosidade_percentual: number | null;
+  insalubridade_percentual: number | null;
+  adicional_fixo: number | null;
+  adicional_fixo_descricao: string | null;
   conjuge_nome: string | null;
   conjuge_cpf: string | null;
   conjuge_nascimento: string | null;
@@ -191,6 +210,10 @@ function paraColaborador(linha: LinhaColaborador): Colaborador {
     conjugeNome: linha.conjuge_nome,
     conjugeCpf: linha.conjuge_cpf,
     conjugeNascimento: linha.conjuge_nascimento,
+    periculosidadePercentual: linha.periculosidade_percentual,
+    insalubridadePercentual: linha.insalubridade_percentual,
+    adicionalFixo: linha.adicional_fixo,
+    adicionalFixoDescricao: linha.adicional_fixo_descricao,
   };
 }
 
@@ -230,8 +253,9 @@ export async function criarColaborador(input: ColaboradorInput): Promise<Colabor
          (nome, data_admissao, salario_base, dependentes, cpf, email, cargo, departamento, gestor_id, cidade,
           vinculo, alimentacao_valor, data_nascimento, cbo, agencia, conta, tipo_transporte, valor_transporte_fixo,
           lider_direto_nome, status, pis, cidade_nascimento, uf_nascimento, nome_pai, nome_mae, telefone, sexo,
-          email_pessoal, horario, banco, cep, estado, bairro, rua, numero, conjuge_nome, conjuge_cpf, conjuge_nascimento)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          email_pessoal, horario, banco, cep, estado, bairro, rua, numero, conjuge_nome, conjuge_cpf, conjuge_nascimento,
+          periculosidade_percentual, insalubridade_percentual, adicional_fixo, adicional_fixo_descricao)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       input.nome,
       input.dataAdmissao,
@@ -271,6 +295,10 @@ export async function criarColaborador(input: ColaboradorInput): Promise<Colabor
       input.conjugeNome ?? null,
       input.conjugeCpf ?? null,
       input.conjugeNascimento ?? null,
+      input.periculosidadePercentual ?? null,
+      input.insalubridadePercentual ?? null,
+      input.adicionalFixo ?? null,
+      input.adicionalFixoDescricao ?? null,
     ],
   });
   return (await buscarColaborador(Number(info.lastInsertRowid)))!;
@@ -324,6 +352,13 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
     conjugeNome: input.conjugeNome !== undefined ? input.conjugeNome : atual.conjugeNome,
     conjugeCpf: input.conjugeCpf !== undefined ? input.conjugeCpf : atual.conjugeCpf,
     conjugeNascimento: input.conjugeNascimento !== undefined ? input.conjugeNascimento : atual.conjugeNascimento,
+    periculosidadePercentual:
+      input.periculosidadePercentual !== undefined ? input.periculosidadePercentual : atual.periculosidadePercentual,
+    insalubridadePercentual:
+      input.insalubridadePercentual !== undefined ? input.insalubridadePercentual : atual.insalubridadePercentual,
+    adicionalFixo: input.adicionalFixo !== undefined ? input.adicionalFixo : atual.adicionalFixo,
+    adicionalFixoDescricao:
+      input.adicionalFixoDescricao !== undefined ? input.adicionalFixoDescricao : atual.adicionalFixoDescricao,
   };
 
   const db = await getDb();
@@ -335,7 +370,9 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
            status = ?, data_desligamento = ?, motivo_desligamento = ?, valor_rescisao = ?,
            pis = ?, cidade_nascimento = ?, uf_nascimento = ?, nome_pai = ?, nome_mae = ?, telefone = ?, sexo = ?,
            email_pessoal = ?, horario = ?, banco = ?, cep = ?, estado = ?, bairro = ?, rua = ?, numero = ?,
-           conjuge_nome = ?, conjuge_cpf = ?, conjuge_nascimento = ?
+           conjuge_nome = ?, conjuge_cpf = ?, conjuge_nascimento = ?,
+           periculosidade_percentual = ?, insalubridade_percentual = ?, adicional_fixo = ?,
+           adicional_fixo_descricao = ?
        WHERE id = ?`,
     args: [
       mesclado.nome,
@@ -379,6 +416,10 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
       mesclado.conjugeNome ?? null,
       mesclado.conjugeCpf ?? null,
       mesclado.conjugeNascimento ?? null,
+      mesclado.periculosidadePercentual ?? null,
+      mesclado.insalubridadePercentual ?? null,
+      mesclado.adicionalFixo ?? null,
+      mesclado.adicionalFixoDescricao ?? null,
       id,
     ],
   });

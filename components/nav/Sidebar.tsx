@@ -91,7 +91,6 @@ function montarGrupos(counts?: NavCounts): GrupoItem[] {
       itens: [
         { href: "/folha?aba=dashboard", label: "Dashboard" },
         { href: "/folha?aba=relatorio", label: "Relatório detalhado" },
-        { href: "/folha?aba=hora-extra", label: "Hora extra" },
       ],
     },
     {
