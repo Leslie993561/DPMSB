@@ -21,6 +21,7 @@ const ROTULO_SITUACAO: Record<string, string> = {
   vencida: "Vencido",
   a_vencer: "Em aberto",
   programada: "Programada",
+  concluido: "Concluído",
 };
 
 /**

@@ -14,6 +14,7 @@ const ROTULO_SITUACAO: Record<SituacaoPeriodo, { label: string; cor: CorBadge }>
   vencida: { label: "Vencido", cor: "vermelho" },
   a_vencer: { label: "Em aberto", cor: "amarelo" },
   programada: { label: "Programada", cor: "azul" },
+  concluido: { label: "Concluído", cor: "verde" },
 };
 
 /**

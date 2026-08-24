@@ -103,7 +103,7 @@ async function buscarTodosLancamentosAtivos(): Promise<Map<number, LinhaLancamen
   return porPeriodo;
 }
 
-export type SituacaoPeriodo = "vencida" | "a_vencer" | "programada";
+export type SituacaoPeriodo = "vencida" | "a_vencer" | "programada" | "concluido";
 
 export interface PeriodoAquisitivoAberto extends PeriodoAquisitivo {
   colaboradorNome: string;
@@ -161,8 +161,16 @@ function enriquecerPeriodo(
   const limiteGozo = new Date(prazo.limiteInicio);
   const diasParaVencer = Math.round((limiteGozo.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
 
+  // Gozado por inteiro vem primeiro: é o resultado do "Confirmar gozo" e não
+  // faz sentido chamar de vencido ou a vencer algo que já foi todo tirado.
   const temProgramacao = lancamentosResumo.some((l) => l.status === "programada");
-  const situacao: SituacaoPeriodo = temProgramacao ? "programada" : prazo.vencida ? "vencida" : "a_vencer";
+  const situacao: SituacaoPeriodo = estado.diasATirar <= 0
+    ? "concluido"
+    : temProgramacao
+      ? "programada"
+      : prazo.vencida
+        ? "vencida"
+        : "a_vencer";
 
   const proximaDataInicio = lancamentosResumo
     .map((l) => l.data_inicio_gozo ?? l.data_inicio_prevista)
@@ -185,10 +193,14 @@ function enriquecerPeriodo(
     concessivoFim: prazo.limiteConcessao,
     limiteGozo: prazo.limiteInicio,
     diasParaVencer,
-    vencida: prazo.vencida,
-    alerta: diasParaVencer < DIAS_ALERTA_VENCIMENTO,
+    // "Vencido" é limite p/ gozo no passado COM dias restantes — é a definição
+    // impressa no rodapé da tela. Período já gozado por inteiro não vence nem
+    // alerta: não há mais o que conceder, então ele não entra nos contadores de
+    // risco só porque a data passou.
+    vencida: estado.diasATirar > 0 && prazo.vencida,
+    alerta: estado.diasATirar > 0 && diasParaVencer < DIAS_ALERTA_VENCIMENTO,
     situacao,
-    riscoDobro,
+    riscoDobro: estado.diasATirar > 0 && riscoDobro,
   };
 }
 
@@ -248,15 +260,25 @@ export async function listarPeriodosAbertos(base?: BaseControle): Promise<Period
     // Ainda dentro do período aquisitivo (não fechou) — não conta como aberto/vencido ainda.
     if (new Date(periodo.dataFim) > hoje) continue;
 
-    // Período que o DP já deu por encerrado. Necessário porque o histórico
-    // ("Relação de Férias Calculadas") traz períodos antigos em que a soma dos
-    // dias lançados não fecha os 30 — sem esta regra, o resto viraria saldo em
-    // aberto e apareceria como "vencida" mesmo o DP não cobrando mais nada.
-    // Quem manda é o relatório de programação: período que não está lá está
-    // resolvido, e entra no banco com status 'concluido'.
+    const candidato = enriquecerPeriodo(periodo, colaborador, hoje, lancamentosPorPeriodo.get(periodo.id) ?? []);
+
+    // Período com os 30 dias efetivamente gozados FICA na tela, como
+    // "Concluído". É por aqui que o "Confirmar gozo" do Planejamento aparece no
+    // Controle: os dias entram na coluna GOZ em vez de a linha sumir, que era o
+    // que acontecia antes e dava a impressão de que a baixa não tinha valido.
+    if (candidato.diasTirados >= candidato.diasDireito) {
+      abertos.push(candidato);
+      continue;
+    }
+
+    // Período que o DP já deu por encerrado SEM os dias fecharem. Vem do
+    // histórico ("Relação de Férias Calculadas"), que traz períodos antigos em
+    // que a soma dos lançamentos não chega aos 30 — sem esta regra o resto
+    // viraria saldo em aberto e apareceria como "vencida" mesmo o DP não
+    // cobrando mais nada. São 22 registros hoje, e continuam fora da tela.
     if (periodo.status === "concluido") continue;
 
-    const candidato = enriquecerPeriodo(periodo, colaborador, hoje, lancamentosPorPeriodo.get(periodo.id) ?? []);
+    // Sem saldo e sem gozo registrado: não há o que mostrar nem o que conciliar.
     if (candidato.diasATirar <= 0) continue;
 
     abertos.push(candidato);
