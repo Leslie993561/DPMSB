@@ -341,10 +341,11 @@ export async function getDb(): Promise<ClientLike> {
       const pool = new Pool({
         connectionString: resolverConnectionString(),
         ssl: { rejectUnauthorized: false },
-        // Teto por instância. O pooler do Supabase aceita 15 clientes no total,
-        // e a aplicação divide esse número com qualquer outra coisa conectada
-        // ao mesmo banco — pedir menos evita derrubar todo mundo em um pico.
-        max: 8,
+        // Teto por PROCESSO. O pooler do Supabase aceita 15 clientes no total e
+        // vários processos disputam esse número: em serverless cada instância
+        // tem seu pool, e no build o Next usa vários workers. Pedir pouco por
+        // processo é o que mantém a soma abaixo do limite.
+        max: 3,
         idleTimeoutMillis: 30_000,
       });
       try {

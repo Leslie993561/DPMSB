@@ -16,6 +16,16 @@ const poppins = Poppins({
   weight: ["400", "500", "700"],
 });
 
+/**
+ * O layout consulta o banco para os contadores da sidebar, o que faz TODA
+ * página depender do banco. Sem isto o build tenta pré-renderizar 48 páginas
+ * com 7 workers em paralelo, cada um abrindo seu próprio pool contra um
+ * pooler que aceita 15 clientes no total — e o build morre com EMAXCONNSESSION.
+ * Além disso, contador de férias vencidas congelado no build seria informação
+ * errada: ele muda todo dia.
+ */
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Portal Inteligente de Departamento Pessoal",
   description: "Assistente de DP com motor de cálculo determinístico e IA para interpretação e riscos.",
