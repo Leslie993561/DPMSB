@@ -43,6 +43,9 @@ export async function GET(request: Request) {
     { header: "Hora noturna", key: "horaNoturna", width: 14 },
     { header: "Premiação", key: "premiacao", width: 14 },
     { header: "Bonificação", key: "bonificacao", width: 14 },
+    { header: "Periculosidade", key: "periculosidade", width: 15 },
+    { header: "Insalubridade", key: "insalubridade", width: 15 },
+    { header: "Adicional fixo", key: "adicionalFixo", width: 15 },
     { header: "Outros custos", key: "outrosCustos", width: 14 },
     { header: "Custo total", key: "custoTotal", width: 16 },
   ];
@@ -73,6 +76,9 @@ export async function GET(request: Request) {
       horaNoturna: l.horaNoturna ?? "",
       premiacao: l.premiacao,
       bonificacao: l.bonificacao ?? "",
+      periculosidade: l.periculosidade || "",
+      insalubridade: l.insalubridade || "",
+      adicionalFixo: l.adicionalFixo || "",
       outrosCustos: l.outrosCustos ?? "",
       custoTotal: l.custoTotal,
     });

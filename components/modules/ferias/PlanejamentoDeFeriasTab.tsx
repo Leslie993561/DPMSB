@@ -208,6 +208,10 @@ export function PlanejamentoDeFeriasTab({
 
   const bucketAtivo = porTrimestre.get(trimestreAtivo)!;
   const itensTrimestre = bucketAtivo.itens;
+  // Duas somas diferentes de propósito: a coluna mostra o que os colaboradores
+  // recebem (líquido do recibo) e o custo da empresa fica no rótulo de apoio,
+  // porque são números que não se comparam — um inclui FGTS e INSS patronal.
+  const totalColaboradores = itensTrimestre.reduce((soma, i) => soma + (i.semSalario ? 0 : i.detalhe.liquido), 0);
   const custoTotalTrimestre = itensTrimestre.reduce((soma, i) => soma + (i.semSalario ? 0 : i.custoPrevisto), 0);
   const semSalarioTrimestre = itensTrimestre.filter((i) => i.semSalario).length;
 
@@ -350,7 +354,9 @@ export function PlanejamentoDeFeriasTab({
                   <th className="px-3 py-2">Início → Retorno</th>
                   <th className="px-3 py-2 text-right">Dias</th>
                   <th className="px-3 py-2">Abono</th>
-                  <th className="px-3 py-2 text-right">Custo previsto</th>
+                  <th className="px-3 py-2 text-right" title="Valor líquido que o colaborador recebe. Passe o mouse sobre o valor para ver o custo da empresa.">
+                    Valor das férias
+                  </th>
                   <th className="px-3 py-2 text-right">Ação</th>
                 </tr>
               </thead>
@@ -401,7 +407,26 @@ export function PlanejamentoDeFeriasTab({
                       {item.semSalario ? (
                         <span className="text-status-warning">a confirmar</span>
                       ) : (
-                        <span className="text-foreground">{formatarMoeda(item.custoPrevisto)}</span>
+                        <span
+                          className="cursor-help text-foreground underline decoration-dotted underline-offset-2"
+                          title={[
+                            `Férias ${item.dias} dia(s): ${formatarMoeda(item.detalhe.valorGozado)}`,
+                            `1/3 constitucional: ${formatarMoeda(item.detalhe.tercoConstitucional)}`,
+                            item.detalhe.dobra > 0 ? `Dobra Art. 137: ${formatarMoeda(item.detalhe.dobra)}` : null,
+                            item.abono ? `Abono: ${formatarMoeda(item.detalhe.abono + item.detalhe.tercoAbono)}` : null,
+                            `(–) INSS: ${formatarMoeda(item.detalhe.inss)}`,
+                            `(–) IRRF: ${formatarMoeda(item.detalhe.irrf)}`,
+                            `= Líquido ao colaborador: ${formatarMoeda(item.detalhe.liquido)}`,
+                            "",
+                            `FGTS: ${formatarMoeda(item.detalhe.fgts)}`,
+                            `INSS patronal: ${formatarMoeda(item.detalhe.inssPatronal)}`,
+                            `CUSTO PREVISTO PARA A EMPRESA: ${formatarMoeda(item.custoPrevisto)}`,
+                          ]
+                            .filter((l) => l !== null)
+                            .join("\n")}
+                        >
+                          {formatarMoeda(item.detalhe.liquido)}
+                        </span>
                       )}
                     </td>
                     <td className="px-3 py-2 text-right">
@@ -438,7 +463,10 @@ export function PlanejamentoDeFeriasTab({
             Mostrando {itensTrimestre.length} programação(ões) do Q{trimestreAtivo}
           </span>
           <span>
-            Custo das linhas com salário na folha: {formatarMoeda(custoTotalTrimestre)}
+            <span title={`Custo previsto para a empresa (com FGTS e INSS patronal): ${formatarMoeda(custoTotalTrimestre)}`}>
+              Colaboradores recebem: <strong>{formatarMoeda(totalColaboradores)}</strong> · custo da empresa:{" "}
+              {formatarMoeda(custoTotalTrimestre)}
+            </span>
             {semSalarioTrimestre > 0 ? ` · ${semSalarioTrimestre} linha(s) sem salário cadastrado` : ""}
           </span>
         </div>

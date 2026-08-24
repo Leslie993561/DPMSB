@@ -32,6 +32,9 @@ interface VerbaColaborador {
   horaNoturna: number | null;
   salarioFamilia: number;
   dependentesSalarioFamilia: number;
+  periculosidade: number;
+  insalubridade: number;
+  adicionalFixo: number;
   custoTotal: number;
 }
 
@@ -134,6 +137,9 @@ export function RelatorioDetalhadoTab() {
           premiacao: acc.premiacao + l.premiacao,
           bonificacao: acc.bonificacao + (l.bonificacao ?? 0),
           salarioFamilia: acc.salarioFamilia + l.salarioFamilia,
+          periculosidade: acc.periculosidade + l.periculosidade,
+          insalubridade: acc.insalubridade + l.insalubridade,
+          adicionalFixo: acc.adicionalFixo + l.adicionalFixo,
           horaExtra50: acc.horaExtra50 + (l.horaExtra50 ?? 0),
           horaExtra100: acc.horaExtra100 + (l.horaExtra100 ?? 0),
           descontoHoras: acc.descontoHoras + (l.descontoHoras ?? 0),
@@ -141,6 +147,9 @@ export function RelatorioDetalhadoTab() {
           custoTotal: acc.custoTotal + l.custoTotal,
         }),
         {
+          periculosidade: 0,
+          insalubridade: 0,
+          adicionalFixo: 0,
           salarioFamilia: 0,
           horaExtra50: 0,
           horaExtra100: 0,
@@ -283,7 +292,7 @@ export function RelatorioDetalhadoTab() {
                   <th colSpan={4} className={cn(TH_GRUPO, DIVISOR, "border-b border-hairline", GRUPO_HORAS, "text-foreground-muted")}>
                     Hora extra
                   </th>
-                  <th colSpan={2} className={cn(TH_GRUPO, DIVISOR, "border-b border-hairline", GRUPO_OUTROS, "text-foreground-muted")}>
+                  <th colSpan={5} className={cn(TH_GRUPO, DIVISOR, "border-b border-hairline", GRUPO_OUTROS, "text-foreground-muted")}>
                     Outros
                   </th>
                   <th rowSpan={2} className={cn(DIVISOR, "min-w-[130px] bg-brand-dark-900 px-3 py-2 text-right align-bottom text-[9.5px] font-bold tracking-wide text-white uppercase")}>
@@ -315,6 +324,19 @@ export function RelatorioDetalhadoTab() {
                   <th className={cn(TH_COL, GRUPO_HORAS, "text-foreground-muted")}>Hora noturna</th>
                   <th className={cn(TH_COL, DIVISOR, GRUPO_OUTROS, "text-foreground-muted")}>Premiação</th>
                   <th className={cn(TH_COL, GRUPO_OUTROS, "text-foreground-muted")}>Bonificação</th>
+                  <th
+                    className={cn(TH_COL, GRUPO_OUTROS, "text-foreground-muted")}
+                    title="30% sobre o salário base (Art. 193 CLT) — vem do cadastro do colaborador"
+                  >
+                    Periculosidade
+                  </th>
+                  <th
+                    className={cn(TH_COL, GRUPO_OUTROS, "text-foreground-muted")}
+                    title="10/20/40% sobre o salário mínimo (Art. 192 CLT) — vem do cadastro do colaborador"
+                  >
+                    Insalubridade
+                  </th>
+                  <th className={cn(TH_COL, GRUPO_OUTROS, "text-foreground-muted")}>Adicional fixo</th>
                 </tr>
               </thead>
               <tbody>
@@ -357,6 +379,9 @@ export function RelatorioDetalhadoTab() {
                     <td className={cn(TD_NUM, GRUPO_HORAS)}>{formatarNumeroOuTraco(l.horaNoturna)}</td>
                     <td className={cn(TD_NUM, DIVISOR, GRUPO_OUTROS)}>{formatarNumero(l.premiacao)}</td>
                     <td className={cn(TD_NUM, GRUPO_OUTROS)}>{formatarNumeroOuTraco(l.bonificacao)}</td>
+                    <td className={cn(TD_NUM, GRUPO_OUTROS)}>{formatarNumeroOuTraco(l.periculosidade || null)}</td>
+                    <td className={cn(TD_NUM, GRUPO_OUTROS)}>{formatarNumeroOuTraco(l.insalubridade || null)}</td>
+                    <td className={cn(TD_NUM, GRUPO_OUTROS)}>{formatarNumeroOuTraco(l.adicionalFixo || null)}</td>
                     <td className={cn(DIVISOR, "bg-brand-dark-900/5 px-3 py-1 text-right text-[11px] font-bold tabular-nums text-foreground", FONTE_NUMERO)}>
                       {formatarNumero(l.custoTotal)}
                     </td>
@@ -390,6 +415,9 @@ export function RelatorioDetalhadoTab() {
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.horaNoturna)}</td>
                   <td className={cn(TD_NUM, DIVISOR, "bg-surface-page")}>{formatarNumero(totais.premiacao)}</td>
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.bonificacao)}</td>
+                  <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.periculosidade)}</td>
+                  <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.insalubridade)}</td>
+                  <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.adicionalFixo)}</td>
                   <td className={cn(DIVISOR, "bg-brand-dark-900 px-3 py-1 text-right text-[11px] tabular-nums text-white", FONTE_NUMERO)}>
                     {formatarNumero(totais.custoTotal)}
                   </td>
@@ -441,13 +469,14 @@ function ExportarPopover({
             <div className="flex items-start justify-between gap-2">
               <p className="text-[12.5px] font-bold text-foreground">Opção 1 · Exportar planilha</p>
               <span className="shrink-0 rounded-full bg-brand-primary-100 px-2 py-0.5 text-[9.5px] font-bold text-brand-primary-800">
-                Excel · 25 colunas
+                Excel · 28 colunas
               </span>
             </div>
             <p className="mt-2 text-[11px] leading-relaxed text-foreground-muted">
               Gera um arquivo .xlsx com uma linha por colaborador e uma coluna para cada verba: salário base, INSS,
               FGTS, provisão de 13º, total de encargos, VT, VA, VM, odontológico, salário família, Sólides, Flash,
-              hora extra 50% e 100%, desconto de horas, hora noturna, premiação, bonificação e custo total.
+              hora extra 50% e 100%, desconto de horas, hora noturna, premiação, bonificação, periculosidade,
+              insalubridade, adicional fixo e custo total.
             </p>
 
             <label className="mt-3 block text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">

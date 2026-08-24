@@ -4,7 +4,7 @@ import { listarColaboradores, type Colaborador } from "./colaboradores";
 import { obterDiasUteis } from "./beneficiosDiasUteis";
 import { calcularINSS, calcularIRRF, calcularFGTS, calcularValeTransporte, tarifaVtPorCidade, arredondar } from "@/lib/calc";
 import type { LinhaExtrasImportada } from "@/lib/parsing/folhaExtras";
-import { calcularSalarioFamilia } from "@/lib/calc";
+import { calcularSalarioFamilia, calcularAdicionais } from "@/lib/calc";
 import { listarDependentesPorColaborador } from "./colaboradorDependentes";
 
 export interface VerbaColaborador {
@@ -42,6 +42,10 @@ export interface VerbaColaborador {
   salarioFamilia: number;
   /** Filhos que geraram a cota. Zero também quando falta a data de nascimento no cadastro. */
   dependentesSalarioFamilia: number;
+  /** Adicionais do cadastro. Integram a remuneração e por isso entram na base de INSS, IRRF, FGTS e 13º. */
+  periculosidade: number;
+  insalubridade: number;
+  adicionalFixo: number;
   custoTotal: number;
 }
 
@@ -181,10 +185,27 @@ export async function gerarBreakdown(competencia: string, colaboradores?: Colabo
     // provisão de 13º nem benefícios (VT/VA) estatutários sobre o valor pago a ela.
     const ehPj = c.vinculo === "PJ";
 
-    const inss = calcularINSS(c.salarioBase, dataCompetencia);
-    const irrf = calcularIRRF(c.salarioBase - inss.valor, c.dependentes, dataCompetencia);
-    const fgts = ehPj ? { valor: 0 } : calcularFGTS(c.salarioBase, dataCompetencia);
-    const provisaoDecimoTerceiro = ehPj ? 0 : arredondar(c.salarioBase / 12);
+    // Adicionais integram a remuneração para todos os efeitos (INSS, FGTS, 13º),
+    // então a base de cálculo é salário + adicionais, não o salário sozinho.
+    // Hoje ninguém tem adicional cadastrado, e por isso os números do relatório
+    // não mudam; conforme o DP preencher, eles passam a refletir a folha real.
+    const adicionais = ehPj
+      ? { periculosidade: 0, insalubridade: 0, adicionalFixo: 0, total: 0 }
+      : calcularAdicionais(
+          {
+            salarioBase: c.salarioBase,
+            periculosidadePercentual: c.periculosidadePercentual,
+            insalubridadePercentual: c.insalubridadePercentual,
+            adicionalFixo: c.adicionalFixo,
+          },
+          dataCompetencia,
+        );
+    const remuneracao = arredondar(c.salarioBase + adicionais.total);
+
+    const inss = calcularINSS(remuneracao, dataCompetencia);
+    const irrf = calcularIRRF(remuneracao - inss.valor, c.dependentes, dataCompetencia);
+    const fgts = ehPj ? { valor: 0 } : calcularFGTS(remuneracao, dataCompetencia);
+    const provisaoDecimoTerceiro = ehPj ? 0 : arredondar(remuneracao / 12);
     const valeTransporte = ehPj
       ? 0
       : c.tipoTransporte === "vm_fixo"
@@ -219,7 +240,8 @@ export async function gerarBreakdown(competencia: string, colaboradores?: Colabo
         (extras.outrosCustos ?? 0) +
         (extras.horaExtra50 ?? 0) +
         (extras.horaExtra100 ?? 0) +
-        (extras.horaNoturna ?? 0) -
+        (extras.horaNoturna ?? 0) +
+        adicionais.total -
         (extras.descontoHoras ?? 0),
     );
 
@@ -249,6 +271,9 @@ export async function gerarBreakdown(competencia: string, colaboradores?: Colabo
       horaNoturna: extras.horaNoturna,
       salarioFamilia: familia.valor,
       dependentesSalarioFamilia: familia.filhosComCota,
+      periculosidade: adicionais.periculosidade,
+      insalubridade: adicionais.insalubridade,
+      adicionalFixo: adicionais.adicionalFixo,
       custoTotal,
     };
   });
@@ -337,6 +362,22 @@ export async function listarBreakdownPersistido(competencia: string): Promise<Ve
     );
     const extras = extrasPorColaborador.get(l.colaborador_id) ?? EXTRAS_VAZIAS;
     const premiacao = extras.premiacao ?? 0;
+    // Mês fechado: o núcleo (salário e encargos) está congelado e não é
+    // recalculado. Os adicionais entram só como informação e no custo — se o
+    // cadastro mudou depois do fechamento, os encargos gravados continuam
+    // valendo, que é o sentido de fechar o mês.
+    const adicionais =
+      colaborador && colaborador.vinculo !== "PJ"
+        ? calcularAdicionais(
+            {
+              salarioBase: colaborador.salarioBase,
+              periculosidadePercentual: colaborador.periculosidadePercentual,
+              insalubridadePercentual: colaborador.insalubridadePercentual,
+              adicionalFixo: colaborador.adicionalFixo,
+            },
+            dataCompetencia,
+          )
+        : { periculosidade: 0, insalubridade: 0, adicionalFixo: 0, total: 0 };
     const familia =
       colaborador && colaborador.vinculo !== "PJ"
         ? calcularSalarioFamilia(
@@ -356,7 +397,8 @@ export async function listarBreakdownPersistido(competencia: string): Promise<Ve
         (extras.outrosCustos ?? 0) +
         (extras.horaExtra50 ?? 0) +
         (extras.horaExtra100 ?? 0) +
-        (extras.horaNoturna ?? 0) -
+        (extras.horaNoturna ?? 0) +
+        adicionais.total -
         (extras.descontoHoras ?? 0),
     );
 
@@ -386,6 +428,9 @@ export async function listarBreakdownPersistido(competencia: string): Promise<Ve
       horaNoturna: extras.horaNoturna,
       salarioFamilia: familia.valor,
       dependentesSalarioFamilia: familia.filhosComCota,
+      periculosidade: adicionais.periculosidade,
+      insalubridade: adicionais.insalubridade,
+      adicionalFixo: adicionais.adicionalFixo,
       custoTotal,
     };
   });

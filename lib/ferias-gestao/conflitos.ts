@@ -12,8 +12,18 @@ export interface Conflito {
  * Duas pessoas do mesmo departamento com férias sobrepostas — usado tanto
  * pelos Alertas Inteligentes quanto pelo Planejamento trimestral, por isso
  * vive como função pura e testável aqui, não duplicada em cada tela.
+ *
+ * Só entram férias que ainda não terminaram: as programadas e as que estão
+ * acontecendo agora. Férias já gozadas não são conflito — são histórico, e não
+ * há nada a remarcar nelas. Considerá-las fazia o Planejamento acusar dezenas
+ * de "conflitos" de anos anteriores, importados da Relação de Férias
+ * Calculadas, afogando os poucos que realmente precisam de decisão.
+ *
+ * `hoje` é parâmetro para o cálculo continuar puro e testável.
  */
-export function detectarConflitos(lancamentos: LancamentoComContexto[]): Conflito[] {
+export function detectarConflitos(lancamentos: LancamentoComContexto[], hoje = new Date()): Conflito[] {
+  const limite = new Date(hoje.toISOString().slice(0, 10));
+
   const comData = lancamentos
     .filter(
       (l) =>
@@ -29,7 +39,8 @@ export function detectarConflitos(lancamentos: LancamentoComContexto[]): Conflit
       dataFim.setDate(dataFim.getDate() + l.lancamento.dias - 1);
       return { ...l, dataInicio, dataFim };
     })
-    .filter((l): l is NonNullable<typeof l> => l !== null);
+    .filter((l): l is NonNullable<typeof l> => l !== null)
+    .filter((l) => l.dataFim >= limite);
 
   const conflitos: Conflito[] = [];
   for (let i = 0; i < comData.length; i++) {

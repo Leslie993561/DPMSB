@@ -8,5 +8,6 @@ export * from "./decimoTerceiro";
 export * from "./ferias";
 export * from "./horasExtras";
 export * from "./salarioFamilia";
+export * from "./adicionais";
 export * from "./rescisao";
 export * from "./beneficios";

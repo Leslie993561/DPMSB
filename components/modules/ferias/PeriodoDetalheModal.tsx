@@ -53,6 +53,7 @@ export function PeriodoDetalheModal({
   const [modo, setModo] = useState<Modo>("lista");
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+  const [revertendoId, setRevertendoId] = useState<number | null>(null);
 
   /** Histórico do COLABORADOR (todos os períodos), não só do período clicado. */
   async function recarregarLancamentos() {
@@ -76,6 +77,35 @@ export function PeriodoDetalheModal({
     void recarregarLancamentos();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- só depende do colaborador, que não muda enquanto o modal está aberto
   }, [alvo.colaboradorId]);
+
+  /**
+   * Devolve o lançamento ao Planejamento como se o "Confirmar gozo" nunca
+   * tivesse sido clicado: volta para "programada", limpa as datas reais de gozo
+   * e o período sai de "Concluído" no Controle de Férias.
+   */
+  async function desfazerBaixa(lancamentoId: number) {
+    if (!exigirOperador()) return;
+    setErro(null);
+    setRevertendoId(lancamentoId);
+    try {
+      const res = await fetch(`/api/lancamentos-ferias/${lancamentoId}/reverter`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ operador }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setErro(data.erro ?? "Erro ao desfazer a baixa.");
+        return;
+      }
+      await recarregarLancamentos();
+      onAtualizado();
+    } catch {
+      setErro("Falha de comunicação com o servidor.");
+    } finally {
+      setRevertendoId(null);
+    }
+  }
 
   function exigirOperador(): boolean {
     if (!operador.trim()) {
@@ -205,24 +235,13 @@ export function PeriodoDetalheModal({
                           <Badge cor={ROTULO_STATUS[f.status].cor}>{ROTULO_STATUS[f.status].label}</Badge>
                         </td>
                         <td className="px-3 py-2 text-right whitespace-nowrap">
-                          {f.status === "programada" && (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => setModo({ tipo: "baixa", lancamentoId: f.lancamentoId })}
-                                className="mr-2 text-xs font-medium text-brand-primary hover:underline"
-                              >
-                                Dar baixa
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setModo({ tipo: "cancelar", lancamentoId: f.lancamentoId })}
-                                className="text-xs font-medium text-red-600 hover:underline dark:text-red-400"
-                              >
-                                Cancelar
-                              </button>
-                            </>
-                          )}
+                          <MenuFerias
+                            status={f.status}
+                            revertendo={revertendoId === f.lancamentoId}
+                            onBaixa={() => setModo({ tipo: "baixa", lancamentoId: f.lancamentoId })}
+                            onCancelar={() => setModo({ tipo: "cancelar", lancamentoId: f.lancamentoId })}
+                            onDesfazer={() => void desfazerBaixa(f.lancamentoId)}
+                          />
                         </td>
                       </tr>
                     ));
@@ -564,5 +583,97 @@ function FormularioCancelar({
         </button>
       </div>
     </div>
+  );
+}
+
+/**
+ * Menu de ações de UM lançamento dentro do histórico. Para férias já
+ * confirmadas oferece "Retornar ao planejamento", que desfaz a baixa — é o
+ * caminho de volta quando o "Confirmar gozo" foi clicado por engano ou as
+ * férias acabaram não acontecendo.
+ */
+function MenuFerias({
+  status,
+  revertendo,
+  onBaixa,
+  onCancelar,
+  onDesfazer,
+}: {
+  status: StatusLancamento;
+  revertendo: boolean;
+  onBaixa: () => void;
+  onCancelar: () => void;
+  onDesfazer: () => void;
+}) {
+  const [aberto, setAberto] = useState(false);
+  const confirmada = status === "concluida" || status === "alterada";
+
+  // Lançamento cancelado não tem ação: não há o que baixar nem o que reabrir.
+  if (status === "cancelada") return null;
+
+  return (
+    <span className="relative inline-flex">
+      <button
+        type="button"
+        aria-label="Ações destas férias"
+        aria-expanded={aberto}
+        disabled={revertendo}
+        onClick={() => setAberto((v) => !v)}
+        className="rounded px-1 leading-none text-foreground-muted hover:bg-brand-surface hover:text-foreground disabled:opacity-50"
+      >
+        <span aria-hidden>{revertendo ? "…" : "⋮"}</span>
+      </button>
+
+      {aberto && (
+        <>
+          {/* Camada de fechamento: qualquer clique fora recolhe o menu. */}
+          <button
+            type="button"
+            aria-hidden
+            tabIndex={-1}
+            onClick={() => setAberto(false)}
+            className="fixed inset-0 z-30 cursor-default"
+          />
+          <span className="absolute top-full right-0 z-40 mt-1 flex w-56 flex-col overflow-hidden rounded-md border border-hairline bg-background py-1 shadow-drawer">
+            {confirmada ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setAberto(false);
+                  onDesfazer();
+                }}
+                className="px-3 py-1.5 text-left text-[12px] font-normal text-foreground normal-case hover:bg-surface-page"
+              >
+                Retornar ao planejamento
+                <span className="block text-[10px] text-foreground-muted">Desfaz a baixa e reabre os dias</span>
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAberto(false);
+                    onBaixa();
+                  }}
+                  className="px-3 py-1.5 text-left text-[12px] font-normal text-foreground normal-case hover:bg-surface-page"
+                >
+                  Dar baixa
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAberto(false);
+                    onCancelar();
+                  }}
+                  className="px-3 py-1.5 text-left text-[12px] font-normal text-red-600 normal-case hover:bg-surface-page dark:text-red-400"
+                >
+                  Cancelar lançamento
+                </button>
+              </>
+            )}
+          </span>
+        </>
+      )}
+    </span>
   );
 }

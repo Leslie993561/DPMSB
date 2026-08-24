@@ -276,7 +276,13 @@ export async function listarPeriodosAbertos(base?: BaseControle): Promise<Period
     // que a soma dos lançamentos não chega aos 30 — sem esta regra o resto
     // viraria saldo em aberto e apareceria como "vencida" mesmo o DP não
     // cobrando mais nada. São 22 registros hoje, e continuam fora da tela.
-    if (periodo.status === "concluido") continue;
+    // A exceção: se ainda existe uma programação em aberto no período, ele NÃO
+    // é sobra — está vivo. É o caso de quem teve a baixa desfeita: os dias
+    // voltam a ser programados e o período continua marcado como 'concluido'
+    // no banco (o status conta dias ALOCADOS, não gozados). Sem esta ressalva a
+    // linha desaparecia da tela logo depois de retornar as férias ao
+    // planejamento, e o saldo ficava invisível.
+    if (periodo.status === "concluido" && candidato.situacao !== "programada") continue;
 
     // Sem saldo e sem gozo registrado: não há o que mostrar nem o que conciliar.
     if (candidato.diasATirar <= 0) continue;
