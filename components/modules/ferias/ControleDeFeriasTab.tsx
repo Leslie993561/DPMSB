@@ -851,6 +851,8 @@ function LinhaEmDia({
   emCurso: PeriodoEmCurso;
   onAbrir: (e: PeriodoEmCurso) => void;
 }) {
+  const j = e.janela;
+
   return (
     <tr className="border-b border-hairline/60 last:border-0 hover:bg-surface-page/60">
       <td className="px-3 py-2 text-[10px] text-foreground-muted/70">#{e.colaboradorId}</td>
@@ -866,36 +868,50 @@ function LinhaEmDia({
         </span>
       </td>
       <td className="px-3 py-2 text-foreground-muted">{formatarDataBr(e.colaboradorAdmissao)}</td>
-      <td className="px-3 py-2 text-foreground-muted">
-        {formatarDataBr(e.aquisitivoInicio)} – {formatarDataBr(e.aquisitivoFim)}
-        {e.derivado && (
-          <span
-            className="ml-1 text-[9px] text-status-warning"
-            title="Período calculado pela data de admissão: este colaborador ainda não apareceu em nenhum relatório do DP."
+      {j ? (
+        <>
+          <td className="px-3 py-2 text-foreground-muted">
+            {formatarDataBr(j.aquisitivoInicio)} – {formatarDataBr(j.aquisitivoFim)}
+            {j.derivado && (
+              <span
+                className="ml-1 text-[9px] text-status-warning"
+                title="Período calculado pela data de admissão: este colaborador ainda não apareceu em nenhum relatório do DP."
+              >
+                estimado
+              </span>
+            )}
+          </td>
+          <td className="px-3 py-2 text-foreground-muted">
+            {formatarDataBr(j.concessivoInicio)} – {formatarDataBr(j.concessivoFim)}
+          </td>
+          <td className="px-3 py-2 text-right text-foreground-muted">
+            {j.diasDireito}
+            <span className="block text-[9px] text-foreground-muted/70" title="Dias já acumulados: 1/12 por mês completo">
+              {j.diasAcumulados} acum.
+            </span>
+          </td>
+          <td
+            className={cn(
+              "px-3 py-2 text-right font-semibold",
+              j.diasTirados > 0 ? "text-status-success" : "font-normal text-foreground-muted/60",
+            )}
           >
-             estimado
-          </span>
-        )}
-      </td>
-      <td className="px-3 py-2 text-foreground-muted">
-        {formatarDataBr(e.concessivoInicio)} – {formatarDataBr(e.concessivoFim)}
-      </td>
-      <td className="px-3 py-2 text-right text-foreground-muted">
-        {e.diasDireito}
-        <span className="block text-[9px] text-foreground-muted/70" title="Dias já acumulados: 1/12 por mês completo">
-          {e.diasAcumulados} acum.
-        </span>
-      </td>
-      <td
-        className={cn(
-          "px-3 py-2 text-right font-semibold",
-          e.diasTirados > 0 ? "text-status-success" : "font-normal text-foreground-muted/60",
-        )}
-      >
-        {e.diasTirados}
-      </td>
-      <td className="px-3 py-2 text-right font-semibold text-foreground">{e.diasATirar}</td>
-      <td className="px-3 py-2 text-foreground-muted">{formatarDataBr(e.limiteGozo)}</td>
+            {j.diasTirados}
+          </td>
+          <td className="px-3 py-2 text-right font-semibold text-foreground">{j.diasATirar}</td>
+          <td className="px-3 py-2 text-foreground-muted">{formatarDataBr(j.limiteGozo)}</td>
+        </>
+      ) : (
+        /* Sem período do DP e fora da lista de projeção: colunas vazias em vez de datas sem respaldo. */
+        <>
+          <td className="px-3 py-2 text-foreground-muted/50">—</td>
+          <td className="px-3 py-2 text-foreground-muted/50">—</td>
+          <td className="px-3 py-2 text-right text-foreground-muted/50">—</td>
+          <td className="px-3 py-2 text-right text-foreground-muted/50">—</td>
+          <td className="px-3 py-2 text-right text-foreground-muted/50">—</td>
+          <td className="px-3 py-2 text-foreground-muted/50">—</td>
+        </>
+      )}
       <td className="px-3 py-2">
         <Badge cor="verde">Em dia</Badge>
       </td>

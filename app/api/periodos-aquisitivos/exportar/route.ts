@@ -205,14 +205,15 @@ async function montarRelatorioIndividual(workbook: ExcelJS.Workbook, colaborador
     });
   }
   for (const e of emCurso.filter((x) => x.colaboradorId === colaboradorId)) {
+    const j = e.janela;
     situacao.addRow({
-      aquisitivo: `${formatarDataBr(e.aquisitivoInicio)} – ${formatarDataBr(e.aquisitivoFim)}`,
-      concessivo: `${formatarDataBr(e.concessivoInicio)} – ${formatarDataBr(e.concessivoFim)}`,
-      direito: e.diasDireito,
-      gozados: e.diasTirados,
-      restantes: e.diasATirar,
-      limite: formatarDataBr(e.limiteGozo),
-      situacao: e.derivado ? "Em dia (período estimado)" : "Em dia",
+      aquisitivo: j ? `${formatarDataBr(j.aquisitivoInicio)} – ${formatarDataBr(j.aquisitivoFim)}` : "—",
+      concessivo: j ? `${formatarDataBr(j.concessivoInicio)} – ${formatarDataBr(j.concessivoFim)}` : "—",
+      direito: j?.diasDireito ?? "—",
+      gozados: j?.diasTirados ?? "—",
+      restantes: j?.diasATirar ?? "—",
+      limite: j ? formatarDataBr(j.limiteGozo) : "—",
+      situacao: !j ? "Em dia (sem período no relatório)" : j.derivado ? "Em dia (período estimado)" : "Em dia",
     });
   }
 }
@@ -259,13 +260,17 @@ async function montarSituacaoAtual(workbook: ExcelJS.Workbook) {
       cargo: e.colaboradorCargo ?? "—",
       setor: e.colaboradorDepartamento ?? "—",
       admissao: formatarDataBr(e.colaboradorAdmissao),
-      aquisitivo: `${formatarDataBr(e.aquisitivoInicio)} – ${formatarDataBr(e.aquisitivoFim)}`,
-      concessivo: `${formatarDataBr(e.concessivoInicio)} – ${formatarDataBr(e.concessivoFim)}`,
-      direito: e.diasDireito,
-      gozados: e.diasTirados,
-      restantes: e.diasATirar,
-      limite: formatarDataBr(e.limiteGozo),
-      situacao: e.derivado ? "Em dia (período estimado)" : "Em dia",
+      aquisitivo: e.janela ? `${formatarDataBr(e.janela.aquisitivoInicio)} – ${formatarDataBr(e.janela.aquisitivoFim)}` : "—",
+      concessivo: e.janela ? `${formatarDataBr(e.janela.concessivoInicio)} – ${formatarDataBr(e.janela.concessivoFim)}` : "—",
+      direito: e.janela?.diasDireito ?? "—",
+      gozados: e.janela?.diasTirados ?? "—",
+      restantes: e.janela?.diasATirar ?? "—",
+      limite: e.janela ? formatarDataBr(e.janela.limiteGozo) : "—",
+      situacao: !e.janela
+        ? "Em dia (sem período no relatório)"
+        : e.janela.derivado
+          ? "Em dia (período estimado)"
+          : "Em dia",
     })),
   ].sort((a, z) => a.nome.localeCompare(z.nome, "pt-BR"));
 

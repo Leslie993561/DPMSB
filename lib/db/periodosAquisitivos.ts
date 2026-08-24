@@ -293,13 +293,7 @@ export async function listarHistoricoColaborador(colaboradorId: number): Promise
  * de traços. Não é um período "em aberto": o direito ainda não é exigível,
  * e por isso ele não entra em `listarPeriodosAbertos()` nem nos alertas.
  */
-export interface PeriodoEmCurso {
-  colaboradorId: number;
-  colaboradorNome: string;
-  colaboradorCargo: string | null;
-  colaboradorDepartamento: string | null;
-  colaboradorCpf: string | null;
-  colaboradorAdmissao: string;
+export interface JanelaEmCurso {
   aquisitivoInicio: string;
   aquisitivoFim: string;
   concessivoInicio: string;
@@ -318,6 +312,50 @@ export interface PeriodoEmCurso {
    */
   derivado: boolean;
 }
+
+export interface PeriodoEmCurso {
+  colaboradorId: number;
+  colaboradorNome: string;
+  colaboradorCargo: string | null;
+  colaboradorDepartamento: string | null;
+  colaboradorCpf: string | null;
+  colaboradorAdmissao: string;
+  /**
+   * null quando não há período do DP para a pessoa e ela também não está na
+   * lista de projeção pela admissão — a linha fica com as colunas vazias, que
+   * é o certo: melhor não mostrar nada do que mostrar um período que o DP não
+   * reconhece.
+   */
+  janela: JanelaEmCurso | null;
+}
+
+/** Compara nomes ignorando acento, caixa e espaço sobrando (o cadastro tem nome com espaço à frente). */
+function normalizarNome(nome: string): string {
+  return nome
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toUpperCase()
+    .replace(/s+/g, " ")
+    .trim();
+}
+
+/**
+ * Quem NÃO tem período no relatório do DP mas mesmo assim deve ter o
+ * aquisitivo projetado pela data de admissão. Lista fechada, definida pelo DP:
+ * para os demais a projeção não corresponde ao que é controlado, então a linha
+ * fica sem período até a pessoa aparecer em um relatório.
+ */
+const PROJETAR_PELA_ADMISSAO = new Set(
+  [
+    "ELIVA DA NATIVIDADE MENESES",
+    "CRISTIANE ANDRADE",
+    "LAISA ROCHA FERREIRA MACHADO DOS SANTOS",
+    "MARIA EDUARDA BRANDAO SOARES",
+    "TASSIO ANTONIO LIMA SANT ANA",
+    "THIAGO ALVES DIAS",
+    "YURI IVONEI CRISPIM",
+  ].map(normalizarNome),
+);
 
 function somarMeses(data: string, meses: number): Date {
   const d = new Date(data);
@@ -377,8 +415,24 @@ export async function listarPeriodosEmCurso(base?: BaseControle): Promise<Period
       .filter((p) => p.colaboradorId === colaborador.id && new Date(p.dataFim) > hoje)
       .sort((a, z) => a.dataInicio.localeCompare(z.dataInicio))[0];
 
+    const identificacao = {
+      colaboradorId: colaborador.id,
+      colaboradorNome: colaborador.nome,
+      colaboradorCargo: colaborador.cargo,
+      colaboradorDepartamento: colaborador.departamento,
+      colaboradorCpf: colaborador.cpf,
+      colaboradorAdmissao: colaborador.dataAdmissao,
+    };
+
+    // Sem período do DP e fora da lista de projeção: a pessoa continua na
+    // tabela, mas sem datas. É a linha que o DP ainda não tem como respaldar.
+    if (!doDp && !PROJETAR_PELA_ADMISSAO.has(normalizarNome(colaborador.nome))) {
+      emCurso.push({ ...identificacao, janela: null });
+      continue;
+    }
+
     const derivado = !doDp;
-    const janela = doDp
+    const periodo = doDp
       ? { inicio: doDp.dataInicio, fim: doDp.dataFim }
       : derivarPeriodoEmCurso(colaborador.dataAdmissao, hoje);
 
@@ -390,25 +444,22 @@ export async function listarPeriodosEmCurso(base?: BaseControle): Promise<Period
     const diasATirar = Math.max(0, diasDireito - diasTirados);
 
     // O limite p/ gozo do relatório: recua conforme os dias que ainda faltam gozar.
-    const prazo = avaliarPrazoConcessao(new Date(janela.fim), hoje, diasATirar);
+    const prazo = avaliarPrazoConcessao(new Date(periodo.fim), hoje, diasATirar);
 
     emCurso.push({
-      colaboradorId: colaborador.id,
-      colaboradorNome: colaborador.nome,
-      colaboradorCargo: colaborador.cargo,
-      colaboradorDepartamento: colaborador.departamento,
-      colaboradorCpf: colaborador.cpf,
-      colaboradorAdmissao: colaborador.dataAdmissao,
-      aquisitivoInicio: janela.inicio,
-      aquisitivoFim: janela.fim,
-      concessivoInicio: janela.fim,
-      concessivoFim: prazo.limiteConcessao,
-      limiteGozo: prazo.limiteInicio,
-      diasDireito,
-      diasTirados,
-      diasATirar,
-      diasAcumulados: Math.round((mesesCompletos(janela.inicio, hoje) / 12) * diasDireito * 10) / 10,
-      derivado,
+      ...identificacao,
+      janela: {
+        aquisitivoInicio: periodo.inicio,
+        aquisitivoFim: periodo.fim,
+        concessivoInicio: periodo.fim,
+        concessivoFim: prazo.limiteConcessao,
+        limiteGozo: prazo.limiteInicio,
+        diasDireito,
+        diasTirados,
+        diasATirar,
+        diasAcumulados: Math.round((mesesCompletos(periodo.inicio, hoje) / 12) * diasDireito * 10) / 10,
+        derivado,
+      },
     });
   }
 
