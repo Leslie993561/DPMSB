@@ -31,7 +31,7 @@ describe("converterExtrasImportadas · quais colunas vieram", () => {
       [...IDENTIFICACAO, "VM"],
       [{ "Código": "1", "Nome do colaborador": "Fulano", VM: 100 }],
     );
-    expect(r.colunasNaoEncontradas).toContain("Hora extra 50%");
+    expect(r.colunasNaoEncontradas).toContain("Hora extra 50% (horas)");
     expect(r.colunasNaoEncontradas).toContain("Odontológico");
     expect(r.colunasNaoEncontradas).not.toContain("VM");
     expect(r.camposPresentes).toEqual(["vm"]);
@@ -80,5 +80,35 @@ describe("converterExtrasImportadas · cabeçalhos abreviados", () => {
       [{ "Código": "1", "Nome do colaborador": "Fulano", HE50: 15 }],
     );
     expect(r.itens[0].horaExtra50).toBe(15);
+  });
+});
+
+describe("converterExtrasImportadas · horas, não reais", () => {
+  it('lê "08:01" como oito horas e um minuto', () => {
+    const r = converterExtrasImportadas(
+      ["Código", "Nome do colaborador", "Hora extra 50%"],
+      [{ "Código": "1", "Nome do colaborador": "Fulano", "Hora extra 50%": "08:01" }],
+    );
+    expect(r.itens[0].horaExtra50).toBeCloseTo(8 + 1 / 60, 6);
+  });
+
+  it("aceita hora quebrada nas quatro colunas", () => {
+    const r = converterExtrasImportadas(
+      ["Código", "Nome do colaborador", "Hora extra 50%", "Hora extra 100%", "Desconto de horas", "Hora noturna"],
+      [
+        {
+          "Código": "1",
+          "Nome do colaborador": "Fulano",
+          "Hora extra 50%": "08:30",
+          "Hora extra 100%": "02:15",
+          "Desconto de horas": "01:45",
+          "Hora noturna": "03:20",
+        },
+      ],
+    );
+    expect(r.itens[0].horaExtra50).toBeCloseTo(8.5, 6);
+    expect(r.itens[0].horaExtra100).toBeCloseTo(2.25, 6);
+    expect(r.itens[0].descontoHoras).toBeCloseTo(1.75, 6);
+    expect(r.itens[0].horaNoturna).toBeCloseTo(3 + 20 / 60, 6);
   });
 });

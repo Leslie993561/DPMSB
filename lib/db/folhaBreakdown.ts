@@ -5,7 +5,7 @@ import { obterDiasUteis } from "./beneficiosDiasUteis";
 import { calcularINSS, calcularIRRF, calcularFGTS, calcularValeTransporte, tarifaVtPorCidade, arredondar } from "@/lib/calc";
 import type { LinhaExtrasImportada, CampoExtra } from "@/lib/parsing/folhaExtras";
 import { estaNaFolha } from "@/lib/folha/vigencia";
-import { calcularSalarioFamilia, calcularAdicionais } from "@/lib/calc";
+import { calcularSalarioFamilia, calcularAdicionais, calcularValorDasHoras } from "@/lib/calc";
 import { listarDependentesPorColaborador } from "./colaboradorDependentes";
 
 export interface VerbaColaborador {
@@ -29,11 +29,24 @@ export interface VerbaColaborador {
   bonificacao: number | null;
   outrosCustos: number | null;
   premiacao: number;
-  /** Hora extra e afins — importados da planilha do mês, nunca calculados aqui. */
+  /**
+   * HORAS lançadas na planilha do mês, em horas decimais (8,0167 = 08:01).
+   * O valor em reais sai do salário — ver `valorHoras`.
+   */
   horaExtra50: number | null;
   horaExtra100: number | null;
   descontoHoras: number | null;
   horaNoturna: number | null;
+  /** O que essas horas custam, já com os adicionais de cada tipo. */
+  valorHoras: {
+    valorHoraNormal: number;
+    extra50: number;
+    extra100: number;
+    desconto: number;
+    noturna: number;
+    /** extra50 + extra100 + noturna − desconto. */
+    liquido: number;
+  };
   /**
    * Salário família (Lei 8.213/91 Art. 65): cota por filho menor de 14 anos
    * para quem ganha até o teto do ano. Sai das datas de nascimento dos
@@ -57,6 +70,7 @@ export interface ExtrasImportadas {
   flash: number | null;
   bonificacao: number | null;
   premiacao: number | null;
+  /** HORAS decimais (8,0167 = 08:01), não reais. */
   horaExtra50: number | null;
   horaExtra100: number | null;
   descontoHoras: number | null;
@@ -86,10 +100,10 @@ interface LinhaExtras {
   flash: number | null;
   bonificacao: number | null;
   premiacao: number | null;
-  hora_extra_50: number | null;
-  hora_extra_100: number | null;
-  desconto_horas: number | null;
-  hora_noturna: number | null;
+  horas_extra_50: number | null;
+  horas_extra_100: number | null;
+  horas_desconto: number | null;
+  horas_noturnas: number | null;
   outros_custos: number | null;
 }
 
@@ -98,7 +112,7 @@ export async function obterExtras(competencia: string): Promise<Map<number, Extr
   const db = await getDb();
   const resultado = await db.execute({
     sql: `SELECT colaborador_id, vm, odontologico, solides, flash, bonificacao, premiacao, outros_custos,
-                 hora_extra_50, hora_extra_100, desconto_horas, hora_noturna
+                 horas_extra_50, horas_extra_100, horas_desconto, horas_noturnas
           FROM folha_extras WHERE competencia = ?`,
     args: [competencia],
   });
@@ -110,10 +124,10 @@ export async function obterExtras(competencia: string): Promise<Map<number, Extr
       {
         vm: l.vm,
         odontologico: l.odontologico,
-        horaExtra50: l.hora_extra_50,
-        horaExtra100: l.hora_extra_100,
-        descontoHoras: l.desconto_horas,
-        horaNoturna: l.hora_noturna,
+        horaExtra50: l.horas_extra_50,
+        horaExtra100: l.horas_extra_100,
+        descontoHoras: l.horas_desconto,
+        horaNoturna: l.horas_noturnas,
         solides: l.solides,
         flash: l.flash,
         bonificacao: l.bonificacao,
@@ -137,10 +151,10 @@ const COLUNA_DE = {
   flash: "flash",
   bonificacao: "bonificacao",
   premiacao: "premiacao",
-  horaExtra50: "hora_extra_50",
-  horaExtra100: "hora_extra_100",
-  descontoHoras: "desconto_horas",
-  horaNoturna: "hora_noturna",
+  horaExtra50: "horas_extra_50",
+  horaExtra100: "horas_extra_100",
+  descontoHoras: "horas_desconto",
+  horaNoturna: "horas_noturnas",
   // "Outros custos" não é uma coluna do arquivo: é a soma das colunas que o
   // portal não reconheceu. Precisa estar aqui mesmo assim, senão ela deixa de
   // ser gravada — foi o que aconteceu quando a gravação passou a ser seletiva.
@@ -264,8 +278,15 @@ export async function gerarBreakdown(competencia: string, colaboradores?: Colabo
       ? { valor: 0, filhosComCota: 0 }
       : calcularSalarioFamilia(c.salarioBase, dependentesPorColaborador.get(c.id) ?? [], dataCompetencia);
 
-    // Hora extra soma; desconto de horas subtrai. É a única extra negativa, e
-    // vem positiva na planilha justamente porque o DP a informa como desconto.
+    // As horas lançadas viram dinheiro aqui, pelo salário do colaborador —
+    // hora extra soma, desconto subtrai. Ver calcularValorDasHoras.
+    const valorHoras = calcularValorDasHoras(c.salarioBase, {
+      extra50: extras.horaExtra50,
+      extra100: extras.horaExtra100,
+      desconto: extras.descontoHoras,
+      noturna: extras.horaNoturna,
+    });
+
     //
     // O ODONTOLÓGICO fica fora da conta de propósito: ele é descontado da folha
     // do colaborador, não pago pela empresa. A empresa recolhe e repassa ao
@@ -283,11 +304,8 @@ export async function gerarBreakdown(competencia: string, colaboradores?: Colabo
         (extras.flash ?? 0) +
         (extras.bonificacao ?? 0) +
         (extras.outrosCustos ?? 0) +
-        (extras.horaExtra50 ?? 0) +
-        (extras.horaExtra100 ?? 0) +
-        (extras.horaNoturna ?? 0) +
-        adicionais.total -
-        (extras.descontoHoras ?? 0),
+        valorHoras.liquido +
+        adicionais.total,
     );
 
     return {
@@ -314,6 +332,7 @@ export async function gerarBreakdown(competencia: string, colaboradores?: Colabo
       horaExtra100: extras.horaExtra100,
       descontoHoras: extras.descontoHoras,
       horaNoturna: extras.horaNoturna,
+      valorHoras,
       salarioFamilia: familia.valor,
       dependentesSalarioFamilia: familia.filhosComCota,
       periculosidade: adicionais.periculosidade,
@@ -442,6 +461,12 @@ export async function listarBreakdownPersistido(competencia: string): Promise<Ve
             dataCompetencia,
           )
         : { periculosidade: 0, insalubridade: 0, adicionalFixo: 0, total: 0 };
+    const valorHoras = calcularValorDasHoras(colaborador?.salarioBase ?? 0, {
+      extra50: extras.horaExtra50,
+      extra100: extras.horaExtra100,
+      desconto: extras.descontoHoras,
+      noturna: extras.horaNoturna,
+    });
     const familia =
       colaborador && colaborador.vinculo !== "PJ"
         ? calcularSalarioFamilia(
@@ -458,11 +483,8 @@ export async function listarBreakdownPersistido(competencia: string): Promise<Ve
         (extras.flash ?? 0) +
         (extras.bonificacao ?? 0) +
         (extras.outrosCustos ?? 0) +
-        (extras.horaExtra50 ?? 0) +
-        (extras.horaExtra100 ?? 0) +
-        (extras.horaNoturna ?? 0) +
-        adicionais.total -
-        (extras.descontoHoras ?? 0),
+        valorHoras.liquido +
+        adicionais.total,
     );
 
     return {
@@ -489,6 +511,7 @@ export async function listarBreakdownPersistido(competencia: string): Promise<Ve
       horaExtra100: extras.horaExtra100,
       descontoHoras: extras.descontoHoras,
       horaNoturna: extras.horaNoturna,
+      valorHoras,
       salarioFamilia: familia.valor,
       dependentesSalarioFamilia: familia.filhosComCota,
       periculosidade: adicionais.periculosidade,

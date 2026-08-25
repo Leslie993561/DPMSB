@@ -1,5 +1,6 @@
 import "server-only";
 import type { LinhaPlanilha } from "./spreadsheet";
+import { parsearHoras } from "@/lib/folha/horas";
 
 const DIACRITICOS = new RegExp("[\\u0300-\\u036f]", "g");
 
@@ -22,6 +23,10 @@ export interface LinhaExtrasImportada {
   flash: number | null;
   bonificacao: number | null;
   premiacao: number | null;
+  /**
+   * HORAS, não reais. O DP lança "08:01" e aqui chega 8,0167 — o valor é
+   * calculado depois, pelo salário do colaborador.
+   */
   horaExtra50: number | null;
   horaExtra100: number | null;
   /** Horas descontadas: entra positivo na planilha e SUBTRAI do custo. */
@@ -104,10 +109,10 @@ const ROTULO_CAMPO: Record<CampoExtra, string> = {
   flash: "Flash",
   bonificacao: "Bonificação",
   premiacao: "Premiação",
-  horaExtra50: "Hora extra 50%",
-  horaExtra100: "Hora extra 100%",
-  descontoHoras: "Desconto de horas",
-  horaNoturna: "Hora noturna",
+  horaExtra50: "Hora extra 50% (horas)",
+  horaExtra100: "Hora extra 100% (horas)",
+  descontoHoras: "Desconto de horas (horas)",
+  horaNoturna: "Hora noturna (horas)",
 };
 
 // Colunas que fazem parte do núcleo calculado (nunca vêm de planilha importada) — ignoradas ao
@@ -226,10 +231,12 @@ export function converterExtrasImportadas(cabecalhos: string[], linhas: LinhaPla
       flash: mapa.flash ? paraNumeroOuNulo(linha[mapa.flash]) : null,
       bonificacao: mapa.bonificacao ? paraNumeroOuNulo(linha[mapa.bonificacao]) : null,
       premiacao: mapa.premiacao ? paraNumeroOuNulo(linha[mapa.premiacao]) : null,
-      horaExtra50: mapa.horaExtra50 ? paraNumeroOuNulo(linha[mapa.horaExtra50]) : null,
-      horaExtra100: mapa.horaExtra100 ? paraNumeroOuNulo(linha[mapa.horaExtra100]) : null,
-      descontoHoras: mapa.descontoHoras ? paraNumeroOuNulo(linha[mapa.descontoHoras]) : null,
-      horaNoturna: mapa.horaNoturna ? paraNumeroOuNulo(linha[mapa.horaNoturna]) : null,
+      // Estas quatro passam por parsearHoras, não por paraNumeroOuNulo:
+      // "08:01" são oito horas e um minuto, e não o número 8,01.
+      horaExtra50: mapa.horaExtra50 ? parsearHoras(linha[mapa.horaExtra50]) : null,
+      horaExtra100: mapa.horaExtra100 ? parsearHoras(linha[mapa.horaExtra100]) : null,
+      descontoHoras: mapa.descontoHoras ? parsearHoras(linha[mapa.descontoHoras]) : null,
+      horaNoturna: mapa.horaNoturna ? parsearHoras(linha[mapa.horaNoturna]) : null,
       outrosCustos: temOutros ? outrosCustosSoma : null,
     });
   });

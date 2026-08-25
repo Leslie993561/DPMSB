@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 import { z } from "zod";
 import { obterBreakdown } from "@/lib/db/folhaBreakdown";
+import { formatarHoras } from "@/lib/folha/horas";
 
 export const runtime = "nodejs";
 
@@ -37,10 +38,11 @@ export async function GET(request: Request) {
     { header: "Salário família", key: "salarioFamilia", width: 15 },
     { header: "Sólides", key: "solides", width: 12 },
     { header: "Flash", key: "flash", width: 12 },
-    { header: "Hora extra 50%", key: "horaExtra50", width: 15 },
-    { header: "Hora extra 100%", key: "horaExtra100", width: 16 },
-    { header: "Desconto de horas", key: "descontoHoras", width: 17 },
-    { header: "Hora noturna", key: "horaNoturna", width: 14 },
+    { header: "Hora extra 50% (h)", key: "horaExtra50", width: 17 },
+    { header: "Hora extra 100% (h)", key: "horaExtra100", width: 18 },
+    { header: "Desconto de horas (h)", key: "descontoHoras", width: 19 },
+    { header: "Hora noturna (h)", key: "horaNoturna", width: 16 },
+    { header: "Total hora extra (R$)", key: "totalHoras", width: 20 },
     { header: "Premiação", key: "premiacao", width: 14 },
     { header: "Bonificação", key: "bonificacao", width: 14 },
     { header: "Periculosidade", key: "periculosidade", width: 15 },
@@ -70,10 +72,11 @@ export async function GET(request: Request) {
       salarioFamilia: l.salarioFamilia,
       solides: l.solides ?? "",
       flash: l.flash ?? "",
-      horaExtra50: l.horaExtra50 ?? "",
-      horaExtra100: l.horaExtra100 ?? "",
-      descontoHoras: l.descontoHoras ?? "",
-      horaNoturna: l.horaNoturna ?? "",
+      horaExtra50: l.horaExtra50 ? formatarHoras(l.horaExtra50) : "",
+      horaExtra100: l.horaExtra100 ? formatarHoras(l.horaExtra100) : "",
+      descontoHoras: l.descontoHoras ? formatarHoras(l.descontoHoras) : "",
+      horaNoturna: l.horaNoturna ? formatarHoras(l.horaNoturna) : "",
+      totalHoras: l.valorHoras.liquido || "",
       premiacao: l.premiacao,
       bonificacao: l.bonificacao ?? "",
       periculosidade: l.periculosidade || "",

@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { formatarNumero, formatarNumeroOuTraco } from "@/lib/format";
+import { formatarNumero, formatarNumeroOuTraco, formatarMoeda } from "@/lib/format";
 import { Card } from "@/components/shared/Card";
 import { RiskCallout } from "@/components/shared/RiskCallout";
 import { cn } from "@/lib/cn";
+import { formatarHoras } from "@/lib/folha/horas";
 
 interface VerbaColaborador {
   colaboradorId: number;
@@ -26,10 +27,19 @@ interface VerbaColaborador {
   bonificacao: number | null;
   outrosCustos: number | null;
   premiacao: number;
+  /** HORAS decimais lançadas na planilha (8,0167 = 08:01). */
   horaExtra50: number | null;
   horaExtra100: number | null;
   descontoHoras: number | null;
   horaNoturna: number | null;
+  valorHoras: {
+    valorHoraNormal: number;
+    extra50: number;
+    extra100: number;
+    desconto: number;
+    noturna: number;
+    liquido: number;
+  };
   salarioFamilia: number;
   dependentesSalarioFamilia: number;
   periculosidade: number;
@@ -190,6 +200,7 @@ export function RelatorioDetalhadoTab() {
           horaExtra100: acc.horaExtra100 + (l.horaExtra100 ?? 0),
           descontoHoras: acc.descontoHoras + (l.descontoHoras ?? 0),
           horaNoturna: acc.horaNoturna + (l.horaNoturna ?? 0),
+          valorHoras: acc.valorHoras + l.valorHoras.liquido,
           custoTotal: acc.custoTotal + l.custoTotal,
         }),
         {
@@ -201,6 +212,7 @@ export function RelatorioDetalhadoTab() {
           horaExtra100: 0,
           descontoHoras: 0,
           horaNoturna: 0,
+          valorHoras: 0,
           salarioBase: 0,
           inss: 0,
           fgts: 0,
@@ -376,7 +388,11 @@ export function RelatorioDetalhadoTab() {
                   <th colSpan={2} className={cn(TH_GRUPO, DIVISOR, "border-b border-hairline", GRUPO_PLATAFORMAS, "text-brand-primary-800")}>
                     Plataformas
                   </th>
-                  <th colSpan={4} className={cn(TH_GRUPO, DIVISOR, "border-b border-hairline", GRUPO_HORAS, "text-foreground-muted")}>
+                  <th
+                    colSpan={5}
+                    className={cn(TH_GRUPO, DIVISOR, "border-b border-hairline", GRUPO_HORAS, "text-foreground-muted")}
+                    title="Horas lançadas na planilha (hh:mm); o total é em reais, calculado pelo salário."
+                  >
                     Hora extra
                   </th>
                   <th colSpan={5} className={cn(TH_GRUPO, DIVISOR, "border-b border-hairline", GRUPO_OUTROS, "text-foreground-muted")}>
@@ -408,12 +424,21 @@ export function RelatorioDetalhadoTab() {
                   </th>
                   <th className={cn(TH_COL, DIVISOR, GRUPO_PLATAFORMAS, "text-brand-primary-800")}>Sólides</th>
                   <th className={cn(TH_COL, GRUPO_PLATAFORMAS, "text-brand-primary-800")}>Flash</th>
-                  <th className={cn(TH_COL, DIVISOR, GRUPO_HORAS, "text-foreground-muted")}>Hora extra 50%</th>
-                  <th className={cn(TH_COL, GRUPO_HORAS, "text-foreground-muted")}>Hora extra 100%</th>
+                  <th className={cn(TH_COL, DIVISOR, GRUPO_HORAS, "text-foreground-muted")}>Hora extra 50% (h)</th>
+                  <th className={cn(TH_COL, GRUPO_HORAS, "text-foreground-muted")}>Hora extra 100% (h)</th>
                   <th className={cn(TH_COL, GRUPO_HORAS, "text-foreground-muted")} title="Subtrai do total do colaborador">
-                    Desconto de horas
+                    Desconto de horas (h)
                   </th>
-                  <th className={cn(TH_COL, GRUPO_HORAS, "text-foreground-muted")}>Hora noturna</th>
+                  <th className={cn(TH_COL, GRUPO_HORAS, "text-foreground-muted")}>Hora noturna (h)</th>
+                  {/* A coluna que fecha o grupo: as horas todas convertidas em
+                      dinheiro, já com o adicional de cada tipo e o desconto
+                      subtraído. É este valor que entra no total do colaborador. */}
+                  <th
+                    className={cn(TH_COL, GRUPO_HORAS, "font-bold text-foreground")}
+                    title="Soma em reais: 50% + 100% + adicional noturno − desconto"
+                  >
+                    Total (R$)
+                  </th>
                   <th className={cn(TH_COL, DIVISOR, GRUPO_OUTROS, "text-foreground-muted")}>Premiação</th>
                   <th className={cn(TH_COL, GRUPO_OUTROS, "text-foreground-muted")}>Bonificação</th>
                   <th
@@ -465,12 +490,51 @@ export function RelatorioDetalhadoTab() {
                     </td>
                     <td className={cn(TD_NUM, DIVISOR, GRUPO_PLATAFORMAS)}>{formatarNumeroOuTraco(l.solides)}</td>
                     <td className={cn(TD_NUM, GRUPO_PLATAFORMAS)}>{formatarNumeroOuTraco(l.flash)}</td>
-                    <td className={cn(TD_NUM, DIVISOR, GRUPO_HORAS)}>{formatarNumeroOuTraco(l.horaExtra50)}</td>
-                    <td className={cn(TD_NUM, GRUPO_HORAS)}>{formatarNumeroOuTraco(l.horaExtra100)}</td>
-                    <td className={cn(TD_NUM, GRUPO_HORAS, l.descontoHoras ? "text-status-danger" : undefined)}>
-                      {l.descontoHoras ? `-${formatarNumero(l.descontoHoras)}` : "—"}
+                    <td
+                      className={cn(TD_NUM, DIVISOR, GRUPO_HORAS)}
+                      title={l.horaExtra50 ? `${formatarMoeda(l.valorHoras.extra50)} — hora normal ${formatarMoeda(l.valorHoras.valorHoraNormal)} × 1,5` : undefined}
+                    >
+                      {l.horaExtra50 ? formatarHoras(l.horaExtra50) : "—"}
                     </td>
-                    <td className={cn(TD_NUM, GRUPO_HORAS)}>{formatarNumeroOuTraco(l.horaNoturna)}</td>
+                    <td
+                      className={cn(TD_NUM, GRUPO_HORAS)}
+                      title={l.horaExtra100 ? `${formatarMoeda(l.valorHoras.extra100)} — hora normal ${formatarMoeda(l.valorHoras.valorHoraNormal)} × 2` : undefined}
+                    >
+                      {l.horaExtra100 ? formatarHoras(l.horaExtra100) : "—"}
+                    </td>
+                    <td
+                      className={cn(TD_NUM, GRUPO_HORAS, l.descontoHoras ? "text-status-danger" : undefined)}
+                      title={l.descontoHoras ? `-${formatarMoeda(l.valorHoras.desconto)} — hora normal, sem adicional` : undefined}
+                    >
+                      {l.descontoHoras ? `-${formatarHoras(l.descontoHoras)}` : "—"}
+                    </td>
+                    <td
+                      className={cn(TD_NUM, GRUPO_HORAS)}
+                      title={l.horaNoturna ? `${formatarMoeda(l.valorHoras.noturna)} — adicional noturno de 20% (Art. 73 CLT)` : undefined}
+                    >
+                      {l.horaNoturna ? formatarHoras(l.horaNoturna) : "—"}
+                    </td>
+                    <td
+                      className={cn(
+                        TD_NUM,
+                        GRUPO_HORAS,
+                        "font-bold",
+                        l.valorHoras.liquido < 0 ? "text-status-danger" : undefined,
+                      )}
+                      title={
+                        l.valorHoras.liquido !== 0
+                          ? [
+                              `Hora normal: ${formatarMoeda(l.valorHoras.valorHoraNormal)}`,
+                              `50%: ${formatarMoeda(l.valorHoras.extra50)}`,
+                              `100%: ${formatarMoeda(l.valorHoras.extra100)}`,
+                              `Adicional noturno: ${formatarMoeda(l.valorHoras.noturna)}`,
+                              `(–) Desconto: ${formatarMoeda(l.valorHoras.desconto)}`,
+                            ].join("\n")
+                          : undefined
+                      }
+                    >
+                      {l.valorHoras.liquido !== 0 ? formatarNumero(l.valorHoras.liquido) : "—"}
+                    </td>
                     <td className={cn(TD_NUM, DIVISOR, GRUPO_OUTROS)}>{formatarNumero(l.premiacao)}</td>
                     <td className={cn(TD_NUM, GRUPO_OUTROS)}>{formatarNumeroOuTraco(l.bonificacao)}</td>
                     <td className={cn(TD_NUM, GRUPO_OUTROS)}>{formatarNumeroOuTraco(l.periculosidade || null)}</td>
@@ -503,12 +567,20 @@ export function RelatorioDetalhadoTab() {
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.salarioFamilia)}</td>
                   <td className={cn(TD_NUM, DIVISOR, "bg-surface-page")}>{formatarNumero(totais.solides)}</td>
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.flash)}</td>
-                  <td className={cn(TD_NUM, DIVISOR, "bg-surface-page")}>{formatarNumero(totais.horaExtra50)}</td>
-                  <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.horaExtra100)}</td>
-                  <td className={cn(TD_NUM, "bg-surface-page", totais.descontoHoras ? "text-status-danger" : undefined)}>
-                    {totais.descontoHoras ? `-${formatarNumero(totais.descontoHoras)}` : "0,00"}
+                  <td
+                    className={cn(TD_NUM, DIVISOR, "bg-surface-page")}
+                    title={`Efeito líquido das horas no custo: ${formatarMoeda(totais.valorHoras)}`}
+                  >
+                    {formatarHoras(totais.horaExtra50)}
                   </td>
-                  <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.horaNoturna)}</td>
+                  <td className={cn(TD_NUM, "bg-surface-page")}>{formatarHoras(totais.horaExtra100)}</td>
+                  <td className={cn(TD_NUM, "bg-surface-page", totais.descontoHoras ? "text-status-danger" : undefined)}>
+                    {totais.descontoHoras ? `-${formatarHoras(totais.descontoHoras)}` : "00:00"}
+                  </td>
+                  <td className={cn(TD_NUM, "bg-surface-page")}>{formatarHoras(totais.horaNoturna)}</td>
+                  <td className={cn(TD_NUM, "bg-surface-page font-bold", totais.valorHoras < 0 ? "text-status-danger" : undefined)}>
+                    {formatarNumero(totais.valorHoras)}
+                  </td>
                   <td className={cn(TD_NUM, DIVISOR, "bg-surface-page")}>{formatarNumero(totais.premiacao)}</td>
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.bonificacao)}</td>
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.periculosidade)}</td>

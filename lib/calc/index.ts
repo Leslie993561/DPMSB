@@ -9,5 +9,6 @@ export * from "./ferias";
 export * from "./horasExtras";
 export * from "./salarioFamilia";
 export * from "./adicionais";
+export * from "./horasLancadas";
 export * from "./rescisao";
 export * from "./beneficios";

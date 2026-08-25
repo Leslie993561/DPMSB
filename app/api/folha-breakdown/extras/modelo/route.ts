@@ -52,6 +52,7 @@ const COLUNAS: ColunaModelo[] = [
   { titulo: "Hora extra 100%", key: "horaExtra100", width: 25, grupo: "Hora extra", origem: "importada" },
   { titulo: "Desconto de horas", key: "descontoHoras", width: 26, grupo: "Hora extra", origem: "importada" },
   { titulo: "Hora noturna", key: "horaNoturna", width: 23, grupo: "Hora extra", origem: "importada" },
+  // As quatro acima recebem HORAS (08:01), não reais — ver a aba "Como preencher".
 
   { titulo: "Premiação", key: "premiacao", width: 18, grupo: "Outros", origem: "importada" },
   { titulo: "Bonificação", key: "bonificacao", width: 19, grupo: "Outros", origem: "importada" },
@@ -101,8 +102,8 @@ export async function GET() {
   });
 
   const exemplos: Record<string, string | number>[] = [
-    { codigo: "63", nome: "Alice Coutinho da Cruz", odontologico: 65 },
-    { codigo: "64", nome: "Ana Beatriz Souza Figueiredo", vm: 166.74, odontologico: 65, solides: 60 },
+    { codigo: "63", nome: "Alice Coutinho da Cruz", odontologico: 65, horaExtra50: "08:01" },
+    { codigo: "64", nome: "Ana Beatriz Souza Figueiredo", vm: 166.74, odontologico: 65, solides: 60, horaNoturna: "02:30" },
   ];
   for (const exemplo of exemplos) {
     const linha: Record<string, string | number> = {};
@@ -133,7 +134,13 @@ export async function GET() {
     }
   }
   ajuda.addRow([]);
-  ajuda.addRow(["Desconto de horas", "Informe positivo: o portal subtrai do custo do colaborador."]);
+  ajuda.addRow([
+    "Hora extra e afins",
+    'As quatro colunas de "Hora extra" recebem HORAS, não reais: escreva 08:01 para oito horas e um minuto. ' +
+      "O portal calcula o valor pelo salário — 50% vale 1,5× a hora normal, 100% vale 2×, e hora noturna soma o " +
+      "adicional de 20% (a hora em si já está no salário).",
+  ]);
+  ajuda.addRow(["Desconto de horas", "Informe positivo, também em horas: o portal subtrai do custo do colaborador."]);
   ajuda.addRow(["Coluna desconhecida", 'Entra somada na coluna "Outros custos" do relatório, nunca é descartada.']);
   ajuda.addRow(["Casamento", "Por código quando houver; senão pelo nome do colaborador."]);
 

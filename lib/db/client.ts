@@ -119,6 +119,14 @@ const MIGRACOES: { tabela: string; coluna: string; definicao: string }[] = [
   { tabela: "folha_extras", coluna: "hora_extra_100", definicao: "REAL" },
   { tabela: "folha_extras", coluna: "desconto_horas", definicao: "REAL" },
   { tabela: "folha_extras", coluna: "hora_noturna", definicao: "REAL" },
+  // As colunas acima guardavam VALOR; o DP lança HORAS ("08:01"). Estas
+  // guardam a quantidade em horas decimais, e o valor passa a ser calculado
+  // pelo salário — assim um reajuste corrige a folha inteira sozinho, em vez
+  // de congelar reais que envelhecem.
+  { tabela: "folha_extras", coluna: "horas_extra_50", definicao: "REAL" },
+  { tabela: "folha_extras", coluna: "horas_extra_100", definicao: "REAL" },
+  { tabela: "folha_extras", coluna: "horas_desconto", definicao: "REAL" },
+  { tabela: "folha_extras", coluna: "horas_noturnas", definicao: "REAL" },
 ];
 
 /**
