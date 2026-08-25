@@ -632,6 +632,7 @@ function ImportarPopover({
     aplicadas: number;
     colunasOutros: string[];
     colunasNaoEncontradas: string[];
+    cabecalhosDoArquivo: string[];
     descartados: { linha: number; motivo: string }[];
   } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -751,6 +752,18 @@ function ImportarPopover({
                       ⚠ Não veio no arquivo, continua como estava:{" "}
                       {resultado.colunasNaoEncontradas.join(", ")}
                     </span>
+                  )}
+                  {/* Os cabeçalhos crus resolvem a dúvida mais comum — "mas eu
+                      preenchi essa coluna!" — mostrando com que nome ela veio. */}
+                  {resultado.cabecalhosDoArquivo?.length > 0 && (
+                    <details className="mt-1.5">
+                      <summary className="cursor-pointer text-[11.5px] font-normal">
+                        Colunas lidas do arquivo ({resultado.cabecalhosDoArquivo.length})
+                      </summary>
+                      <span className="mt-1 block text-[11px] font-normal opacity-90">
+                        {resultado.cabecalhosDoArquivo.join(" · ")}
+                      </span>
+                    </details>
                   )}
                   {resultado.descartados.length > 0 && (
                     <>

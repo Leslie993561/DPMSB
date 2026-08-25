@@ -45,6 +45,10 @@ export async function POST(request: Request) {
       colunasReconhecidas: conversao.colunasReconhecidas,
       colunasOutros: conversao.colunasOutros,
       colunasNaoEncontradas: conversao.colunasNaoEncontradas,
+      // Os cabeçalhos crus do arquivo. É o que permite ver, sem abrir a
+      // planilha, por que uma verba não entrou: quase sempre a coluna existe
+      // com outro nome, e sem isso a investigação vira adivinhação.
+      cabecalhosDoArquivo: cabecalhos,
       descartados: [...conversao.descartadas, ...resultado.descartados],
       totalLinhas: linhas.length,
     });
