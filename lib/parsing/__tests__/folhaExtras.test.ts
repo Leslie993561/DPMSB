@@ -62,3 +62,23 @@ describe("converterExtrasImportadas · quais colunas vieram", () => {
     expect(r.itens[0].outrosCustos).toBeNull();
   });
 });
+
+describe("converterExtrasImportadas · cabeçalhos abreviados", () => {
+  it('entende "H.E. 50%" e "H.E. 100%", que o ponto transformava em coluna desconhecida', () => {
+    const r = converterExtrasImportadas(
+      ["Código", "Nome do colaborador", "H.E. 50%", "H.E. 100%"],
+      [{ "Código": "1", "Nome do colaborador": "Fulano", "H.E. 50%": 10, "H.E. 100%": 20 }],
+    );
+    expect(r.itens[0].horaExtra50).toBe(10);
+    expect(r.itens[0].horaExtra100).toBe(20);
+    expect(r.colunasOutros).toEqual([]);
+  });
+
+  it('entende "HE50" sem espaço', () => {
+    const r = converterExtrasImportadas(
+      ["Código", "Nome do colaborador", "HE50"],
+      [{ "Código": "1", "Nome do colaborador": "Fulano", HE50: 15 }],
+    );
+    expect(r.itens[0].horaExtra50).toBe(15);
+  });
+});

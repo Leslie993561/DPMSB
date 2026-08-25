@@ -55,7 +55,19 @@ const SINONIMOS: Record<CampoExtra, string[]> = {
   premiacao: ["premiacao", "premiacao do mes", "premio"],
   // Os sinônimos de 100% vêm antes na busca por casarem com o texto mais
   // específico; "hora extra" sozinho ficaria ambíguo entre os dois percentuais.
-  horaExtra100: ["hora extra 100", "horas extras 100", "he 100", "he100", "hora extra 100%", "extra 100", "he 100%"],
+  // "H.E. 100%" normaliza para "h e 100" — abreviação com ponto é comum no
+  // arquivo do DP e antes caía silenciosamente em "Outros custos".
+  horaExtra100: [
+    "hora extra 100",
+    "horas extras 100",
+    "he 100",
+    "he100",
+    "h e 100",
+    "hora extra 100%",
+    "extra 100",
+    "he 100%",
+    "adicional 100",
+  ],
   horaExtra50: [
     "hora extra 50",
     "horas extras 50",
@@ -64,6 +76,8 @@ const SINONIMOS: Record<CampoExtra, string[]> = {
     "hora extra 50%",
     "extra 50",
     "he 50%",
+    "h e 50",
+    "adicional 50",
     "hora extra",
     "horas extras",
   ],
@@ -74,6 +88,8 @@ const SINONIMOS: Record<CampoExtra, string[]> = {
     "desc horas",
     "faltas horas",
     "desconto de hora",
+    "desc de horas",
+    "horas desconto",
   ],
   horaNoturna: ["hora noturna", "horas noturnas", "adicional noturno", "ad noturno", "adic noturno", "noturno"],
 };
