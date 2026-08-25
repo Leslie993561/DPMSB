@@ -343,12 +343,11 @@ export function ColaboradoresTable({
                 </td>
                 <td className="px-3 py-1 text-foreground-muted">{formatarDataBr(c.dataAdmissao)}</td>
                 <td className="px-3 py-1 text-foreground-muted">{formatarAnos(tempoDeCasaAnos(c.dataAdmissao))}</td>
-                <td className="px-3 py-1">
+                {/* Dia/mês e ano na mesma fonte: destacar só o dia/mês fazia a
+                    data parecer duas informações soltas em vez de uma só. */}
+                <td className="px-3 py-1 text-foreground-muted">
                   {c.dataNascimento ? (
-                    <>
-                      <span className="font-medium text-foreground">{diaEMes(c.dataNascimento)}</span>
-                      <span className="ml-1 text-[10px] text-foreground-muted">{c.dataNascimento.slice(0, 4)}</span>
-                    </>
+                    `${diaEMes(c.dataNascimento)}/${c.dataNascimento.slice(0, 4)}`
                   ) : (
                     <span className="text-foreground-muted/50">—</span>
                   )}
