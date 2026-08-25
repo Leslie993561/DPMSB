@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import type { Colaborador, Vinculo } from "@/lib/db/colaboradores";
 import { Badge, type CorBadge } from "@/components/shared/Badge";
 import { formatarDataBr } from "@/lib/format";
+import { cn } from "@/lib/cn";
 
 const COR_VINCULO: Record<Vinculo, CorBadge> = {
   CLT: "azul",
@@ -20,6 +21,46 @@ function tempoDeCasaAnos(dataAdmissao: string): number {
 
 function formatarAnos(anos: number): string {
   return `${anos.toFixed(1).replace(".", ",")} anos`;
+}
+
+const MESES = [
+  "Janeiro",
+  "Fevereiro",
+  "Março",
+  "Abril",
+  "Maio",
+  "Junho",
+  "Julho",
+  "Agosto",
+  "Setembro",
+  "Outubro",
+  "Novembro",
+  "Dezembro",
+];
+
+/**
+ * Chave de ordenação por aniversário: MÊS e depois dia, ignorando o ano.
+ * O ano diz a idade, não quando comemorar — ordenar por ele espalharia os
+ * aniversários de janeiro ao longo de toda a lista. Sem data de nascimento a
+ * pessoa vai para o fim, em vez de fingir um mês qualquer.
+ */
+function chaveAniversario(dataNascimento: string | null): number {
+  if (!dataNascimento || dataNascimento.length < 10) return 9999;
+  const mes = Number(dataNascimento.slice(5, 7));
+  const dia = Number(dataNascimento.slice(8, 10));
+  if (!mes || !dia) return 9999;
+  return mes * 100 + dia;
+}
+
+function mesDoAniversario(dataNascimento: string | null): string | null {
+  const chave = chaveAniversario(dataNascimento);
+  return chave === 9999 ? null : MESES[Math.floor(chave / 100) - 1];
+}
+
+/** "10/08" — o dia e o mês, que é o que interessa em um calendário de aniversários. */
+function diaEMes(dataNascimento: string | null): string {
+  if (!dataNascimento || dataNascimento.length < 10) return "—";
+  return `${dataNascimento.slice(8, 10)}/${dataNascimento.slice(5, 7)}`;
 }
 
 interface FiltrosColuna {
@@ -53,6 +94,8 @@ export function ColaboradoresTable({
   const porId = new Map(colaboradores.map((c) => [c.id, c]));
   const [filtros, setFiltros] = useState<FiltrosColuna>(FILTROS_VAZIOS);
   const [colunaAberta, setColunaAberta] = useState<"vinculo" | "texto" | "lider" | "admissao" | "tempo" | null>(null);
+  /** Ordenação por aniversário: desligada por padrão, para a lista continuar na ordem do cadastro. */
+  const [porAniversario, setPorAniversario] = useState(false);
 
   function definir<K extends keyof FiltrosColuna>(campo: K, valor: FiltrosColuna[K]) {
     setFiltros((atual) => ({ ...atual, [campo]: valor }));
@@ -88,6 +131,14 @@ export function ColaboradoresTable({
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [colaboradores, filtros]);
+
+  const ordenadas = useMemo(() => {
+    if (!porAniversario) return linhas;
+    return [...linhas].sort((a, z) => {
+      const diff = chaveAniversario(a.dataNascimento) - chaveAniversario(z.dataNascimento);
+      return diff !== 0 ? diff : a.nome.localeCompare(z.nome, "pt-BR");
+    });
+  }, [linhas, porAniversario]);
 
   const algumFiltroAtivo = Object.values(filtros).some(Boolean);
 
@@ -220,13 +271,35 @@ export function ColaboradoresTable({
               </div>
             </CabecalhoFiltravel>
 
+            {/* ANI = aniversário. Clicar agrupa a lista por mês, com separador
+                de mês e a data de cada um; clicar de novo volta ao normal. */}
+            <th className="px-3 py-1">
+              <button
+                type="button"
+                onClick={() => setPorAniversario((v) => !v)}
+                title={
+                  porAniversario
+                    ? "Voltar à ordem normal"
+                    : "Ordenar todos por mês de aniversário e mostrar as datas"
+                }
+                className={cn(
+                  "flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors",
+                  porAniversario
+                    ? "bg-brand-primary text-brand-white"
+                    : "text-foreground-muted hover:bg-brand-primary-050 hover:text-foreground",
+                )}
+              >
+                <span aria-hidden>🎂</span> ANI
+              </button>
+            </th>
+
             <th className="w-9 px-2 py-1.5" />
           </tr>
         </thead>
         <tbody>
           {algumFiltroAtivo && (
             <tr>
-              <td colSpan={6} className="border-b border-hairline bg-brand-primary-050 px-3 py-1 text-[10.5px] text-brand-primary-800">
+              <td colSpan={7} className="border-b border-hairline bg-brand-primary-050 px-3 py-1 text-[10.5px] text-brand-primary-800">
                 {linhas.length} de {colaboradores.length} colaborador(es) ·{" "}
                 <button type="button" onClick={() => setFiltros(FILTROS_VAZIOS)} className="font-semibold underline">
                   limpar filtros
@@ -236,13 +309,28 @@ export function ColaboradoresTable({
           )}
           {linhas.length === 0 ? (
             <tr>
-              <td colSpan={6} className="px-3 py-4 text-center text-foreground-muted">
+              <td colSpan={7} className="px-3 py-4 text-center text-foreground-muted">
                 Nenhum colaborador corresponde aos filtros.
               </td>
             </tr>
           ) : (
-            linhas.map((c) => (
-              <tr key={c.id} className="border-b border-hairline/70 last:border-0 hover:bg-surface-page/60">
+            ordenadas.map((c, i) => {
+              const mes = mesDoAniversario(c.dataNascimento);
+              // Separador só na ordenação por aniversário, e só quando o mês vira.
+              const abreMes = porAniversario && mes !== mesDoAniversario(ordenadas[i - 1]?.dataNascimento ?? null);
+              return (
+                <React.Fragment key={c.id}>
+                  {abreMes && (
+                    <tr className="bg-brand-primary-050">
+                      <td
+                        colSpan={7}
+                        className="px-3 py-1 text-[10px] font-bold tracking-wide text-brand-primary-800 uppercase"
+                      >
+                        {mes ?? "Sem data de nascimento"}
+                      </td>
+                    </tr>
+                  )}
+              <tr className="border-b border-hairline/70 last:border-0 hover:bg-surface-page/60">
                 <td className="px-3 py-1">{c.vinculo ? <Badge cor={COR_VINCULO[c.vinculo]}>{c.vinculo}</Badge> : "—"}</td>
                 <td className="px-3 py-1">
                   <div className="font-medium text-foreground uppercase">{c.nome}</div>
@@ -255,6 +343,16 @@ export function ColaboradoresTable({
                 </td>
                 <td className="px-3 py-1 text-foreground-muted">{formatarDataBr(c.dataAdmissao)}</td>
                 <td className="px-3 py-1 text-foreground-muted">{formatarAnos(tempoDeCasaAnos(c.dataAdmissao))}</td>
+                <td className="px-3 py-1">
+                  {c.dataNascimento ? (
+                    <>
+                      <span className="font-medium text-foreground">{diaEMes(c.dataNascimento)}</span>
+                      <span className="ml-1 text-[10px] text-foreground-muted">{c.dataNascimento.slice(0, 4)}</span>
+                    </>
+                  ) : (
+                    <span className="text-foreground-muted/50">—</span>
+                  )}
+                </td>
                 <td className="px-2 py-1 text-right">
                   <button
                     type="button"
@@ -267,7 +365,9 @@ export function ColaboradoresTable({
                   </button>
                 </td>
               </tr>
-            ))
+                </React.Fragment>
+              );
+            })
           )}
         </tbody>
       </table>
