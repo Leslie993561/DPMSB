@@ -116,22 +116,35 @@ export function RelatorioDetalhadoTab() {
   }, [competencia]);
 
   /**
-   * Fecha o mês: grava um retrato do breakdown que passa a não mudar mais,
-   * mesmo que o cadastro (salário, vínculo, benefícios) seja editado depois.
-   * É o que garante que mexer em agosto não altere julho já fechado.
+   * Fechar grava um retrato do breakdown que não muda mais, mesmo que o
+   * cadastro (salário, vínculo, benefícios) seja editado depois — é o que
+   * garante que mexer em agosto não altere julho já fechado. Reabrir descarta
+   * esse retrato e devolve o mês ao cálculo ao vivo.
+   *
+   * Reabrir pede confirmação porque é irreversível: os valores congelados não
+   * voltam, só podem ser refeitos com o cadastro de agora, que pode já estar
+   * diferente do que era quando o mês fechou.
    */
-  async function fecharMes() {
+  async function alternarFechamento() {
+    if (fechado) {
+      const confirmou = window.confirm(
+        `Reabrir ${competenciaCurta(competencia)}?\n\nOs valores congelados serão descartados e o mês volta a ser ` +
+          "calculado com o cadastro atual. Não há como recuperar o retrato anterior.",
+      );
+      if (!confirmou) return;
+    }
+
     setErroFechar(null);
     setFechando(true);
     try {
-      const res = await fetch("/api/folha-breakdown/fechar", {
+      const res = await fetch(`/api/folha-breakdown/${fechado ? "reabrir" : "fechar"}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ competencia }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setErroFechar(data.erro ?? "Erro ao fechar o mês.");
+        setErroFechar(data.erro ?? `Erro ao ${fechado ? "reabrir" : "fechar"} o mês.`);
         return;
       }
       await recarregar();
@@ -252,16 +265,21 @@ export function RelatorioDetalhadoTab() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {fechado ? (
-              <span
-                className="rounded-full border border-status-success-border bg-status-success-bg px-2.5 py-1 text-[10.5px] font-bold text-status-success"
-                title="Mês fechado: os valores são um retrato gravado e não mudam mais, mesmo que o cadastro seja editado."
+              <button
+                type="button"
+                onClick={() => void alternarFechamento()}
+                disabled={fechando}
+                title="Mês fechado: os valores são um retrato gravado e não mudam mais. Clique para reabrir e voltar ao cálculo ao vivo."
+                className="group/selo flex items-center gap-1 rounded-full border border-status-success-border bg-status-success-bg px-2.5 py-1 text-[10.5px] font-bold text-status-success transition-colors hover:border-status-danger-border hover:bg-status-danger-bg hover:text-status-danger disabled:opacity-50"
               >
-                🔒 Mês fechado
-              </span>
+                <span aria-hidden>🔒</span>
+                <span className="group-hover/selo:hidden">{fechando ? "Reabrindo…" : "Mês fechado"}</span>
+                <span className="hidden group-hover/selo:inline">{fechando ? "Reabrindo…" : "Reabrir mês"}</span>
+              </button>
             ) : (
               <button
                 type="button"
-                onClick={() => void fecharMes()}
+                onClick={() => void alternarFechamento()}
                 disabled={fechando || linhasFiltradas.length === 0}
                 title="Grava um retrato desta competência. Depois de fechado, editar o cadastro não altera mais estes valores."
                 className="rounded-md border border-hairline px-2.5 py-1 text-[11px] font-semibold text-foreground-muted transition-colors hover:border-brand-primary hover:text-brand-primary-800 disabled:opacity-50 dark:border-brand-neutral/30"

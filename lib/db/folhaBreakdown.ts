@@ -338,6 +338,25 @@ export async function fecharCompetencia(competencia: string): Promise<VerbaColab
   return linhas;
 }
 
+/**
+ * Reabre o mês: apaga o retrato congelado, e a competência volta a ser
+ * calculada ao vivo a partir do cadastro. Só o NÚCLEO some — as verbas extras
+ * importadas ficam, porque vivem em `folha_extras` e valem para o mês esteja
+ * ele fechado ou aberto.
+ *
+ * É destrutivo de propósito: depois de reabrir não há como recuperar os
+ * valores que estavam congelados, só refazê-los com o cadastro de agora. Quem
+ * chama precisa confirmar antes.
+ */
+export async function reabrirCompetencia(competencia: string): Promise<number> {
+  const db = await getDb();
+  const resultado = await db.execute({
+    sql: "DELETE FROM folha_breakdown WHERE competencia = ?",
+    args: [competencia],
+  });
+  return resultado.rowsAffected;
+}
+
 export async function competenciaFechada(competencia: string): Promise<boolean> {
   const db = await getDb();
   const resultado = await db.execute({

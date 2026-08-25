@@ -146,13 +146,14 @@ function feriasDoItem(item: ItemProgramacaoFerias): number {
  *
  * O custo anual soma duas metades que nunca se sobrepõem:
  *
- * 1. `planejado` — os lançamentos que já existem no Planejamento, com o valor
- *    que a própria tela mostra.
+ * 1. `realizado` — as férias do ano que já foram gozadas (baixa dada), com o
+ *    mesmo valor que o Planejamento mostra na linha.
  * 2. `porVencimento` — o saldo AINDA NÃO lançado (`diasSemLancamento`, que já
  *    desconta tudo que virou lançamento) de períodos cujo limite p/ gozo cai
- *    até dezembro do ano. Esse é o único número projetado do painel, e existe
- *    porque a empresa vai pagá-lo mesmo sem programação: o prazo não deixa
- *    adiar. A tela mostra as duas metades separadas, com esse nome.
+ *    até dezembro do ano, MAIS as férias já planejadas que ainda não
+ *    aconteceram. O saldo sem programação é o único número projetado do
+ *    painel, e existe porque a empresa vai pagá-lo mesmo sem programação: o
+ *    prazo não deixa adiar. A tela mostra as duas metades separadas.
  */
 export async function obterDashboardFerias(
   ano: number = new Date().getFullYear(),
