@@ -3,7 +3,7 @@ import { getDb } from "./client";
 import { listarColaboradores, type Colaborador } from "./colaboradores";
 import { obterDiasUteis } from "./beneficiosDiasUteis";
 import { calcularINSS, calcularIRRF, calcularFGTS, calcularValeTransporte, tarifaVtPorCidade, arredondar } from "@/lib/calc";
-import type { LinhaExtrasImportada } from "@/lib/parsing/folhaExtras";
+import type { LinhaExtrasImportada, CampoExtra } from "@/lib/parsing/folhaExtras";
 import { estaNaFolha } from "@/lib/folha/vigencia";
 import { calcularSalarioFamilia, calcularAdicionais } from "@/lib/calc";
 import { listarDependentesPorColaborador } from "./colaboradorDependentes";
@@ -129,32 +129,59 @@ export async function obterExtras(competencia: string): Promise<Map<number, Extr
  * completo (não mescla com o que já existia). Cada importação representa o
  * estado inteiro daquele mês, igual ao "fechar mês" já faz para o núcleo.
  */
-export async function upsertExtras(colaboradorId: number, competencia: string, extras: ExtrasImportadas): Promise<void> {
+/** Coluna do banco de cada verba, para montar o UPDATE só com o que veio no arquivo. */
+const COLUNA_DE: Record<Exclude<CampoExtra, "codigo" | "nomeColaborador">, string> = {
+  vm: "vm",
+  odontologico: "odontologico",
+  solides: "solides",
+  flash: "flash",
+  bonificacao: "bonificacao",
+  premiacao: "premiacao",
+  horaExtra50: "hora_extra_50",
+  horaExtra100: "hora_extra_100",
+  descontoHoras: "desconto_horas",
+  horaNoturna: "hora_noturna",
+};
+
+type CampoVerba = keyof typeof COLUNA_DE;
+
+/**
+ * Grava as verbas do colaborador na competência.
+ *
+ * `campos` diz quais verbas VIERAM no arquivo; só essas são escritas. Antes o
+ * upsert reescrevia todas as colunas, então importar uma planilha só com horas
+ * extras zerava VM, odontológico e o resto sem avisar ninguém — o arquivo do DP
+ * raramente traz todas as verbas de uma vez.
+ *
+ * Sem `campos`, mantém o comportamento antigo de escrever tudo (usado quando a
+ * origem realmente representa o mês inteiro).
+ */
+export async function upsertExtras(
+  colaboradorId: number,
+  competencia: string,
+  extras: ExtrasImportadas,
+  campos?: CampoVerba[],
+): Promise<void> {
   const db = await getDb();
+  const aGravar: CampoVerba[] = campos ?? (Object.keys(COLUNA_DE) as CampoVerba[]);
+  if (aGravar.length === 0) return;
+
+  const colunas = aGravar.map((c) => COLUNA_DE[c]);
+  const valores = aGravar.map((c) => extras[c] ?? null);
+  const placeholders = colunas.map(() => "?").join(", ");
+  // COALESCE, e não atribuição direta: célula VAZIA na planilha não apaga o
+  // que já existe. Vale a regra do DP — o que não vem na planilha fica como
+  // está, e só um valor informado muda o registro. Para zerar de propósito,
+  // basta escrever 0, que é um valor e não um vazio.
+  const atualizacoes = colunas
+    .map((col) => `${col} = COALESCE(excluded.${col}, folha_extras.${col})`)
+    .join(", ");
+
   await db.execute({
-    sql: `INSERT INTO folha_extras (colaborador_id, competencia, vm, odontologico, solides, flash, bonificacao,
-                                 premiacao, outros_custos, hora_extra_50, hora_extra_100, desconto_horas, hora_noturna)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(colaborador_id, competencia) DO UPDATE SET
-         vm = excluded.vm, odontologico = excluded.odontologico, solides = excluded.solides, flash = excluded.flash,
-         bonificacao = excluded.bonificacao, premiacao = excluded.premiacao, outros_custos = excluded.outros_custos,
-         hora_extra_50 = excluded.hora_extra_50, hora_extra_100 = excluded.hora_extra_100,
-         desconto_horas = excluded.desconto_horas, hora_noturna = excluded.hora_noturna`,
-    args: [
-      colaboradorId,
-      competencia,
-      extras.vm,
-      extras.odontologico,
-      extras.solides,
-      extras.flash,
-      extras.bonificacao,
-      extras.premiacao,
-      extras.outrosCustos,
-      extras.horaExtra50,
-      extras.horaExtra100,
-      extras.descontoHoras,
-      extras.horaNoturna,
-    ],
+    sql: `INSERT INTO folha_extras (colaborador_id, competencia, ${colunas.join(", ")})
+       VALUES (?, ?, ${placeholders})
+       ON CONFLICT(colaborador_id, competencia) DO UPDATE SET ${atualizacoes}`,
+    args: [colaboradorId, competencia, ...valores],
   });
 }
 
@@ -546,7 +573,11 @@ export interface ResultadoImportacaoExtras {
  * premiação, outros custos) de uma planilha importada à competência —
  * casamento por código (se houver) e, senão, por nome do colaborador.
  */
-export async function importarExtras(itens: LinhaExtrasImportada[], competencia: string): Promise<ResultadoImportacaoExtras> {
+export async function importarExtras(
+  itens: LinhaExtrasImportada[],
+  competencia: string,
+  camposPresentes?: CampoVerba[],
+): Promise<ResultadoImportacaoExtras> {
   const colaboradores = await listarColaboradores();
   const porCodigo = new Map(colaboradores.map((c) => [String(c.id), c]));
   const porNome = new Map(colaboradores.map((c) => [c.nome.trim().toLowerCase(), c]));
@@ -577,7 +608,7 @@ export async function importarExtras(itens: LinhaExtrasImportada[], competencia:
       descontoHoras: item.descontoHoras,
       horaNoturna: item.horaNoturna,
       outrosCustos: item.outrosCustos,
-    });
+    }, camposPresentes);
     aplicadas++;
   }
 

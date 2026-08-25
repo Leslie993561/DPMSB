@@ -631,6 +631,7 @@ function ImportarPopover({
   const [resultado, setResultado] = useState<{
     aplicadas: number;
     colunasOutros: string[];
+    colunasNaoEncontradas: string[];
     descartados: { linha: number; motivo: string }[];
   } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -731,21 +732,40 @@ function ImportarPopover({
             )}
             {resultado && (
               <div className="mt-2.5">
-                <RiskCallout nivel="sucesso">
-                  {resultado.aplicadas} linha(s) aplicada(s)
+                {/* O desfecho vem antes dos números: com linhas descartadas a
+                    importação não foi concluída por inteiro, e isso precisa
+                    estar dito com todas as letras, não deduzido da contagem. */}
+                <RiskCallout nivel={resultado.descartados.length > 0 ? "atencao" : "sucesso"}>
+                  <strong>
+                    {resultado.descartados.length > 0
+                      ? `Concluída em parte — ${resultado.aplicadas} de ${resultado.aplicadas + resultado.descartados.length} linha(s)`
+                      : `Concluída — ${resultado.aplicadas} linha(s) aplicada(s)`}
+                  </strong>
                   {resultado.colunasOutros.length > 0 && (
-                    <> · colunas em &quot;Outros custos&quot;: {resultado.colunasOutros.join(", ")}</>
+                    <span className="mt-1 block">
+                      Colunas somadas em &quot;Outros custos&quot;: {resultado.colunasOutros.join(", ")}
+                    </span>
+                  )}
+                  {resultado.colunasNaoEncontradas?.length > 0 && (
+                    <span className="mt-1 block">
+                      ⚠ Não veio no arquivo, continua como estava:{" "}
+                      {resultado.colunasNaoEncontradas.join(", ")}
+                    </span>
                   )}
                   {resultado.descartados.length > 0 && (
                     <>
-                      <br />
-                      {resultado.descartados.length} linha(s) descartada(s):
+                      <span className="mt-1 block">
+                        {resultado.descartados.length} linha(s) NÃO aplicada(s):
+                      </span>
                       <ul className="mt-1 list-inside list-disc">
                         {resultado.descartados.slice(0, 5).map((d, i) => (
                           <li key={i}>
                             Linha {d.linha}: {d.motivo}
                           </li>
                         ))}
+                        {resultado.descartados.length > 5 && (
+                          <li>… e mais {resultado.descartados.length - 5}</li>
+                        )}
                       </ul>
                     </>
                   )}

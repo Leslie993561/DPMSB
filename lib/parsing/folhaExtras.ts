@@ -55,10 +55,43 @@ const SINONIMOS: Record<CampoExtra, string[]> = {
   premiacao: ["premiacao", "premiacao do mes", "premio"],
   // Os sinônimos de 100% vêm antes na busca por casarem com o texto mais
   // específico; "hora extra" sozinho ficaria ambíguo entre os dois percentuais.
-  horaExtra100: ["hora extra 100", "horas extras 100", "he 100", "hora extra 100%", "extra 100"],
-  horaExtra50: ["hora extra 50", "horas extras 50", "he 50", "hora extra 50%", "extra 50", "hora extra", "horas extras"],
-  descontoHoras: ["desconto de horas", "desconto horas", "horas descontadas", "desc horas", "faltas horas"],
-  horaNoturna: ["hora noturna", "horas noturnas", "adicional noturno", "ad noturno"],
+  horaExtra100: ["hora extra 100", "horas extras 100", "he 100", "he100", "hora extra 100%", "extra 100", "he 100%"],
+  horaExtra50: [
+    "hora extra 50",
+    "horas extras 50",
+    "he 50",
+    "he50",
+    "hora extra 50%",
+    "extra 50",
+    "he 50%",
+    "hora extra",
+    "horas extras",
+  ],
+  descontoHoras: [
+    "desconto de horas",
+    "desconto horas",
+    "horas descontadas",
+    "desc horas",
+    "faltas horas",
+    "desconto de hora",
+  ],
+  horaNoturna: ["hora noturna", "horas noturnas", "adicional noturno", "ad noturno", "adic noturno", "noturno"],
+};
+
+/** Nome que a tela mostra quando a coluna não é encontrada no arquivo. */
+const ROTULO_CAMPO: Record<CampoExtra, string> = {
+  codigo: "Código",
+  nomeColaborador: "Nome do colaborador",
+  vm: "VM",
+  odontologico: "Odontológico",
+  solides: "Sólides",
+  flash: "Flash",
+  bonificacao: "Bonificação",
+  premiacao: "Premiação",
+  horaExtra50: "Hora extra 50%",
+  horaExtra100: "Hora extra 100%",
+  descontoHoras: "Desconto de horas",
+  horaNoturna: "Hora noturna",
 };
 
 // Colunas que fazem parte do núcleo calculado (nunca vêm de planilha importada) — ignoradas ao
@@ -121,8 +154,23 @@ export interface ConversaoExtras {
   itens: LinhaExtrasImportada[];
   colunasReconhecidas: string[];
   colunasOutros: string[];
+  /**
+   * Verbas que o portal sabe ler mas que NÃO existiam no arquivo. Sem esta
+   * lista a importação parecia ter dado certo quando metade das colunas ficava
+   * de fora — foi assim que um mês inteiro entrou sem as horas extras, e nada
+   * na tela dizia o porquê.
+   */
+  colunasNaoEncontradas: string[];
+  /**
+   * Verbas que existiam como coluna no arquivo. Só elas são gravadas — as
+   * ausentes ficam como estavam, senão importar uma planilha com metade das
+   * colunas apagaria a outra metade.
+   */
+  camposPresentes: CampoExtra[];
   descartadas: { linha: number; motivo: string }[];
 }
+
+export type { CampoExtra };
 
 /**
  * Identifica cada verba pelo cabeçalho da coluna (não pela posição) — colunas
@@ -170,10 +218,18 @@ export function converterExtrasImportadas(cabecalhos: string[], linhas: LinhaPla
     });
   });
 
+  const naoEncontradas = (Object.keys(SINONIMOS) as CampoExtra[])
+    .filter((campo) => campo !== "codigo" && campo !== "nomeColaborador" && !mapa[campo])
+    .map((campo) => ROTULO_CAMPO[campo]);
+
   return {
     itens,
     colunasReconhecidas: Object.values(mapa) as string[],
     colunasOutros: naoReconhecidas,
+    colunasNaoEncontradas: naoEncontradas,
+    camposPresentes: (Object.keys(mapa) as CampoExtra[]).filter(
+      (campo) => campo !== "codigo" && campo !== "nomeColaborador",
+    ),
     descartadas,
   };
 }

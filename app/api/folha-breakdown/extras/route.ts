@@ -32,12 +32,19 @@ export async function POST(request: Request) {
       : await parsearPlanilha(buffer, arquivo.name);
 
     const conversao = converterExtrasImportadas(cabecalhos, linhas);
-    const resultado = await importarExtras(conversao.itens, parsed.data.competencia);
+    // Só as verbas presentes no arquivo são gravadas; as ausentes ficam como
+    // estavam. Ver upsertExtras.
+    const resultado = await importarExtras(
+      conversao.itens,
+      parsed.data.competencia,
+      conversao.camposPresentes.filter((c) => c !== "codigo" && c !== "nomeColaborador"),
+    );
 
     return Response.json({
       aplicadas: resultado.aplicadas,
       colunasReconhecidas: conversao.colunasReconhecidas,
       colunasOutros: conversao.colunasOutros,
+      colunasNaoEncontradas: conversao.colunasNaoEncontradas,
       descartados: [...conversao.descartadas, ...resultado.descartados],
       totalLinhas: linhas.length,
     });
