@@ -78,6 +78,14 @@ const SINONIMOS_NUCLEO = [
   "va",
   "vale alimentacao",
   "custo total",
+  "total do colaborador",
+  // Calculadas pelo cadastro/motor: aparecem no modelo para o arquivo ter a
+  // mesma cara do relatório, mas não podem virar "outros custos" se vierem
+  // preenchidas — seria somar duas vezes o mesmo dinheiro.
+  "salario familia",
+  "periculosidade",
+  "insalubridade",
+  "adicional fixo",
   "cargo",
   "departamento",
   "setor",

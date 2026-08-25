@@ -202,8 +202,14 @@ export async function gerarBreakdown(competencia: string, colaboradores?: Colabo
         );
     const remuneracao = arredondar(c.salarioBase + adicionais.total);
 
-    const inss = calcularINSS(remuneracao, dataCompetencia);
-    const irrf = calcularIRRF(remuneracao - inss.valor, c.dependentes, dataCompetencia);
+    // PJ não tem INSS nem IRRF de empregado: o que a empresa paga é nota
+    // fiscal de prestação de serviço, não salário. Antes só FGTS, 13º e
+    // benefícios eram zerados, e o PJ aparecia no relatório com quase
+    // R$ 1.800 de encargos trabalhistas que não existem.
+    const inss = ehPj ? { valor: 0 } : calcularINSS(remuneracao, dataCompetencia);
+    const irrf = ehPj
+      ? { valor: 0 }
+      : calcularIRRF(remuneracao - inss.valor, c.dependentes, dataCompetencia);
     const fgts = ehPj ? { valor: 0 } : calcularFGTS(remuneracao, dataCompetencia);
     const provisaoDecimoTerceiro = ehPj ? 0 : arredondar(remuneracao / 12);
     const valeTransporte = ehPj

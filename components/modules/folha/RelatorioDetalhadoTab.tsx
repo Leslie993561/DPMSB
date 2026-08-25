@@ -93,12 +93,18 @@ export function RelatorioDetalhadoTab() {
   const [setorTabela, setSetorTabela] = useState("");
   const [exportarAberto, setExportarAberto] = useState(false);
   const [importarAberto, setImportarAberto] = useState(false);
+  const [fechado, setFechado] = useState(false);
+  const [competenciasFechadas, setCompetenciasFechadas] = useState<string[]>([]);
+  const [fechando, setFechando] = useState(false);
+  const [erroFechar, setErroFechar] = useState<string | null>(null);
 
   async function recarregar() {
     try {
       const res = await fetch(`/api/folha-breakdown?competencia=${competencia}`);
       const data = await res.json();
       setLinhas(data.linhas ?? []);
+      setFechado(Boolean(data.fechado));
+      setCompetenciasFechadas(data.competenciasFechadas ?? []);
     } finally {
       setCarregando(false);
     }
@@ -108,6 +114,33 @@ export function RelatorioDetalhadoTab() {
     void recarregar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [competencia]);
+
+  /**
+   * Fecha o mês: grava um retrato do breakdown que passa a não mudar mais,
+   * mesmo que o cadastro (salário, vínculo, benefícios) seja editado depois.
+   * É o que garante que mexer em agosto não altere julho já fechado.
+   */
+  async function fecharMes() {
+    setErroFechar(null);
+    setFechando(true);
+    try {
+      const res = await fetch("/api/folha-breakdown/fechar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ competencia }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setErroFechar(data.erro ?? "Erro ao fechar o mês.");
+        return;
+      }
+      await recarregar();
+    } catch {
+      setErroFechar("Falha de comunicação com o servidor.");
+    } finally {
+      setFechando(false);
+    }
+  }
 
   const setores = useMemo(
     () => Array.from(new Set(linhas.map((l) => l.departamento).filter((d): d is string => Boolean(d)))).sort(),
@@ -217,8 +250,34 @@ export function RelatorioDetalhadoTab() {
               {competenciaCurta(competencia)}
             </span>
           </div>
-          <p className="text-[10px] text-foreground-muted">colaborador, cargo e salário fixos · demais rolam</p>
+          <div className="flex flex-wrap items-center gap-2">
+            {fechado ? (
+              <span
+                className="rounded-full border border-status-success-border bg-status-success-bg px-2.5 py-1 text-[10.5px] font-bold text-status-success"
+                title="Mês fechado: os valores são um retrato gravado e não mudam mais, mesmo que o cadastro seja editado."
+              >
+                🔒 Mês fechado
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void fecharMes()}
+                disabled={fechando || linhasFiltradas.length === 0}
+                title="Grava um retrato desta competência. Depois de fechado, editar o cadastro não altera mais estes valores."
+                className="rounded-md border border-hairline px-2.5 py-1 text-[11px] font-semibold text-foreground-muted transition-colors hover:border-brand-primary hover:text-brand-primary-800 disabled:opacity-50 dark:border-brand-neutral/30"
+              >
+                {fechando ? "Fechando…" : "🔒 Fechar mês"}
+              </button>
+            )}
+            <p className="text-[10px] text-foreground-muted">colaborador, cargo e salário fixos · demais rolam</p>
+          </div>
         </div>
+
+        {erroFechar && (
+          <p className="border-b border-hairline bg-status-danger-bg px-4 py-2 text-[11.5px] text-status-danger">
+            {erroFechar}
+          </p>
+        )}
 
         <div className="flex items-center gap-1 overflow-x-auto border-b border-hairline bg-surface-page px-4 py-2">
           <span className="mr-2 shrink-0 text-[9.5px] font-semibold tracking-wide text-foreground-muted uppercase">
@@ -226,18 +285,28 @@ export function RelatorioDetalhadoTab() {
           </span>
           {MESES_ABREV.map((m, i) => {
             const mesNum = i + 1;
+            const alvo = `${competencia.slice(0, 4)}-${String(mesNum).padStart(2, "0")}`;
             const ativo = Number(competencia.slice(5, 7)) === mesNum;
+            // O cadeado deixa visível, sem precisar clicar, quais meses já
+            // estão congelados — é a informação que responde "posso mexer?".
+            const mesFechado = competenciasFechadas.includes(alvo);
             return (
               <button
                 key={m}
                 type="button"
-                onClick={() => setCompetencia(`${competencia.slice(0, 4)}-${String(mesNum).padStart(2, "0")}`)}
+                onClick={() => setCompetencia(alvo)}
+                title={mesFechado ? "Mês fechado" : undefined}
                 className={cn(
-                  "shrink-0 rounded-full px-3 py-1 text-[11px] font-semibold transition-colors",
+                  "flex shrink-0 items-center gap-1 rounded-full px-3 py-1 text-[11px] font-semibold transition-colors",
                   ativo ? "bg-brand-primary text-brand-white" : "text-foreground-muted hover:bg-brand-primary-050",
                 )}
               >
                 {m}
+                {mesFechado && (
+                  <span aria-hidden className={cn("text-[9px]", ativo ? "text-brand-white/80" : "text-status-success")}>
+                    🔒
+                  </span>
+                )}
               </button>
             );
           })}
@@ -463,9 +532,9 @@ function ExportarPopover({
       </button>
       {aberto && (
         <>
-          <div className="fixed inset-0 z-20" onClick={onFechar} />
+          <div className="fixed inset-0 z-40" onClick={onFechar} />
           {/* Abre para BAIXO: o botão fica no topo da página e, aberto para cima, o painel saía da área visível. */}
-          <div className="absolute top-full right-0 z-30 mt-1.5 max-h-[70vh] w-[320px] overflow-y-auto rounded-md border border-hairline bg-background p-4 shadow-drawer">
+          <div className="absolute top-full right-0 z-50 mt-1.5 max-h-[70vh] w-[320px] overflow-y-auto rounded-md border border-hairline bg-background p-4 shadow-drawer">
             <div className="flex items-start justify-between gap-2">
               <p className="text-[12.5px] font-bold text-foreground">Opção 1 · Exportar planilha</p>
               <span className="shrink-0 rounded-full bg-brand-primary-100 px-2 py-0.5 text-[9.5px] font-bold text-brand-primary-800">
@@ -579,9 +648,9 @@ function ImportarPopover({
       </button>
       {aberto && (
         <>
-          <div className="fixed inset-0 z-20" onClick={onFechar} />
+          <div className="fixed inset-0 z-40" onClick={onFechar} />
           {/* Para baixo, pelo mesmo motivo do popover de exportar. */}
-          <div className="absolute top-full right-0 z-30 mt-1.5 max-h-[70vh] w-[340px] overflow-y-auto rounded-md border border-hairline bg-background p-4 shadow-drawer">
+          <div className="absolute top-full right-0 z-50 mt-1.5 max-h-[70vh] w-[340px] overflow-y-auto rounded-md border border-hairline bg-background p-4 shadow-drawer">
             <div className="flex items-start justify-between gap-2">
               <p className="text-[12.5px] font-bold text-foreground">Opção 2 · Importar planilha</p>
               <a

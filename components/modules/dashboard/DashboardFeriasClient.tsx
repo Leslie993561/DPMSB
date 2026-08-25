@@ -430,15 +430,15 @@ export function DashboardFeriasClient() {
                 </span>
 
                 <span className="mt-2 flex items-baseline justify-between gap-2">
-                  <span className="text-[11.5px] font-semibold text-foreground">Planejado</span>
+                  <span className="text-[11.5px] font-semibold text-foreground">Realizado</span>
                   <span className="text-[12px] font-bold text-foreground">
-                    {formatarMoeda(dados.custoAnual.planejado.total)}
+                    {formatarMoeda(dados.custoAnual.realizado.total)}
                   </span>
                 </span>
                 <span className="block text-[10.5px] font-normal text-foreground-muted">
-                  {dados.custoAnual.planejado.periodos} programação(ões) já lançada(s) · férias{" "}
-                  {formatarMoeda(dados.custoAnual.planejado.valor)} + encargos{" "}
-                  {formatarMoeda(dados.custoAnual.planejado.encargos)}
+                  {dados.custoAnual.realizado.periodos} colaborador(es) que já tiraram férias · férias{" "}
+                  {formatarMoeda(dados.custoAnual.realizado.valor)} + encargos{" "}
+                  {formatarMoeda(dados.custoAnual.realizado.encargos)}
                 </span>
 
                 <span className="mt-2.5 flex items-baseline justify-between gap-2">
@@ -448,7 +448,7 @@ export function DashboardFeriasClient() {
                   </span>
                 </span>
                 <span className="block text-[10.5px] font-normal text-foreground-muted">
-                  {dados.custoAnual.porVencimento.periodos} período(s) com saldo a gozar até dezembro · férias{" "}
+                  {dados.custoAnual.porVencimento.periodos} período(s) — já planejados e a vencer até dezembro · férias{" "}
                   {formatarMoeda(dados.custoAnual.porVencimento.valor)} + encargos{" "}
                   {formatarMoeda(dados.custoAnual.porVencimento.encargos)}
                 </span>
@@ -485,7 +485,7 @@ export function DashboardFeriasClient() {
               encargos {formatarMoeda(dados.custoAnual.encargos)} · {dados.custoAnual.percentualEncargos}%
             </p>
             <p className="mt-2 text-[10.5px] text-brand-white/60">
-              planejado + o que vence até dezembro · férias + 1/3 + abono + FGTS 8% + INSS patronal 20% ·{" "}
+              realizado + o que vence até dezembro · férias + 1/3 + abono + FGTS 8% + INSS patronal 20% ·{" "}
               {dados.custoAnual.programacoesCalculadas}{" "}
               programação(ões) calculada(s)
               {dados.custoAnual.semSalarioCadastrado > 0

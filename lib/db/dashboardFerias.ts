@@ -73,13 +73,14 @@ export interface CustoAnualEstimado {
   programacoesCalculadas: number;
   semSalarioCadastrado: number;
   /**
-   * O custo anual tem duas origens, e somá-las sem separar escondia de onde
-   * vinha cada real: o que JÁ está lançado no Planejamento, e o saldo que
-   * ainda não foi lançado mas vence até dezembro — esse a empresa vai pagar de
-   * qualquer jeito, porque o limite p/ gozo não deixa empurrar para o ano
+   * O ano se divide no que já aconteceu e no que ainda vem, e é essa a leitura
+   * útil: `realizado` é o dinheiro que já saiu (férias com gozo confirmado) e
+   * `porVencimento` é o que ainda está por sair — as férias já planejadas mais
+   * o saldo sem programação cujo limite p/ gozo cai até dezembro, que a empresa
+   * vai pagar de qualquer jeito porque o prazo não deixa empurrar para o ano
    * seguinte.
    */
-  planejado: ParcelaCusto;
+  realizado: ParcelaCusto;
   porVencimento: ParcelaCusto;
 }
 
@@ -222,13 +223,24 @@ export async function obterDashboardFerias(
     { colaboradores: 0, valorPago: 0, encargos: 0 },
   );
 
-  // --- Metade 1 do custo anual: o que já está no Planejamento ---
-  const planejado: ParcelaCusto = {
-    valor: totalAno.valorPago,
-    encargos: totalAno.encargos,
-    total: arredondar(totalAno.valorPago + totalAno.encargos),
-    periodos: itensDoAno.length,
+  // --- Metade 1: REALIZADO — quem já tirou as férias (gozo confirmado) ---
+  const jaGozados = itensDoAno.filter((i) => i.status === "concluida" || i.status === "alterada");
+  const somaItens = (lista: typeof itensDoAno) => ({
+    valor: arredondar(lista.reduce((s, i) => s + feriasDoItem(i), 0)),
+    encargos: arredondar(lista.reduce((s, i) => s + encargosDoItem(i), 0)),
+  });
+
+  const somaRealizado = somaItens(jaGozados);
+  const realizado: ParcelaCusto = {
+    valor: somaRealizado.valor,
+    encargos: somaRealizado.encargos,
+    total: arredondar(somaRealizado.valor + somaRealizado.encargos),
+    periodos: jaGozados.length,
   };
+
+  // --- Metade 2, parte A: férias já PLANEJADAS que ainda não foram gozadas ---
+  const planejadasAbertas = itensDoAno.filter((i) => i.status === "programada");
+  const somaPlanejadas = somaItens(planejadasAbertas);
 
   // --- Metade 2: saldo sem lançamento cujo limite p/ gozo vence até dezembro ---
   // O corte é o LIMITE P/ GOZO (última data para INICIAR o gozo), não o fim do
@@ -272,28 +284,31 @@ export async function obterDashboardFerias(
     vencimentoPeriodos++;
   }
 
+  // Metade 2 = planejado em aberto + saldo que vence até dezembro. As duas
+  // parcelas são coisas que ainda vão sair do caixa, e nenhuma se sobrepõe à
+  // outra: `diasSemLancamento` já desconta tudo que virou lançamento.
   const porVencimento: ParcelaCusto = {
-    valor: arredondar(vencimentoValor),
-    encargos: arredondar(vencimentoEncargos),
-    total: arredondar(vencimentoValor + vencimentoEncargos),
-    periodos: vencimentoPeriodos,
+    valor: arredondar(somaPlanejadas.valor + vencimentoValor),
+    encargos: arredondar(somaPlanejadas.encargos + vencimentoEncargos),
+    total: arredondar(somaPlanejadas.valor + somaPlanejadas.encargos + vencimentoValor + vencimentoEncargos),
+    periodos: planejadasAbertas.length + vencimentoPeriodos,
   };
 
-  const custoAnualValor = arredondar(planejado.total + porVencimento.total);
-  const custoAnualEncargos = arredondar(planejado.encargos + porVencimento.encargos);
+  const custoAnualValor = arredondar(realizado.total + porVencimento.total);
+  const custoAnualEncargos = arredondar(realizado.encargos + porVencimento.encargos);
 
   const custoAnual: CustoAnualEstimado = {
     valor: custoAnualValor,
     encargos: custoAnualEncargos,
     percentualEncargos: custoAnualValor > 0 ? Math.round((custoAnualEncargos / custoAnualValor) * 100) : 0,
-    programacoesCalculadas: planejado.periodos + porVencimento.periodos,
+    programacoesCalculadas: realizado.periodos + porVencimento.periodos,
     semSalarioCadastrado: semSalarioIds.size,
-    planejado,
+    realizado,
     porVencimento,
   };
 
-  // --- Já pago: as férias do ano com gozo já confirmado (baixa dada) ---
-  const gozados = itensDoAno.filter((i) => i.status === "concluida" || i.status === "alterada");
+  // --- Já pago: mesma base do "realizado" acima, aqui pelo desembolso total ---
+  const gozados = jaGozados;
   const jaPagoValor = arredondar(gozados.reduce((s, i) => s + i.custoPrevisto, 0));
   const mesesGozados = gozados.map((i) => i.dataInicio.slice(0, 7)).sort();
 
