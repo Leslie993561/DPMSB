@@ -45,3 +45,24 @@ describe("calcularValorDasHoras", () => {
     expect(r.extra50).toBe(0);
   });
 });
+
+/**
+ * Os exemplos que o DP passou por escrito, ao pé da letra. Servem de âncora:
+ * se alguém mexer no fator ou na jornada, é aqui que quebra primeiro.
+ */
+describe("calcularValorDasHoras · exemplos conferidos com o DP", () => {
+  it("salário 2.200 dá hora de R$ 10,00 com jornada de 220h", () => {
+    const r = calcularValorDasHoras(2200, NENHUMA);
+    expect(r.valorHoraNormal).toBeCloseTo(10, 2);
+  });
+
+  it("2 horas extras a 50% = R$ 30,00 (10,00 + 5,00 = 15,00 por hora)", () => {
+    const r = calcularValorDasHoras(2200, { ...NENHUMA, extra50: 2 });
+    expect(r.extra50).toBeCloseTo(30, 2);
+  });
+
+  it("2 horas extras a 100% = R$ 40,00 (10,00 × 2 = 20,00 por hora)", () => {
+    const r = calcularValorDasHoras(2200, { ...NENHUMA, extra100: 2 });
+    expect(r.extra100).toBeCloseTo(40, 2);
+  });
+});
