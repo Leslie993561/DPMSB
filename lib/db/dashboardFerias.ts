@@ -2,6 +2,7 @@ import "server-only";
 import { getDb } from "./client";
 import { listarColaboradores } from "./colaboradores";
 import { listarPeriodosAbertos } from "./periodosAquisitivos";
+import { listarProgramacaoFerias, type ItemProgramacaoFerias } from "./programacaoFerias";
 import { calcularFerias, calcularFGTS, calcularInssPatronal, arredondar } from "@/lib/calc";
 
 export interface LinhaTrimestre {
@@ -10,8 +11,11 @@ export interface LinhaTrimestre {
   aquisitivo: string;
   concessivo: string;
   dias: number;
+  /** Férias + 1/3 (+ abono e dobra quando houver) — a remuneração das férias. */
   valorFerias: number;
+  /** FGTS 8% + INSS patronal 20%. */
   encargos: number;
+  /** valorFerias + encargos = o mesmo "custo previsto" que o Planejamento mostra na linha. */
   total: number;
 }
 
@@ -40,12 +44,32 @@ export interface PrevistoMesVigente {
   pagamentosEmAberto: number;
 }
 
+/** Uma das duas metades do custo anual, para a tela poder mostrar a origem de cada real. */
+export interface ParcelaCusto {
+  /** Férias + 1/3 (+ abono e dobra) — a remuneração das férias. */
+  valor: number;
+  /** FGTS + INSS patronal. */
+  encargos: number;
+  /** valor + encargos: o desembolso. */
+  total: number;
+  periodos: number;
+}
+
 export interface CustoAnualEstimado {
   valor: number;
   encargos: number;
   percentualEncargos: number;
   programacoesCalculadas: number;
   semSalarioCadastrado: number;
+  /**
+   * O custo anual tem duas origens, e somá-las sem separar escondia de onde
+   * vinha cada real: o que JÁ está lançado no Planejamento, e o saldo que
+   * ainda não foi lançado mas vence até dezembro — esse a empresa vai pagar de
+   * qualquer jeito, porque o limite p/ gozo não deixa empurrar para o ano
+   * seguinte.
+   */
+  planejado: ParcelaCusto;
+  porVencimento: ParcelaCusto;
 }
 
 export interface ResumoControle {
@@ -76,42 +100,33 @@ export interface DashboardFerias {
   controle: ResumoControle;
 }
 
-interface LinhaLancamentoResumo {
-  status: "programada" | "concluida" | "cancelada" | "alterada";
-  dias: number;
-  abono: number;
-  data_inicio_prevista: string | null;
-  data_inicio_gozo: string | null;
-  colaborador_id: number;
-  dias_direito: number;
+/** Encargos de um item: o que sobra do custo previsto depois da remuneração das férias. */
+function encargosDoItem(item: ItemProgramacaoFerias): number {
+  return arredondar(item.detalhe.fgts + item.detalhe.inssPatronal);
 }
 
-interface EventoCalculado {
-  colaboradorId: number;
-  dataRef: Date;
-  status: LinhaLancamentoResumo["status"];
-  dias: number;
-  bruto: number;
-  encargos: number;
-  semSalario: boolean;
+/** Remuneração das férias do item — férias + 1/3 + abono + dobra, sem encargos. */
+function feriasDoItem(item: ItemProgramacaoFerias): number {
+  return arredondar(item.custoPrevisto - encargosDoItem(item));
 }
 
 /**
- * Agrega os indicadores do Dashboard de Férias para o ano (e, opcionalmente,
- * setor) informados. Dois componentes de custo, sempre complementares —
- * nunca sobrepostos — compõem o "custo anual estimado":
+ * Indicadores do Dashboard de Férias para o ano (e, opcionalmente, setor).
  *
- * 1. `eventos` — lançamentos reais (programados/concluídos) já registrados
- *    em `lancamentos_ferias`, valorados com o motor determinístico
- *    (`calcularFerias`/`calcularFGTS`/`calcularInssPatronal`) na competência
- *    de cada evento.
- * 2. `porTrimestre` — o saldo AINDA NÃO lançado dos períodos em aberto
- *    (`diasSemLancamento`, que desconta TANTO os já confirmados quanto os
- *    programados/não confirmados — os dois já cobertos por (1) — para nunca
- *    contar a mesma férias duas vezes).
+ * A FONTE é a mesma do Planejamento (`listarProgramacaoFerias`) e do Controle
+ * (`listarPeriodosAbertos`) — não há cálculo próprio aqui. Antes o dashboard
+ * recalculava tudo por conta e chegava a números que não batiam com as telas;
+ * agora, se o Planejamento mostra R$ X no Q1, o dashboard mostra R$ X no Q1.
  *
- * Nunca um número inventado: tudo vem de `lancamentos_ferias`/
- * `periodos_aquisitivos` reais passados pelas funções de `lib/calc`.
+ * O custo anual soma duas metades que nunca se sobrepõem:
+ *
+ * 1. `planejado` — os lançamentos que já existem no Planejamento, com o valor
+ *    que a própria tela mostra.
+ * 2. `porVencimento` — o saldo AINDA NÃO lançado (`diasSemLancamento`, que já
+ *    desconta tudo que virou lançamento) de períodos cujo limite p/ gozo cai
+ *    até dezembro do ano. Esse é o único número projetado do painel, e existe
+ *    porque a empresa vai pagá-lo mesmo sem programação: o prazo não deixa
+ *    adiar. A tela mostra as duas metades separadas, com esse nome.
  */
 export async function obterDashboardFerias(
   ano: number = new Date().getFullYear(),
@@ -127,10 +142,15 @@ export async function obterDashboardFerias(
   const idsFiltrados = new Set(colaboradoresFiltrados.map((c) => c.id));
   const colaboradoresPorId = new Map(todosColaboradores.map((c) => [c.id, c]));
 
-  const semSalarioIds = new Set<number>();
+  const [programacao, periodosTodos] = await Promise.all([listarProgramacaoFerias(), listarPeriodosAbertos()]);
+  const itens = programacao.filter((i) => idsFiltrados.has(i.colaboradorId));
+  const periodos = periodosTodos.filter((p) => idsFiltrados.has(p.colaboradorId));
 
-  // --- Por trimestre: saldo ainda não lançado dos períodos em aberto ---
-  const periodos = (await listarPeriodosAbertos()).filter((p) => idsFiltrados.has(p.colaboradorId));
+  const semSalarioIds = new Set<number>();
+  for (const i of itens) if (i.semSalario) semSalarioIds.add(i.colaboradorId);
+
+  // --- Por trimestre: exatamente as linhas do Planejamento do ano ---
+  const itensDoAno = itens.filter((i) => i.ano === ano);
   const trimestres = new Map<
     number,
     { colaboradores: Set<number>; valorPago: number; encargos: number; linhas: LinhaTrimestre[] }
@@ -141,43 +161,22 @@ export async function obterDashboardFerias(
     [4, { colaboradores: new Set(), valorPago: 0, encargos: 0, linhas: [] }],
   ]);
 
-  for (const periodo of periodos) {
-    const colaborador = colaboradoresPorId.get(periodo.colaboradorId);
-    if (!colaborador) continue;
-    if (Number(periodo.concessivoFim.slice(0, 4)) !== ano) continue;
-
-    const diasEstimativa = Math.min(periodo.diasSemLancamento, 30);
-    if (diasEstimativa <= 0) continue;
-
-    if (!colaborador.salarioBase || colaborador.salarioBase <= 0) semSalarioIds.add(colaborador.id);
-
-    const resultado = calcularFerias({
-      salarioBase: colaborador.salarioBase,
-      diasDireito: 30,
-      diasGozados: diasEstimativa,
-      abonoPecuniario: false,
-      dependentes: colaborador.dependentes,
-      competencia: hoje,
-    });
-    const bruto = arredondar(resultado.detalhe.valorGozado + resultado.detalhe.tercoConstitucional);
-    const fgts = calcularFGTS(bruto, hoje).valor;
-    const patronal = calcularInssPatronal(bruto, hoje).valor;
-    const encargos = arredondar(fgts + patronal);
-
-    const trimestre = Math.ceil(Number(periodo.concessivoFim.slice(5, 7)) / 3);
-    const bucket = trimestres.get(trimestre)!;
-    bucket.colaboradores.add(periodo.colaboradorId);
-    bucket.valorPago += bruto;
+  for (const item of itensDoAno) {
+    const bucket = trimestres.get(item.trimestre)!;
+    const ferias = feriasDoItem(item);
+    const encargos = encargosDoItem(item);
+    bucket.colaboradores.add(item.colaboradorId);
+    bucket.valorPago += ferias;
     bucket.encargos += encargos;
     bucket.linhas.push({
-      colaboradorNome: periodo.colaboradorNome,
-      colaboradorDepartamento: periodo.colaboradorDepartamento,
-      aquisitivo: `${periodo.dataInicio} – ${periodo.dataFim}`,
-      concessivo: `${periodo.concessivoInicio} – ${periodo.concessivoFim}`,
-      dias: diasEstimativa,
-      valorFerias: bruto,
+      colaboradorNome: item.colaboradorNome,
+      colaboradorDepartamento: item.colaboradorDepartamento,
+      aquisitivo: `${item.aquisitivoInicio} – ${item.aquisitivoFim}`,
+      concessivo: `${item.concessivoInicio} – ${item.concessivoFim}`,
+      dias: item.dias,
+      valorFerias: ferias,
       encargos,
-      total: arredondar(bruto + encargos),
+      total: item.custoPrevisto,
     });
   }
 
@@ -186,7 +185,7 @@ export async function obterDashboardFerias(
     colaboradores: b.colaboradores.size,
     valorPago: arredondar(b.valorPago),
     encargos: arredondar(b.encargos),
-    linhas: b.linhas.sort((a, z) => a.colaboradorNome.localeCompare(z.colaboradorNome)),
+    linhas: b.linhas.sort((a, z) => a.colaboradorNome.localeCompare(z.colaboradorNome, "pt-BR")),
   }));
 
   const totalAno = porTrimestre.reduce(
@@ -198,136 +197,117 @@ export async function obterDashboardFerias(
     { colaboradores: 0, valorPago: 0, encargos: 0 },
   );
 
-  // --- Lançamentos reais (já programados/concluídos) ---
-  const db = await getDb();
-  const resultadoLancamentos = await db.execute(
-    `SELECT l.status, l.dias, l.abono, l.data_inicio_prevista, l.data_inicio_gozo,
-              p.colaborador_id, p.dias_direito
-       FROM lancamentos_ferias l
-       JOIN periodos_aquisitivos p ON p.id = l.periodo_aquisitivo_id
-       WHERE l.status != 'cancelada'`,
-  );
-  const linhasLancamentos = resultadoLancamentos.rows as unknown as LinhaLancamentoResumo[];
+  // --- Metade 1 do custo anual: o que já está no Planejamento ---
+  const planejado: ParcelaCusto = {
+    valor: totalAno.valorPago,
+    encargos: totalAno.encargos,
+    total: arredondar(totalAno.valorPago + totalAno.encargos),
+    periodos: itensDoAno.length,
+  };
 
-  function calcularEvento(l: LinhaLancamentoResumo): EventoCalculado | null {
-    if (!idsFiltrados.has(l.colaborador_id)) return null;
-    const colaborador = colaboradoresPorId.get(l.colaborador_id);
-    if (!colaborador) return null;
-    const dataRefStr = l.data_inicio_gozo ?? l.data_inicio_prevista;
-    if (!dataRefStr) return null;
-    const dataRef = new Date(dataRefStr);
+  // --- Metade 2: saldo sem lançamento cujo limite p/ gozo vence até dezembro ---
+  // O corte é o LIMITE P/ GOZO (última data para INICIAR o gozo), não o fim do
+  // concessivo: é ele que obriga o pagamento dentro do ano. Limite já vencido
+  // também entra — atrasado continua sendo desembolso, e mais caro (Art. 137).
+  let vencimentoValor = 0;
+  let vencimentoEncargos = 0;
+  let vencimentoPeriodos = 0;
 
-    const semSalario = !colaborador.salarioBase || colaborador.salarioBase <= 0;
+  for (const periodo of periodos) {
+    if (Number(periodo.limiteGozo.slice(0, 4)) > ano) continue;
+    const dias = Math.min(periodo.diasSemLancamento, 30);
+    if (dias <= 0) continue;
 
-    // Férias importadas do histórico ("Relação de Férias Calculadas") podem ser
-    // anteriores à tabela legal mais antiga do app, e aí `calcularFerias`
-    // recusa — com razão: sem a tabela do ano não há como apurar INSS/IRRF.
-    // Essas férias já foram pagas e não precisam de novo cálculo; o evento
-    // entra valendo zero em vez de derrubar o dashboard inteiro, que era o que
-    // acontecia. Nada é estimado.
-    let resultado: ReturnType<typeof calcularFerias> | null = null;
-    try {
-      resultado = calcularFerias({
-        salarioBase: colaborador.salarioBase,
-        diasDireito: l.dias_direito,
-        diasGozados: l.dias,
-        abonoPecuniario: Boolean(l.abono),
-        dependentes: colaborador.dependentes,
-        competencia: dataRef,
-      });
-    } catch {
-      resultado = null;
+    const colaborador = colaboradoresPorId.get(periodo.colaboradorId);
+    if (!colaborador) continue;
+    if (!colaborador.salarioBase || colaborador.salarioBase <= 0) {
+      semSalarioIds.add(colaborador.id);
+      continue;
     }
 
-    const bruto = resultado
-      ? arredondar(
-          resultado.detalhe.valorGozado +
-            resultado.detalhe.tercoConstitucional +
-            resultado.detalhe.abono +
-            resultado.detalhe.tercoAbono,
-        )
-      : 0;
-    const fgts = resultado ? calcularFGTS(bruto, dataRef).valor : 0;
-    const patronal = resultado ? calcularInssPatronal(bruto, dataRef).valor : 0;
-    const encargos = arredondar(fgts + patronal);
+    // Mesma resiliência do resto do portal: sem tabela legal da competência
+    // não se estima nada, o período apenas não entra na conta.
+    let calculo: ReturnType<typeof calcularFerias> | null = null;
+    try {
+      calculo = calcularFerias({
+        salarioBase: colaborador.salarioBase,
+        diasDireito: periodo.diasDireito,
+        diasGozados: dias,
+        abonoPecuniario: false,
+        dependentes: colaborador.dependentes,
+        competencia: hoje,
+      });
+    } catch {
+      continue;
+    }
 
-    return { colaboradorId: l.colaborador_id, dataRef, status: l.status, dias: l.dias, bruto, encargos, semSalario };
+    const ferias = arredondar(calculo.detalhe.valorGozado + calculo.detalhe.tercoConstitucional);
+    vencimentoValor += ferias;
+    vencimentoEncargos += arredondar(calcularFGTS(ferias, hoje).valor + calcularInssPatronal(ferias, hoje).valor);
+    vencimentoPeriodos++;
   }
 
-  const eventosCalculados = linhasLancamentos
-    .map(calcularEvento)
-    .filter((e): e is EventoCalculado => e !== null);
+  const porVencimento: ParcelaCusto = {
+    valor: arredondar(vencimentoValor),
+    encargos: arredondar(vencimentoEncargos),
+    total: arredondar(vencimentoValor + vencimentoEncargos),
+    periodos: vencimentoPeriodos,
+  };
 
-  const eventosDoAno = eventosCalculados.filter((e) => e.dataRef.getFullYear() === ano);
-  const eventosDoMesVigente = eventosCalculados.filter(
-    (e) => e.dataRef.getFullYear() === hoje.getFullYear() && e.dataRef.getMonth() === hoje.getMonth(),
-  );
-
-  eventosDoAno.forEach((e) => {
-    if (e.semSalario) semSalarioIds.add(e.colaboradorId);
-  });
-
-  // --- Custo anual estimado: eventos reais do ano + saldo ainda não lançado (por trimestre) ---
-  const custoEventosAno = eventosDoAno.reduce(
-    (acc, e) => ({ valor: acc.valor + e.bruto, encargos: acc.encargos + e.encargos }),
-    { valor: 0, encargos: 0 },
-  );
-  const custoAnualValor = arredondar(
-    custoEventosAno.valor + custoEventosAno.encargos + totalAno.valorPago + totalAno.encargos,
-  );
-  const custoAnualEncargos = arredondar(custoEventosAno.encargos + totalAno.encargos);
-  const programacoesCalculadas = eventosDoAno.length + porTrimestre.reduce((s, t) => s + t.linhas.length, 0);
+  const custoAnualValor = arredondar(planejado.total + porVencimento.total);
+  const custoAnualEncargos = arredondar(planejado.encargos + porVencimento.encargos);
 
   const custoAnual: CustoAnualEstimado = {
     valor: custoAnualValor,
     encargos: custoAnualEncargos,
     percentualEncargos: custoAnualValor > 0 ? Math.round((custoAnualEncargos / custoAnualValor) * 100) : 0,
-    programacoesCalculadas,
+    programacoesCalculadas: planejado.periodos + porVencimento.periodos,
     semSalarioCadastrado: semSalarioIds.size,
+    planejado,
+    porVencimento,
   };
 
-  // --- Já pago: eventos com gozo confirmado no ano (baixa dada — concluída ou com dias alterados na baixa) ---
-  const concluidosDoAno = eventosDoAno.filter((e) => e.status === "concluida" || e.status === "alterada");
-  const jaPagoValor = arredondar(concluidosDoAno.reduce((s, e) => s + e.bruto + e.encargos, 0));
-  const mesesConcluidos = concluidosDoAno
-    .map((e) => `${e.dataRef.getFullYear()}-${String(e.dataRef.getMonth() + 1).padStart(2, "0")}`)
-    .sort();
+  // --- Já pago: as férias do ano com gozo já confirmado (baixa dada) ---
+  const gozados = itensDoAno.filter((i) => i.status === "concluida" || i.status === "alterada");
+  const jaPagoValor = arredondar(gozados.reduce((s, i) => s + i.custoPrevisto, 0));
+  const mesesGozados = gozados.map((i) => i.dataInicio.slice(0, 7)).sort();
 
   const jaPago: JaPago = {
     valor: jaPagoValor,
-    periodosPagos: concluidosDoAno.length,
-    mesInicio: mesesConcluidos[0] ?? null,
-    mesFim: mesesConcluidos[mesesConcluidos.length - 1] ?? null,
+    periodosPagos: gozados.length,
+    mesInicio: mesesGozados[0] ?? null,
+    mesFim: mesesGozados[mesesGozados.length - 1] ?? null,
     percentualDoAnual: custoAnualValor > 0 ? Math.round((jaPagoValor / custoAnualValor) * 100) : 0,
   };
 
-  // --- Previsto para o mês vigente (independe do filtro de ano — é sempre "agora") ---
-  const previstoValor = arredondar(eventosDoMesVigente.reduce((s, e) => s + e.bruto + e.encargos, 0));
-  const previstoDias = eventosDoMesVigente.reduce((s, e) => s + e.dias, 0);
+  // --- Previsto para o mês vigente: sempre "agora", independe do filtro de ano ---
+  const competencia = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}`;
+  const doMesVigente = itens.filter((i) => i.dataInicio.slice(0, 7) === competencia);
+  const previstoValor = arredondar(doMesVigente.reduce((s, i) => s + i.custoPrevisto, 0));
+
   const previsto: PrevistoMesVigente = {
     valor: previstoValor,
-    periodos: eventosDoMesVigente.length,
-    media: eventosDoMesVigente.length > 0 ? arredondar(previstoValor / eventosDoMesVigente.length) : 0,
-    diasAusencia: previstoDias,
-    pagamentosEmAberto: eventosDoMesVigente.filter((e) => e.status === "programada").length,
+    periodos: doMesVigente.length,
+    media: doMesVigente.length > 0 ? arredondar(previstoValor / doMesVigente.length) : 0,
+    diasAusencia: doMesVigente.reduce((s, i) => s + i.dias, 0),
+    pagamentosEmAberto: doMesVigente.filter((i) => i.status === "programada").length,
   };
 
-  // --- Colaboradores com período em aberto neste ano mas nenhum lançamento ainda (nunca programaram) ---
-  const idsComLancamento = new Set(linhasLancamentos.map((l) => l.colaborador_id));
-  const colaboradoresSemProgramacao = new Set(
-    periodos.filter((p) => p.diasATirar > 0).map((p) => p.colaboradorId),
-  );
-  for (const id of idsComLancamento) colaboradoresSemProgramacao.delete(id);
+  // --- Colaboradores com saldo em aberto e nenhum lançamento ainda ---
+  const idsComLancamento = new Set(itens.map((i) => i.colaboradorId));
+  const semProgramacao = new Set(periodos.filter((p) => p.diasATirar > 0).map((p) => p.colaboradorId));
+  for (const id of idsComLancamento) semProgramacao.delete(id);
 
+  const db = await getDb();
   const resultadoDataBase = await db.execute("SELECT MAX(criado_em) as m FROM folha_breakdown");
   const dataBaseRelatorio = resultadoDataBase.rows[0] as unknown as { m: string | null };
 
   // --- Controle: situação dos períodos/lançamentos no ano ---
-  const periodosDoAno = periodos.filter((p) => Number(p.concessivoFim.slice(0, 4)) === ano);
+  const periodosDoAno = periodos.filter((p) => Number(p.limiteGozo.slice(0, 4)) === ano);
   const controle: ResumoControle = {
-    programadas: eventosDoAno.length,
-    realizadas: concluidosDoAno.length,
-    pendentes: eventosDoAno.filter((e) => e.status === "programada").length,
+    programadas: itensDoAno.length,
+    realizadas: gozados.length,
+    pendentes: itensDoAno.filter((i) => i.status === "programada").length,
     vencidas: periodosDoAno.filter((p) => p.vencida).length,
     vencendo30: periodosDoAno.filter((p) => !p.vencida && p.diasParaVencer >= 0 && p.diasParaVencer <= 30).length,
     vencendo60: periodosDoAno.filter((p) => !p.vencida && p.diasParaVencer > 30 && p.diasParaVencer <= 60).length,
@@ -339,14 +319,14 @@ export async function obterDashboardFerias(
     setor: setor ?? null,
     setoresDisponiveis,
     empregadosAtivos: colaboradoresFiltrados.length,
-    competencia: `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}`,
+    competencia,
     dataBaseRelatorio: dataBaseRelatorio.m ? dataBaseRelatorio.m.slice(0, 10) : null,
     porTrimestre,
     totalAno,
     jaPago,
     previsto,
     custoAnual,
-    colaboradoresSemProgramacao: colaboradoresSemProgramacao.size,
+    colaboradoresSemProgramacao: semProgramacao.size,
     controle,
   };
 }

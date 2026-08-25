@@ -400,7 +400,45 @@ export function DashboardFeriasClient() {
 
           <div className="relative overflow-hidden rounded-md border border-hairline bg-brand-dark-900 p-4 shadow-card">
             <p className="text-[10px] font-bold tracking-wide text-brand-white/70 uppercase">Custo anual estimado</p>
-            <p className="mt-1 text-2xl font-bold tracking-tight text-brand-white">{formatarMoeda(dados.custoAnual.valor)}</p>
+            {/* O valor tem duas origens e o usuário precisa saber qual é qual —
+                daí a divisão aparecer ao passar o mouse, sem poluir o card. */}
+            <p className="group relative mt-1 inline-block cursor-help text-2xl font-bold tracking-tight text-brand-white underline decoration-brand-white/30 decoration-dotted underline-offset-4">
+              {formatarMoeda(dados.custoAnual.valor)}
+              <span className="pointer-events-none absolute top-full left-0 z-40 mt-2 hidden w-72 rounded-md border border-hairline bg-background p-3 text-left shadow-drawer group-hover:block">
+                <span className="block text-[10px] font-bold tracking-wide text-foreground-muted uppercase">
+                  De onde vem o valor
+                </span>
+
+                <span className="mt-2 flex items-baseline justify-between gap-2">
+                  <span className="text-[11.5px] font-semibold text-foreground">Planejado</span>
+                  <span className="text-[12px] font-bold text-foreground">
+                    {formatarMoeda(dados.custoAnual.planejado.total)}
+                  </span>
+                </span>
+                <span className="block text-[10.5px] font-normal text-foreground-muted">
+                  {dados.custoAnual.planejado.periodos} programação(ões) já lançada(s) · férias{" "}
+                  {formatarMoeda(dados.custoAnual.planejado.valor)} + encargos{" "}
+                  {formatarMoeda(dados.custoAnual.planejado.encargos)}
+                </span>
+
+                <span className="mt-2.5 flex items-baseline justify-between gap-2">
+                  <span className="text-[11.5px] font-semibold text-foreground">De acordo com o vencimento</span>
+                  <span className="text-[12px] font-bold text-foreground">
+                    {formatarMoeda(dados.custoAnual.porVencimento.total)}
+                  </span>
+                </span>
+                <span className="block text-[10.5px] font-normal text-foreground-muted">
+                  {dados.custoAnual.porVencimento.periodos} período(s) com saldo a gozar até dezembro · férias{" "}
+                  {formatarMoeda(dados.custoAnual.porVencimento.valor)} + encargos{" "}
+                  {formatarMoeda(dados.custoAnual.porVencimento.encargos)}
+                </span>
+
+                <span className="mt-2.5 flex items-baseline justify-between gap-2 border-t border-hairline pt-2">
+                  <span className="text-[11.5px] font-bold text-foreground">Total</span>
+                  <span className="text-[12px] font-bold text-foreground">{formatarMoeda(dados.custoAnual.valor)}</span>
+                </span>
+              </span>
+            </p>
 
             <svg viewBox="0 0 64 64" className="pointer-events-none absolute top-3 right-3 h-16 w-16 opacity-90">
               <circle cx="32" cy="32" r="26" fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="6" />
@@ -427,7 +465,8 @@ export function DashboardFeriasClient() {
               encargos {formatarMoeda(dados.custoAnual.encargos)} · {dados.custoAnual.percentualEncargos}%
             </p>
             <p className="mt-2 text-[10.5px] text-brand-white/60">
-              férias + 1/3 + abono + FGTS 8% + INSS patronal 20% sobre a folha · {dados.custoAnual.programacoesCalculadas}{" "}
+              planejado + o que vence até dezembro · férias + 1/3 + abono + FGTS 8% + INSS patronal 20% ·{" "}
+              {dados.custoAnual.programacoesCalculadas}{" "}
               programação(ões) calculada(s)
               {dados.custoAnual.semSalarioCadastrado > 0
                 ? ` · ${dados.custoAnual.semSalarioCadastrado} sem salário cadastrado`
