@@ -454,3 +454,60 @@ export async function importarColaboradores(
   }
   return { criados, descartados: [] };
 }
+
+export interface VinculosDoColaborador {
+  periodosAquisitivos: number;
+  lancamentosFerias: number;
+  verbasImportadas: number;
+  mesesFechados: number;
+  liderados: number;
+}
+
+/** O que existe amarrado ao colaborador — o que impede apagá-lo sem perder histórico. */
+export async function contarVinculos(colaboradorId: number): Promise<VinculosDoColaborador> {
+  const db = await getDb();
+  const resultado = await db.execute({
+    sql: `SELECT
+        (SELECT COUNT(*) FROM periodos_aquisitivos WHERE colaborador_id = ?) AS periodos,
+        (SELECT COUNT(*) FROM lancamentos_ferias l
+           JOIN periodos_aquisitivos p ON p.id = l.periodo_aquisitivo_id
+          WHERE p.colaborador_id = ?) AS lancamentos,
+        (SELECT COUNT(*) FROM folha_extras WHERE colaborador_id = ?) AS extras,
+        (SELECT COUNT(*) FROM folha_breakdown WHERE colaborador_id = ?) AS fechados,
+        (SELECT COUNT(*) FROM colaboradores WHERE gestor_id = ?) AS liderados`,
+    args: [colaboradorId, colaboradorId, colaboradorId, colaboradorId, colaboradorId],
+  });
+  const l = resultado.rows[0] as unknown as {
+    periodos: number;
+    lancamentos: number;
+    extras: number;
+    fechados: number;
+    liderados: number;
+  };
+  return {
+    periodosAquisitivos: Number(l.periodos),
+    lancamentosFerias: Number(l.lancamentos),
+    verbasImportadas: Number(l.extras),
+    mesesFechados: Number(l.fechados),
+    liderados: Number(l.liderados),
+  };
+}
+
+/**
+ * Apaga o colaborador de vez. Existe para o cadastro criado por engano — a
+ * pessoa que "não vai para lugar nenhum" —, NÃO para quem saiu da empresa:
+ * para esse caso existe o desligamento, que preserva o histórico.
+ *
+ * Por isso a exclusão é recusada quando há período de férias, lançamento,
+ * verba importada, mês fechado ou liderado apontando para ele. Apagar assim
+ * arrancaria pedaços de folha e de férias já apuradas, e nada disso volta.
+ *
+ * Os dependentes vão junto: eles só existem por causa do titular.
+ */
+export async function excluirColaborador(colaboradorId: number): Promise<void> {
+  const db = await getDb();
+  await db.batch([
+    { sql: "DELETE FROM colaborador_dependentes WHERE colaborador_id = ?", args: [colaboradorId] },
+    { sql: "DELETE FROM colaboradores WHERE id = ?", args: [colaboradorId] },
+  ]);
+}

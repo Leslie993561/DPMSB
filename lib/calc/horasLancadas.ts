@@ -14,6 +14,14 @@ export interface HorasLancadas {
   noturna: number | null;
 }
 
+/** Calendário do mês para o DSR. Sem ele, o reflexo não é calculado. */
+export interface CalendarioDsr {
+  /** Dias úteis do mês — o número que o DP mantém em Benefícios, já com feriados. */
+  diasUteis: number;
+  /** Domingos e feriados: o complemento dos dias úteis no mês. */
+  diasDsr: number;
+}
+
 export interface ValorDasHoras {
   valorHoraNormal: number;
   extra50: number;
@@ -21,7 +29,9 @@ export interface ValorDasHoras {
   /** Positivo aqui; quem soma o custo é que subtrai. */
   desconto: number;
   noturna: number;
-  /** extra50 + extra100 + noturna − desconto: o efeito líquido na folha. */
+  /** Reflexo no descanso semanal remunerado (Lei 605/1949). Zero sem calendário. */
+  dsr: number;
+  /** extra50 + extra100 + noturna + dsr − desconto: o efeito líquido na folha. */
   liquido: number;
 }
 
@@ -33,14 +43,19 @@ export interface ValorDasHoras {
  * salário do mês, e pagá-las de novo dobraria o valor. O desconto de horas sai
  * pela hora normal, sem adicional nenhum.
  *
- * O reflexo no DSR não entra aqui: ele depende do calendário de dias úteis e
- * de feriados do mês, que o portal não tem — estimar daria um número errado
- * com cara de certo.
+ * O DSR (Lei 605/1949) reflete sobre os adicionais — hora extra e noturno —
+ * pela fórmula do DP: valor dos adicionais ÷ dias úteis × dias de DSR. O
+ * desconto de horas fica de fora: ele não é adicional, é hora não trabalhada.
+ *
+ * Sem `calendario` o DSR é zero, e de propósito: ele depende dos dias úteis do
+ * mês, que já incluem os feriados. Chutar 25/5 daria um número errado com cara
+ * de certo — o número real vem da tabela que o DP mantém em Benefícios.
  */
 export function calcularValorDasHoras(
   salarioBase: number,
   horas: HorasLancadas,
   jornadaMensal: number = JORNADA_MENSAL_PADRAO,
+  calendario?: CalendarioDsr,
 ): ValorDasHoras {
   const valorHoraNormal = jornadaMensal > 0 ? salarioBase / jornadaMensal : 0;
 
@@ -49,12 +64,20 @@ export function calcularValorDasHoras(
   const noturna = arredondar((horas.noturna ?? 0) * valorHoraNormal * ADICIONAL_NOTURNO);
   const desconto = arredondar((horas.desconto ?? 0) * valorHoraNormal);
 
+  // A base do DSR são os ADICIONAIS do mês, não o desconto.
+  const baseDsr = extra50 + extra100 + noturna;
+  const dsr =
+    calendario && calendario.diasUteis > 0 && calendario.diasDsr > 0
+      ? arredondar((baseDsr / calendario.diasUteis) * calendario.diasDsr)
+      : 0;
+
   return {
     valorHoraNormal: arredondar(valorHoraNormal),
     extra50,
     extra100,
     desconto,
     noturna,
-    liquido: arredondar(extra50 + extra100 + noturna - desconto),
+    dsr,
+    liquido: arredondar(extra50 + extra100 + noturna + dsr - desconto),
   };
 }

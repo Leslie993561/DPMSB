@@ -38,6 +38,7 @@ interface VerbaColaborador {
     extra100: number;
     desconto: number;
     noturna: number;
+    dsr: number;
     liquido: number;
   };
   salarioFamilia: number;
@@ -201,6 +202,7 @@ export function RelatorioDetalhadoTab() {
           descontoHoras: acc.descontoHoras + (l.descontoHoras ?? 0),
           horaNoturna: acc.horaNoturna + (l.horaNoturna ?? 0),
           valorHoras: acc.valorHoras + l.valorHoras.liquido,
+          dsrHoras: acc.dsrHoras + l.valorHoras.dsr,
           custoTotal: acc.custoTotal + l.custoTotal,
         }),
         {
@@ -213,6 +215,7 @@ export function RelatorioDetalhadoTab() {
           descontoHoras: 0,
           horaNoturna: 0,
           valorHoras: 0,
+          dsrHoras: 0,
           salarioBase: 0,
           inss: 0,
           fgts: 0,
@@ -389,7 +392,7 @@ export function RelatorioDetalhadoTab() {
                     Plataformas
                   </th>
                   <th
-                    colSpan={5}
+                    colSpan={6}
                     className={cn(TH_GRUPO, DIVISOR, "border-b border-hairline", GRUPO_HORAS, "text-foreground-muted")}
                     title="Horas lançadas na planilha (hh:mm); o total é em reais, calculado pelo salário."
                   >
@@ -430,6 +433,14 @@ export function RelatorioDetalhadoTab() {
                     Desconto de horas (h)
                   </th>
                   <th className={cn(TH_COL, GRUPO_HORAS, "text-foreground-muted")}>Hora noturna (h)</th>
+                  {/* O DSR é verba própria na folha; esconder num tooltip
+                      obrigaria a refazer a conta para conferir o holerite. */}
+                  <th
+                    className={cn(TH_COL, GRUPO_HORAS, "text-foreground-muted")}
+                    title="Reflexo no descanso semanal remunerado: adicionais ÷ dias úteis × dias de DSR do mês"
+                  >
+                    DSR s/ HE (R$)
+                  </th>
                   {/* A coluna que fecha o grupo: as horas todas convertidas em
                       dinheiro, já com o adicional de cada tipo e o desconto
                       subtraído. É este valor que entra no total do colaborador. */}
@@ -515,6 +526,12 @@ export function RelatorioDetalhadoTab() {
                       {l.horaNoturna ? formatarHoras(l.horaNoturna) : "—"}
                     </td>
                     <td
+                      className={cn(TD_NUM, GRUPO_HORAS)}
+                      title={l.valorHoras.dsr ? "Adicionais do mês ÷ dias úteis × dias de DSR" : undefined}
+                    >
+                      {l.valorHoras.dsr ? formatarNumero(l.valorHoras.dsr) : "—"}
+                    </td>
+                    <td
                       className={cn(
                         TD_NUM,
                         GRUPO_HORAS,
@@ -528,6 +545,7 @@ export function RelatorioDetalhadoTab() {
                               `50%: ${formatarMoeda(l.valorHoras.extra50)}`,
                               `100%: ${formatarMoeda(l.valorHoras.extra100)}`,
                               `Adicional noturno: ${formatarMoeda(l.valorHoras.noturna)}`,
+                              `DSR: ${formatarMoeda(l.valorHoras.dsr)}`,
                               `(–) Desconto: ${formatarMoeda(l.valorHoras.desconto)}`,
                             ].join("\n")
                           : undefined
@@ -578,6 +596,7 @@ export function RelatorioDetalhadoTab() {
                     {totais.descontoHoras ? `-${formatarHoras(totais.descontoHoras)}` : "00:00"}
                   </td>
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarHoras(totais.horaNoturna)}</td>
+                  <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.dsrHoras)}</td>
                   <td className={cn(TD_NUM, "bg-surface-page font-bold", totais.valorHoras < 0 ? "text-status-danger" : undefined)}>
                     {formatarNumero(totais.valorHoras)}
                   </td>

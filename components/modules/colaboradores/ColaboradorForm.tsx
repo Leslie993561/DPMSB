@@ -130,10 +130,45 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
   const [adicionalFixoDescricao, setAdicionalFixoDescricao] = useState(editando?.adicionalFixoDescricao ?? "");
 
   const desligado = editando?.status === "desligado";
+
+  /**
+   * Exclusão definitiva, para o cadastro criado por engano. Diferente de
+   * desligar: aqui não sobra nada. A API recusa quem tem histórico e devolve o
+   * motivo, então a confirmação daqui não precisa fingir que sabe o que existe
+   * amarrado à pessoa.
+   */
+  async function handleExcluir() {
+    if (!editando) return;
+    const confirmou = window.confirm(
+      `Excluir ${editando.nome.trim()} definitivamente?\n\n` +
+        "O cadastro some do portal e não há como recuperar. Se a pessoa saiu da empresa, o certo é " +
+        "“Desligar colaborador”, que preserva férias e folha já apuradas.",
+    );
+    if (!confirmou) return;
+
+    setErroExcluir(null);
+    setExcluindo(true);
+    try {
+      const res = await fetch(`/api/colaboradores/${editando.id}/excluir`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setErroExcluir(data.erro ?? "Erro ao excluir o colaborador.");
+        return;
+      }
+      onSalvo();
+    } catch {
+      setErroExcluir("Falha de comunicação com o servidor.");
+    } finally {
+      setExcluindo(false);
+    }
+  }
   const [desligando, setDesligando] = useState(false);
   const [dataDesligamento, setDataDesligamento] = useState(editando?.dataDesligamento ?? "");
   const [valorRescisao, setValorRescisao] = useState(editando?.valorRescisao ? String(editando.valorRescisao) : "");
   const [motivoDesligamento, setMotivoDesligamento] = useState(editando?.motivoDesligamento ?? "");
+
+  const [excluindo, setExcluindo] = useState(false);
+  const [erroExcluir, setErroExcluir] = useState<string | null>(null);
 
   const [temDependente, setTemDependente] = useState(false);
   const [dependentesForm, setDependentesForm] = useState<DependenteForm[]>([]);
@@ -1165,13 +1200,33 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
       </div>
 
       {editando && !desligado && (
-        <button
-          type="button"
-          onClick={() => setDesligando(true)}
-          className="mt-0.5 self-start text-[11px] font-medium text-status-danger underline decoration-dotted underline-offset-2 hover:no-underline"
-        >
-          Desligar colaborador
-        </button>
+        <div className="mt-0.5 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setDesligando(true)}
+            className="text-[11px] font-medium text-status-danger underline decoration-dotted underline-offset-2 hover:no-underline"
+          >
+            Desligar colaborador
+          </button>
+          <span aria-hidden className="text-[10px] text-foreground-muted/50">
+            |
+          </span>
+          <button
+            type="button"
+            onClick={() => void handleExcluir()}
+            disabled={excluindo}
+            title="Apaga o cadastro de vez. Só para registro criado por engano — quem tem histórico não pode ser excluído."
+            className="text-[11px] font-medium text-status-danger underline decoration-dotted underline-offset-2 hover:no-underline disabled:opacity-50"
+          >
+            {excluindo ? "Excluindo…" : "Excluir colaborador"}
+          </button>
+        </div>
+      )}
+
+      {erroExcluir && (
+        <p className="mt-1 rounded border border-status-danger-border bg-status-danger-bg px-2.5 py-1.5 text-[11px] text-status-danger">
+          {erroExcluir}
+        </p>
       )}
 
       {editando && desligado && (

@@ -5,7 +5,14 @@ import { obterDiasUteis } from "./beneficiosDiasUteis";
 import { calcularINSS, calcularIRRF, calcularFGTS, calcularValeTransporte, tarifaVtPorCidade, arredondar } from "@/lib/calc";
 import type { LinhaExtrasImportada, CampoExtra } from "@/lib/parsing/folhaExtras";
 import { estaNaFolha } from "@/lib/folha/vigencia";
-import { calcularSalarioFamilia, calcularAdicionais, calcularValorDasHoras } from "@/lib/calc";
+import { casarPorNome } from "@/lib/folha/casarNome";
+import {
+  calcularSalarioFamilia,
+  calcularAdicionais,
+  calcularValorDasHoras,
+  JORNADA_MENSAL_PADRAO,
+  type CalendarioDsr,
+} from "@/lib/calc";
 import { listarDependentesPorColaborador } from "./colaboradorDependentes";
 
 export interface VerbaColaborador {
@@ -44,7 +51,9 @@ export interface VerbaColaborador {
     extra100: number;
     desconto: number;
     noturna: number;
-    /** extra50 + extra100 + noturna − desconto. */
+    /** Reflexo no descanso semanal remunerado. */
+    dsr: number;
+    /** extra50 + extra100 + noturna + dsr − desconto. */
     liquido: number;
   };
   /**
@@ -223,6 +232,14 @@ export async function gerarBreakdown(competencia: string, colaboradores?: Colabo
   const listaColaboradores = colaboradores ?? (await listarColaboradores());
   const { ano, mes } = competenciaParaAnoMes(competencia);
   const diasUteis = await obterDiasUteis(ano, mes);
+  // Dias de DSR são o COMPLEMENTO dos dias úteis no mês: se o DP registrou 25
+  // úteis num mês de 30 dias, sobram 5 de domingo e feriado. Assim o reflexo
+  // usa o mesmo número que o DP já mantém, sem uma segunda tabela para
+  // conferir — e sem inventar feriado nenhum.
+  const calendarioDsr: CalendarioDsr = {
+    diasUteis,
+    diasDsr: Math.max(0, new Date(ano, mes, 0).getDate() - diasUteis),
+  };
   const dataCompetencia = new Date(`${competencia}-01`);
   const [extrasPorColaborador, dependentesPorColaborador] = await Promise.all([
     obterExtras(competencia),
@@ -280,12 +297,17 @@ export async function gerarBreakdown(competencia: string, colaboradores?: Colabo
 
     // As horas lançadas viram dinheiro aqui, pelo salário do colaborador —
     // hora extra soma, desconto subtrai. Ver calcularValorDasHoras.
-    const valorHoras = calcularValorDasHoras(c.salarioBase, {
-      extra50: extras.horaExtra50,
-      extra100: extras.horaExtra100,
-      desconto: extras.descontoHoras,
-      noturna: extras.horaNoturna,
-    });
+    const valorHoras = calcularValorDasHoras(
+      c.salarioBase,
+      {
+        extra50: extras.horaExtra50,
+        extra100: extras.horaExtra100,
+        desconto: extras.descontoHoras,
+        noturna: extras.horaNoturna,
+      },
+      JORNADA_MENSAL_PADRAO,
+      calendarioDsr,
+    );
 
     //
     // O ODONTOLÓGICO fica fora da conta de propósito: ele é descontado da folha
@@ -428,6 +450,13 @@ export async function competenciaFechada(competencia: string): Promise<boolean> 
 export async function listarBreakdownPersistido(competencia: string): Promise<VerbaColaborador[]> {
   const colaboradoresPorId = new Map((await listarColaboradores()).map((c) => [c.id, c]));
   const dataCompetencia = new Date(`${competencia}-01`);
+  // Mesmo calendário do caminho ao vivo — ver gerarBreakdown.
+  const { ano: anoComp, mes: mesComp } = competenciaParaAnoMes(competencia);
+  const diasUteisComp = await obterDiasUteis(anoComp, mesComp);
+  const calendarioDsr: CalendarioDsr = {
+    diasUteis: diasUteisComp,
+    diasDsr: Math.max(0, new Date(anoComp, mesComp, 0).getDate() - diasUteisComp),
+  };
   const [extrasPorColaborador, dependentesPorColaborador] = await Promise.all([
     obterExtras(competencia),
     listarDependentesPorColaborador(),
@@ -461,12 +490,17 @@ export async function listarBreakdownPersistido(competencia: string): Promise<Ve
             dataCompetencia,
           )
         : { periculosidade: 0, insalubridade: 0, adicionalFixo: 0, total: 0 };
-    const valorHoras = calcularValorDasHoras(colaborador?.salarioBase ?? 0, {
-      extra50: extras.horaExtra50,
-      extra100: extras.horaExtra100,
-      desconto: extras.descontoHoras,
-      noturna: extras.horaNoturna,
-    });
+    const valorHoras = calcularValorDasHoras(
+      colaborador?.salarioBase ?? 0,
+      {
+        extra50: extras.horaExtra50,
+        extra100: extras.horaExtra100,
+        desconto: extras.descontoHoras,
+        noturna: extras.horaNoturna,
+      },
+      JORNADA_MENSAL_PADRAO,
+      calendarioDsr,
+    );
     const familia =
       colaborador && colaborador.vinculo !== "PJ"
         ? calcularSalarioFamilia(
@@ -610,19 +644,26 @@ export async function importarExtras(
 ): Promise<ResultadoImportacaoExtras> {
   const colaboradores = await listarColaboradores();
   const porCodigo = new Map(colaboradores.map((c) => [String(c.id), c]));
-  const porNome = new Map(colaboradores.map((c) => [c.nome.trim().toLowerCase(), c]));
 
   let aplicadas = 0;
   const descartados: ResultadoImportacaoExtras["descartados"] = [];
 
   for (const [indice, item] of itens.entries()) {
     const linha = indice + 2;
-    const colaborador =
-      (item.codigo ? porCodigo.get(item.codigo.trim()) : undefined) ??
-      porNome.get(item.nomeColaborador.trim().toLowerCase());
+    // Código primeiro; sem ele, o nome com tolerância a acento e conectivo.
+    const porCodigoAchado = item.codigo ? porCodigo.get(item.codigo.trim()) : undefined;
+    const porNomeAchado = porCodigoAchado
+      ? { encontrado: porCodigoAchado, ambiguo: false }
+      : casarPorNome(item.nomeColaborador, colaboradores, (c) => c.nome);
+    const colaborador = porNomeAchado.encontrado;
 
     if (!colaborador) {
-      descartados.push({ linha, motivo: `Colaborador "${item.nomeColaborador}" não encontrado no cadastro.` });
+      descartados.push({
+        linha,
+        motivo: porNomeAchado.ambiguo
+          ? `"${item.nomeColaborador}" casa com mais de um colaborador — informe o código para não aplicar na pessoa errada.`
+          : `Colaborador "${item.nomeColaborador}" não encontrado no cadastro.`,
+      });
       continue;
     }
 

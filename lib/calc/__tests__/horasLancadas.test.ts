@@ -66,3 +66,40 @@ describe("calcularValorDasHoras · exemplos conferidos com o DP", () => {
     expect(r.extra100).toBeCloseTo(40, 2);
   });
 });
+
+describe("calcularValorDasHoras · DSR conferido com o DP", () => {
+  const CALENDARIO = { diasUteis: 25, diasDsr: 5 };
+
+  it("10 horas a 50% com salário 2.200 dão R$ 150,00 de hora extra", () => {
+    const r = calcularValorDasHoras(2200, { ...NENHUMA, extra50: 10 }, 220, CALENDARIO);
+    expect(r.extra50).toBeCloseTo(150, 2);
+  });
+
+  it("DSR = 150 ÷ 25 × 5 = R$ 30,00", () => {
+    const r = calcularValorDasHoras(2200, { ...NENHUMA, extra50: 10 }, 220, CALENDARIO);
+    expect(r.dsr).toBeCloseTo(30, 2);
+  });
+
+  it("total com DSR = R$ 180,00", () => {
+    const r = calcularValorDasHoras(2200, { ...NENHUMA, extra50: 10 }, 220, CALENDARIO);
+    expect(r.liquido).toBeCloseTo(180, 2);
+  });
+
+  it("sem calendário o DSR é zero — não se chuta 25/5", () => {
+    const r = calcularValorDasHoras(2200, { ...NENHUMA, extra50: 10 });
+    expect(r.dsr).toBe(0);
+    expect(r.liquido).toBeCloseTo(150, 2);
+  });
+
+  it("o desconto de horas fica fora da base do DSR — não é adicional", () => {
+    const so50 = calcularValorDasHoras(2200, { ...NENHUMA, extra50: 10 }, 220, CALENDARIO);
+    const comDesconto = calcularValorDasHoras(2200, { ...NENHUMA, extra50: 10, desconto: 5 }, 220, CALENDARIO);
+    expect(comDesconto.dsr).toBeCloseTo(so50.dsr, 2);
+  });
+
+  it("o adicional noturno também reflete no DSR", () => {
+    const r = calcularValorDasHoras(2200, { ...NENHUMA, noturna: 10 }, 220, CALENDARIO);
+    expect(r.noturna).toBeCloseTo(20, 2);
+    expect(r.dsr).toBeCloseTo(4, 2);
+  });
+});
