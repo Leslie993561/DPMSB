@@ -12,7 +12,20 @@ export interface PlanilhaParseada {
 function normalizarCelula(valor: ExcelJS.CellValue): CelulaValor {
   if (valor === null || valor === undefined) return null;
   if (typeof valor === "number" || typeof valor === "string") return valor;
-  if (valor instanceof Date) return valor.toISOString().slice(0, 10);
+  if (valor instanceof Date) {
+    // Célula formatada como HORA no Excel chega como data ancorada em
+    // 30/12/1899 (a época que o Excel usa para valores só de tempo). Cortar em
+    // 10 caracteres jogava a hora fora e "04:17" virava "1899-12-30", que não
+    // vira número nenhum — foi assim que uma planilha inteira de horas extras
+    // entrou vazia. Aqui a hora é preservada como "HH:MM".
+    const ehHoraDoExcel = valor.getUTCFullYear() === 1899;
+    if (ehHoraDoExcel) {
+      const hh = String(valor.getUTCHours()).padStart(2, "0");
+      const mm = String(valor.getUTCMinutes()).padStart(2, "0");
+      return `${hh}:${mm}`;
+    }
+    return valor.toISOString().slice(0, 10);
+  }
   if (typeof valor === "object") {
     if ("result" in valor && valor.result !== undefined) {
       return normalizarCelula(valor.result as ExcelJS.CellValue);

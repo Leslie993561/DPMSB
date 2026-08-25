@@ -51,3 +51,23 @@ describe("formatarHoras", () => {
     expect(formatarHoras(null)).toBe("—");
   });
 });
+
+/**
+ * O caso real que fez uma planilha inteira entrar vazia: as células estavam
+ * formatadas como HORA no Excel, e a leitura devolve uma data ancorada em
+ * 30/12/1899. O valor precisa chegar aqui já como "HH:MM" — quem converte é
+ * `normalizarCelula`, em lib/parsing/spreadsheet.ts.
+ */
+describe("parsearHoras · célula formatada como hora no Excel", () => {
+  it('entende o "04:17" que a planilha do DP produz', () => {
+    expect(parsearHoras("04:17")).toBeCloseTo(4 + 17 / 60, 6);
+  });
+
+  it("00:00 é zero hora, não ausência", () => {
+    expect(parsearHoras("00:00")).toBe(0);
+  });
+
+  it("hora maior que a jornada de um dia continua valendo", () => {
+    expect(parsearHoras("08:21")).toBeCloseTo(8 + 21 / 60, 6);
+  });
+});
