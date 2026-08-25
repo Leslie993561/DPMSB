@@ -218,22 +218,37 @@ export async function obterDashboardFerias(
     const dataRef = new Date(dataRefStr);
 
     const semSalario = !colaborador.salarioBase || colaborador.salarioBase <= 0;
-    const resultado = calcularFerias({
-      salarioBase: colaborador.salarioBase,
-      diasDireito: l.dias_direito,
-      diasGozados: l.dias,
-      abonoPecuniario: Boolean(l.abono),
-      dependentes: colaborador.dependentes,
-      competencia: dataRef,
-    });
-    const bruto = arredondar(
-      resultado.detalhe.valorGozado +
-        resultado.detalhe.tercoConstitucional +
-        resultado.detalhe.abono +
-        resultado.detalhe.tercoAbono,
-    );
-    const fgts = calcularFGTS(bruto, dataRef).valor;
-    const patronal = calcularInssPatronal(bruto, dataRef).valor;
+
+    // Férias importadas do histórico ("Relação de Férias Calculadas") podem ser
+    // anteriores à tabela legal mais antiga do app, e aí `calcularFerias`
+    // recusa — com razão: sem a tabela do ano não há como apurar INSS/IRRF.
+    // Essas férias já foram pagas e não precisam de novo cálculo; o evento
+    // entra valendo zero em vez de derrubar o dashboard inteiro, que era o que
+    // acontecia. Nada é estimado.
+    let resultado: ReturnType<typeof calcularFerias> | null = null;
+    try {
+      resultado = calcularFerias({
+        salarioBase: colaborador.salarioBase,
+        diasDireito: l.dias_direito,
+        diasGozados: l.dias,
+        abonoPecuniario: Boolean(l.abono),
+        dependentes: colaborador.dependentes,
+        competencia: dataRef,
+      });
+    } catch {
+      resultado = null;
+    }
+
+    const bruto = resultado
+      ? arredondar(
+          resultado.detalhe.valorGozado +
+            resultado.detalhe.tercoConstitucional +
+            resultado.detalhe.abono +
+            resultado.detalhe.tercoAbono,
+        )
+      : 0;
+    const fgts = resultado ? calcularFGTS(bruto, dataRef).valor : 0;
+    const patronal = resultado ? calcularInssPatronal(bruto, dataRef).valor : 0;
     const encargos = arredondar(fgts + patronal);
 
     return { colaboradorId: l.colaborador_id, dataRef, status: l.status, dias: l.dias, bruto, encargos, semSalario };

@@ -66,7 +66,6 @@ function montarGrupos(counts?: NavCounts): GrupoItem[] {
       badge: counts?.colaboradores,
       base: "/colaboradores",
       itens: [
-        { href: "/colaboradores?aba=organograma", label: "Organograma" },
         { href: "/colaboradores?aba=quadro", label: "Quadro de colaboradores" },
       ],
     },
