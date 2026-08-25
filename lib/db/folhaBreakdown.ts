@@ -4,6 +4,7 @@ import { listarColaboradores, type Colaborador } from "./colaboradores";
 import { obterDiasUteis } from "./beneficiosDiasUteis";
 import { calcularINSS, calcularIRRF, calcularFGTS, calcularValeTransporte, tarifaVtPorCidade, arredondar } from "@/lib/calc";
 import type { LinhaExtrasImportada } from "@/lib/parsing/folhaExtras";
+import { estaNaFolha } from "@/lib/folha/vigencia";
 import { calcularSalarioFamilia, calcularAdicionais } from "@/lib/calc";
 import { listarDependentesPorColaborador } from "./colaboradorDependentes";
 
@@ -180,7 +181,7 @@ export async function gerarBreakdown(competencia: string, colaboradores?: Colabo
     listarDependentesPorColaborador(),
   ]);
 
-  return listaColaboradores.map((c) => {
+  return listaColaboradores.filter((c) => estaNaFolha(c, competencia)).map((c) => {
     // PJ é pessoa jurídica prestando serviço, não empregado CLT — não há FGTS,
     // provisão de 13º nem benefícios (VT/VA) estatutários sobre o valor pago a ela.
     const ehPj = c.vinculo === "PJ";
@@ -231,6 +232,11 @@ export async function gerarBreakdown(competencia: string, colaboradores?: Colabo
 
     // Hora extra soma; desconto de horas subtrai. É a única extra negativa, e
     // vem positiva na planilha justamente porque o DP a informa como desconto.
+    //
+    // O ODONTOLÓGICO fica fora da conta de propósito: ele é descontado da folha
+    // do colaborador, não pago pela empresa. A empresa recolhe e repassa ao
+    // plano, então o desembolso líquido dela é zero — somá-lo inflava o custo
+    // de cada pessoa pelo valor do plano.
     const custoTotal = arredondar(
       c.salarioBase +
         fgts.valor +
@@ -239,7 +245,6 @@ export async function gerarBreakdown(competencia: string, colaboradores?: Colabo
         valeAlimentacao +
         premiacao +
         (extras.vm ?? 0) +
-        (extras.odontologico ?? 0) +
         (extras.solides ?? 0) +
         (extras.flash ?? 0) +
         (extras.bonificacao ?? 0) +
@@ -415,7 +420,6 @@ export async function listarBreakdownPersistido(competencia: string): Promise<Ve
       nucleoCongelado +
         premiacao +
         (extras.vm ?? 0) +
-        (extras.odontologico ?? 0) +
         (extras.solides ?? 0) +
         (extras.flash ?? 0) +
         (extras.bonificacao ?? 0) +

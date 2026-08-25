@@ -394,7 +394,12 @@ export function RelatorioDetalhadoTab() {
                   <th className={cn(TH_COL, DIVISOR, GRUPO_BENEFICIOS, "text-brand-primary-800")}>VT</th>
                   <th className={cn(TH_COL, GRUPO_BENEFICIOS, "text-brand-primary-800")}>VA</th>
                   <th className={cn(TH_COL, GRUPO_BENEFICIOS, "text-brand-primary-800")}>VM</th>
-                  <th className={cn(TH_COL, GRUPO_BENEFICIOS, "text-brand-primary-800")}>Odontológico</th>
+                  <th
+                    className={cn(TH_COL, GRUPO_BENEFICIOS, "text-brand-primary-800")}
+                    title="Descontado da folha do colaborador. A empresa recolhe e repassa ao plano, então não entra no custo dela."
+                  >
+                    Odontológico (desc.)
+                  </th>
                   <th
                     className={cn(TH_COL, GRUPO_BENEFICIOS, "text-brand-primary-800")}
                     title="Cota por filho menor de 14 anos (Lei 8.213/91). Adiantado pelo empregador e compensado na guia do INSS — por isso não entra no total do colaborador."
@@ -445,7 +450,9 @@ export function RelatorioDetalhadoTab() {
                     <td className={cn(TD_NUM, DIVISOR, GRUPO_BENEFICIOS)}>{formatarNumero(l.valeTransporte)}</td>
                     <td className={cn(TD_NUM, GRUPO_BENEFICIOS)}>{formatarNumero(l.valeAlimentacao)}</td>
                     <td className={cn(TD_NUM, GRUPO_BENEFICIOS)}>{formatarNumeroOuTraco(l.vm)}</td>
-                    <td className={cn(TD_NUM, GRUPO_BENEFICIOS)}>{formatarNumeroOuTraco(l.odontologico)}</td>
+                    <td className={cn(TD_NUM, GRUPO_BENEFICIOS, l.odontologico ? "text-status-danger" : undefined)}>
+                      {l.odontologico ? `-${formatarNumero(l.odontologico)}` : "—"}
+                    </td>
                     <td
                       className={cn(TD_NUM, GRUPO_BENEFICIOS)}
                       title={
@@ -490,7 +497,9 @@ export function RelatorioDetalhadoTab() {
                   <td className={cn(TD_NUM, DIVISOR, "bg-surface-page")}>{formatarNumero(totais.vt)}</td>
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.va)}</td>
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.vm)}</td>
-                  <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.odontologico)}</td>
+                  <td className={cn(TD_NUM, "bg-surface-page", totais.odontologico ? "text-status-danger" : undefined)}>
+                    {totais.odontologico ? `-${formatarNumero(totais.odontologico)}` : "0,00"}
+                  </td>
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.salarioFamilia)}</td>
                   <td className={cn(TD_NUM, DIVISOR, "bg-surface-page")}>{formatarNumero(totais.solides)}</td>
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.flash)}</td>
