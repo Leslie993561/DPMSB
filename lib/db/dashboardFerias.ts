@@ -36,12 +36,23 @@ export interface JaPago {
   percentualDoAnual: number;
 }
 
+/** Uma fatia do mês vigente: as férias já gozadas ou as que ainda vão acontecer. */
+export interface FatiaMes {
+  valor: number;
+  periodos: number;
+  dias: number;
+}
+
 export interface PrevistoMesVigente {
   valor: number;
   periodos: number;
   media: number;
   diasAusencia: number;
   pagamentosEmAberto: number;
+  /** Férias do mês com gozo já confirmado — a baixa foi dada. */
+  tiradas: FatiaMes;
+  /** Férias do mês ainda por acontecer: lançadas no Planejamento, aguardando a baixa. */
+  aTirar: FatiaMes;
 }
 
 /** Uma das duas metades do custo anual, para a tela poder mostrar a origem de cada real. */
@@ -72,14 +83,28 @@ export interface CustoAnualEstimado {
   porVencimento: ParcelaCusto;
 }
 
+/** Quem está em cada faixa de vencimento — o número sozinho não diz com quem falar. */
+export interface PeriodoEmRisco {
+  colaboradorNome: string;
+  colaboradorDepartamento: string | null;
+  /** Última data para INICIAR o gozo do saldo. */
+  limiteGozo: string;
+  diasRestantes: number;
+}
+
+export interface GrupoVencimento {
+  quantidade: number;
+  periodos: PeriodoEmRisco[];
+}
+
 export interface ResumoControle {
   programadas: number;
   realizadas: number;
   pendentes: number;
-  vencidas: number;
-  vencendo30: number;
-  vencendo60: number;
-  vencendo90: number;
+  vencidas: GrupoVencimento;
+  vencendo30: GrupoVencimento;
+  vencendo60: GrupoVencimento;
+  vencendo90: GrupoVencimento;
 }
 
 export interface DashboardFerias {
@@ -285,12 +310,23 @@ export async function obterDashboardFerias(
   const doMesVigente = itens.filter((i) => i.dataInicio.slice(0, 7) === competencia);
   const previstoValor = arredondar(doMesVigente.reduce((s, i) => s + i.custoPrevisto, 0));
 
+  // O total do mês é a soma das duas fatias, e nada além delas: o que já foi
+  // gozado e o que está planejado para acontecer. A divisão importa porque uma
+  // metade é despesa realizada e a outra ainda pode mudar de data.
+  const fatia = (lista: typeof doMesVigente): FatiaMes => ({
+    valor: arredondar(lista.reduce((s, i) => s + i.custoPrevisto, 0)),
+    periodos: lista.length,
+    dias: lista.reduce((s, i) => s + i.dias, 0),
+  });
+
   const previsto: PrevistoMesVigente = {
     valor: previstoValor,
     periodos: doMesVigente.length,
     media: doMesVigente.length > 0 ? arredondar(previstoValor / doMesVigente.length) : 0,
     diasAusencia: doMesVigente.reduce((s, i) => s + i.dias, 0),
     pagamentosEmAberto: doMesVigente.filter((i) => i.status === "programada").length,
+    tiradas: fatia(doMesVigente.filter((i) => i.status === "concluida" || i.status === "alterada")),
+    aTirar: fatia(doMesVigente.filter((i) => i.status === "programada")),
   };
 
   // --- Colaboradores com saldo em aberto e nenhum lançamento ainda ---
@@ -303,15 +339,33 @@ export async function obterDashboardFerias(
   const dataBaseRelatorio = resultadoDataBase.rows[0] as unknown as { m: string | null };
 
   // --- Controle: situação dos períodos/lançamentos no ano ---
-  const periodosDoAno = periodos.filter((p) => Number(p.limiteGozo.slice(0, 4)) === ano);
+  // Só períodos com SALDO entram nos alertas de vencimento: um período já
+  // gozado por inteiro continua tendo data de limite, mas não há nada para
+  // conceder nele — aparecia como "a vencer" com 0 dias, cobrando uma ação
+  // que não existe.
+  const periodosDoAno = periodos.filter(
+    (p) => p.diasATirar > 0 && Number(p.limiteGozo.slice(0, 4)) === ano,
+  );
+  const grupo = (lista: typeof periodosDoAno): GrupoVencimento => ({
+    quantidade: lista.length,
+    periodos: lista
+      .map((p) => ({
+        colaboradorNome: p.colaboradorNome,
+        colaboradorDepartamento: p.colaboradorDepartamento,
+        limiteGozo: p.limiteGozo,
+        diasRestantes: p.diasATirar,
+      }))
+      .sort((a, z) => a.limiteGozo.localeCompare(z.limiteGozo)),
+  });
+
   const controle: ResumoControle = {
     programadas: itensDoAno.length,
     realizadas: gozados.length,
     pendentes: itensDoAno.filter((i) => i.status === "programada").length,
-    vencidas: periodosDoAno.filter((p) => p.vencida).length,
-    vencendo30: periodosDoAno.filter((p) => !p.vencida && p.diasParaVencer >= 0 && p.diasParaVencer <= 30).length,
-    vencendo60: periodosDoAno.filter((p) => !p.vencida && p.diasParaVencer > 30 && p.diasParaVencer <= 60).length,
-    vencendo90: periodosDoAno.filter((p) => !p.vencida && p.diasParaVencer > 60 && p.diasParaVencer <= 90).length,
+    vencidas: grupo(periodosDoAno.filter((p) => p.vencida)),
+    vencendo30: grupo(periodosDoAno.filter((p) => !p.vencida && p.diasParaVencer >= 0 && p.diasParaVencer <= 30)),
+    vencendo60: grupo(periodosDoAno.filter((p) => !p.vencida && p.diasParaVencer > 30 && p.diasParaVencer <= 60)),
+    vencendo90: grupo(periodosDoAno.filter((p) => !p.vencida && p.diasParaVencer > 60 && p.diasParaVencer <= 90)),
   };
 
   return {

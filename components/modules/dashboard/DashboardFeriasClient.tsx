@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import type { DashboardFerias } from "@/lib/db/dashboardFerias";
+import type { DashboardFerias, GrupoVencimento } from "@/lib/db/dashboardFerias";
 import { formatarMoeda, formatarDataBr } from "@/lib/format";
 import { Card } from "@/components/shared/Card";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -384,27 +384,47 @@ export function DashboardFeriasClient() {
               Previsto para {MESES_COMPLETOS[Number(dados.competencia.slice(5, 7)) - 1]}
             </p>
             <p className="mt-1 text-2xl font-bold tracking-tight text-foreground">{formatarMoeda(dados.previsto.valor)}</p>
-            <div className="mt-2 flex gap-1.5">
-              <span className="rounded-full bg-brand-primary-100 px-2 py-0.5 text-[10.5px] font-semibold text-brand-primary-800">
-                {dados.previsto.periodos} período(s)
-              </span>
-              <span className="rounded-full bg-brand-primary-100 px-2 py-0.5 text-[10.5px] font-semibold text-brand-primary-800">
-                média {formatarMoeda(dados.previsto.media)}
-              </span>
+            {/* O total do mês é a soma das duas linhas abaixo — férias que já
+                aconteceram e férias que ainda vão acontecer no mesmo mês. */}
+            <div className="mt-2 space-y-1">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-[11px] text-foreground-muted">
+                  Já tiradas
+                  <span className="ml-1 text-[10px] text-foreground-muted/70">
+                    {dados.previsto.tiradas.periodos} período(s) · {dados.previsto.tiradas.dias}d
+                  </span>
+                </span>
+                <span className="text-[11.5px] font-semibold text-status-success">
+                  {formatarMoeda(dados.previsto.tiradas.valor)}
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-[11px] text-foreground-muted">
+                  A tirar (planejadas)
+                  <span className="ml-1 text-[10px] text-foreground-muted/70">
+                    {dados.previsto.aTirar.periodos} período(s) · {dados.previsto.aTirar.dias}d
+                  </span>
+                </span>
+                <span className="text-[11.5px] font-semibold text-brand-primary-800">
+                  {formatarMoeda(dados.previsto.aTirar.valor)}
+                </span>
+              </div>
             </div>
-            <p className="mt-1.5 text-[11px] text-foreground-muted">
-              mês vigente · {dados.previsto.diasAusencia} dias de ausência · {dados.previsto.pagamentosEmAberto} pagamento(s) em
-              aberto
+            <p className="mt-1.5 border-t border-hairline pt-1.5 text-[11px] text-foreground-muted">
+              mês vigente · {dados.previsto.diasAusencia} dias de ausência no total
             </p>
           </Card>
 
-          <div className="relative overflow-hidden rounded-md border border-hairline bg-brand-dark-900 p-4 shadow-card">
+          {/* Sem overflow-hidden: ele cortava o painel de detalhe que abre no hover.
+              O SVG decorativo cabe dentro do card, e a barra de progresso já
+              tem o próprio overflow-hidden. */}
+          <div className="relative rounded-md border border-hairline bg-brand-dark-900 p-4 shadow-card">
             <p className="text-[10px] font-bold tracking-wide text-brand-white/70 uppercase">Custo anual estimado</p>
             {/* O valor tem duas origens e o usuário precisa saber qual é qual —
                 daí a divisão aparecer ao passar o mouse, sem poluir o card. */}
             <p className="group relative mt-1 inline-block cursor-help text-2xl font-bold tracking-tight text-brand-white underline decoration-brand-white/30 decoration-dotted underline-offset-4">
               {formatarMoeda(dados.custoAnual.valor)}
-              <span className="pointer-events-none absolute top-full left-0 z-40 mt-2 hidden w-72 rounded-md border border-hairline bg-background p-3 text-left shadow-drawer group-hover:block">
+              <span className="pointer-events-none absolute top-full right-0 z-50 mt-2 hidden w-80 rounded-md border border-hairline bg-background p-3 text-left shadow-drawer group-hover:block">
                 <span className="block text-[10px] font-bold tracking-wide text-foreground-muted uppercase">
                   De onde vem o valor
                 </span>
@@ -526,32 +546,84 @@ export function DashboardFeriasClient() {
               </Link>
             </div>
             <div className="grid grid-cols-4 gap-2">
-              <div className="rounded-lg border border-status-danger-border bg-status-danger-bg p-2.5">
-                <p className="flex items-center gap-1 text-[9px] font-bold tracking-wide text-status-danger uppercase">
-                  <span aria-hidden>⚠</span> Vencidas
-                </p>
-                <p className="mt-0.5 text-xl font-bold tracking-tight text-status-danger">{dados.controle.vencidas}</p>
-                <p className="text-[9px] text-status-danger/80">em dobra (Art. 137)</p>
-              </div>
-              <div className="rounded-lg border border-status-warning-border bg-status-warning-bg p-2.5">
-                <p className="text-[9px] font-bold tracking-wide text-status-warning uppercase">A vencer · 30d</p>
-                <p className="mt-0.5 text-xl font-bold tracking-tight text-status-warning">{dados.controle.vencendo30}</p>
-                <p className="text-[9px] text-status-warning/80">período(s)</p>
-              </div>
-              <div className="rounded-lg border border-status-warning-border bg-status-warning-bg p-2.5">
-                <p className="text-[9px] font-bold tracking-wide text-status-warning uppercase">A vencer · 60d</p>
-                <p className="mt-0.5 text-xl font-bold tracking-tight text-status-warning">{dados.controle.vencendo60}</p>
-                <p className="text-[9px] text-status-warning/80">período(s)</p>
-              </div>
-              <div className="rounded-lg border border-status-warning-border bg-status-warning-bg p-2.5">
-                <p className="text-[9px] font-bold tracking-wide text-status-warning uppercase">A vencer · 90d</p>
-                <p className="mt-0.5 text-xl font-bold tracking-tight text-status-warning">{dados.controle.vencendo90}</p>
-                <p className="text-[9px] text-status-warning/80">período(s)</p>
-              </div>
+              <CartaoVencimento
+                rotulo="Vencidas"
+                nota="em dobra (Art. 137)"
+                grupo={dados.controle.vencidas}
+                perigo
+              />
+              <CartaoVencimento rotulo="A vencer · 30d" nota="período(s)" grupo={dados.controle.vencendo30} />
+              <CartaoVencimento rotulo="A vencer · 60d" nota="período(s)" grupo={dados.controle.vencendo60} />
+              <CartaoVencimento rotulo="A vencer · 90d" nota="período(s)" grupo={dados.controle.vencendo90} />
             </div>
           </Card>
         </div>
       </section>
+    </div>
+  );
+}
+
+/**
+ * Uma faixa de vencimento. O número sozinho não resolve nada — quem lê precisa
+ * saber COM QUEM falar, então a lista de colaboradores abre ao passar o mouse,
+ * ordenada pelo limite mais apertado primeiro.
+ */
+function CartaoVencimento({
+  rotulo,
+  nota,
+  grupo,
+  perigo = false,
+}: {
+  rotulo: string;
+  nota: string;
+  grupo: GrupoVencimento;
+  perigo?: boolean;
+}) {
+  const vazio = grupo.quantidade === 0;
+
+  return (
+    <div
+      className={cn(
+        "group relative rounded-lg border p-2.5",
+        perigo
+          ? "border-status-danger-border bg-status-danger-bg"
+          : "border-status-warning-border bg-status-warning-bg",
+        !vazio && "cursor-help",
+      )}
+    >
+      <p
+        className={cn(
+          "flex items-center gap-1 text-[9px] font-bold tracking-wide uppercase",
+          perigo ? "text-status-danger" : "text-status-warning",
+        )}
+      >
+        {perigo && <span aria-hidden>⚠</span>} {rotulo}
+      </p>
+      <p
+        className={cn(
+          "mt-0.5 text-xl font-bold tracking-tight",
+          perigo ? "text-status-danger" : "text-status-warning",
+        )}
+      >
+        {grupo.quantidade}
+      </p>
+      <p className={cn("text-[9px]", perigo ? "text-status-danger/80" : "text-status-warning/80")}>{nota}</p>
+
+      {!vazio && (
+        <div className="pointer-events-none absolute top-full left-0 z-50 mt-1.5 hidden w-64 rounded-md border border-hairline bg-background p-2.5 text-left shadow-drawer group-hover:block">
+          <p className="text-[9.5px] font-bold tracking-wide text-foreground-muted uppercase">{rotulo}</p>
+          <ul className="mt-1.5 space-y-1.5">
+            {grupo.periodos.map((p, i) => (
+              <li key={i}>
+                <span className="block text-[11px] font-semibold text-foreground uppercase">{p.colaboradorNome}</span>
+                <span className="block text-[10px] font-normal text-foreground-muted normal-case">
+                  {p.colaboradorDepartamento ?? "—"} · {p.diasRestantes} dia(s) · limite {formatarDataBr(p.limiteGozo)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
