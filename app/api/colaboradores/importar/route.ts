@@ -110,6 +110,7 @@ export async function POST(request: Request) {
   );
   return Response.json({
     criados: resultado.criados,
+    atualizados: resultado.atualizados,
     descartadas: conversao.descartadas,
   });
 }

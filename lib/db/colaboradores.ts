@@ -1,6 +1,7 @@
 import "server-only";
 import { getDb } from "./client";
 import { substituirDependentes } from "./colaboradorDependentes";
+import { casarPorNome } from "@/lib/folha/casarNome";
 
 export type Vinculo = "CLT" | "CLT-bio" | "PJ" | "EST" | "JÁ";
 export type TipoTransporte = "vt_diario" | "vm_fixo";
@@ -428,7 +429,14 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
 
 export interface ImportacaoColaboradores {
   criados: number;
+  /** Já existiam e foram atualizados com o que veio na planilha. */
+  atualizados: number;
   descartados: { linha: number; motivo: string }[];
+}
+
+/** Só os dígitos do CPF — a planilha ora traz pontuação, ora não. */
+function digitosCpf(cpf: string | null | undefined): string {
+  return (cpf ?? "").replace(/\D/g, "");
 }
 
 /** Dependentes vindos da mesma linha da planilha do colaborador (colunas "Dependente N — ..."). */
@@ -436,23 +444,73 @@ export interface ColaboradorInputComDependentes extends ColaboradorInput {
   dependentesLista?: { nome: string; dataNascimento?: string | null; cpf?: string | null }[];
 }
 
-/** Insere um lote de colaboradores (vindo da importação de planilha), com seus dependentes. */
+/**
+ * Aplica um lote de colaboradores vindo de planilha.
+ *
+ * Quem já existe é ATUALIZADO, não duplicado. Antes esta função só criava, e
+ * reimportar a mesma planilha triplicava o cadastro inteiro — foi o que
+ * aconteceu em produção, com 61 pessoas viradas 183 e as importações de folha
+ * passando a recusar linhas por "casa com mais de um colaborador".
+ *
+ * O reconhecimento é por CPF (só os dígitos, porque a planilha ora pontua ora
+ * não) e, na falta dele, pelo nome com a mesma tolerância a acento e conectivo
+ * usada na folha. Nome que casa com mais de uma pessoa NÃO é atualizado às
+ * cegas: vira uma linha descartada pedindo o CPF, porque escolher o registro
+ * errado sobrescreveria o cadastro de outra pessoa.
+ */
 export async function importarColaboradores(
   itens: ColaboradorInputComDependentes[],
 ): Promise<ImportacaoColaboradores> {
+  const existentes = await listarColaboradores();
+  const porCpf = new Map<string, Colaborador>();
+  for (const c of existentes) {
+    const chave = digitosCpf(c.cpf);
+    if (chave && !porCpf.has(chave)) porCpf.set(chave, c);
+  }
+
   let criados = 0;
-  for (const item of itens) {
+  let atualizados = 0;
+  const descartados: ImportacaoColaboradores["descartados"] = [];
+
+  for (const [indice, item] of itens.entries()) {
+    const linha = indice + 2;
     const { dependentesLista, ...dadosColaborador } = item;
-    const colaborador = await criarColaborador({
+    const dados = {
       ...dadosColaborador,
       dependentes: dependentesLista?.length ?? dadosColaborador.dependentes ?? 0,
-    });
+    };
+
+    const cpf = digitosCpf(dadosColaborador.cpf);
+    const porCpfAchado = cpf ? porCpf.get(cpf) : undefined;
+    const casamento = porCpfAchado
+      ? { encontrado: porCpfAchado, ambiguo: false }
+      : casarPorNome(dadosColaborador.nome ?? "", existentes, (c) => c.nome);
+
+    if (!casamento.encontrado && casamento.ambiguo) {
+      descartados.push({
+        linha,
+        motivo: `"${dadosColaborador.nome}" casa com mais de um cadastro — informe o CPF para não sobrescrever a pessoa errada.`,
+      });
+      continue;
+    }
+
+    let colaborador: Colaborador;
+    if (casamento.encontrado) {
+      colaborador = await atualizarColaborador(casamento.encontrado.id, dados);
+      atualizados++;
+    } else {
+      colaborador = await criarColaborador(dados);
+      existentes.push(colaborador);
+      if (cpf) porCpf.set(cpf, colaborador);
+      criados++;
+    }
+
     if (dependentesLista && dependentesLista.length > 0) {
       await substituirDependentes(colaborador.id, dependentesLista);
     }
-    criados++;
   }
-  return { criados, descartados: [] };
+
+  return { criados, atualizados, descartados };
 }
 
 export interface VinculosDoColaborador {

@@ -49,6 +49,7 @@ export function ImportarColaboradoresPanel({ onImportado }: { onImportado: () =>
 
   const [resultado, setResultado] = useState<{
     criados: number;
+    atualizados: number;
     descartadas: { linha: number; motivo: string }[];
   } | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -196,7 +197,14 @@ export function ImportarColaboradoresPanel({ onImportado }: { onImportado: () =>
 
         {resultado && (
           <div className="space-y-2">
-            <RiskCallout nivel="info">{resultado.criados} colaborador(es) importado(s).</RiskCallout>
+            <RiskCallout nivel="info">
+              {/* Criados e atualizados aparecem separados: reimportar a mesma
+                  planilha agora atualiza em vez de duplicar, e quem lê precisa
+                  ver que nada foi criado de novo. */}
+              {resultado.criados > 0 && <>{resultado.criados} colaborador(es) criado(s). </>}
+              {resultado.atualizados > 0 && <>{resultado.atualizados} já existia(m) e foi(ram) atualizado(s). </>}
+              {resultado.criados === 0 && resultado.atualizados === 0 && <>Nenhuma linha aplicada.</>}
+            </RiskCallout>
             {resultado.descartadas.length > 0 && (
               <RiskCallout nivel="atencao">
                 {resultado.descartadas.length} linha(s) descartadas:
