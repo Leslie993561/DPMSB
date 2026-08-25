@@ -2,7 +2,7 @@ import { z } from "zod";
 import { parsearPlanilha } from "@/lib/parsing/spreadsheet";
 import { parsearFolhaExtrasPdf } from "@/lib/parsing/pdfFolhaExtras";
 import { converterExtrasImportadas } from "@/lib/parsing/folhaExtras";
-import { importarExtras } from "@/lib/db/folhaBreakdown";
+import { importarExtras, type CampoVerba } from "@/lib/db/folhaBreakdown";
 
 export const runtime = "nodejs";
 
@@ -33,12 +33,13 @@ export async function POST(request: Request) {
 
     const conversao = converterExtrasImportadas(cabecalhos, linhas);
     // Só as verbas presentes no arquivo são gravadas; as ausentes ficam como
-    // estavam. Ver upsertExtras.
-    const resultado = await importarExtras(
-      conversao.itens,
-      parsed.data.competencia,
-      conversao.camposPresentes.filter((c) => c !== "codigo" && c !== "nomeColaborador"),
-    );
+    // estavam. "Outros custos" entra junto quando o arquivo trouxe alguma
+    // coluna que o portal não reconhece — senão esse valor se perderia.
+    const campos: CampoVerba[] = [
+      ...conversao.camposPresentes.filter((c) => c !== "codigo" && c !== "nomeColaborador"),
+      ...(conversao.colunasOutros.length > 0 ? (["outrosCustos"] as const) : []),
+    ];
+    const resultado = await importarExtras(conversao.itens, parsed.data.competencia, campos);
 
     return Response.json({
       aplicadas: resultado.aplicadas,

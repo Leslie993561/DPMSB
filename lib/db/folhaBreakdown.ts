@@ -130,7 +130,7 @@ export async function obterExtras(competencia: string): Promise<Map<number, Extr
  * estado inteiro daquele mês, igual ao "fechar mês" já faz para o núcleo.
  */
 /** Coluna do banco de cada verba, para montar o UPDATE só com o que veio no arquivo. */
-const COLUNA_DE: Record<Exclude<CampoExtra, "codigo" | "nomeColaborador">, string> = {
+const COLUNA_DE = {
   vm: "vm",
   odontologico: "odontologico",
   solides: "solides",
@@ -141,9 +141,13 @@ const COLUNA_DE: Record<Exclude<CampoExtra, "codigo" | "nomeColaborador">, strin
   horaExtra100: "hora_extra_100",
   descontoHoras: "desconto_horas",
   horaNoturna: "hora_noturna",
-};
+  // "Outros custos" não é uma coluna do arquivo: é a soma das colunas que o
+  // portal não reconheceu. Precisa estar aqui mesmo assim, senão ela deixa de
+  // ser gravada — foi o que aconteceu quando a gravação passou a ser seletiva.
+  outrosCustos: "outros_custos",
+} satisfies Partial<Record<CampoExtra | "outrosCustos", string>>;
 
-type CampoVerba = keyof typeof COLUNA_DE;
+export type CampoVerba = keyof typeof COLUNA_DE;
 
 /**
  * Grava as verbas do colaborador na competência.
@@ -164,6 +168,9 @@ export async function upsertExtras(
 ): Promise<void> {
   const db = await getDb();
   const aGravar: CampoVerba[] = campos ?? (Object.keys(COLUNA_DE) as CampoVerba[]);
+  // Nada a gravar significa arquivo sem nenhuma coluna reconhecida E sem
+  // coluna desconhecida — não há o que registrar. Antes o retorno vazio também
+  // engolia "outros custos", e a importação não salvava nada.
   if (aGravar.length === 0) return;
 
   const colunas = aGravar.map((c) => COLUNA_DE[c]);
