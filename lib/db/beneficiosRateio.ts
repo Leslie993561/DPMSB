@@ -19,6 +19,8 @@ export interface LinhaRateio {
   valeTransporte: number;
   /** "cadastro" = veio do valor por dia do colaborador; o resto é suprimento, e a tela avisa. */
   origemVt: OrigemTransporte;
+  /** Parte descontada do empregado (Lei 7.418/85) — o custo líquido da empresa é valeTransporte menos isto. */
+  descontoVtEmpregado: number;
   valeAlimentacao: number;
   /** Odontológico/Sólides/Flash/Bonificação/Outros — vêm da mesma planilha de extras do Breakdown de Folha (Relatório detalhado); `null` = nada importado nesse mês. */
   odontologico: number | null;
@@ -90,7 +92,10 @@ export async function gerarRateio(competencia: string): Promise<{ linhas: LinhaR
       departamento: c.departamento,
       cidade: c.cidade,
       tipoTransporte: c.tipoTransporte,
-      valeTransporte: override?.valeTransporte ?? transporte.valor,
+      // Bruto, não líquido: no rateio o que interessa é o valor do vale, que é
+      // o que a operadora fatura. O desconto do empregado vai à parte.
+      valeTransporte: override?.valeTransporte ?? transporte.bruto,
+      descontoVtEmpregado: override?.valeTransporte !== null && override?.valeTransporte !== undefined ? 0 : transporte.descontoEmpregado,
       origemVt: override?.valeTransporte !== null && override?.valeTransporte !== undefined ? "cadastro" : transporte.origem,
       valeAlimentacao: override?.valeAlimentacao ?? (c.alimentacaoValor ?? 0),
       odontologico: extraFolha?.odontologico ?? null,

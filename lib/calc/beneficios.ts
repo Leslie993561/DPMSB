@@ -105,7 +105,7 @@ export interface TransporteDoColaborador {
  * trecho e por isso vai dobrada.
  */
 export function calcularTransporteDoMes(c: TransporteDoColaborador, diasUteis: number): number {
-  return detalharTransporteDoMes(c, diasUteis).valor;
+  return detalharTransporteDoMes(c, diasUteis).custoEmpresa;
 }
 
 /** De onde veio o valor do dia usado no cálculo do VT. */
@@ -119,20 +119,47 @@ export type OrigemTransporte = "cadastro" | "tarifa-cidade" | "sem-valor" | "vm-
  * havia como saber por quê. A origem sobe até o Rateio para que se veja quem
  * está sem valor cadastrado em vez de ficar procurando.
  */
-export function detalharTransporteDoMes(
-  c: TransporteDoColaborador,
-  diasUteis: number,
-): { valor: number; origem: OrigemTransporte } {
-  if (c.tipoTransporte === "vm_fixo") return { valor: c.valorTransporteFixo ?? 0, origem: "vm-fixo" };
+export interface DetalheTransporteDoMes {
+  /** Valor do vale que a empresa compra da operadora: valor do dia × dias úteis. */
+  bruto: number;
+  /** Parte do empregado, descontada em folha — até 6% do salário (Lei 7.418/85). */
+  descontoEmpregado: number;
+  /** O que sobra para a empresa depois do desconto. */
+  custoEmpresa: number;
+  origem: OrigemTransporte;
+}
 
-  if (c.valorTransporteDia !== null) {
-    return {
-      valor: calcularValeTransporte(c.valorTransporteDia / 2, c.salarioBase, diasUteis).valor,
-      origem: "cadastro",
-    };
+/**
+ * Mesmo cálculo, aberto em bruto, desconto e custo líquido.
+ *
+ * Os dois números têm usos diferentes e confundi-los faz o portal nunca fechar
+ * com a operadora: o Rateio de Benefícios mostra o BRUTO, que é o valor do
+ * vale e o que aparece na fatura; o Breakdown de Folha mostra o CUSTO
+ * LÍQUIDO, que é o que a empresa desembolsa depois do desconto em folha.
+ *
+ * A origem também sobe até a tela: sem ela, VT calculado pela tarifa da cidade
+ * era indistinguível de VT vindo do cadastro, e alterar o colaborador não
+ * mudava nada sem que houvesse como saber por quê.
+ */
+export function detalharTransporteDoMes(c: TransporteDoColaborador, diasUteis: number): DetalheTransporteDoMes {
+  // Vale mobilidade é valor fixo do mês e não sofre o desconto do VT: não é
+  // vale-transporte, é auxílio, e a Lei 7.418/85 não alcança.
+  if (c.tipoTransporte === "vm_fixo") {
+    const fixo = c.valorTransporteFixo ?? 0;
+    return { bruto: fixo, descontoEmpregado: 0, custoEmpresa: fixo, origem: "vm-fixo" };
   }
 
-  const tarifa = tarifaVtPorCidade(c.cidade ?? "");
-  if (tarifa <= 0) return { valor: 0, origem: "sem-valor" };
-  return { valor: calcularValeTransporte(tarifa, c.salarioBase, diasUteis).valor, origem: "tarifa-cidade" };
+  // O valor cadastrado é o do dia inteiro (ida + volta), como o DP informa; a
+  // tarifa da cidade é de um trecho só. Daí a divisão por 2 de um lado.
+  const valorDia = c.valorTransporteDia;
+  const tarifa = valorDia === null ? tarifaVtPorCidade(c.cidade ?? "") : valorDia / 2;
+  if (tarifa <= 0) return { bruto: 0, descontoEmpregado: 0, custoEmpresa: 0, origem: "sem-valor" };
+
+  const { detalhe } = calcularValeTransporte(tarifa, c.salarioBase, diasUteis);
+  return {
+    bruto: detalhe.valorBruto,
+    descontoEmpregado: detalhe.descontoEmpregado,
+    custoEmpresa: detalhe.custoEmpresa,
+    origem: valorDia === null ? "tarifa-cidade" : "cadastro",
+  };
 }

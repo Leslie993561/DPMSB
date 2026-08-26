@@ -389,6 +389,9 @@ export function RateioTab() {
                     </div>
                   </td>
                   <td className="px-4 py-2 text-right">
+                    {/* Valor integral do vale: valor do dia × dias úteis do mês.
+                        Sem abater os 6% do empregado — é o valor do benefício, e
+                        é ele que fecha com a fatura da operadora. */}
                     <div className="text-foreground">{formatarMoeda(l.valeTransporte)}</div>
                     <div className="text-[10.5px] text-foreground-muted">
                       {rotuloVale(l.tipoTransporte)} · {l.cidade ?? "—"}
