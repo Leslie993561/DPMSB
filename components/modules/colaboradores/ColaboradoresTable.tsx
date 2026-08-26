@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from "react";
 import type { Colaborador, Vinculo } from "@/lib/db/colaboradores";
 import { Badge, type CorBadge } from "@/components/shared/Badge";
-import { formatarDataBr } from "@/lib/format";
+import { formatarDataBr, formatarMoeda } from "@/lib/format";
 import { cn } from "@/lib/cn";
 
 const COR_VINCULO: Record<Vinculo, CorBadge> = {
@@ -14,9 +14,14 @@ const COR_VINCULO: Record<Vinculo, CorBadge> = {
   JÁ: "neutro",
 };
 
-/** Tempo de casa em anos (fracionário), para exibir e para comparar em filtros de faixa. */
-function tempoDeCasaAnos(dataAdmissao: string): number {
-  return Math.max(0, (Date.now() - new Date(dataAdmissao).getTime()) / (1000 * 60 * 60 * 24 * 365.25));
+/**
+ * Tempo de casa em anos (fracionário), para exibir e para comparar em filtros
+ * de faixa. Para quem saiu, conta até a data de DESLIGAMENTO: contar até hoje
+ * faria o tempo de casa de um ex-colaborador continuar crescendo.
+ */
+function tempoDeCasaAnos(dataAdmissao: string, dataDesligamento?: string | null): number {
+  const fim = dataDesligamento ? new Date(dataDesligamento).getTime() : Date.now();
+  return Math.max(0, (fim - new Date(dataAdmissao).getTime()) / (1000 * 60 * 60 * 24 * 365.25));
 }
 
 function formatarAnos(anos: number): string {
@@ -87,9 +92,16 @@ const FILTROS_VAZIOS: FiltrosColuna = {
 export function ColaboradoresTable({
   colaboradores,
   onEditar,
+  desligados = false,
 }: {
   colaboradores: Colaborador[];
   onEditar: (colaborador: Colaborador) => void;
+  /**
+   * Visão de desligados. Troca a coluna de aniversário pelo valor da rescisão e
+   * acrescenta a data de saída ao lado da admissão — o aniversário de quem já
+   * saiu não serve para nada, e a rescisão é justamente o que se procura ali.
+   */
+  desligados?: boolean;
 }) {
   const porId = new Map(colaboradores.map((c) => [c.id, c]));
   const [filtros, setFiltros] = useState<FiltrosColuna>(FILTROS_VAZIOS);
@@ -238,6 +250,8 @@ export function ColaboradoresTable({
               </div>
             </CabecalhoFiltravel>
 
+            {desligados && <th className="px-3 py-1">Desligamento</th>}
+
             <CabecalhoFiltravel
               label="Tempo"
               aberta={colunaAberta === "tempo"}
@@ -271,8 +285,11 @@ export function ColaboradoresTable({
               </div>
             </CabecalhoFiltravel>
 
+            {desligados && <th className="px-3 py-1 text-right">Valor da rescisão</th>}
+
             {/* ANI = aniversário. Clicar agrupa a lista por mês, com separador
                 de mês e a data de cada um; clicar de novo volta ao normal. */}
+            {!desligados && (
             <th className="px-3 py-1">
               <button
                 type="button"
@@ -292,6 +309,7 @@ export function ColaboradoresTable({
                 <span aria-hidden>🎂</span> ANI
               </button>
             </th>
+            )}
 
             <th className="w-9 px-2 py-1.5" />
           </tr>
@@ -299,7 +317,7 @@ export function ColaboradoresTable({
         <tbody>
           {algumFiltroAtivo && (
             <tr>
-              <td colSpan={7} className="border-b border-hairline bg-brand-primary-050 px-3 py-1 text-[10.5px] text-brand-primary-800">
+              <td colSpan={desligados ? 8 : 7} className="border-b border-hairline bg-brand-primary-050 px-3 py-1 text-[10.5px] text-brand-primary-800">
                 {linhas.length} de {colaboradores.length} colaborador(es) ·{" "}
                 <button type="button" onClick={() => setFiltros(FILTROS_VAZIOS)} className="font-semibold underline">
                   limpar filtros
@@ -309,7 +327,7 @@ export function ColaboradoresTable({
           )}
           {linhas.length === 0 ? (
             <tr>
-              <td colSpan={7} className="px-3 py-4 text-center text-foreground-muted">
+              <td colSpan={desligados ? 8 : 7} className="px-3 py-4 text-center text-foreground-muted">
                 Nenhum colaborador corresponde aos filtros.
               </td>
             </tr>
@@ -323,7 +341,7 @@ export function ColaboradoresTable({
                   {abreMes && (
                     <tr className="bg-brand-primary-050">
                       <td
-                        colSpan={7}
+                        colSpan={desligados ? 8 : 7}
                         className="px-3 py-1 text-[10px] font-bold tracking-wide text-brand-primary-800 uppercase"
                       >
                         {mes ?? "Sem data de nascimento"}
@@ -342,16 +360,40 @@ export function ColaboradoresTable({
                   {c.gestorId ? (porId.get(c.gestorId)?.nome ?? "—") : (c.liderDiretoNome ?? "—")}
                 </td>
                 <td className="px-3 py-1 text-foreground-muted">{formatarDataBr(c.dataAdmissao)}</td>
-                <td className="px-3 py-1 text-foreground-muted">{formatarAnos(tempoDeCasaAnos(c.dataAdmissao))}</td>
+                {desligados && (
+                  <td className="px-3 py-1 text-foreground-muted">
+                    {c.dataDesligamento ? (
+                      formatarDataBr(c.dataDesligamento)
+                    ) : (
+                      <span className="text-foreground-muted/50">—</span>
+                    )}
+                  </td>
+                )}
+                {/* Tempo de casa de quem saiu conta até a data de saída, não até
+                    hoje: senão o número seguiria crescendo depois do desligamento. */}
+                <td className="px-3 py-1 text-foreground-muted">
+                  {formatarAnos(tempoDeCasaAnos(c.dataAdmissao, c.dataDesligamento))}
+                </td>
+                {desligados && (
+                  <td className="px-3 py-1 text-right text-foreground">
+                    {c.valorRescisao !== null && c.valorRescisao !== undefined ? (
+                      formatarMoeda(c.valorRescisao)
+                    ) : (
+                      <span className="text-foreground-muted/50">—</span>
+                    )}
+                  </td>
+                )}
                 {/* Dia/mês e ano na mesma fonte: destacar só o dia/mês fazia a
                     data parecer duas informações soltas em vez de uma só. */}
-                <td className="px-3 py-1 text-foreground-muted">
-                  {c.dataNascimento ? (
-                    `${diaEMes(c.dataNascimento)}/${c.dataNascimento.slice(0, 4)}`
-                  ) : (
-                    <span className="text-foreground-muted/50">—</span>
-                  )}
-                </td>
+                {!desligados && (
+                  <td className="px-3 py-1 text-foreground-muted">
+                    {c.dataNascimento ? (
+                      `${diaEMes(c.dataNascimento)}/${c.dataNascimento.slice(0, 4)}`
+                    ) : (
+                      <span className="text-foreground-muted/50">—</span>
+                    )}
+                  </td>
+                )}
                 <td className="px-2 py-1 text-right">
                   <button
                     type="button"

@@ -111,6 +111,7 @@ export async function POST(request: Request) {
   return Response.json({
     criados: resultado.criados,
     atualizados: resultado.atualizados,
+    parecidos: resultado.parecidos,
     descartadas: conversao.descartadas,
   });
 }

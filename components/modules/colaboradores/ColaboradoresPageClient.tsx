@@ -141,7 +141,9 @@ export function ColaboradoresPageClient() {
           </div>
 
           <div className="rounded-md border border-hairline bg-background shadow-card">
-            <ColaboradoresTable colaboradores={filtrados} onEditar={setDrawer} />
+            {/* Na visão de desligados o que interessa é outro conjunto de colunas:
+                a data de saída e o valor da rescisão, no lugar do aniversário. */}
+            <ColaboradoresTable colaboradores={filtrados} onEditar={setDrawer} desligados={verDesligados} />
           </div>
         </>
       )}

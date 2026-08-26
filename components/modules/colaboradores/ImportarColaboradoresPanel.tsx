@@ -50,6 +50,7 @@ export function ImportarColaboradoresPanel({ onImportado }: { onImportado: () =>
   const [resultado, setResultado] = useState<{
     criados: number;
     atualizados: number;
+    parecidos: { linha: number; campo: string; valor: string; parecidoCom: string }[];
     descartadas: { linha: number; motivo: string }[];
   } | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -204,6 +205,24 @@ export function ImportarColaboradoresPanel({ onImportado }: { onImportado: () =>
               {resultado.criados > 0 && <>{resultado.criados} colaborador(es) criado(s). </>}
               {resultado.atualizados > 0 && <>{resultado.atualizados} já existia(m) e foi(ram) atualizado(s). </>}
               {resultado.criados === 0 && resultado.atualizados === 0 && <>Nenhuma linha aplicada.</>}
+              {resultado.parecidos?.length > 0 && (
+                <>
+                  {/* Uma letra trocada cria setor novo em silêncio. Aponta-se, sem
+                      juntar sozinho: setores parecidos podem ser distintos. */}
+                  <span className="mt-1.5 block font-semibold text-status-warning">
+                    ⚠ {resultado.parecidos.length} valor(es) quase igual(is) a um que já existe — confira se não é
+                    erro de digitação:
+                  </span>
+                  <ul className="mt-1 list-inside list-disc text-status-warning">
+                    {resultado.parecidos.slice(0, 6).map((p, i) => (
+                      <li key={i}>
+                        Linha {p.linha}: {p.campo} “{p.valor}” parece “{p.parecidoCom}”
+                      </li>
+                    ))}
+                    {resultado.parecidos.length > 6 && <li>… e mais {resultado.parecidos.length - 6}</li>}
+                  </ul>
+                </>
+              )}
             </RiskCallout>
             {resultado.descartadas.length > 0 && (
               <RiskCallout nivel="atencao">

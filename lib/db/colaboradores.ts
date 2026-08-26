@@ -2,6 +2,7 @@ import "server-only";
 import { getDb } from "./client";
 import { substituirDependentes } from "./colaboradorDependentes";
 import { casarPorNome } from "@/lib/folha/casarNome";
+import { acharParecido } from "@/lib/folha/parecidos";
 
 export type Vinculo = "CLT" | "CLT-bio" | "PJ" | "EST" | "JÁ";
 export type TipoTransporte = "vt_diario" | "vm_fixo";
@@ -431,6 +432,12 @@ export interface ImportacaoColaboradores {
   criados: number;
   /** Já existiam e foram atualizados com o que veio na planilha. */
   atualizados: number;
+  /**
+   * Setor ou cargo que chegou quase igual a um que já existe. Não é corrigido
+   * sozinho — só apontado. Uma letra trocada cria um setor novo em silêncio, e
+   * foi assim que "mantenção" passou a conviver com "Manutenção" na tela.
+   */
+  parecidos: { linha: number; campo: string; valor: string; parecidoCom: string }[];
   descartados: { linha: number; motivo: string }[];
 }
 
@@ -471,6 +478,12 @@ export async function importarColaboradores(
   let criados = 0;
   let atualizados = 0;
   const descartados: ImportacaoColaboradores["descartados"] = [];
+  const parecidos: ImportacaoColaboradores["parecidos"] = [];
+
+  const setoresConhecidos = Array.from(
+    new Set(existentes.map((c) => c.departamento).filter((d): d is string => Boolean(d))),
+  );
+  const cargosConhecidos = Array.from(new Set(existentes.map((c) => c.cargo).filter((c): c is string => Boolean(c))));
 
   for (const [indice, item] of itens.entries()) {
     const linha = indice + 2;
@@ -479,6 +492,15 @@ export async function importarColaboradores(
       ...dadosColaborador,
       dependentes: dependentesLista?.length ?? dadosColaborador.dependentes ?? 0,
     };
+
+    for (const [campo, valor, conhecidos] of [
+      ["Departamento", dadosColaborador.departamento, setoresConhecidos],
+      ["Cargo", dadosColaborador.cargo, cargosConhecidos],
+    ] as const) {
+      if (!valor) continue;
+      const parecidoCom = acharParecido(valor, conhecidos);
+      if (parecidoCom) parecidos.push({ linha, campo, valor, parecidoCom });
+    }
 
     const cpf = digitosCpf(dadosColaborador.cpf);
     const porCpfAchado = cpf ? porCpf.get(cpf) : undefined;
@@ -517,7 +539,7 @@ export async function importarColaboradores(
     }
   }
 
-  return { criados, atualizados, descartados };
+  return { criados, atualizados, parecidos, descartados };
 }
 
 export interface VinculosDoColaborador {
