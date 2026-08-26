@@ -180,7 +180,11 @@ export function BeneficiosDashboardTab() {
   const elegiveisVa = linhas.filter((l) => l.valeAlimentacao > 0).length;
   const elegiveisOdonto = linhas.filter((l) => totalOdontoPlataformas(l) > 0).length;
 
-  const colaboradoresClt = linhas.filter((l) => l.vinculo === "CLT").length;
+  // O rateio já exclui PJ e quem não está na folha do mês, então quem sobrou
+  // recebe benefício — contar só vinculo === "CLT" deixava de fora jovem
+  // aprendiz, estagiário e as grafias do cadastro ("CLT - bio"), dizendo 47
+  // onde havia 57 pessoas na conta.
+  const colaboradoresNaFolha = linhas.length;
 
   const composicaoPorSetor = useMemo(() => {
     const mapa = new Map<MacroSetor, { vt: number; va: number; brindes: number; colaboradores: number }>([
@@ -239,7 +243,7 @@ export function BeneficiosDashboardTab() {
         <StatCard
           titulo="Total em benefícios"
           valor={formatarMoeda(totalGeral)}
-          subtitulo={`${competenciaExibida(competencia)} · ${colaboradoresClt} colaborador(es) CLT`}
+          subtitulo={`${competenciaExibida(competencia)} · ${colaboradoresNaFolha} colaborador(es) na folha`}
           destaque
         />
         <StatCard

@@ -55,10 +55,12 @@ export async function obterVariaveis(competencia: string): Promise<Map<number, V
 
   // Aniversariantes do mês, direto do cadastro. Só entra quem está na folha
   // dessa competência: quem foi admitido depois, ou já saiu, não recebe o
-  // presente de um mês em que não estava na empresa.
+  // presente de um mês em que não estava na empresa. PJ também não — prestador
+  // de serviço não recebe benefício, recebe nota.
   for (const c of await listarColaboradores()) {
     if (!c.dataNascimento) continue;
     if (Number(c.dataNascimento.slice(5, 7)) !== mesCompetencia) continue;
+    if (c.vinculo === "PJ") continue;
     if (!estaNaFolha(c, competencia)) continue;
 
     const atual = mapa.get(c.id) ?? { total: 0, itens: [] };

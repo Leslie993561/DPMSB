@@ -1,6 +1,7 @@
 import "server-only";
 import { getDb } from "./client";
 import { listarColaboradores } from "./colaboradores";
+import { estaNaFolha } from "@/lib/folha/vigencia";
 import { obterDiasUteis } from "./beneficiosDiasUteis";
 import { obterExtras, listarCompetenciasFechadas } from "./folhaBreakdown";
 import { obterVariaveis, type ItemVariavel } from "./beneficiosVariaveis";
@@ -68,7 +69,14 @@ export async function gerarRateio(competencia: string): Promise<{ linhas: LinhaR
   const extrasFolha = await obterExtras(competencia);
   const variaveis = await obterVariaveis(competencia);
 
-  const linhas: LinhaRateio[] = (await listarColaboradores()).map((c) => {
+  // Benefício é da folha CLT do mês: quem já saiu não recebe mais, quem ainda
+  // não entrou não recebe ainda, e PJ não tem benefício nenhum — emite nota.
+  // Sem este filtro o rateio listava desligados e PJs com valor cheio, e o
+  // alerta de "sem valor de VT cadastrado" cobrava cadastro de gente que não
+  // deveria estar na conta.
+  const doMes = (await listarColaboradores()).filter((c) => c.vinculo !== "PJ" && estaNaFolha(c, competencia));
+
+  const linhas: LinhaRateio[] = doMes.map((c) => {
     const transporte = detalharTransporteDoMes(c, diasUteis);
     const override = extras.get(c.id);
     const extraFolha = extrasFolha.get(c.id);
