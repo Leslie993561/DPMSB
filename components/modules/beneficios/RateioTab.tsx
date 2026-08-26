@@ -345,7 +345,7 @@ export function RateioTab() {
                   </strong>{" "}
                   O cálculo abaixo está usando a tarifa padrão da cidade para essas pessoas, então alterar o cadastro
                   delas não muda o valor aqui enquanto o campo continuar vazio:{" "}
-                  {semValorNoCadastro.map((l) => l.nome).join(", ")}.
+                  <span className="uppercase">{semValorNoCadastro.map((l) => l.nome).join(", ")}</span>.
                 </RiskCallout>
               )}
 
@@ -353,7 +353,7 @@ export function RateioTab() {
                 <RiskCallout nivel="critico">
                   <strong>{semTarifaNenhuma.length} colaborador(es) estão com VT R$ 0,00.</strong> Não há valor por dia
                   no cadastro nem tarifa conhecida para a cidade, e o portal não arbitra valor de folha:{" "}
-                  {semTarifaNenhuma.map((l) => l.nome).join(", ")}.
+                  <span className="uppercase">{semTarifaNenhuma.map((l) => l.nome).join(", ")}</span>.
                 </RiskCallout>
               )}
             </div>
@@ -383,7 +383,7 @@ export function RateioTab() {
               {filtrados.map((l) => (
                 <tr key={l.colaboradorId} className="border-b border-hairline/60 last:border-0">
                   <td className="px-4 py-2">
-                    <div className="font-semibold text-foreground-muted">{l.nome}</div>
+                    <div className="font-semibold text-foreground-muted uppercase">{l.nome}</div>
                     <div className="text-[10.5px] text-foreground-muted">
                       {l.vinculo ?? "—"} · {l.departamento ?? "—"}
                     </div>
