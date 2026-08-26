@@ -80,3 +80,32 @@ export function calcularValeTransporte(
     detalhe: { tarifaUnitaria, diasUteis, valorBruto, descontoEmpregado, custoEmpresa },
   };
 }
+
+/** O que o cálculo de transporte precisa saber do cadastro. */
+export interface TransporteDoColaborador {
+  tipoTransporte: string;
+  /** Vale mobilidade: valor fixo do mês, não multiplica por dias úteis. */
+  valorTransporteFixo: number | null;
+  /** Vale transporte: valor de UM dia útil, ida e volta somadas. */
+  valorTransporteDia: number | null;
+  cidade: string | null;
+  salarioBase: number;
+}
+
+/**
+ * Custo mensal de transporte do colaborador, seja VT ou VM.
+ *
+ * Existe para que o Rateio de benefícios e o Breakdown de folha respondam o
+ * mesmo número: os dois repetiam esta escolha e qualquer ajuste precisava ser
+ * feito duas vezes.
+ *
+ * VM é um valor fixo do mês — não se multiplica por dia útil nem se desconta do
+ * empregado. VT é valor do dia × dias úteis, menos o desconto de até 6% da Lei
+ * 7.418/85. Sem valor de dia cadastrado cai na tarifa da cidade, que é por
+ * trecho e por isso vai dobrada.
+ */
+export function calcularTransporteDoMes(c: TransporteDoColaborador, diasUteis: number): number {
+  if (c.tipoTransporte === "vm_fixo") return c.valorTransporteFixo ?? 0;
+  const valorDia = c.valorTransporteDia ?? tarifaVtPorCidade(c.cidade ?? "") * 2;
+  return calcularValeTransporte(valorDia / 2, c.salarioBase, diasUteis).valor;
+}

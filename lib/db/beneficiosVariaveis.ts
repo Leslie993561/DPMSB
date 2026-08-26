@@ -2,8 +2,18 @@ import "server-only";
 import { getDb } from "./client";
 import { listarColaboradores } from "./colaboradores";
 import { arredondar } from "@/lib/calc";
+import { estaNaFolha } from "@/lib/folha/vigencia";
 
-export type CategoriaVariavel = "transporte" | "mobilidade" | "alimentacao";
+export type CategoriaVariavel = "transporte" | "mobilidade" | "alimentacao" | "aniversario";
+
+/**
+ * Presente de aniversário, por pessoa que faz aniversário no mês.
+ *
+ * Não é importado: sai da data de nascimento do Quadro de Colaboradores, que já
+ * é a fonte da informação. Lançar por planilha significaria manter a mesma lista
+ * em dois lugares e esquecer alguém sempre que entrasse gente nova.
+ */
+export const VALOR_ANIVERSARIO = 70;
 
 export interface ItemVariavel {
   categoria: CategoriaVariavel;
@@ -28,6 +38,7 @@ interface LinhaVariavel {
 /** Variáveis lançadas na competência, por colaborador — cada importação SOMA linhas novas, nunca substitui as anteriores. */
 export async function obterVariaveis(competencia: string): Promise<Map<number, VariaveisColaborador>> {
   const db = await getDb();
+  const mesCompetencia = Number(competencia.slice(5, 7));
   const resultado = await db.execute({
     sql: "SELECT colaborador_id, categoria, valor, motivo, arquivo FROM beneficios_variaveis WHERE competencia = ? ORDER BY criado_em",
     args: [competencia],
@@ -41,6 +52,26 @@ export async function obterVariaveis(competencia: string): Promise<Map<number, V
     atual.itens.push({ categoria: l.categoria, valor: l.valor, motivo: l.motivo, arquivo: l.arquivo });
     mapa.set(l.colaborador_id, atual);
   }
+
+  // Aniversariantes do mês, direto do cadastro. Só entra quem está na folha
+  // dessa competência: quem foi admitido depois, ou já saiu, não recebe o
+  // presente de um mês em que não estava na empresa.
+  for (const c of await listarColaboradores()) {
+    if (!c.dataNascimento) continue;
+    if (Number(c.dataNascimento.slice(5, 7)) !== mesCompetencia) continue;
+    if (!estaNaFolha(c, competencia)) continue;
+
+    const atual = mapa.get(c.id) ?? { total: 0, itens: [] };
+    atual.total = arredondar(atual.total + VALOR_ANIVERSARIO);
+    atual.itens.push({
+      categoria: "aniversario",
+      valor: VALOR_ANIVERSARIO,
+      motivo: `Aniversário em ${c.dataNascimento.slice(8, 10)}/${c.dataNascimento.slice(5, 7)}`,
+      arquivo: null,
+    });
+    mapa.set(c.id, atual);
+  }
+
   return mapa;
 }
 

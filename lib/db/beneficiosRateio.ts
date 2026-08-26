@@ -2,9 +2,10 @@ import "server-only";
 import { getDb } from "./client";
 import { listarColaboradores } from "./colaboradores";
 import { obterDiasUteis } from "./beneficiosDiasUteis";
-import { obterExtras } from "./folhaBreakdown";
+import { obterExtras, listarCompetenciasFechadas } from "./folhaBreakdown";
 import { obterVariaveis, type ItemVariavel } from "./beneficiosVariaveis";
-import { calcularValeTransporte, tarifaVtPorCidade, arredondar } from "@/lib/calc";
+import { calcularTransporteDoMes, arredondar } from "@/lib/calc";
+import { obterTotaisInformados } from "./beneficiosTotais";
 
 export interface LinhaRateio {
   colaboradorId: number;
@@ -66,10 +67,7 @@ export async function gerarRateio(competencia: string): Promise<{ linhas: LinhaR
   const variaveis = await obterVariaveis(competencia);
 
   const linhas: LinhaRateio[] = (await listarColaboradores()).map((c) => {
-    const calculado =
-      c.tipoTransporte === "vm_fixo"
-        ? (c.valorTransporteFixo ?? 0)
-        : calcularValeTransporte(c.valorTransporteFixo ?? tarifaVtPorCidade(c.cidade ?? ""), c.salarioBase, diasUteis).valor;
+    const calculado = calcularTransporteDoMes(c, diasUteis);
     const override = extras.get(c.id);
     const extraFolha = extrasFolha.get(c.id);
     const variavelColaborador = variaveis.get(c.id);
@@ -99,16 +97,40 @@ export async function gerarRateio(competencia: string): Promise<{ linhas: LinhaR
 
 export interface ResumoMensalBeneficios {
   mes: number;
+  /** Vale transporte — por dia útil. */
   vt: number;
-  va: number;
+  /** Vale mobilidade — valor fixo do mês. */
+  vm: number;
+  /** Vale refeição. */
+  vr: number;
   odontoPlataformas: number;
   brindes: number;
   variaveis: number;
   total: number;
+  /**
+   * VT/VM/VR vieram do total que o DP informou para o mês, não da soma do
+   * cadastro. O dashboard marca a diferença: um número conferido com a
+   * operadora não é a mesma coisa que uma projeção.
+   */
+  informado: boolean;
+  /** Mês fechado no Breakdown — não aceita mais edição em lugar nenhum do portal. */
+  fechado: boolean;
 }
 
-/** Custo de benefícios por mês do ano — real, a partir do mesmo cadastro/extras usados no rateio e no Breakdown de Folha. */
+/**
+ * Custo de benefícios por mês do ano.
+ *
+ * VT/VM/VR saem do cadastro, colaborador a colaborador — é o que permite
+ * ratear por setor. Mas quando o DP informa o total que a empresa pagou no mês
+ * (`beneficios_totais_mes`), é ESSE número que vale aqui: ele veio da operadora
+ * e já embute recarga proporcional, catraca não usada e ajuste de crédito, que
+ * a soma teórica não tem como saber. O rateio por pessoa segue calculado — o
+ * que muda é só o total do mês.
+ */
 export async function obterResumoAnualBeneficios(ano: number): Promise<ResumoMensalBeneficios[]> {
+  const informados = await obterTotaisInformados(ano);
+  const fechadas = new Set(await listarCompetenciasFechadas());
+
   return Promise.all(
     Array.from({ length: 12 }, async (_, i) => {
       const mes = i + 1;
@@ -116,26 +138,37 @@ export async function obterResumoAnualBeneficios(ano: number): Promise<ResumoMen
       const { linhas } = await gerarRateio(competencia);
 
       let vt = 0;
-      let va = 0;
+      let vm = 0;
+      let vr = 0;
       let odontoPlataformas = 0;
       let brindes = 0;
       let variaveis = 0;
       for (const l of linhas) {
-        vt += l.valeTransporte;
-        va += l.valeAlimentacao;
+        if (l.tipoTransporte === "vm_fixo") vm += l.valeTransporte;
+        else vt += l.valeTransporte;
+        vr += l.valeAlimentacao;
         odontoPlataformas += (l.odontologico ?? 0) + (l.solides ?? 0) + (l.flash ?? 0);
         brindes += (l.bonificacao ?? 0) + (l.outrosCustos ?? 0);
         variaveis += l.variaveis;
       }
 
+      // Verba a verba: o informado substitui o calculado só onde existe.
+      const t = informados.get(mes);
+      vt = t?.vt ?? vt;
+      vm = t?.vm ?? vm;
+      vr = t?.vr ?? vr;
+
       return {
         mes,
         vt: arredondar(vt),
-        va: arredondar(va),
+        vm: arredondar(vm),
+        vr: arredondar(vr),
         odontoPlataformas: arredondar(odontoPlataformas),
         brindes: arredondar(brindes),
         variaveis: arredondar(variaveis),
-        total: arredondar(vt + va + odontoPlataformas + brindes + variaveis),
+        total: arredondar(vt + vm + vr + odontoPlataformas + brindes + variaveis),
+        informado: t !== undefined && (t.vt !== null || t.vm !== null || t.vr !== null),
+        fechado: fechadas.has(competencia),
       };
     }),
   );

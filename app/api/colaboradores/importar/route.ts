@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { parsearPlanilha } from "@/lib/parsing/spreadsheet";
 import { converterParaColaboradoresCadastro, sugerirMapeamentoColaborador } from "@/lib/parsing/mappers";
-import { importarColaboradores, type Vinculo } from "@/lib/db/colaboradores";
+import { importarColaboradores, type TipoTransporte, type Vinculo } from "@/lib/db/colaboradores";
 
 export const runtime = "nodejs";
 
@@ -12,9 +12,11 @@ const schemaConfirmacao = z.object({
   linhas: z.array(z.record(z.string(), z.union([z.string(), z.number(), z.null()]))),
   mapeamento: z.object({
     nome: z.string().nullable().optional(),
-    dataAdmissao: z.string(),
+    // Anuláveis: planilha de atualização mexe só em quem já está no quadro e
+    // por isso não precisa repetir admissão nem salário. Ver mappers.ts.
+    dataAdmissao: z.string().nullable().optional(),
     dataNascimento: z.string().nullable().optional(),
-    salarioBase: z.string(),
+    salarioBase: z.string().nullable().optional(),
     dependentes: z.string().nullable().optional(),
     cpf: z.string().nullable().optional(),
     email: z.string().nullable().optional(),
@@ -23,6 +25,9 @@ const schemaConfirmacao = z.object({
     vinculo: z.string().nullable().optional(),
     liderDireto: z.string().nullable().optional(),
     alimentacaoValor: z.string().nullable().optional(),
+    tipoTransporte: z.string().nullable().optional(),
+    valorTransporteDia: z.string().nullable().optional(),
+    valorTransporteFixo: z.string().nullable().optional(),
     cbo: z.string().nullable().optional(),
     cidade: z.string().nullable().optional(),
     agencia: z.string().nullable().optional(),
@@ -106,12 +111,21 @@ export async function POST(request: Request) {
   }
 
   const resultado = await importarColaboradores(
-    conversao.colaboradores.map((c) => ({ ...c, vinculo: c.vinculo as Vinculo | null })),
+    conversao.colaboradores.map((c) => ({
+      ...c,
+      vinculo: c.vinculo as Vinculo | null,
+      // Coluna de transporte ausente na planilha vira undefined, não null: a
+      // regra da importação é que campo em branco não apaga o que já existe.
+      tipoTransporte: (c.tipoTransporte as TipoTransporte | null) ?? undefined,
+    })),
   );
   return Response.json({
     criados: resultado.criados,
     atualizados: resultado.atualizados,
     parecidos: resultado.parecidos,
-    descartadas: conversao.descartadas,
+    // As duas listas: a planilha rejeitou a linha (descartadas) ou o cadastro
+    // não soube em quem aplicar (descartados). Somir com a segunda fazia a
+    // importação dizer "50 atualizados" sobre um arquivo de 53 linhas.
+    descartadas: [...conversao.descartadas, ...resultado.descartados],
   });
 }

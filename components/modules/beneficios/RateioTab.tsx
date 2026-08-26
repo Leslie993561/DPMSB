@@ -7,7 +7,7 @@ import { RiskCallout } from "@/components/shared/RiskCallout";
 import { cn } from "@/lib/cn";
 
 interface ItemVariavel {
-  categoria: "transporte" | "mobilidade" | "alimentacao";
+  categoria: "transporte" | "mobilidade" | "alimentacao" | "aniversario";
   valor: number;
   motivo: string | null;
   arquivo: string | null;
@@ -31,6 +31,7 @@ const ROTULO_CATEGORIA_VARIAVEL: Record<ItemVariavel["categoria"], string> = {
   transporte: "Transporte",
   mobilidade: "Mobilidade",
   alimentacao: "Alimentação",
+  aniversario: "Aniversário",
 };
 
 const MESES_ABREV = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];

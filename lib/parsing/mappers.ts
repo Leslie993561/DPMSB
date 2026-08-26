@@ -158,6 +158,9 @@ export type CampoColaborador =
   | "vinculo"
   | "liderDireto"
   | "alimentacaoValor"
+  | "tipoTransporte"
+  | "valorTransporteDia"
+  | "valorTransporteFixo"
   | "cbo"
   | "cidade"
   | "agencia"
@@ -205,7 +208,11 @@ const SINONIMOS_COLABORADOR: Record<CampoColaborador, string[]> = {
   departamento: ["departamento", "setor", "area"],
   vinculo: ["vinculo", "tipo de vinculo", "contrato"],
   liderDireto: ["lider direto", "lider", "gestor", "gestor responsavel"],
-  alimentacaoValor: ["alimentacao", "vale alimentacao", "va"],
+  alimentacaoValor: ["alimentacao", "vale alimentacao", "va", "vale refeicao", "vr", "refeicao"],
+  // "Vale" é o cabeçalho da planilha de transporte do DP: a célula diz VT ou VM.
+  tipoTransporte: ["vale", "tipo de transporte", "tipo transporte", "transporte", "beneficio transporte"],
+  valorTransporteDia: ["valor por dia util", "valor por dia", "valor dia", "vt dia", "vt por dia"],
+  valorTransporteFixo: ["valor fixo", "vm", "vale mobilidade", "transporte fixo", "valor mensal transporte"],
   cbo: ["cbo"],
   cidade: ["cidade", "municipio"],
   agencia: ["agencia"],
@@ -245,6 +252,9 @@ const OBRIGATORIOS_COLABORADOR: Record<CampoColaborador, boolean> = {
   vinculo: false,
   liderDireto: false,
   alimentacaoValor: false,
+  tipoTransporte: false,
+  valorTransporteDia: false,
+  valorTransporteFixo: false,
   cbo: false,
   cidade: false,
   agencia: false,
@@ -281,9 +291,10 @@ export interface DependenteImportado {
 
 export interface ColaboradorImportado {
   nome: string;
-  dataAdmissao: string; // ISO
+  /** `null` só em planilha de atualização, que não cria ninguém. */
+  dataAdmissao: string | null; // ISO
   dataNascimento: string | null; // ISO
-  salarioBase: number;
+  salarioBase: number | null;
   dependentes: number;
   cpf: string | null;
   email: string | null;
@@ -293,6 +304,10 @@ export interface ColaboradorImportado {
   /** Nome do líder direto conforme a planilha — resolvido para gestorId numa etapa posterior (após todos os colaboradores existirem). */
   liderDiretoNome: string | null;
   alimentacaoValor: number | null;
+  /** "vt_diario" ou "vm_fixo"; `null` = a planilha não fala de transporte e o cadastro fica como está. */
+  tipoTransporte: string | null;
+  valorTransporteDia: number | null;
+  valorTransporteFixo: number | null;
   cbo: string | null;
   cidade: string | null;
   agencia: string | null;
@@ -358,8 +373,19 @@ export function converterParaColaboradoresCadastro(
 ): ConversaoColaboradores {
   const colunaSalario = mapeamento.salarioBase;
   const colunaAdmissao = mapeamento.dataAdmissao;
-  if (!colunaSalario) throw new Error("A coluna de salário base é obrigatória e não foi mapeada.");
-  if (!colunaAdmissao) throw new Error("A coluna de data de admissão é obrigatória e não foi mapeada.");
+
+  // Planilha SEM salário e SEM admissão é de atualização: só mexe em quem já
+  // está no quadro. É o formato que o DP usa para mandar uma informação
+  // isolada — o vale-transporte de cada um, por exemplo — sem repetir o
+  // cadastro inteiro. Exigir as duas colunas aí só obrigaria a inventá-las.
+  const modoAtualizacao = !colunaSalario && !colunaAdmissao;
+  if (!modoAtualizacao) {
+    if (!colunaSalario) throw new Error("A coluna de salário base é obrigatória e não foi mapeada.");
+    if (!colunaAdmissao) throw new Error("A coluna de data de admissão é obrigatória e não foi mapeada.");
+  }
+  if (!mapeamento.nome) {
+    throw new Error("A coluna de nome é obrigatória e não foi mapeada.");
+  }
 
   const colaboradores: ColaboradorImportado[] = [];
   const descartadas: { linha: number; motivo: string }[] = [];
@@ -367,10 +393,11 @@ export function converterParaColaboradoresCadastro(
   linhas.forEach((linha, i) => {
     const numeroLinha = i + 2;
 
-    const salarioBruto = linha[colunaSalario];
-    const salarioBase =
+    const salarioBruto = colunaSalario ? linha[colunaSalario] : null;
+    const salarioLido =
       typeof salarioBruto === "number" ? salarioBruto : Number(String(salarioBruto ?? "").replace(",", "."));
-    if (!Number.isFinite(salarioBase) || salarioBase <= 0) {
+    const salarioBase = Number.isFinite(salarioLido) && salarioLido > 0 ? salarioLido : null;
+    if (!modoAtualizacao && salarioBase === null) {
       descartadas.push({
         linha: numeroLinha,
         motivo: `Salário base inválido ou ausente (valor lido: "${salarioBruto ?? ""}").`,
@@ -378,9 +405,9 @@ export function converterParaColaboradoresCadastro(
       return;
     }
 
-    const admissaoBruta = linha[colunaAdmissao];
+    const admissaoBruta = colunaAdmissao ? linha[colunaAdmissao] : null;
     const dataAdmissao = parseDataAdmissao(admissaoBruta);
-    if (!dataAdmissao) {
+    if (!modoAtualizacao && !dataAdmissao) {
       descartadas.push({
         linha: numeroLinha,
         motivo: `Data de admissão inválida ou ausente (valor lido: "${admissaoBruta ?? ""}"). Use AAAA-MM-DD ou DD/MM/AAAA.`,
@@ -405,6 +432,25 @@ export function converterParaColaboradoresCadastro(
         ? null
         : Number(typeof alimentacaoBruta === "number" ? alimentacaoBruta : String(alimentacaoBruta).replace(",", "."));
 
+    const numero = (campo: CampoColaborador): number | null => {
+      const coluna = mapeamento[campo];
+      if (!coluna) return null;
+      const v = linha[coluna];
+      if (v === null || v === "") return null;
+      const n = Number(typeof v === "number" ? v : String(v).replace(",", "."));
+      return Number.isFinite(n) ? n : null;
+    };
+
+    // A planilha de transporte do DP traz só "VT" ou "VM" na coluna "Vale".
+    // Qualquer outro texto vira null: melhor deixar o cadastro como está do que
+    // reclassificar o benefício de alguém por uma palavra que ninguém sabe ler.
+    const valeBruto = (opcional("tipoTransporte") ?? "").toLowerCase();
+    const tipoTransporte = valeBruto.startsWith("vm")
+      ? "vm_fixo"
+      : valeBruto.startsWith("vt")
+        ? "vt_diario"
+        : null;
+
     const dependentesLista = lerDependentesDaLinha(linha);
 
     colaboradores.push({
@@ -427,6 +473,9 @@ export function converterParaColaboradoresCadastro(
       vinculo: opcional("vinculo"),
       liderDiretoNome: opcional("liderDireto"),
       alimentacaoValor: alimentacaoValor !== null && Number.isFinite(alimentacaoValor) ? alimentacaoValor : null,
+      tipoTransporte,
+      valorTransporteDia: numero("valorTransporteDia"),
+      valorTransporteFixo: numero("valorTransporteFixo"),
       cbo: opcional("cbo"),
       cidade: opcional("cidade"),
       agencia: opcional("agencia"),

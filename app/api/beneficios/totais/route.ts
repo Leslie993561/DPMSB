@@ -1,19 +1,28 @@
 import { z } from "zod";
 import { bloquearSeFechada, competenciaDeAnoMes } from "@/lib/db/fechamento";
-import { listarDiasUteisAno, definirDiasUteis } from "@/lib/db/beneficiosDiasUteis";
+import { listarTotaisAno, definirTotaisDoMes } from "@/lib/db/beneficiosTotais";
 
 export const runtime = "nodejs";
+
+/**
+ * `null` é um valor legítimo aqui: significa "esqueça o total que eu informei,
+ * volte a usar o calculado pelo cadastro". Ausente significa "não mexa nesta
+ * verba". Por isso `.nullable()` sem `.optional()` embrulhado num optional.
+ */
+const valor = z.coerce.number().min(0).nullable().optional();
 
 const schemaPatch = z.object({
   ano: z.coerce.number().int().min(2000).max(2100),
   mes: z.coerce.number().int().min(1).max(12),
-  diasUteis: z.coerce.number().int().min(0).max(31),
+  vt: valor,
+  vm: valor,
+  vr: valor,
 });
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const ano = Number(searchParams.get("ano")) || new Date().getFullYear();
-  return Response.json({ ano, meses: await listarDiasUteisAno(ano) });
+  return Response.json({ ano, meses: await listarTotaisAno(ano) });
 }
 
 export async function PATCH(request: Request) {
@@ -22,13 +31,11 @@ export async function PATCH(request: Request) {
   if (!parsed.success) {
     return Response.json({ erro: "Dados inválidos", detalhes: parsed.error.issues }, { status: 400 });
   }
-  const { ano, mes, diasUteis } = parsed.data;
+  const { ano, mes, ...totais } = parsed.data;
 
-  // Dias úteis mudam o VT de todo mundo naquele mês — é edição da competência
-  // como qualquer outra, e mês fechado não aceita.
   const bloqueio = await bloquearSeFechada(competenciaDeAnoMes(ano, mes));
   if (bloqueio) return bloqueio;
 
-  await definirDiasUteis(ano, mes, diasUteis);
-  return Response.json({ ano, meses: await listarDiasUteisAno(ano) });
+  await definirTotaisDoMes(ano, mes, totais);
+  return Response.json({ ano, meses: await listarTotaisAno(ano) });
 }

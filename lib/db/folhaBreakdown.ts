@@ -2,7 +2,7 @@ import "server-only";
 import { getDb } from "./client";
 import { listarColaboradores, type Colaborador } from "./colaboradores";
 import { obterDiasUteis } from "./beneficiosDiasUteis";
-import { calcularINSS, calcularIRRF, calcularFGTS, calcularValeTransporte, tarifaVtPorCidade, arredondar } from "@/lib/calc";
+import { calcularINSS, calcularIRRF, calcularFGTS, calcularTransporteDoMes, arredondar } from "@/lib/calc";
 import type { LinhaExtrasImportada, CampoExtra } from "@/lib/parsing/folhaExtras";
 import { estaNaFolha } from "@/lib/folha/vigencia";
 import { casarPorNome } from "@/lib/folha/casarNome";
@@ -278,12 +278,7 @@ export async function gerarBreakdown(competencia: string, colaboradores?: Colabo
       : calcularIRRF(remuneracao - inss.valor, c.dependentes, dataCompetencia);
     const fgts = ehPj ? { valor: 0 } : calcularFGTS(remuneracao, dataCompetencia);
     const provisaoDecimoTerceiro = ehPj ? 0 : arredondar(remuneracao / 12);
-    const valeTransporte = ehPj
-      ? 0
-      : c.tipoTransporte === "vm_fixo"
-        ? (c.valorTransporteFixo ?? 0)
-        : calcularValeTransporte(c.valorTransporteFixo ?? tarifaVtPorCidade(c.cidade ?? ""), c.salarioBase, diasUteis)
-            .valor;
+    const valeTransporte = ehPj ? 0 : calcularTransporteDoMes(c, diasUteis);
     const valeAlimentacao = ehPj ? 0 : (c.alimentacaoValor ?? 0);
     const extras = extrasPorColaborador.get(c.id) ?? EXTRAS_VAZIAS;
     const premiacao = extras.premiacao ?? 0;

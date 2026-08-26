@@ -29,6 +29,8 @@ export interface Colaborador {
   conta: string | null;
   tipoTransporte: TipoTransporte;
   valorTransporteFixo: number | null;
+  /** VT: valor de um dia útil, ida e volta somadas — como o DP informa. */
+  valorTransporteDia: number | null;
   /** Nome do líder direto conforme registro externo (planilha) quando esse líder ainda não tem cadastro próprio — exibido como texto simples; se `gestorId` existir, ele prevalece. */
   liderDiretoNome: string | null;
   status: StatusColaborador;
@@ -90,6 +92,7 @@ export interface ColaboradorInput {
   conta?: string | null;
   tipoTransporte?: TipoTransporte;
   valorTransporteFixo?: number | null;
+  valorTransporteDia?: number | null;
   liderDiretoNome?: string | null;
   status?: StatusColaborador;
   dataDesligamento?: string | null;
@@ -139,6 +142,7 @@ interface LinhaColaborador {
   conta: string | null;
   tipo_transporte: TipoTransporte;
   valor_transporte_fixo: number | null;
+  valor_transporte_dia: number | null;
   lider_direto_nome: string | null;
   status: StatusColaborador;
   data_desligamento: string | null;
@@ -189,6 +193,7 @@ function paraColaborador(linha: LinhaColaborador): Colaborador {
     conta: linha.conta,
     tipoTransporte: linha.tipo_transporte,
     valorTransporteFixo: linha.valor_transporte_fixo,
+    valorTransporteDia: linha.valor_transporte_dia,
     liderDiretoNome: linha.lider_direto_nome,
     status: linha.status,
     dataDesligamento: linha.data_desligamento,
@@ -253,11 +258,11 @@ export async function criarColaborador(input: ColaboradorInput): Promise<Colabor
   const info = await db.execute({
     sql: `INSERT INTO colaboradores
          (nome, data_admissao, salario_base, dependentes, cpf, email, cargo, departamento, gestor_id, cidade,
-          vinculo, alimentacao_valor, data_nascimento, cbo, agencia, conta, tipo_transporte, valor_transporte_fixo,
+          vinculo, alimentacao_valor, data_nascimento, cbo, agencia, conta, tipo_transporte, valor_transporte_fixo, valor_transporte_dia,
           lider_direto_nome, status, pis, cidade_nascimento, uf_nascimento, nome_pai, nome_mae, telefone, sexo,
           email_pessoal, horario, banco, cep, estado, bairro, rua, numero, conjuge_nome, conjuge_cpf, conjuge_nascimento,
           periculosidade_percentual, insalubridade_percentual, adicional_fixo, adicional_fixo_descricao)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       input.nome,
       input.dataAdmissao,
@@ -277,6 +282,7 @@ export async function criarColaborador(input: ColaboradorInput): Promise<Colabor
       input.conta ?? null,
       input.tipoTransporte ?? "vt_diario",
       input.valorTransporteFixo ?? null,
+      input.valorTransporteDia ?? null,
       input.liderDiretoNome ?? null,
       input.status ?? "ativo",
       input.pis ?? null,
@@ -330,6 +336,8 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
     tipoTransporte: input.tipoTransporte ?? atual.tipoTransporte,
     valorTransporteFixo:
       input.valorTransporteFixo !== undefined ? input.valorTransporteFixo : atual.valorTransporteFixo,
+    valorTransporteDia:
+      input.valorTransporteDia !== undefined ? input.valorTransporteDia : atual.valorTransporteDia,
     liderDiretoNome: input.liderDiretoNome !== undefined ? input.liderDiretoNome : atual.liderDiretoNome,
     status: input.status ?? atual.status,
     dataDesligamento: input.dataDesligamento !== undefined ? input.dataDesligamento : atual.dataDesligamento,
@@ -368,7 +376,7 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
     sql: `UPDATE colaboradores
        SET nome = ?, data_admissao = ?, salario_base = ?, dependentes = ?, cpf = ?, email = ?, cargo = ?,
            departamento = ?, gestor_id = ?, cidade = ?, vinculo = ?, alimentacao_valor = ?, data_nascimento = ?,
-           cbo = ?, agencia = ?, conta = ?, tipo_transporte = ?, valor_transporte_fixo = ?, lider_direto_nome = ?,
+           cbo = ?, agencia = ?, conta = ?, tipo_transporte = ?, valor_transporte_fixo = ?, valor_transporte_dia = ?, lider_direto_nome = ?,
            status = ?, data_desligamento = ?, motivo_desligamento = ?, valor_rescisao = ?,
            pis = ?, cidade_nascimento = ?, uf_nascimento = ?, nome_pai = ?, nome_mae = ?, telefone = ?, sexo = ?,
            email_pessoal = ?, horario = ?, banco = ?, cep = ?, estado = ?, bairro = ?, rua = ?, numero = ?,
@@ -395,6 +403,7 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
       mesclado.conta ?? null,
       mesclado.tipoTransporte,
       mesclado.valorTransporteFixo ?? null,
+      mesclado.valorTransporteDia ?? null,
       mesclado.liderDiretoNome ?? null,
       mesclado.status,
       mesclado.dataDesligamento ?? null,
@@ -446,8 +455,17 @@ function digitosCpf(cpf: string | null | undefined): string {
   return (cpf ?? "").replace(/\D/g, "");
 }
 
-/** Dependentes vindos da mesma linha da planilha do colaborador (colunas "Dependente N — ..."). */
-export interface ColaboradorInputComDependentes extends ColaboradorInput {
+/**
+ * Uma linha de planilha de colaborador.
+ *
+ * Admissão e salário são anuláveis porque a planilha pode ser de ATUALIZAÇÃO —
+ * uma coluna só, para quem já está no quadro (o vale-transporte de cada um, por
+ * exemplo). Nesse caso não há o que criar, e a linha que não achar dono é
+ * descartada com o motivo explícito em vez de virar um cadastro pela metade.
+ */
+export interface ColaboradorInputComDependentes extends Omit<ColaboradorInput, "dataAdmissao" | "salarioBase"> {
+  dataAdmissao: string | null;
+  salarioBase: number | null;
   dependentesLista?: { nome: string; dataNascimento?: string | null; cpf?: string | null }[];
 }
 
@@ -527,8 +545,14 @@ export async function importarColaboradores(
       ) as Partial<ColaboradorInput>;
       colaborador = await atualizarColaborador(casamento.encontrado.id, informados);
       atualizados++;
+    } else if (dados.dataAdmissao === null || dados.salarioBase === null) {
+      descartados.push({
+        linha,
+        motivo: `"${dadosColaborador.nome}" não está no quadro de colaboradores. Esta planilha atualiza quem já existe — para cadastrar alguém novo ela precisa das colunas de admissão e salário.`,
+      });
+      continue;
     } else {
-      colaborador = await criarColaborador(dados);
+      colaborador = await criarColaborador({ ...dados, dataAdmissao: dados.dataAdmissao, salarioBase: dados.salarioBase });
       existentes.push(colaborador);
       if (cpf) porCpf.set(cpf, colaborador);
       criados++;

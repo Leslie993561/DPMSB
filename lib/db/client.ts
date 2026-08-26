@@ -76,6 +76,11 @@ const MIGRACOES: { tabela: string; coluna: string; definicao: string }[] = [
   { tabela: "colaboradores", coluna: "conta", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "tipo_transporte", definicao: "TEXT NOT NULL DEFAULT 'vt_diario'" },
   { tabela: "colaboradores", coluna: "valor_transporte_fixo", definicao: "REAL" },
+  // Valor do VT por dia útil JÁ com ida e volta — é como o DP informa ("Valor
+  // por dia útil"). Coluna separada de valor_transporte_fixo, que guarda o
+  // mensal do vale mobilidade: uma só coluna para os dois significava
+  // multiplicar o VM por dias úteis ou dobrar o VT sem ninguém perceber.
+  { tabela: "colaboradores", coluna: "valor_transporte_dia", definicao: "REAL" },
   { tabela: "colaboradores", coluna: "lider_direto_nome", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "status", definicao: "TEXT NOT NULL DEFAULT 'ativo'" },
   { tabela: "colaboradores", coluna: "data_desligamento", definicao: "TEXT" },
@@ -196,6 +201,25 @@ CREATE TABLE IF NOT EXISTS beneficios_dias_uteis (
   PRIMARY KEY (ano, mes)
 );
 
+-- Totais REAIS de benefícios por mês, informados pelo DP.
+--
+-- O rateio calcula VT/VR pelo cadastro, colaborador a colaborador, e isso
+-- serve para dividir custo por setor. Mas o valor que a empresa efetivamente
+-- pagou no mês vem da operadora e não bate com a soma teórica: catraca não
+-- usada, recarga proporcional, ajuste de crédito. Quando o DP informa o total
+-- do mês, é ele que vale no Dashboard.
+CREATE TABLE IF NOT EXISTS beneficios_totais_mes (
+  ano INTEGER NOT NULL,
+  mes INTEGER NOT NULL,
+  -- DOUBLE PRECISION, não REAL: float4 guarda ~7 dígitos significativos e
+  -- devolvia R$ 40.926,25 como 40926.2. Total de benefício passa de R$ 40 mil,
+  -- então o REAL usado no resto do schema perderia centavos exatamente aqui.
+  vt DOUBLE PRECISION,
+  vm DOUBLE PRECISION,
+  vr DOUBLE PRECISION,
+  PRIMARY KEY (ano, mes)
+);
+
 CREATE TABLE IF NOT EXISTS colaborador_dependentes (
   id SERIAL PRIMARY KEY,
   colaborador_id INTEGER NOT NULL REFERENCES colaboradores(id),
@@ -255,7 +279,11 @@ interface Queryable {
 
 async function executarUm(conexao: Queryable, stmt: StatementLike | string): Promise<ResultSetLike> {
   const { sql, args } = normalizarStmt(stmt);
-  const comRetorno = precisaRetornarId(sql) ? `${sql} RETURNING id` : sql;
+  // RETURNING * e não RETURNING id: nem toda tabela tem id. As que têm chave
+  // composta (beneficios_dias_uteis, beneficios_totais_mes) davam 42703
+  // "column id does not exist" em todo INSERT — o ajuste de dias úteis
+  // respondia 500 sem que nada na tela dissesse por quê.
+  const comRetorno = precisaRetornarId(sql) ? `${sql} RETURNING *` : sql;
   const resultado = await conexao.query(paraPlaceholdersPg(comRetorno), args);
   return {
     rows: resultado.rows,

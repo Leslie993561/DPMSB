@@ -1,5 +1,7 @@
 import "server-only";
 import { getDb } from "./client";
+import { competenciaFechada } from "./folhaBreakdown";
+import { competenciaDaData } from "./fechamento";
 import { buscarPeriodo, type PeriodoAquisitivo } from "./periodosAquisitivos";
 import {
   calcularEstadoPeriodo,
@@ -96,6 +98,29 @@ async function buscarPeriodoOuFalhar(periodoAquisitivoId: number): Promise<Perio
   return periodo;
 }
 
+/**
+ * Recusa mexer num lançamento cujo gozo cai em mês fechado.
+ *
+ * Fechar o mês no Breakdown congela o custo daquela competência, e férias
+ * entram nesse custo. Dar baixa, cancelar ou reverter um gozo de julho depois
+ * de julho fechado mudaria um número que a contabilidade já levou como final.
+ *
+ * O mês que vale é o do gozo — previsto quando ainda não houve baixa, real
+ * depois dela. Lançamento sem data nenhuma (import histórico) não tem
+ * competência para conferir, e passa.
+ */
+async function garantirMesAberto(data: string | null, acao: string): Promise<void> {
+  if (!data) return;
+  if (!(await competenciaFechada(competenciaDaData(data)))) return;
+  throw new ErroValidacaoFerias(
+    `Não dá para ${acao}: o gozo começa em ${data.slice(8, 10)}/${data.slice(5, 7)}/${data.slice(0, 4)} e essa competência está fechada. Reabra o mês no Breakdown de folha primeiro.`,
+  );
+}
+
+async function garantirMesAbertoDoLancamento(lancamento: LancamentoFerias, acao: string): Promise<void> {
+  await garantirMesAberto(lancamento.dataInicioGozo ?? lancamento.dataInicioPrevista, acao);
+}
+
 async function buscarLancamento(id: number): Promise<LancamentoFerias | null> {
   const db = await getDb();
   const resultado = await db.execute({ sql: "SELECT * FROM lancamentos_ferias WHERE id = ?", args: [id] });
@@ -172,6 +197,7 @@ export interface CriarLancamentoCalculadoInput {
  * — só vira "concluída" quando a baixa for confirmada.
  */
 export async function criarLancamentoCalculado(input: CriarLancamentoCalculadoInput): Promise<LancamentoFerias> {
+  await garantirMesAberto(input.dataInicioPrevista, "programar férias");
   const periodo = await buscarPeriodoOuFalhar(input.periodoAquisitivoId);
   const ativos = await listarAtivosPorPeriodo(periodo.id);
   const estado = calcularEstadoPeriodo(periodo, ativos);
@@ -221,6 +247,7 @@ export interface CriarLancamentoManualInput {
  * sistema) — nasce direto como "concluída", sem passar por programação/baixa.
  */
 export async function criarLancamentoManual(input: CriarLancamentoManualInput): Promise<LancamentoFerias> {
+  await garantirMesAberto(input.dataInicioGozo, "lançar férias");
   const periodo = await buscarPeriodoOuFalhar(input.periodoAquisitivoId);
   const ativos = await listarAtivosPorPeriodo(periodo.id);
   const estado = calcularEstadoPeriodo(periodo, ativos);
@@ -279,6 +306,13 @@ export async function darBaixa(lancamentoId: number, input: DarBaixaInput): Prom
   if (input.diasGozadosReal <= 0) {
     throw new ErroValidacaoFerias("Informe uma quantidade de dias gozados maior que zero.");
   }
+  await garantirMesAbertoDoLancamento(lancamento, "dar baixa");
+  // A baixa também não pode JOGAR o gozo para dentro de um mês fechado.
+  if (await competenciaFechada(competenciaDaData(input.dataInicioReal))) {
+    throw new ErroValidacaoFerias(
+      `A data de início informada cai numa competência fechada. Reabra o mês no Breakdown de folha primeiro.`,
+    );
+  }
 
   const periodo = await buscarPeriodoOuFalhar(lancamento.periodoAquisitivoId);
   const outrosAtivos = (await listarAtivosPorPeriodo(periodo.id)).filter((l) => l.id !== lancamentoId);
@@ -331,6 +365,7 @@ export async function reverterBaixa(lancamentoId: number, input: ReverterBaixaIn
   if (lancamento.status !== "concluida" && lancamento.status !== "alterada") {
     throw new ErroValidacaoFerias("Só é possível desfazer a baixa de férias já confirmadas.");
   }
+  await garantirMesAbertoDoLancamento(lancamento, "desfazer a baixa");
 
   // Lançamentos que nasceram já "concluída" (import histórico do Controle de
   // Férias) nunca tiveram data prevista — sem isso, o Planejamento perderia a
@@ -367,6 +402,7 @@ export async function cancelarLancamento(lancamentoId: number, input: CancelarLa
   if (lancamento.status !== "programada") {
     throw new ErroValidacaoFerias("Só é possível cancelar férias com status Programada.");
   }
+  await garantirMesAbertoDoLancamento(lancamento, "cancelar");
 
   const db = await getDb();
   await db.execute({

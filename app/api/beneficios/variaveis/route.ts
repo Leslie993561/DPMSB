@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { bloquearSeFechada } from "@/lib/db/fechamento";
 import { parsearPlanilha } from "@/lib/parsing/spreadsheet";
 import { converterVariaveisImportadas } from "@/lib/parsing/variaveisBeneficios";
 import { importarVariaveis } from "@/lib/db/beneficiosVariaveis";
@@ -19,6 +20,9 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return Response.json({ erro: "Informe o mês de referência da planilha." }, { status: 400 });
   }
+
+  const bloqueio = await bloquearSeFechada(parsed.data.competencia);
+  if (bloqueio) return bloqueio;
   if (arquivo.size > 10 * 1024 * 1024) {
     return Response.json({ erro: "Arquivo maior que 10 MB." }, { status: 400 });
   }

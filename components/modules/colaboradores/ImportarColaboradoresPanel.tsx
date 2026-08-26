@@ -7,6 +7,9 @@ import { RiskCallout } from "@/components/shared/RiskCallout";
 
 const ROTULOS: Record<CampoColaborador, string> = {
   nome: "Nome",
+  tipoTransporte: "Vale (VT/VM)",
+  valorTransporteDia: "Valor do VT por dia útil",
+  valorTransporteFixo: "Valor fixo do VM",
   cpf: "CPF",
   pis: "PIS",
   dataNascimento: "Nascimento",

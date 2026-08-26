@@ -10,6 +10,7 @@ interface LinhaRateio {
   nome: string;
   vinculo: string | null;
   departamento: string | null;
+  tipoTransporte: string;
   valeTransporte: number;
   valeAlimentacao: number;
   odontologico: number | null;
@@ -21,11 +22,20 @@ interface LinhaRateio {
 
 interface ResumoMensal {
   mes: number;
+  /** Vale transporte — por dia útil. */
   vt: number;
-  va: number;
+  /** Vale mobilidade — valor fixo do mês. */
+  vm: number;
+  /** Vale refeição. */
+  vr: number;
   odontoPlataformas: number;
   brindes: number;
+  variaveis: number;
   total: number;
+  /** Total conferido com a operadora, informado pelo DP — não é a soma do cadastro. */
+  informado: boolean;
+  /** Mês fechado no Breakdown — não aceita mais edição em lugar nenhum do portal. */
+  fechado: boolean;
 }
 
 const ANO_ATUAL = new Date().getFullYear();
@@ -151,12 +161,22 @@ export function BeneficiosDashboardTab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [diasUteisAno]);
 
-  const totalVt = useMemo(() => linhas.reduce((s, l) => s + l.valeTransporte, 0), [linhas]);
-  const totalVa = useMemo(() => linhas.reduce((s, l) => s + l.valeAlimentacao, 0), [linhas]);
-  const totalOdonto = useMemo(() => linhas.reduce((s, l) => s + totalOdontoPlataformas(l), 0), [linhas]);
-  const totalGeral = totalVt + totalVa + totalOdonto;
+  const mesAtual = Number(competencia.slice(5, 7));
 
-  const elegiveisVt = linhas.filter((l) => l.valeTransporte > 0).length;
+  // Os cartões saem do resumo do mês, não da soma das linhas: quando o DP
+  // informa o total pago no mês, é ele que vale, e o resumo já resolve essa
+  // escolha verba a verba. Somar as linhas aqui faria o topo da tela discordar
+  // do gráfico logo abaixo.
+  const resumoDoMes = useMemo(() => resumoAnual.find((m) => m.mes === mesAtual), [resumoAnual, mesAtual]);
+
+  const totalVt = resumoDoMes?.vt ?? 0;
+  const totalVm = resumoDoMes?.vm ?? 0;
+  const totalVa = resumoDoMes?.vr ?? 0;
+  const totalOdonto = resumoDoMes?.odontoPlataformas ?? 0;
+  const totalGeral = resumoDoMes?.total ?? 0;
+
+  const elegiveisVt = linhas.filter((l) => l.tipoTransporte !== "vm_fixo" && l.valeTransporte > 0).length;
+  const elegiveisVm = linhas.filter((l) => l.tipoTransporte === "vm_fixo" && l.valeTransporte > 0).length;
   const elegiveisVa = linhas.filter((l) => l.valeAlimentacao > 0).length;
   const elegiveisOdonto = linhas.filter((l) => totalOdontoPlataformas(l) > 0).length;
 
@@ -187,7 +207,15 @@ export function BeneficiosDashboardTab() {
     setValorEdicao(String(m.diasUteis));
   }
 
+  const mesEstaFechado = (mes: number) => resumoAnual.some((m) => m.mes === mes && m.fechado);
+
   async function salvarEdicao(mes: number) {
+    // O servidor recusa de qualquer jeito (409); barrar aqui é só para não
+    // deixar a pessoa digitar um número que vai ser jogado fora.
+    if (diasUteisAno === ano && mesEstaFechado(mes)) {
+      setEditando(null);
+      return;
+    }
     setSalvando(true);
     try {
       const res = await fetch("/api/beneficios/dias-uteis", {
@@ -207,17 +235,45 @@ export function BeneficiosDashboardTab() {
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard
           titulo="Total em benefícios"
           valor={formatarMoeda(totalGeral)}
           subtitulo={`${competenciaExibida(competencia)} · ${colaboradoresClt} colaborador(es) CLT`}
           destaque
         />
-        <StatCard titulo="Vale-transporte" valor={formatarMoeda(totalVt)} subtitulo={`${elegiveisVt} elegíveis`} />
-        <StatCard titulo="Vale-refeição/alimentação" valor={formatarMoeda(totalVa)} subtitulo={`${elegiveisVa} elegíveis`} />
+        <StatCard
+          titulo="Vale-transporte"
+          valor={formatarMoeda(totalVt)}
+          subtitulo={`${elegiveisVt} elegíveis${resumoDoMes?.informado ? " · informado" : ""}`}
+        />
+        <StatCard
+          titulo="Vale-mobilidade"
+          valor={formatarMoeda(totalVm)}
+          subtitulo={`${elegiveisVm} elegíveis${resumoDoMes?.informado ? " · informado" : ""}`}
+        />
+        <StatCard
+          titulo="Vale-refeição"
+          valor={formatarMoeda(totalVa)}
+          subtitulo={`${elegiveisVa} elegíveis${resumoDoMes?.informado ? " · informado" : ""}`}
+        />
         <StatCard titulo="Odonto + plataformas" valor={formatarMoeda(totalOdonto)} subtitulo={`${elegiveisOdonto} elegíveis`} />
       </div>
+
+      {resumoDoMes?.fechado && (
+        <p className="flex items-center gap-1.5 rounded-md border border-hairline bg-brand-surface/40 px-3 py-2 text-[11px] text-foreground-muted">
+          <span aria-hidden>🔒</span>
+          {competenciaExibida(competencia)} está fechado no Breakdown de folha. Os números abaixo são o retrato do mês e
+          nada aqui pode ser alterado — reabra o mês no Breakdown se precisar corrigir alguma coisa.
+        </p>
+      )}
+
+      {resumoDoMes?.informado && (
+        <p className="text-[10.5px] text-foreground-muted">
+          VT/VM/VR de {competenciaExibida(competencia)} vêm do total informado pelo DP, conferido com a operadora — o
+          rateio por colaborador abaixo continua calculado pelo cadastro e pode não fechar exatamente com esse total.
+        </p>
+      )}
 
       <Card className="p-4">
         <h3 className="text-[13px] font-bold text-foreground">Composição dos benefícios por setor</h3>
