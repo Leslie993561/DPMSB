@@ -225,9 +225,11 @@ const SINONIMOS_COLABORADOR: Record<CampoColaborador, string[]> = {
   bairro: ["bairro"],
   rua: ["rua", "logradouro", "endereco"],
   numero: ["numero", "num", "nro"],
-  conjugeNome: ["conjuge nome", "nome do conjuge", "conjuge"],
-  conjugeCpf: ["conjuge cpf", "cpf do conjuge"],
-  conjugeNascimento: ["conjuge nascimento", "nascimento do conjuge"],
+  // "Cônjunge" com o N extra é a grafia da planilha-mestre do DP; sem ela, o
+  // grupo desambiguado ("Cônjunge · Nome") não casava com nada.
+  conjugeNome: ["conjuge nome", "nome do conjuge", "conjuge", "conjunge nome", "conjunge"],
+  conjugeCpf: ["conjuge cpf", "cpf do conjuge", "conjunge cpf"],
+  conjugeNascimento: ["conjuge nascimento", "nascimento do conjuge", "conjunge nascimento"],
 };
 
 const OBRIGATORIOS_COLABORADOR: Record<CampoColaborador, boolean> = {

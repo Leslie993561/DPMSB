@@ -40,10 +40,47 @@ function normalizarCelula(valor: ExcelJS.CellValue): CelulaValor {
   return String(valor);
 }
 
+/** Rótulos de uma linha, sem vazios e normalizados para comparação. */
+function rotulosDaLinha(sheet: ExcelJS.Worksheet, numero: number): string[] {
+  const rotulos: string[] = [];
+  sheet.getRow(numero).eachCell({ includeEmpty: false }, (cell) => {
+    const texto = String(normalizarCelula(cell.value) ?? "").trim();
+    if (texto) rotulos.push(texto.toLowerCase());
+  });
+  return rotulos;
+}
+
+/**
+ * Descobre em qual linha estão os nomes das colunas.
+ *
+ * A planilha-mestre do DP tem duas linhas de cabeçalho: a primeira agrupa
+ * ("Dados Pessoais" repetido em onze colunas) e a segunda traz os nomes de
+ * verdade ("Nome", "CPF", "PIS"...). Ler a primeira devolvia onze colunas com o
+ * mesmo nome e o arquivo inteiro era rejeitado.
+ *
+ * A pista é a repetição: um cabeçalho de verdade tem rótulos distintos, uma
+ * faixa de grupo repete o mesmo texto célula a célula. Quando a linha 1 tem
+ * menos da metade de rótulos distintos, o cabeçalho é a linha 2.
+ */
+function acharLinhaDeCabecalho(sheet: ExcelJS.Worksheet): number {
+  const primeira = rotulosDaLinha(sheet, 1);
+  if (primeira.length < 3) return 1;
+
+  const distintos = new Set(primeira).size;
+  const ehFaixaDeGrupo = distintos * 2 <= primeira.length;
+  if (!ehFaixaDeGrupo) return 1;
+
+  // Só desce se a linha 2 realmente parecer cabeçalho: mais rótulos distintos.
+  const segunda = rotulosDaLinha(sheet, 2);
+  return new Set(segunda).size > distintos ? 2 : 1;
+}
+
 /**
  * Lê a primeira planilha de um arquivo .xlsx/.csv e devolve os cabeçalhos
- * (primeira linha) e as linhas como objetos. Não interpreta o significado das
- * colunas — esse mapeamento é feito em mappers.ts e confirmado pelo usuário.
+ * e as linhas como objetos. O cabeçalho normalmente é a primeira linha, mas
+ * uma faixa de grupo acima dele é detectada e pulada — ver
+ * `acharLinhaDeCabecalho`. Não interpreta o significado das colunas: esse
+ * mapeamento é feito em mappers.ts e confirmado pelo usuário.
  */
 export async function parsearPlanilha(
   buffer: ArrayBuffer,
@@ -64,11 +101,31 @@ export async function parsearPlanilha(
     throw new Error("O arquivo não contém nenhuma planilha legível.");
   }
 
-  const linhaCabecalho = sheet.getRow(1);
+  const numeroCabecalho = acharLinhaDeCabecalho(sheet);
+  const linhaCabecalho = sheet.getRow(numeroCabecalho);
   const cabecalhos: string[] = [];
   linhaCabecalho.eachCell({ includeEmpty: false }, (cell, col) => {
     cabecalhos[col - 1] = String(normalizarCelula(cell.value) ?? `Coluna ${col}`).trim();
   });
+
+  // Rótulo repetido ganha o nome do grupo na frente. Na planilha-mestre do DP a
+  // coluna do cônjuge se chama só "Nome", igual à do colaborador — sem o grupo,
+  // o casamento pegava a primeira e copiava o nome da própria pessoa para o
+  // campo do cônjuge. Com o grupo vira "Cônjunge · Nome", que é inequívoco.
+  if (numeroCabecalho > 1) {
+    const vezes = new Map<string, number>();
+    for (const rotulo of cabecalhos) {
+      if (!rotulo) continue;
+      const chave = rotulo.toLowerCase();
+      vezes.set(chave, (vezes.get(chave) ?? 0) + 1);
+    }
+    const linhaGrupo = sheet.getRow(numeroCabecalho - 1);
+    cabecalhos.forEach((rotulo, i) => {
+      if (!rotulo || (vezes.get(rotulo.toLowerCase()) ?? 0) < 2) return;
+      const grupo = String(normalizarCelula(linhaGrupo.getCell(i + 1).value) ?? "").trim();
+      if (grupo) cabecalhos[i] = `${grupo} · ${rotulo}`;
+    });
+  }
 
   if (cabecalhos.filter(Boolean).length === 0) {
     throw new Error("A primeira linha da planilha deve conter os nomes das colunas.");
@@ -76,7 +133,7 @@ export async function parsearPlanilha(
 
   const linhas: LinhaPlanilha[] = [];
   sheet.eachRow({ includeEmpty: false }, (row, numeroLinha) => {
-    if (numeroLinha === 1) return;
+    if (numeroLinha <= numeroCabecalho) return;
     const registro: LinhaPlanilha = {};
     let temConteudo = false;
     cabecalhos.forEach((cabecalho, i) => {

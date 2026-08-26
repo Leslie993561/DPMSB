@@ -496,7 +496,14 @@ export async function importarColaboradores(
 
     let colaborador: Colaborador;
     if (casamento.encontrado) {
-      colaborador = await atualizarColaborador(casamento.encontrado.id, dados);
+      // Só o que a planilha realmente trouxe é gravado. Sem isto, uma coluna
+      // ausente no arquivo (alimentação, por exemplo) chegaria como null e
+      // apagaria o valor que já estava no cadastro — a mesma regra que vale na
+      // importação de verbas: o que não vem na planilha fica como está.
+      const informados = Object.fromEntries(
+        Object.entries(dados).filter(([, valor]) => valor !== null && valor !== undefined),
+      ) as Partial<ColaboradorInput>;
+      colaborador = await atualizarColaborador(casamento.encontrado.id, informados);
       atualizados++;
     } else {
       colaborador = await criarColaborador(dados);
