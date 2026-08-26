@@ -22,6 +22,8 @@ interface LinhaRateio {
   cidade: string | null;
   tipoTransporte: string;
   valeTransporte: number;
+  /** "cadastro" = veio do valor por dia do colaborador; o resto é suprimento. */
+  origemVt: "cadastro" | "tarifa-cidade" | "sem-valor" | "vm-fixo";
   valeAlimentacao: number;
   variaveis: number;
   variaveisItens: ItemVariavel[];
@@ -99,6 +101,12 @@ export function RateioTab() {
     const buscaNorm = busca.trim().toLowerCase();
     return buscaNorm ? linhas.filter((l) => l.nome.toLowerCase().includes(buscaNorm)) : linhas;
   }, [linhas, busca]);
+
+  // Quem tem VT calculado por tarifa da cidade em vez do valor cadastrado: para
+  // essas pessoas, mexer no Quadro de Colaboradores não muda nada aqui, e sem
+  // aviso não havia como descobrir isso olhando a tela.
+  const semValorNoCadastro = useMemo(() => linhas.filter((l) => l.origemVt === "tarifa-cidade"), [linhas]);
+  const semTarifaNenhuma = useMemo(() => linhas.filter((l) => l.origemVt === "sem-valor"), [linhas]);
 
   const ano = competencia.slice(0, 4);
 
@@ -286,6 +294,26 @@ export function RateioTab() {
           <span aria-hidden>⬆</span> Importar rateio
         </button>
       </div>
+
+      {semValorNoCadastro.length > 0 && (
+        <RiskCallout nivel="atencao">
+          <strong>
+            {semValorNoCadastro.length} colaborador(es) com VT sem valor por dia útil no Quadro de Colaboradores.
+          </strong>{" "}
+          O cálculo abaixo está usando a tarifa padrão da cidade para essas pessoas, então alterar o cadastro delas não
+          muda o valor aqui enquanto o campo continuar vazio:{" "}
+          {semValorNoCadastro.slice(0, 8).map((l) => l.nome).join(", ")}
+          {semValorNoCadastro.length > 8 && " e mais " + (semValorNoCadastro.length - 8)}.
+        </RiskCallout>
+      )}
+
+      {semTarifaNenhuma.length > 0 && (
+        <RiskCallout nivel="critico">
+          <strong>{semTarifaNenhuma.length} colaborador(es) estão com VT R$ 0,00.</strong> Não há valor por dia no
+          cadastro nem tarifa conhecida para a cidade, e o portal não arbitra valor de folha:{" "}
+          {semTarifaNenhuma.map((l) => l.nome).join(", ")}.
+        </RiskCallout>
+      )}
 
       {carregando ? (
         <p className="text-sm text-foreground-muted">Carregando...</p>

@@ -4,7 +4,7 @@ import { listarColaboradores } from "./colaboradores";
 import { obterDiasUteis } from "./beneficiosDiasUteis";
 import { obterExtras, listarCompetenciasFechadas } from "./folhaBreakdown";
 import { obterVariaveis, type ItemVariavel } from "./beneficiosVariaveis";
-import { calcularTransporteDoMes, arredondar } from "@/lib/calc";
+import { detalharTransporteDoMes, arredondar, type OrigemTransporte } from "@/lib/calc";
 import { obterTotaisInformados } from "./beneficiosTotais";
 
 export interface LinhaRateio {
@@ -16,6 +16,8 @@ export interface LinhaRateio {
   cidade: string | null;
   tipoTransporte: string;
   valeTransporte: number;
+  /** "cadastro" = veio do valor por dia do colaborador; o resto é suprimento, e a tela avisa. */
+  origemVt: OrigemTransporte;
   valeAlimentacao: number;
   /** Odontológico/Sólides/Flash/Bonificação/Outros — vêm da mesma planilha de extras do Breakdown de Folha (Relatório detalhado); `null` = nada importado nesse mês. */
   odontologico: number | null;
@@ -67,7 +69,7 @@ export async function gerarRateio(competencia: string): Promise<{ linhas: LinhaR
   const variaveis = await obterVariaveis(competencia);
 
   const linhas: LinhaRateio[] = (await listarColaboradores()).map((c) => {
-    const calculado = calcularTransporteDoMes(c, diasUteis);
+    const transporte = detalharTransporteDoMes(c, diasUteis);
     const override = extras.get(c.id);
     const extraFolha = extrasFolha.get(c.id);
     const variavelColaborador = variaveis.get(c.id);
@@ -80,7 +82,8 @@ export async function gerarRateio(competencia: string): Promise<{ linhas: LinhaR
       departamento: c.departamento,
       cidade: c.cidade,
       tipoTransporte: c.tipoTransporte,
-      valeTransporte: override?.valeTransporte ?? calculado,
+      valeTransporte: override?.valeTransporte ?? transporte.valor,
+      origemVt: override?.valeTransporte !== null && override?.valeTransporte !== undefined ? "cadastro" : transporte.origem,
       valeAlimentacao: override?.valeAlimentacao ?? (c.alimentacaoValor ?? 0),
       odontologico: extraFolha?.odontologico ?? null,
       solides: extraFolha?.solides ?? null,

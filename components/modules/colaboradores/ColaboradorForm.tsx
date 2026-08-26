@@ -100,9 +100,14 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
     editando?.alimentacaoValor ? String(editando.alimentacaoValor) : "",
   );
   const [tipoTransporte, setTipoTransporte] = useState<TipoTransporte>(editando?.tipoTransporte ?? "vt_diario");
-  const [valorTransporteFixo, setValorTransporteFixo] = useState(
-    editando?.valorTransporteFixo ? String(editando.valorTransporteFixo) : "",
-  );
+
+  // Um campo só na tela, duas colunas no banco: VT é valor de um dia útil, VM é
+  // valor fixo do mês, e cada um entra numa conta diferente. O campo carrega o
+  // valor da coluna que corresponde ao tipo escolhido.
+  const [valorTransporte, setValorTransporte] = useState(() => {
+    const atual = editando?.tipoTransporte === "vm_fixo" ? editando?.valorTransporteFixo : editando?.valorTransporteDia;
+    return atual ? String(atual) : "";
+  });
 
   // Endereço
   const [cep, setCep] = useState(editando?.cep ?? "");
@@ -267,7 +272,11 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
         conta: conta || null,
         alimentacaoValor: alimentacaoValor ? Number(alimentacaoValor) : null,
         tipoTransporte,
-        valorTransporteFixo: valorTransporteFixo ? Number(valorTransporteFixo) : null,
+        // A coluna do outro tipo vai a null de propósito: quem passa a receber
+        // VT não pode continuar com um valor de VM pendurado no cadastro, senão
+        // o número sobra ali sem ninguém saber a qual benefício pertence.
+        valorTransporteDia: tipoTransporte === "vt_diario" && valorTransporte ? Number(valorTransporte) : null,
+        valorTransporteFixo: tipoTransporte === "vm_fixo" && valorTransporte ? Number(valorTransporte) : null,
         cep: cep || null,
         estado: estado || null,
         cidade: cidade || null,
@@ -837,8 +846,8 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
             type="number"
             min={0}
             step="0.01"
-            value={valorTransporteFixo}
-            onChange={(e) => setValorTransporteFixo(e.target.value)}
+            value={valorTransporte}
+            onChange={(e) => setValorTransporte(e.target.value)}
             placeholder="R$ 0,00"
             disabled={bloqueado}
             className={INPUT_CLASS}

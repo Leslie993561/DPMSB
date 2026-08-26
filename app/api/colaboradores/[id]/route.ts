@@ -34,6 +34,8 @@ const schema = z.object({
   conta: z.string().nullable().optional(),
   tipoTransporte: z.enum(["vt_diario", "vm_fixo"]).optional(),
   valorTransporteFixo: z.coerce.number().min(0).nullable().optional(),
+  /** VT: valor de um dia útil, ida e volta. Coluna diferente da do VM. */
+  valorTransporteDia: z.coerce.number().min(0).nullable().optional(),
   status: z.enum(["ativo", "desligado"]).optional(),
   dataDesligamento: z.iso.date().nullable().optional(),
   motivoDesligamento: z.string().nullable().optional(),

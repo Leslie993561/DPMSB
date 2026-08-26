@@ -38,7 +38,7 @@ export const COLUNAS_COLABORADOR = [
   // Benefícios
   { header: "Alimentação", key: "alimentacaoValor", width: 14 },
   { header: "Tipo de transporte", key: "tipoTransporte", width: 18 },
-  { header: "Valor do transporte", key: "valorTransporteFixo", width: 18 },
+  { header: "Valor do transporte", key: "valorTransporte", width: 18 },
   // Endereço
   { header: "CEP", key: "cep", width: 12 },
   { header: "Estado", key: "estado", width: 10 },

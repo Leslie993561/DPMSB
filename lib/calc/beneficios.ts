@@ -105,7 +105,34 @@ export interface TransporteDoColaborador {
  * trecho e por isso vai dobrada.
  */
 export function calcularTransporteDoMes(c: TransporteDoColaborador, diasUteis: number): number {
-  if (c.tipoTransporte === "vm_fixo") return c.valorTransporteFixo ?? 0;
-  const valorDia = c.valorTransporteDia ?? tarifaVtPorCidade(c.cidade ?? "") * 2;
-  return calcularValeTransporte(valorDia / 2, c.salarioBase, diasUteis).valor;
+  return detalharTransporteDoMes(c, diasUteis).valor;
+}
+
+/** De onde veio o valor do dia usado no cálculo do VT. */
+export type OrigemTransporte = "cadastro" | "tarifa-cidade" | "sem-valor" | "vm-fixo";
+
+/**
+ * Mesmo cálculo, dizendo também de onde saiu o número.
+ *
+ * Sem isso, VT calculado pela tarifa da cidade era indistinguível de VT
+ * calculado pelo valor cadastrado: alterar o cadastro não mudava a tela e não
+ * havia como saber por quê. A origem sobe até o Rateio para que se veja quem
+ * está sem valor cadastrado em vez de ficar procurando.
+ */
+export function detalharTransporteDoMes(
+  c: TransporteDoColaborador,
+  diasUteis: number,
+): { valor: number; origem: OrigemTransporte } {
+  if (c.tipoTransporte === "vm_fixo") return { valor: c.valorTransporteFixo ?? 0, origem: "vm-fixo" };
+
+  if (c.valorTransporteDia !== null) {
+    return {
+      valor: calcularValeTransporte(c.valorTransporteDia / 2, c.salarioBase, diasUteis).valor,
+      origem: "cadastro",
+    };
+  }
+
+  const tarifa = tarifaVtPorCidade(c.cidade ?? "");
+  if (tarifa <= 0) return { valor: 0, origem: "sem-valor" };
+  return { valor: calcularValeTransporte(tarifa, c.salarioBase, diasUteis).valor, origem: "tarifa-cidade" };
 }

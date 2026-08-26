@@ -62,7 +62,9 @@ export async function GET() {
       conta: c.conta ?? "",
       alimentacaoValor: c.alimentacaoValor ?? "",
       tipoTransporte: c.tipoTransporte === "vm_fixo" ? "VM - fixo mensal" : "VT - por dia útil",
-      valorTransporteFixo: c.valorTransporteFixo ?? "",
+      // A coluna é uma só porque cada pessoa tem um tipo de transporte só; o
+      // valor que sai é o da coluna correspondente ao tipo dela.
+      valorTransporte: (c.tipoTransporte === "vm_fixo" ? c.valorTransporteFixo : c.valorTransporteDia) ?? "",
       cep: c.cep ?? "",
       estado: c.estado ?? "",
       cidade: c.cidade ?? "",
