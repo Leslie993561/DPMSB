@@ -18,6 +18,11 @@ function normalizarCelula(valor: ExcelJS.CellValue): CelulaValor {
     // 10 caracteres jogava a hora fora e "04:17" virava "1899-12-30", que não
     // vira número nenhum — foi assim que uma planilha inteira de horas extras
     // entrou vazia. Aqui a hora é preservada como "HH:MM".
+    // Só a época do Excel (30/12/1899) é hora-do-dia. Uma célula com formato de
+    // hora mas conteúdo maior que 24h vira data de 1900 em diante, e aí o valor
+    // NÃO é uma hora: é um número que foi digitado em cima de um formato de
+    // hora. Devolver a data crua faz o parser de horas recusar, e a importação
+    // avisa — melhor do que gravar 219 horas de desconto.
     const ehHoraDoExcel = valor.getUTCFullYear() === 1899;
     if (ehHoraDoExcel) {
       const hh = String(valor.getUTCHours()).padStart(2, "0");

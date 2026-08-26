@@ -1,6 +1,6 @@
 import "server-only";
 import type { LinhaPlanilha } from "./spreadsheet";
-import { parsearHoras } from "@/lib/folha/horas";
+import { parsearHoras, horasImplausiveis, formatarHoras } from "@/lib/folha/horas";
 
 const DIACRITICOS = new RegExp("[\\u0300-\\u036f]", "g");
 
@@ -188,6 +188,12 @@ export interface ConversaoExtras {
    * colunas apagaria a outra metade.
    */
   camposPresentes: CampoExtra[];
+  /**
+   * Horas que não cabem num mês de trabalho. Não são recusadas — quem lança é
+   * que sabe —, mas precisam aparecer: uma célula com valor em reais no lugar
+   * da hora vira centenas de horas e some dentro do total sem ninguém notar.
+   */
+  horasSuspeitas: { linha: number; colaborador: string; coluna: string; valor: string; motivo: string }[];
   descartadas: { linha: number; motivo: string }[];
 }
 
@@ -207,6 +213,7 @@ export function converterExtrasImportadas(cabecalhos: string[], linhas: LinhaPla
 
   const itens: LinhaExtrasImportada[] = [];
   const descartadas: ConversaoExtras["descartadas"] = [];
+  const horasSuspeitas: ConversaoExtras["horasSuspeitas"] = [];
 
   linhas.forEach((linha, i) => {
     const numeroLinha = i + 2;
@@ -214,6 +221,38 @@ export function converterExtrasImportadas(cabecalhos: string[], linhas: LinhaPla
     if (!nomeColaborador) {
       descartadas.push({ linha: numeroLinha, motivo: "Nome do colaborador ausente." });
       return;
+    }
+
+    /** Lê a hora da coluna e registra a suspeita quando o número não cabe num mês. */
+    function conferirHoras(coluna: string | undefined, rotulo: string): number | null {
+      if (!coluna) return null;
+      const bruto = linha[coluna];
+      const horas = parsearHoras(bruto);
+
+      // Célula com conteúdo que o portal não conseguiu ler como hora. É o caso
+      // mais perigoso: some sem deixar rastro e o mês fica sem a verba.
+      const temConteudo = bruto !== null && bruto !== undefined && String(bruto).trim() !== "";
+      if (temConteudo && horas === null) {
+        horasSuspeitas.push({
+          linha: numeroLinha,
+          colaborador: nomeColaborador,
+          coluna: rotulo,
+          valor: String(bruto),
+          motivo: "não foi lido como hora — use o formato hh:mm (ex.: 08:01)",
+        });
+        return null;
+      }
+
+      if (horasImplausiveis(horas)) {
+        horasSuspeitas.push({
+          linha: numeroLinha,
+          colaborador: nomeColaborador,
+          coluna: rotulo,
+          valor: formatarHoras(horas),
+          motivo: "não cabe num mês de trabalho — confira se a célula não tem valor em reais",
+        });
+      }
+      return horas;
     }
 
     const outrosCustosSoma = naoReconhecidas.reduce((soma, coluna) => {
@@ -233,10 +272,10 @@ export function converterExtrasImportadas(cabecalhos: string[], linhas: LinhaPla
       premiacao: mapa.premiacao ? paraNumeroOuNulo(linha[mapa.premiacao]) : null,
       // Estas quatro passam por parsearHoras, não por paraNumeroOuNulo:
       // "08:01" são oito horas e um minuto, e não o número 8,01.
-      horaExtra50: mapa.horaExtra50 ? parsearHoras(linha[mapa.horaExtra50]) : null,
-      horaExtra100: mapa.horaExtra100 ? parsearHoras(linha[mapa.horaExtra100]) : null,
-      descontoHoras: mapa.descontoHoras ? parsearHoras(linha[mapa.descontoHoras]) : null,
-      horaNoturna: mapa.horaNoturna ? parsearHoras(linha[mapa.horaNoturna]) : null,
+      horaExtra50: conferirHoras(mapa.horaExtra50, "Hora extra 50%"),
+      horaExtra100: conferirHoras(mapa.horaExtra100, "Hora extra 100%"),
+      descontoHoras: conferirHoras(mapa.descontoHoras, "Desconto de horas"),
+      horaNoturna: conferirHoras(mapa.horaNoturna, "Hora noturna"),
       outrosCustos: temOutros ? outrosCustosSoma : null,
     });
   });
@@ -250,6 +289,7 @@ export function converterExtrasImportadas(cabecalhos: string[], linhas: LinhaPla
     colunasReconhecidas: Object.values(mapa) as string[],
     colunasOutros: naoReconhecidas,
     colunasNaoEncontradas: naoEncontradas,
+    horasSuspeitas,
     camposPresentes: (Object.keys(mapa) as CampoExtra[]).filter(
       (campo) => campo !== "codigo" && campo !== "nomeColaborador",
     ),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parsearHoras, formatarHoras } from "../horas";
+import { parsearHoras, formatarHoras, horasImplausiveis } from "../horas";
 
 describe("parsearHoras", () => {
   it('lê "08:01" como oito horas e um minuto, não como 8,01', () => {
@@ -69,5 +69,34 @@ describe("parsearHoras · célula formatada como hora no Excel", () => {
 
   it("hora maior que a jornada de um dia continua valendo", () => {
     expect(parsearHoras("08:21")).toBeCloseTo(8 + 21 / 60, 6);
+  });
+});
+
+describe("parsearHoras · sinal negativo", () => {
+  it("aceita desconto já lançado com sinal", () => {
+    expect(parsearHoras("-08:21")).toBeCloseTo(-(8 + 21 / 60), 6);
+    expect(parsearHoras("-2,5")).toBeCloseTo(-2.5, 6);
+  });
+
+  it("formata negativo de volta com o sinal", () => {
+    expect(formatarHoras(-(8 + 21 / 60))).toBe("-08:21");
+  });
+
+  it("aceita duração acima de 99 horas", () => {
+    expect(parsearHoras("219:40")).toBeCloseTo(219 + 40 / 60, 6);
+  });
+});
+
+describe("horasImplausiveis", () => {
+  it("avisa sobre número que não cabe num mês de trabalho", () => {
+    expect(horasImplausiveis(61)).toBe(true);
+    expect(horasImplausiveis(219.66)).toBe(true);
+    expect(horasImplausiveis(-500)).toBe(true);
+  });
+
+  it("não implica nas horas do dia a dia", () => {
+    expect(horasImplausiveis(8.5)).toBe(false);
+    expect(horasImplausiveis(18.3)).toBe(false);
+    expect(horasImplausiveis(null)).toBe(false);
   });
 });

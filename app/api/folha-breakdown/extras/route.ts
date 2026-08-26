@@ -50,6 +50,7 @@ export async function POST(request: Request) {
       // planilha, por que uma verba não entrou: quase sempre a coluna existe
       // com outro nome, e sem isso a investigação vira adivinhação.
       cabecalhosDoArquivo: cabecalhos,
+      horasSuspeitas: conversao.horasSuspeitas,
       descartados: [...conversao.descartadas, ...resultado.descartados],
       totalLinhas: linhas.length,
     });

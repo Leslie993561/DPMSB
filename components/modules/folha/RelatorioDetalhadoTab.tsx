@@ -724,6 +724,7 @@ function ImportarPopover({
     colunasOutros: string[];
     colunasNaoEncontradas: string[];
     cabecalhosDoArquivo: string[];
+    horasSuspeitas: { linha: number; colaborador: string; coluna: string; valor: string; motivo: string }[];
     descartados: { linha: number; motivo: string }[];
   } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -827,7 +828,11 @@ function ImportarPopover({
                 {/* O desfecho vem antes dos números: com linhas descartadas a
                     importação não foi concluída por inteiro, e isso precisa
                     estar dito com todas as letras, não deduzido da contagem. */}
-                <RiskCallout nivel={resultado.descartados.length > 0 ? "atencao" : "sucesso"}>
+                <RiskCallout
+                  nivel={
+                    resultado.descartados.length > 0 || resultado.horasSuspeitas?.length > 0 ? "atencao" : "sucesso"
+                  }
+                >
                   <strong>
                     {resultado.descartados.length > 0
                       ? `Concluída em parte — ${resultado.aplicadas} de ${resultado.aplicadas + resultado.descartados.length} linha(s)`
@@ -837,6 +842,23 @@ function ImportarPopover({
                     <span className="mt-1 block">
                       Colunas somadas em &quot;Outros custos&quot;: {resultado.colunasOutros.join(", ")}
                     </span>
+                  )}
+                  {resultado.horasSuspeitas?.length > 0 && (
+                    <>
+                      <span className="mt-1 block font-semibold">
+                        ⚠ {resultado.horasSuspeitas.length} célula(s) de hora com problema:
+                      </span>
+                      <ul className="mt-1 list-inside list-disc">
+                        {resultado.horasSuspeitas.slice(0, 6).map((h, i) => (
+                          <li key={i}>
+                            Linha {h.linha}: {h.colaborador} · {h.coluna} = {h.valor} — {h.motivo}
+                          </li>
+                        ))}
+                        {resultado.horasSuspeitas.length > 6 && (
+                          <li>… e mais {resultado.horasSuspeitas.length - 6}</li>
+                        )}
+                      </ul>
+                    </>
                   )}
                   {resultado.colunasNaoEncontradas?.length > 0 && (
                     <span className="mt-1 block">
