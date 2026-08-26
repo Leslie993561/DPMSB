@@ -74,6 +74,8 @@ export function RateioTab() {
   const [carregando, setCarregando] = useState(true);
   const [importarAberto, setImportarAberto] = useState(false);
   const [menuMes, setMenuMes] = useState<number | null>(null);
+  const [avisosAbertos, setAvisosAbertos] = useState(false);
+  const avisosRef = useRef<HTMLDivElement>(null);
   const [editandoMes, setEditandoMes] = useState<number | null>(null);
   const [valorEdicaoDiasUteis, setValorEdicaoDiasUteis] = useState("");
   const [salvandoDiasUteis, setSalvandoDiasUteis] = useState(false);
@@ -107,6 +109,15 @@ export function RateioTab() {
   // aviso não havia como descobrir isso olhando a tela.
   const semValorNoCadastro = useMemo(() => linhas.filter((l) => l.origemVt === "tarifa-cidade"), [linhas]);
   const semTarifaNenhuma = useMemo(() => linhas.filter((l) => l.origemVt === "sem-valor"), [linhas]);
+
+  useEffect(() => {
+    if (!avisosAbertos) return;
+    const aoClicarFora = (e: MouseEvent) => {
+      if (!avisosRef.current?.contains(e.target as Node)) setAvisosAbertos(false);
+    };
+    document.addEventListener("mousedown", aoClicarFora);
+    return () => document.removeEventListener("mousedown", aoClicarFora);
+  }, [avisosAbertos]);
 
   const ano = competencia.slice(0, 4);
 
@@ -295,24 +306,59 @@ export function RateioTab() {
         </button>
       </div>
 
-      {semValorNoCadastro.length > 0 && (
-        <RiskCallout nivel="atencao">
-          <strong>
-            {semValorNoCadastro.length} colaborador(es) com VT sem valor por dia útil no Quadro de Colaboradores.
-          </strong>{" "}
-          O cálculo abaixo está usando a tarifa padrão da cidade para essas pessoas, então alterar o cadastro delas não
-          muda o valor aqui enquanto o campo continuar vazio:{" "}
-          {semValorNoCadastro.slice(0, 8).map((l) => l.nome).join(", ")}
-          {semValorNoCadastro.length > 8 && " e mais " + (semValorNoCadastro.length - 8)}.
-        </RiskCallout>
-      )}
+      {(semValorNoCadastro.length > 0 || semTarifaNenhuma.length > 0) && (
+        <div ref={avisosRef} className="relative self-start">
+          {/* Os dois avisos ocupavam um terço da tela toda vez que a aba abria.
+              Ficam atrás de uma bolinha: o número continua à vista, o texto
+              inteiro aparece a um clique. */}
+          <button
+            type="button"
+            onClick={() => setAvisosAbertos((v) => !v)}
+            aria-expanded={avisosAbertos}
+            aria-label={`${semValorNoCadastro.length + semTarifaNenhuma.length} aviso(s) sobre vale-transporte`}
+            className={cn(
+              "flex items-center gap-2 rounded-full border py-1.5 pr-3 pl-2 text-[12px] font-semibold transition-colors",
+              semTarifaNenhuma.length > 0
+                ? "border-status-danger-border bg-status-danger-bg text-status-danger hover:brightness-95"
+                : "border-status-warning-border bg-status-warning-bg text-status-warning hover:brightness-95",
+            )}
+          >
+            <span
+              aria-hidden
+              className={cn(
+                "inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold text-brand-white",
+                semTarifaNenhuma.length > 0 ? "bg-status-danger" : "bg-status-warning",
+              )}
+            >
+              {semValorNoCadastro.length + semTarifaNenhuma.length}
+            </span>
+            Vale-transporte {avisosAbertos ? "▴" : "▾"}
+          </button>
 
-      {semTarifaNenhuma.length > 0 && (
-        <RiskCallout nivel="critico">
-          <strong>{semTarifaNenhuma.length} colaborador(es) estão com VT R$ 0,00.</strong> Não há valor por dia no
-          cadastro nem tarifa conhecida para a cidade, e o portal não arbitra valor de folha:{" "}
-          {semTarifaNenhuma.map((l) => l.nome).join(", ")}.
-        </RiskCallout>
+          {avisosAbertos && (
+            <div className="absolute top-full left-0 z-50 mt-1.5 w-[min(46rem,calc(100vw-3rem))] space-y-2 rounded-xl border border-hairline bg-background p-3 shadow-lg dark:border-brand-neutral/30">
+              {semValorNoCadastro.length > 0 && (
+                <RiskCallout nivel="atencao">
+                  <strong>
+                    {semValorNoCadastro.length} colaborador(es) com VT sem valor por dia útil no Quadro de
+                    Colaboradores.
+                  </strong>{" "}
+                  O cálculo abaixo está usando a tarifa padrão da cidade para essas pessoas, então alterar o cadastro
+                  delas não muda o valor aqui enquanto o campo continuar vazio:{" "}
+                  {semValorNoCadastro.map((l) => l.nome).join(", ")}.
+                </RiskCallout>
+              )}
+
+              {semTarifaNenhuma.length > 0 && (
+                <RiskCallout nivel="critico">
+                  <strong>{semTarifaNenhuma.length} colaborador(es) estão com VT R$ 0,00.</strong> Não há valor por dia
+                  no cadastro nem tarifa conhecida para a cidade, e o portal não arbitra valor de folha:{" "}
+                  {semTarifaNenhuma.map((l) => l.nome).join(", ")}.
+                </RiskCallout>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {carregando ? (
