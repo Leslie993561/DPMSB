@@ -25,3 +25,30 @@ describe("elegibilidade a benefícios", () => {
     expect(estaNaFolha({ dataAdmissao: "2025-02-03", dataDesligamento: "2001-02-09" }, "2026-08")).toBe(true);
   });
 });
+
+describe("desligado com data de desligamento inutilizável", () => {
+  // O cadastro da Nathalia tem admissão 03/02/2025 e desligamento 09/02/2001 —
+  // ano digitado errado. A data é ignorada, mas o status diz "desligado", e
+  // isso basta para tirá-la da folha corrente.
+  const nathalia = {
+    dataAdmissao: "2025-02-03",
+    dataDesligamento: "2001-02-09",
+    status: "desligado",
+  };
+
+  it("sai da competência corrente", () => {
+    const agora = new Date();
+    const mesAtual = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, "0")}`;
+    expect(estaNaFolha(nathalia, mesAtual)).toBe(false);
+  });
+
+  it("continua nas competências passadas, que não se reescrevem por um chute", () => {
+    expect(estaNaFolha(nathalia, "2025-06")).toBe(true);
+  });
+
+  it("quem está ativo com data impossível permanece na folha", () => {
+    expect(
+      estaNaFolha({ dataAdmissao: "2026-08-10", dataDesligamento: "2026-08-07", status: "ativo" }, "2026-08"),
+    ).toBe(true);
+  });
+});

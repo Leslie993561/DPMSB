@@ -47,6 +47,96 @@ function IconeLapis() {
 }
 
 /** Divisor com rótulo em versalete, usado para separar o formulário em blocos temáticos. */
+/**
+ * Nome de cada campo como ele aparece na tela.
+ *
+ * Serve para traduzir o erro de validação da rota, que chega como caminho
+ * técnico ("conjugeNascimento"), no rótulo que a pessoa acabou de preencher.
+ * Sem isto o formulário mostrava só "Dados inválidos" e não havia como saber
+ * qual dos setenta campos recusou o valor.
+ */
+const ROTULO_CAMPO: Record<string, string> = {
+  nome: "Nome",
+  cpf: "CPF",
+  pis: "PIS",
+  dataNascimento: "Nascimento",
+  dataAdmissao: "Admissão",
+  dataDesligamento: "Desligamento",
+  salarioBase: "Salário base",
+  email: "E-mail",
+  emailPessoal: "E-mail pessoal",
+  telefone: "Telefone",
+  cargo: "Cargo",
+  departamento: "Setor",
+  vinculo: "Vínculo",
+  cbo: "CBO",
+  horario: "Horário",
+  banco: "Banco",
+  agencia: "Agência",
+  conta: "Conta",
+  cep: "CEP",
+  estado: "Estado",
+  cidade: "Cidade",
+  bairro: "Bairro",
+  rua: "Rua",
+  numero: "Número",
+  sexo: "Sexo",
+  cidadeNascimento: "Cidade de nascimento",
+  ufNascimento: "UF de nascimento",
+  nomePai: "Nome do pai",
+  nomeMae: "Nome da mãe",
+  alimentacaoValor: "Alimentação",
+  tipoTransporte: "Transporte",
+  valorTransporteDia: "Valor do VT (por dia útil)",
+  valorTransporteFixo: "Valor do VM (fixo mensal)",
+  periculosidadePercentual: "Periculosidade",
+  insalubridadePercentual: "Insalubridade",
+  adicionalFixo: "Adicional fixo",
+  adicionalFixoDescricao: "Descrição do adicional fixo",
+  conjugeNome: "Nome do cônjuge",
+  conjugeCpf: "CPF do cônjuge",
+  conjugeNascimento: "Nascimento do cônjuge",
+  conjugeSexo: "Sexo do cônjuge",
+  valorRescisao: "Valor da rescisão",
+  motivoDesligamento: "Motivo do desligamento",
+  dependentes: "Dependentes",
+  dependentesLista: "Dependente",
+};
+
+/** Texto de campo numérico: vazio vira null, "0" vira 0. */
+function numeroOuNulo(texto: string): number | null {
+  if (texto.trim() === "") return null;
+  const n = Number(texto.replace(",", "."));
+  return Number.isFinite(n) ? n : null;
+}
+
+interface DetalheValidacao {
+  path?: (string | number)[];
+  message?: string;
+}
+
+/** Monta a mensagem de erro nomeando os campos que a validação recusou. */
+function descreverErro(data: { erro?: string; detalhes?: DetalheValidacao[] }): string {
+  const detalhes = data.detalhes ?? [];
+  if (detalhes.length === 0) return data.erro ?? "Erro ao salvar colaborador.";
+
+  const campos = detalhes.map((d) => {
+    const caminho = (d.path ?? []).filter((p): p is string => typeof p === "string");
+    const raiz = caminho[0];
+    const rotulo = raiz ? (ROTULO_CAMPO[raiz] ?? raiz) : "campo desconhecido";
+    // Caminho de dependente vem como ["dependentesLista", 1, "dataNascimento"] —
+    // vira "Dependente 2 · Nascimento", que é o que se vê na tela.
+    const indice = (d.path ?? []).find((p) => typeof p === "number");
+    const sub = caminho[1];
+    const prefixo = typeof indice === "number" ? `${rotulo} ${indice + 1}` : rotulo;
+    const alvo = sub ? `${prefixo} · ${ROTULO_CAMPO[sub] ?? sub}` : prefixo;
+    return d.message ? `${alvo} (${d.message})` : alvo;
+  });
+
+  const unicos = Array.from(new Set(campos));
+  return `Confira ${unicos.length === 1 ? "o campo" : "os campos"}: ${unicos.join("; ")}.`;
+}
+
 function Secao({ titulo }: { titulo: string }) {
   return (
     <p className="mt-1 border-t border-hairline pt-2 text-[10px] font-semibold tracking-wide text-brand-primary-800 uppercase dark:border-brand-neutral/30">
@@ -121,6 +211,7 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
   const [conjugeNome, setConjugeNome] = useState(editando?.conjugeNome ?? "");
   const [conjugeCpf, setConjugeCpf] = useState(editando?.conjugeCpf ?? "");
   const [conjugeNascimento, setConjugeNascimento] = useState(editando?.conjugeNascimento ?? "");
+  const [conjugeSexo, setConjugeSexo] = useState<SexoColaborador | "">(editando?.conjugeSexo ?? "");
 
   // Adicionais
   const [periculosidade, setPericulosidade] = useState(
@@ -275,8 +366,11 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
         // A coluna do outro tipo vai a null de propósito: quem passa a receber
         // VT não pode continuar com um valor de VM pendurado no cadastro, senão
         // o número sobra ali sem ninguém saber a qual benefício pertence.
-        valorTransporteDia: tipoTransporte === "vt_diario" && valorTransporte ? Number(valorTransporte) : null,
-        valorTransporteFixo: tipoTransporte === "vm_fixo" && valorTransporte ? Number(valorTransporte) : null,
+        // Zero é um valor, não "campo vazio": significa que a pessoa não recebe
+        // transporte, e é diferente de null, que significa "ninguém informou" e
+        // faz o cálculo cair na tarifa da cidade.
+        valorTransporteDia: tipoTransporte === "vt_diario" ? numeroOuNulo(valorTransporte) : null,
+        valorTransporteFixo: tipoTransporte === "vm_fixo" ? numeroOuNulo(valorTransporte) : null,
         cep: cep || null,
         estado: estado || null,
         cidade: cidade || null,
@@ -286,6 +380,7 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
         conjugeNome: conjugeNome ? paraTitleCase(conjugeNome) : null,
         conjugeCpf: conjugeCpf || null,
         conjugeNascimento: conjugeNascimento || null,
+        conjugeSexo: conjugeSexo || null,
         periculosidadePercentual: periculosidade ? Number(periculosidade) : null,
         insalubridadePercentual: insalubridade ? Number(insalubridade) : null,
         adicionalFixo: adicionalFixo ? Number(adicionalFixo) : null,
@@ -307,7 +402,7 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
       });
       const data = await res.json();
       if (!res.ok) {
-        setErro(data.erro ?? "Erro ao salvar colaborador.");
+        setErro(descreverErro(data));
         return;
       }
       onSalvo();
@@ -1024,6 +1119,20 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
           />
         </label>
       </div>
+
+      <label className="flex w-1/2 flex-col gap-0 pr-1 text-[10px] font-normal text-foreground-muted">
+        Sexo
+        <select
+          value={conjugeSexo}
+          onChange={(e) => setConjugeSexo(e.target.value as SexoColaborador)}
+          disabled={bloqueado}
+          className={INPUT_CLASS}
+        >
+          <option value="">—</option>
+          <option value="M">Masculino</option>
+          <option value="F">Feminino</option>
+        </select>
+      </label>
 
       <Secao titulo="Dependentes" />
 

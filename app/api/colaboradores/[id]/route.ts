@@ -58,6 +58,7 @@ const schema = z.object({
   conjugeNome: z.string().nullable().optional(),
   conjugeCpf: z.string().nullable().optional(),
   conjugeNascimento: z.iso.date().nullable().optional(),
+  conjugeSexo: z.enum(["M", "F"]).nullable().optional(),
   dependentesLista: z.array(schemaDependente).optional(),
 });
 

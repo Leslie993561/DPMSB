@@ -6,6 +6,8 @@
 export interface VigenciaColaborador {
   dataAdmissao: string | null;
   dataDesligamento: string | null;
+  /** "ativo" | "desligado" — vale quando a data de desligamento está inutilizável. */
+  status?: string | null;
 }
 
 /**
@@ -31,9 +33,25 @@ export function estaNaFolha(colaborador: VigenciaColaborador, competencia: strin
   // esta guarda, um dígito trocado no cadastro apagava o colaborador de todas
   // as competências sem deixar rastro do motivo.
   const desligamento = colaborador.dataDesligamento;
-  if (desligamento && desligamento >= colaborador.dataAdmissao!) {
-    if (competencia >= desligamento.slice(0, 7)) return false;
+  const dataUtilizavel = Boolean(desligamento && desligamento >= colaborador.dataAdmissao!);
+
+  if (dataUtilizavel) {
+    if (competencia >= desligamento!.slice(0, 7)) return false;
+    return true;
   }
 
+  // Data inutilizável, mas o cadastro diz "desligado": a pessoa não está na
+  // folha de hoje, e é isso que se pode afirmar. Sem data válida não há como
+  // saber em que mês ela saiu, então as competências passadas ficam como
+  // estavam — reescrever o histórico com um mês chutado seria pior do que a
+  // data errada. O aviso de cadastro inconsistente cobra a correção.
+  if (colaborador.status === "desligado" && competencia >= mesAtual()) return false;
+
   return true;
+}
+
+/** Competência corrente, no formato "AAAA-MM". */
+function mesAtual(): string {
+  const agora = new Date();
+  return `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, "0")}`;
 }

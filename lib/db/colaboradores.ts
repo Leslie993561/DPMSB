@@ -60,6 +60,7 @@ export interface Colaborador {
   conjugeNome: string | null;
   conjugeCpf: string | null;
   conjugeNascimento: string | null;
+  conjugeSexo: SexoColaborador | null;
   /**
    * Adicionais guardados como PERCENTUAL, não como valor: periculosidade incide
    * sobre o salário base (Art. 193 §1º CLT) e insalubridade sobre o salário
@@ -116,6 +117,7 @@ export interface ColaboradorInput {
   conjugeNome?: string | null;
   conjugeCpf?: string | null;
   conjugeNascimento?: string | null;
+  conjugeSexo?: SexoColaborador | null;
   periculosidadePercentual?: number | null;
   insalubridadePercentual?: number | null;
   adicionalFixo?: number | null;
@@ -170,6 +172,7 @@ interface LinhaColaborador {
   conjuge_nome: string | null;
   conjuge_cpf: string | null;
   conjuge_nascimento: string | null;
+  conjuge_sexo: string | null;
 }
 
 function paraColaborador(linha: LinhaColaborador): Colaborador {
@@ -217,6 +220,7 @@ function paraColaborador(linha: LinhaColaborador): Colaborador {
     conjugeNome: linha.conjuge_nome,
     conjugeCpf: linha.conjuge_cpf,
     conjugeNascimento: linha.conjuge_nascimento,
+    conjugeSexo: linha.conjuge_sexo as SexoColaborador | null,
     periculosidadePercentual: linha.periculosidade_percentual,
     insalubridadePercentual: linha.insalubridade_percentual,
     adicionalFixo: linha.adicional_fixo,
@@ -260,9 +264,9 @@ export async function criarColaborador(input: ColaboradorInput): Promise<Colabor
          (nome, data_admissao, salario_base, dependentes, cpf, email, cargo, departamento, gestor_id, cidade,
           vinculo, alimentacao_valor, data_nascimento, cbo, agencia, conta, tipo_transporte, valor_transporte_fixo, valor_transporte_dia,
           lider_direto_nome, status, pis, cidade_nascimento, uf_nascimento, nome_pai, nome_mae, telefone, sexo,
-          email_pessoal, horario, banco, cep, estado, bairro, rua, numero, conjuge_nome, conjuge_cpf, conjuge_nascimento,
+          email_pessoal, horario, banco, cep, estado, bairro, rua, numero, conjuge_nome, conjuge_cpf, conjuge_nascimento, conjuge_sexo,
           periculosidade_percentual, insalubridade_percentual, adicional_fixo, adicional_fixo_descricao)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       input.nome,
       input.dataAdmissao,
@@ -303,6 +307,7 @@ export async function criarColaborador(input: ColaboradorInput): Promise<Colabor
       input.conjugeNome ?? null,
       input.conjugeCpf ?? null,
       input.conjugeNascimento ?? null,
+      input.conjugeSexo ?? null,
       input.periculosidadePercentual ?? null,
       input.insalubridadePercentual ?? null,
       input.adicionalFixo ?? null,
@@ -362,6 +367,7 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
     conjugeNome: input.conjugeNome !== undefined ? input.conjugeNome : atual.conjugeNome,
     conjugeCpf: input.conjugeCpf !== undefined ? input.conjugeCpf : atual.conjugeCpf,
     conjugeNascimento: input.conjugeNascimento !== undefined ? input.conjugeNascimento : atual.conjugeNascimento,
+    conjugeSexo: input.conjugeSexo !== undefined ? input.conjugeSexo : atual.conjugeSexo,
     periculosidadePercentual:
       input.periculosidadePercentual !== undefined ? input.periculosidadePercentual : atual.periculosidadePercentual,
     insalubridadePercentual:
@@ -380,7 +386,7 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
            status = ?, data_desligamento = ?, motivo_desligamento = ?, valor_rescisao = ?,
            pis = ?, cidade_nascimento = ?, uf_nascimento = ?, nome_pai = ?, nome_mae = ?, telefone = ?, sexo = ?,
            email_pessoal = ?, horario = ?, banco = ?, cep = ?, estado = ?, bairro = ?, rua = ?, numero = ?,
-           conjuge_nome = ?, conjuge_cpf = ?, conjuge_nascimento = ?,
+           conjuge_nome = ?, conjuge_cpf = ?, conjuge_nascimento = ?, conjuge_sexo = ?,
            periculosidade_percentual = ?, insalubridade_percentual = ?, adicional_fixo = ?,
            adicional_fixo_descricao = ?
        WHERE id = ?`,
@@ -427,6 +433,7 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
       mesclado.conjugeNome ?? null,
       mesclado.conjugeCpf ?? null,
       mesclado.conjugeNascimento ?? null,
+      mesclado.conjugeSexo ?? null,
       mesclado.periculosidadePercentual ?? null,
       mesclado.insalubridadePercentual ?? null,
       mesclado.adicionalFixo ?? null,

@@ -109,6 +109,7 @@ const MIGRACOES: { tabela: string; coluna: string; definicao: string }[] = [
   { tabela: "colaboradores", coluna: "conjuge_nome", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "conjuge_cpf", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "conjuge_nascimento", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "conjuge_sexo", definicao: "TEXT" },
   // Adicionais de salário. Percentuais e não valores: periculosidade incide
   // sobre o salário base (Art. 193 §1º) e insalubridade sobre o salário mínimo
   // (Art. 192) — guardar o valor calculado congelaria um número que muda com
