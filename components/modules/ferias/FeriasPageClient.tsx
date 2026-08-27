@@ -23,7 +23,6 @@ export function FeriasPageClient() {
   const searchParams = useSearchParams();
   const abaParam = searchParams.get("aba");
   const aba: Aba = abaParam && ABAS_VALIDAS.has(abaParam) ? (abaParam as Aba) : "controle";
-  const [simuladorAberto, setSimuladorAberto] = useState(false);
   const [ano, setAno] = useState(ANO_ATUAL);
   const [lancarAberto, setLancarAberto] = useState(false);
   const [importarAberto, setImportarAberto] = useState(false);
@@ -59,13 +58,6 @@ export function FeriasPageClient() {
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={() => setSimuladorAberto((v) => !v)}
-                className="flex items-center gap-1.5 rounded bg-brand-primary px-3 py-1.5 text-[12.5px] font-medium text-brand-white shadow-card transition-colors hover:bg-brand-primary-hover"
-              >
-                <span aria-hidden>🧮</span> Simulador de férias
-              </button>
-              <button
-                type="button"
                 onClick={() => setLancarAberto(true)}
                 className="flex items-center gap-1.5 rounded bg-brand-primary px-3 py-1.5 text-[12.5px] font-medium text-brand-white shadow-card transition-colors hover:bg-brand-primary-hover"
               >
@@ -97,7 +89,6 @@ export function FeriasPageClient() {
       )}
       {aba === "planejamento" && (
         <PlanejamentoDeFeriasTab
-          simuladorAberto={simuladorAberto}
           ano={ano}
           lancarAberto={lancarAberto}
           onFecharLancar={() => setLancarAberto(false)}

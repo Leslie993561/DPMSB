@@ -9,7 +9,6 @@ import { Card } from "@/components/shared/Card";
 import { RiskCallout } from "@/components/shared/RiskCallout";
 import { cn } from "@/lib/cn";
 import { formatarDataBr, formatarMoeda } from "@/lib/format";
-import { SimuladorFeriasTab } from "./SimuladorFeriasTab";
 import { ValidadorCltPanel } from "./ValidadorCltPanel";
 import { DetalheCalculoModal } from "./DetalheCalculoModal";
 import { LancarProgramacaoModal } from "./LancarProgramacaoModal";
@@ -40,13 +39,21 @@ function dataFimGozoExibida(item: ItemProgramacaoFerias): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** Uma linha rótulo/valor da aba suspensa de custo. */
+function LinhaValor({ rotulo, valor, destaque }: { rotulo: string; valor: number; destaque?: boolean }) {
+  return (
+    <span className={cn("flex justify-between gap-3", destaque ? "font-bold text-foreground" : "text-foreground-muted")}>
+      <span>{rotulo}</span>
+      <span>{formatarMoeda(valor)}</span>
+    </span>
+  );
+}
+
 export function PlanejamentoDeFeriasTab({
-  simuladorAberto = false,
   ano,
   lancarAberto,
   onFecharLancar,
 }: {
-  simuladorAberto?: boolean;
   ano: number;
   lancarAberto: boolean;
   onFecharLancar: () => void;
@@ -219,12 +226,6 @@ export function PlanejamentoDeFeriasTab({
 
   return (
     <div className="space-y-5">
-      {simuladorAberto && (
-        <Card className="p-4">
-          <h3 className="mb-3 text-[13.5px] font-bold text-foreground">Simulador de férias</h3>
-          <SimuladorFeriasTab />
-        </Card>
-      )}
 
       <p className="text-sm text-foreground-muted">
         Programação anual de {ano} por trimestre — o trimestre é o mês em que a férias começa (ou começou).
@@ -422,25 +423,32 @@ export function PlanejamentoDeFeriasTab({
                       {item.semSalario ? (
                         <span className="text-status-warning">a confirmar</span>
                       ) : (
-                        <span
-                          className="cursor-help text-foreground underline decoration-dotted underline-offset-2"
-                          title={[
-                            `Férias ${item.dias} dia(s): ${formatarMoeda(item.detalhe.valorGozado)}`,
-                            `1/3 constitucional: ${formatarMoeda(item.detalhe.tercoConstitucional)}`,
-                            item.detalhe.dobra > 0 ? `Dobra Art. 137: ${formatarMoeda(item.detalhe.dobra)}` : null,
-                            item.abono ? `Abono: ${formatarMoeda(item.detalhe.abono + item.detalhe.tercoAbono)}` : null,
-                            `(–) INSS: ${formatarMoeda(item.detalhe.inss)}`,
-                            `(–) IRRF: ${formatarMoeda(item.detalhe.irrf)}`,
-                            `= Líquido ao colaborador: ${formatarMoeda(item.detalhe.liquido)}`,
-                            "",
-                            `FGTS: ${formatarMoeda(item.detalhe.fgts)}`,
-                            `INSS patronal: ${formatarMoeda(item.detalhe.inssPatronal)}`,
-                            `CUSTO PREVISTO PARA A EMPRESA: ${formatarMoeda(item.custoPrevisto)}`,
-                          ]
-                            .filter((l) => l !== null)
-                            .join("\n")}
-                        >
-                          {formatarMoeda(item.detalhe.liquido)}
+                        <span className="group relative inline-flex justify-end">
+                          <span
+                            tabIndex={0}
+                            role="button"
+                            className="cursor-help text-foreground underline decoration-dotted underline-offset-2"
+                          >
+                            {formatarMoeda(item.detalhe.liquido)}
+                          </span>
+
+                          <span className="pointer-events-none absolute top-full right-0 z-50 hidden w-64 rounded-lg border border-hairline bg-background p-2.5 text-left text-[11px] font-normal shadow-lg group-hover:block group-focus-within:block dark:border-brand-neutral/30">
+                            <span className="block font-semibold text-foreground">Recebe o colaborador</span>
+                            <LinhaValor rotulo={`Férias (${item.dias} dias)`} valor={item.detalhe.valorGozado} />
+                            <LinhaValor rotulo="1/3 constitucional" valor={item.detalhe.tercoConstitucional} />
+                            {item.detalhe.dobra > 0 && <LinhaValor rotulo="Dobra (Art. 137)" valor={item.detalhe.dobra} />}
+                            {item.abono && <LinhaValor rotulo="Abono" valor={item.detalhe.abono + item.detalhe.tercoAbono} />}
+                            <LinhaValor rotulo="(–) INSS" valor={-item.detalhe.inss} />
+                            <LinhaValor rotulo="(–) IRRF" valor={-item.detalhe.irrf} />
+                            <LinhaValor rotulo="Líquido" valor={item.detalhe.liquido} destaque />
+
+                            <span className="mt-2 block border-t border-hairline pt-1.5 font-semibold text-foreground">
+                              Custo para a empresa
+                            </span>
+                            <LinhaValor rotulo="FGTS" valor={item.detalhe.fgts} />
+                            <LinhaValor rotulo="INSS patronal" valor={item.detalhe.inssPatronal} />
+                            <LinhaValor rotulo="Custo total" valor={item.custoPrevisto} destaque />
+                          </span>
                         </span>
                       )}
                     </td>

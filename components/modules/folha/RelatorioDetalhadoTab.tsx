@@ -48,6 +48,10 @@ interface VerbaColaborador {
   insalubridade: number;
   adicionalFixo: number;
   custoTotal: number;
+  encargosDiretos: number;
+  provisoes: number;
+  encargosSobreProvisoes: number;
+  regimeEncargos: "celetista" | "aprendiz" | null;
 }
 
 const MESES_ABREV = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
@@ -97,6 +101,19 @@ const GRUPO_PLATAFORMAS = "bg-[#EAF1F3]";
 const GRUPO_OUTROS = "bg-[#E9EEF1]";
 const GRUPO_HORAS = "bg-[#F0EDF6]";
 const DIVISOR = "border-l-2 border-hairline";
+
+/** Uma linha da composição de custo, com o percentual quando houver. */
+function LinhaCusto({ rotulo, percentual, valor }: { rotulo: string; percentual?: string; valor: number }) {
+  return (
+    <span className="flex justify-between gap-2 text-foreground-muted">
+      <span>
+        {rotulo}
+        {percentual && <span className="ml-1 opacity-70">{percentual}</span>}
+      </span>
+      <span className="tabular-nums">{formatarNumero(valor)}</span>
+    </span>
+  );
+}
 
 export function RelatorioDetalhadoTab() {
   const [competencia, setCompetencia] = useState(competenciaAtual());
@@ -561,7 +578,40 @@ export function RelatorioDetalhadoTab() {
                     <td className={cn(TD_NUM, GRUPO_OUTROS)}>{formatarNumeroOuTraco(l.insalubridade || null)}</td>
                     <td className={cn(TD_NUM, GRUPO_OUTROS)}>{formatarNumeroOuTraco(l.adicionalFixo || null)}</td>
                     <td className={cn(DIVISOR, "bg-brand-dark-900/5 px-3 py-1 text-right text-[11px] font-bold tabular-nums text-foreground", FONTE_NUMERO)}>
-                      {formatarNumero(l.custoTotal)}
+                      {/* O custo total abre a composição do empregador — a mesma
+                          do demonstrativo do DP: encargos diretos, provisões e
+                          os encargos que incidem sobre elas. Jovem aprendiz tem
+                          FGTS de 2%, então cai em 28,80% em vez de 34,80%. */}
+                      {l.regimeEncargos ? (
+                        <span className="group relative inline-flex justify-end">
+                          <span tabIndex={0} role="button" className="cursor-help underline decoration-dotted underline-offset-2">
+                            {formatarNumero(l.custoTotal)}
+                          </span>
+                          <span className="pointer-events-none absolute top-full right-0 z-50 hidden w-60 rounded-lg border border-hairline bg-background p-2.5 text-left text-[10.5px] font-normal shadow-lg group-hover:block group-focus-within:block dark:border-brand-neutral/30">
+                            <span className="block font-semibold text-foreground">
+                              Custo mensal folha ·{" "}
+                              {l.regimeEncargos === "aprendiz" ? "jovem aprendiz" : "celetista"}
+                            </span>
+                            <LinhaCusto rotulo="Salário" valor={l.salarioBase} />
+                            <LinhaCusto
+                              rotulo="Encargos diretos"
+                              percentual={l.regimeEncargos === "aprendiz" ? "28,80%" : "34,80%"}
+                              valor={l.encargosDiretos}
+                            />
+                            <LinhaCusto rotulo="Provisões" percentual="19,44%" valor={l.provisoes} />
+                            <LinhaCusto
+                              rotulo="Sobre as provisões"
+                              percentual={l.regimeEncargos === "aprendiz" ? "5,60%" : "6,77%"}
+                              valor={l.encargosSobreProvisoes}
+                            />
+                            <span className="mt-1 block border-t border-hairline pt-1 text-foreground-muted">
+                              Benefícios e verbas do mês entram no total da coluna.
+                            </span>
+                          </span>
+                        </span>
+                      ) : (
+                        formatarNumero(l.custoTotal)
+                      )}
                     </td>
                   </tr>
                 ))}

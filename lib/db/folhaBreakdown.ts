@@ -36,6 +36,12 @@ export interface VerbaColaborador {
   irrf: number;
   fgts: number;
   provisaoDecimoTerceiro: number;
+  /** Composição do custo do empregador, para a tela poder abrir o número. */
+  encargosDiretos: number;
+  provisoes: number;
+  encargosSobreProvisoes: number;
+  /** "aprendiz" tem FGTS de 2% e encargos diretos de 28,80%; "celetista", 8% e 34,80%. */
+  regimeEncargos: RegimeEncargos | null;
   valeTransporte: number;
   valeAlimentacao: number;
   /** Verbas "extras" do mês — vêm só de planilha importada (Relatório detalhado), nunca calculadas; `null` = nada importado ainda para esse mês. */
@@ -281,6 +287,16 @@ export async function carregarJanelasDeFerias(): Promise<Map<number, JanelaDeFer
  * interface para o operador ajustar manualmente antes de fechar o mês, caso
  * o módulo evolua para permitir edição.
  */
+/** "JÁ", "JA", "jovem aprendiz" — todas as grafias do cadastro para o mesmo contrato. */
+function ehJovemAprendiz(vinculo: string | null): boolean {
+  const v = (vinculo ?? "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .trim()
+    .toUpperCase();
+  return v === "JA" || v.startsWith("JOVEM APRENDIZ") || v === "APRENDIZ";
+}
+
 export async function gerarBreakdown(
   competencia: string,
   colaboradores?: Colaborador[],
@@ -342,8 +358,10 @@ export async function gerarBreakdown(
       ? { valor: 0 }
       : calcularIRRF(remuneracao - inss.valor, c.dependentes, dataCompetencia);
     // Jovem aprendiz recolhe FGTS de 2%, não de 8% (Lei 10.097/2000). O resto
-    // dos encargos é igual ao do celetista.
-    const regime: RegimeEncargos = c.vinculo === "JÁ" ? "aprendiz" : "celetista";
+    // dos encargos é igual ao do celetista. O cadastro escreve "JÁ", mas a
+    // comparação tolera acento e caixa para uma grafia diferente não jogar o
+    // aprendiz na alíquota cheia sem ninguém perceber.
+    const regime: RegimeEncargos = ehJovemAprendiz(c.vinculo) ? "aprendiz" : "celetista";
 
     // Custo do empregador completo: INSS patronal, RAT efetivo, Terceiros,
     // FGTS, as três provisões e os encargos que incidem sobre elas. Antes o
@@ -425,6 +443,10 @@ export async function gerarBreakdown(
       irrf: irrf.valor,
       fgts: fgts.valor,
       provisaoDecimoTerceiro,
+      encargosDiretos: encargos?.encargosDiretos ?? 0,
+      provisoes: encargos?.provisoes ?? 0,
+      encargosSobreProvisoes: encargos?.encargosSobreProvisoes ?? 0,
+      regimeEncargos: encargos ? regime : null,
       valeTransporte,
       valeAlimentacao,
       vm: extras.vm,
@@ -616,6 +638,14 @@ export async function listarBreakdownPersistido(competencia: string): Promise<Ve
       irrf: l.irrf,
       fgts: l.fgts,
       provisaoDecimoTerceiro: l.provisao_decimo_terceiro,
+      // O retrato do mês fechado guarda só salário, encargos e benefícios; a
+      // abertura em diretos/provisões não foi persistida quando o mês fechou.
+      // Zerar é o honesto: melhor a tela não mostrar composição do que mostrar
+      // uma recalculada com o cadastro de hoje sobre um mês congelado.
+      encargosDiretos: 0,
+      provisoes: 0,
+      encargosSobreProvisoes: 0,
+      regimeEncargos: null,
       valeTransporte: l.vale_transporte,
       valeAlimentacao: l.vale_alimentacao,
       vm: extras.vm,
