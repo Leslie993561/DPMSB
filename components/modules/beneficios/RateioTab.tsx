@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { formatarMoeda } from "@/lib/format";
+import { formatarDataBr, formatarMoeda } from "@/lib/format";
 import { Modal } from "@/components/shared/Modal";
 import { RiskCallout } from "@/components/shared/RiskCallout";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -26,6 +26,8 @@ interface LinhaRateio {
   /** "cadastro" = veio do valor por dia do colaborador; o resto é suprimento. */
   origemVt: "cadastro" | "tarifa-cidade" | "sem-valor" | "vm-fixo";
   vtDiarioImplausivel: boolean;
+  diasUteisDeFerias: number;
+  feriasNoMes: { inicio: string; fim: string }[];
   valeAlimentacao: number;
   variaveis: number;
   variaveisItens: ItemVariavel[];
@@ -393,8 +395,37 @@ export function RateioTab() {
                 <tr key={l.colaboradorId} className="border-b border-hairline/60 last:border-0">
                   <td className="px-4 py-2">
                     <div className="font-semibold text-foreground-muted uppercase">{l.nome}</div>
-                    <div className="text-[10.5px] text-foreground-muted">
-                      {l.vinculo ?? "—"} · {l.departamento ?? "—"}
+                    <div className="flex items-center gap-1 text-[10.5px] text-foreground-muted">
+                      <span>
+                        {l.vinculo ?? "—"} · {l.departamento ?? "—"}
+                      </span>
+
+                      {/* Transporte e mobilidade abatidos pelos dias de férias.
+                          O aviso fica ao lado do setor porque é ali que se olha
+                          quando um valor destoa dos colegas do mesmo time. */}
+                      {l.diasUteisDeFerias > 0 && (
+                        <span className="group relative inline-flex">
+                          <span
+                            tabIndex={0}
+                            role="button"
+                            aria-label={`Valor ajustado por ${l.diasUteisDeFerias} dia(s) útil(eis) de férias`}
+                            className="flex h-3.5 w-3.5 cursor-help items-center justify-center rounded-full bg-status-warning text-[9px] font-bold text-brand-white"
+                          >
+                            !
+                          </span>
+                          <span className="pointer-events-none absolute top-full left-0 z-50 hidden w-[min(24rem,calc(100vw-3rem))] rounded-lg border border-status-warning-border bg-status-warning-bg px-3 py-2 text-[11px] leading-snug font-normal text-status-warning shadow-lg group-hover:block group-focus-within:block">
+                            Transporte e mobilidade reduzidos: {l.diasUteisDeFerias} dia(s) útil(eis) de férias neste
+                            mês
+                            {l.feriasNoMes.length > 0 && (
+                              <>
+                                {" "}
+                                ({l.feriasNoMes.map((f) => `${formatarDataBr(f.inicio)} a ${formatarDataBr(f.fim)}`).join("; ")})
+                              </>
+                            )}
+                            . A alimentação não é abatida.
+                          </span>
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="px-4 py-2 text-right">

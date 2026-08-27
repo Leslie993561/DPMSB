@@ -2,6 +2,8 @@ import "server-only";
 import { getDb } from "./client";
 import { listarColaboradores } from "./colaboradores";
 import { estaNaFolha } from "@/lib/folha/vigencia";
+import { diasUteisDeFeriasNoMes, proporcionalAosDiasTrabalhados, type JanelaDeFerias } from "@/lib/folha/feriasNoMes";
+import { listarProgramacaoFerias } from "./programacaoFerias";
 import { obterDiasUteis } from "./beneficiosDiasUteis";
 import { obterExtras, listarCompetenciasFechadas } from "./folhaBreakdown";
 import { obterVariaveis, type ItemVariavel } from "./beneficiosVariaveis";
@@ -25,6 +27,10 @@ export interface LinhaRateio {
   descontoVtEmpregado: number;
   /** Valor por dia útil alto demais para ser passagem — provável valor mensal na coluna errada. */
   vtDiarioImplausivel: boolean;
+  /** Dias úteis de férias na competência — abatidos do transporte e da mobilidade. */
+  diasUteisDeFerias: number;
+  /** Datas do gozo que causou o abatimento, para a tela poder explicar. */
+  feriasNoMes: JanelaDeFerias[];
   valeAlimentacao: number;
   /** Odontológico/Sólides/Flash/Bonificação/Outros — vêm da mesma planilha de extras do Breakdown de Folha (Relatório detalhado); `null` = nada importado nesse mês. */
   odontologico: number | null;
@@ -80,6 +86,23 @@ export async function gerarRateio(competencia: string): Promise<{ linhas: LinhaR
   const { ano, mes } = competenciaParaAnoMes(competencia);
   const diasUteis = await obterDiasUteis(ano, mes);
   const extras = await obterExtrasRateio(competencia);
+
+  // Janelas de gozo vindas da Programação/Controle de Férias — a mesma fonte
+  // que as duas telas usam. Cancelada não conta: as férias não vão acontecer.
+  const feriasPorColaborador = new Map<number, JanelaDeFerias[]>();
+  for (const item of await listarProgramacaoFerias()) {
+    if (item.status === "cancelada") continue;
+    const inicio = item.dataInicio;
+    if (!inicio) continue;
+    // Sem data de retorno registrada, o fim sai dos dias do lançamento — as
+    // férias contam dias corridos a partir do início (Art. 130 CLT).
+    const fim =
+      item.dataRetorno ??
+      new Date(new Date(`${inicio}T00:00:00Z`).getTime() + (item.dias - 1) * 86400000).toISOString().slice(0, 10);
+    const atual = feriasPorColaborador.get(item.colaboradorId) ?? [];
+    atual.push({ inicio, fim });
+    feriasPorColaborador.set(item.colaboradorId, atual);
+  }
   const extrasFolha = await obterExtras(competencia);
   const variaveis = await obterVariaveis(competencia);
 
@@ -92,6 +115,15 @@ export async function gerarRateio(competencia: string): Promise<{ linhas: LinhaR
 
   const linhas: LinhaRateio[] = doMes.map((c) => {
     const transporte = detalharTransporteDoMes(c, diasUteis);
+
+    // Transporte e mobilidade pagam deslocamento: em dia de férias não há
+    // deslocamento. Alimentação fica fora — o DP paga o mês cheio.
+    const janelas = feriasPorColaborador.get(c.id) ?? [];
+    const diasDeFerias = diasUteisDeFeriasNoMes(competencia, janelas);
+    const transporteComFerias =
+      diasDeFerias > 0
+        ? arredondar(proporcionalAosDiasTrabalhados(transporte.bruto, diasUteis, diasDeFerias))
+        : transporte.bruto;
     const override = extras.get(c.id);
     const extraFolha = extrasFolha.get(c.id);
     const variavelColaborador = variaveis.get(c.id);
@@ -107,11 +139,16 @@ export async function gerarRateio(competencia: string): Promise<{ linhas: LinhaR
       tipoTransporte: c.tipoTransporte,
       // Bruto, não líquido: no rateio o que interessa é o valor do vale, que é
       // o que a operadora fatura. O desconto do empregado vai à parte.
-      valeTransporte: override?.valeTransporte ?? transporte.bruto,
+      valeTransporte: override?.valeTransporte ?? transporteComFerias,
       descontoVtEmpregado: override?.valeTransporte !== null && override?.valeTransporte !== undefined ? 0 : transporte.descontoEmpregado,
       origemVt: override?.valeTransporte !== null && override?.valeTransporte !== undefined ? "cadastro" : transporte.origem,
       vtDiarioImplausivel:
         c.tipoTransporte !== "vm_fixo" && (c.valorTransporteDia ?? 0) > VT_DIARIO_IMPLAUSIVEL,
+      // O override da planilha manda: se o DP informou o valor, ele já vem com
+      // o desconto que quiser, e o portal não abate de novo por cima.
+      diasUteisDeFerias:
+        override?.valeTransporte !== null && override?.valeTransporte !== undefined ? 0 : diasDeFerias,
+      feriasNoMes: janelas.filter((j) => diasUteisDeFeriasNoMes(competencia, [j]) > 0),
       valeAlimentacao: override?.valeAlimentacao ?? (c.alimentacaoValor ?? 0),
       odontologico: extraFolha?.odontologico ?? null,
       solides: extraFolha?.solides ?? null,
