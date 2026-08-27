@@ -40,6 +40,8 @@ export interface LinhaRateio {
 interface ExtrasRateio {
   valeTransporte: number | null;
   valeAlimentacao: number | null;
+  /** Variáveis informadas na planilha; substituem o calculado do mês. */
+  variaveis: number | null;
 }
 
 function competenciaParaAnoMes(competencia: string): { ano: number; mes: number } {
@@ -51,16 +53,22 @@ interface LinhaExtrasRateio {
   colaborador_id: number;
   vale_transporte: number | null;
   vale_alimentacao: number | null;
+  variaveis: number | null;
 }
 
 async function obterExtrasRateio(competencia: string): Promise<Map<number, ExtrasRateio>> {
   const db = await getDb();
   const resultado = await db.execute({
-    sql: "SELECT colaborador_id, vale_transporte, vale_alimentacao FROM beneficios_rateio_extras WHERE competencia = ?",
+    sql: "SELECT colaborador_id, vale_transporte, vale_alimentacao, variaveis FROM beneficios_rateio_extras WHERE competencia = ?",
     args: [competencia],
   });
   const linhas = resultado.rows as unknown as LinhaExtrasRateio[];
-  return new Map(linhas.map((l) => [l.colaborador_id, { valeTransporte: l.vale_transporte, valeAlimentacao: l.vale_alimentacao }]));
+  return new Map(
+    linhas.map((l) => [
+      l.colaborador_id,
+      { valeTransporte: l.vale_transporte, valeAlimentacao: l.vale_alimentacao, variaveis: l.variaveis },
+    ]),
+  );
 }
 
 /**
@@ -110,7 +118,9 @@ export async function gerarRateio(competencia: string): Promise<{ linhas: LinhaR
       flash: extraFolha?.flash ?? null,
       bonificacao: extraFolha?.bonificacao ?? null,
       outrosCustos: extraFolha?.outrosCustos ?? null,
-      variaveis: variavelColaborador?.total ?? 0,
+      // Informado na planilha de rateio manda; senão, o calculado do mês (hoje,
+      // o presente de aniversário lido do Quadro de Colaboradores).
+      variaveis: override?.variaveis ?? variavelColaborador?.total ?? 0,
       variaveisItens: variavelColaborador?.itens ?? [],
     };
   });
@@ -206,11 +216,13 @@ export async function obterResumoAnualBeneficios(ano: number): Promise<ResumoMen
 export async function upsertExtrasRateio(colaboradorId: number, competencia: string, extras: ExtrasRateio): Promise<void> {
   const db = await getDb();
   await db.execute({
-    sql: `INSERT INTO beneficios_rateio_extras (colaborador_id, competencia, vale_transporte, vale_alimentacao)
-       VALUES (?, ?, ?, ?)
+    sql: `INSERT INTO beneficios_rateio_extras (colaborador_id, competencia, vale_transporte, vale_alimentacao, variaveis)
+       VALUES (?, ?, ?, ?, ?)
        ON CONFLICT(colaborador_id, competencia) DO UPDATE SET
-         vale_transporte = excluded.vale_transporte, vale_alimentacao = excluded.vale_alimentacao`,
-    args: [colaboradorId, competencia, extras.valeTransporte, extras.valeAlimentacao],
+         vale_transporte = excluded.vale_transporte,
+         vale_alimentacao = excluded.vale_alimentacao,
+         variaveis = excluded.variaveis`,
+    args: [colaboradorId, competencia, extras.valeTransporte, extras.valeAlimentacao, extras.variaveis],
   });
 }
 
@@ -219,6 +231,7 @@ export interface LinhaImportacaoRateio {
   nomeColaborador: string;
   valeTransporte: number | null;
   valeAlimentacao: number | null;
+  variaveis: number | null;
 }
 
 export interface ResultadoImportacaoRateio {
@@ -249,6 +262,7 @@ export async function importarRateio(itens: LinhaImportacaoRateio[], competencia
     await upsertExtrasRateio(colaborador.id, competencia, {
       valeTransporte: item.valeTransporte,
       valeAlimentacao: item.valeAlimentacao,
+      variaveis: item.variaveis,
     });
     aplicadas++;
   }

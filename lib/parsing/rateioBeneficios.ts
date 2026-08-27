@@ -14,13 +14,14 @@ function normalizar(texto: string): string {
     .trim();
 }
 
-type CampoRateio = "codigo" | "nomeColaborador" | "valeTransporte" | "valeAlimentacao";
+type CampoRateio = "codigo" | "nomeColaborador" | "valeTransporte" | "valeAlimentacao" | "variaveis";
 
 const SINONIMOS: Record<CampoRateio, string[]> = {
   codigo: ["codigo", "cod", "matricula", "id"],
   nomeColaborador: ["nome do colaborador", "colaborador", "nome", "empregado", "funcionario"],
   valeTransporte: ["transporte", "vale transporte", "vt", "vm"],
   valeAlimentacao: ["alimentacao", "vale alimentacao", "va", "vr"],
+  variaveis: ["variaveis", "variavel", "aniversario", "premiacao"],
 };
 
 function mapearCabecalhos(cabecalhos: string[]): Partial<Record<CampoRateio, string>> {
@@ -69,6 +70,7 @@ export function converterRateioImportado(cabecalhos: string[], linhas: LinhaPlan
       nomeColaborador,
       valeTransporte: mapa.valeTransporte ? paraNumeroOuNulo(linha[mapa.valeTransporte]) : null,
       valeAlimentacao: mapa.valeAlimentacao ? paraNumeroOuNulo(linha[mapa.valeAlimentacao]) : null,
+      variaveis: mapa.variaveis ? paraNumeroOuNulo(linha[mapa.variaveis]) : null,
     });
   });
 

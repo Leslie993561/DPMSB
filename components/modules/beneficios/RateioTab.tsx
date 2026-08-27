@@ -85,8 +85,6 @@ export function RateioTab() {
   const [editandoMes, setEditandoMes] = useState<number | null>(null);
   const [valorEdicaoDiasUteis, setValorEdicaoDiasUteis] = useState("");
   const [salvandoDiasUteis, setSalvandoDiasUteis] = useState(false);
-  const [menuVariavelAberto, setMenuVariavelAberto] = useState(false);
-  const [importarVariaveisAberto, setImportarVariaveisAberto] = useState(false);
   const [colaboradorHover, setColaboradorHover] = useState<number | null>(null);
 
   async function recarregar() {
@@ -172,41 +170,6 @@ export function RateioTab() {
   // dependem da competência e do estado de importação, que vivem aqui.
   const acoes = (
     <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setMenuVariavelAberto((v) => !v)}
-              className="flex items-center gap-1.5 rounded-md border border-hairline bg-background px-3 py-1.5 text-[12px] font-semibold text-foreground transition-colors hover:border-brand-primary hover:text-brand-primary-800 dark:border-brand-neutral/30"
-            >
-              <span aria-hidden>🧮</span> Variável
-            </button>
-
-            {menuVariavelAberto && (
-              <>
-                <div className="fixed inset-0 z-20" onClick={() => setMenuVariavelAberto(false)} />
-                <div className="absolute top-full right-0 z-30 mt-1.5 w-56 rounded-md border border-hairline bg-background py-1 shadow-drawer">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMenuVariavelAberto(false);
-                      setImportarVariaveisAberto(true);
-                    }}
-                    className="block w-full px-3 py-1.5 text-left text-[12px] text-foreground hover:bg-surface-page"
-                  >
-                    Importar planilha
-                  </button>
-                  <a
-                    href="/api/beneficios/variaveis/modelo"
-                    download
-                    onClick={() => setMenuVariavelAberto(false)}
-                    className="block w-full px-3 py-1.5 text-left text-[12px] text-foreground hover:bg-surface-page"
-                  >
-                    Baixar planilha modelo
-                  </a>
-                </div>
-              </>
-            )}
-          </div>
       <a
         href={`/api/beneficios/rateio/exportar?competencia=${competencia}`}
         download
@@ -501,13 +464,6 @@ export function RateioTab() {
         />
       )}
 
-      {importarVariaveisAberto && (
-        <ImportarVariaveisModal
-          competenciaInicial={competencia}
-          onFechar={() => setImportarVariaveisAberto(false)}
-          onImportado={() => void recarregar()}
-        />
-      )}
     </div>
   );
 }
@@ -654,144 +610,3 @@ function ImportarRateioModal({
   );
 }
 
-function ImportarVariaveisModal({
-  competenciaInicial,
-  onFechar,
-  onImportado,
-}: {
-  competenciaInicial: string;
-  onFechar: () => void;
-  onImportado: () => void;
-}) {
-  const [mesReferencia, setMesReferencia] = useState(competenciaInicial);
-  const [arquivo, setArquivo] = useState<File | null>(null);
-  const [enviando, setEnviando] = useState(false);
-  const [erro, setErro] = useState<string | null>(null);
-  const [resultado, setResultado] = useState<{
-    aplicadas: number;
-    descartados: { linha: number; motivo: string }[];
-  } | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  async function aplicar() {
-    if (!arquivo) {
-      setErro("Anexe a planilha antes de continuar.");
-      return;
-    }
-    setErro(null);
-    setEnviando(true);
-    try {
-      const formData = new FormData();
-      formData.append("arquivo", arquivo);
-      formData.append("competencia", mesReferencia);
-      const res = await fetch("/api/beneficios/variaveis", { method: "POST", body: formData });
-      const data = await res.json();
-      if (!res.ok) {
-        setErro(data.erro ?? "Erro ao ler a planilha.");
-        return;
-      }
-      setResultado(data);
-      onImportado();
-    } catch {
-      setErro("Falha de comunicação com o servidor.");
-    } finally {
-      setEnviando(false);
-    }
-  }
-
-  return (
-    <Modal
-      aberto
-      onFechar={onFechar}
-      eyebrow="Benefícios · Rateio"
-      titulo="Importar variáveis"
-      subtitulo="Soma valores avulsos de Transporte, Mobilidade e Alimentação ao total já lançado de cada colaborador"
-      rodape={
-        <>
-          <button
-            type="button"
-            onClick={onFechar}
-            className="rounded-md border border-hairline px-4 py-2 text-sm text-foreground-muted hover:bg-surface-page dark:border-brand-neutral/30"
-          >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            onClick={aplicar}
-            disabled={enviando || !arquivo}
-            className="ml-auto rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-brand-white hover:bg-brand-primary-700 disabled:opacity-50"
-          >
-            {enviando ? "Lendo..." : `✓ Ler planilha e somar em ${competenciaLonga(mesReferencia)}`}
-          </button>
-        </>
-      }
-    >
-      <div className="space-y-3">
-        <div className="flex items-start justify-between gap-2 rounded border border-hairline bg-surface-page px-3 py-2.5">
-          <p className="text-[11px] leading-relaxed text-foreground-muted">
-            Cada planilha importada é somada às anteriores — não substitui valores já lançados. A leitura identifica
-            as colunas pelo cabeçalho (não pela posição) e casa cada linha por código ou nome do colaborador.
-          </p>
-          <a
-            href="/api/beneficios/variaveis/modelo"
-            download
-            className="shrink-0 text-[11px] font-semibold text-brand-primary-800 hover:underline"
-          >
-            Baixar modelo
-          </a>
-        </div>
-
-        <label className="block text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">
-          Mês de referência da planilha
-          <input
-            type="month"
-            value={mesReferencia}
-            onChange={(e) => setMesReferencia(e.target.value)}
-            className="mt-1 w-full rounded-md border border-hairline bg-background px-2.5 py-1.5 text-[12px] font-normal text-foreground normal-case"
-          />
-        </label>
-
-        <label className="flex cursor-pointer flex-col items-center gap-1 rounded-md border-2 border-dashed border-hairline px-4 py-5 text-center hover:border-brand-primary">
-          <span aria-hidden className="text-xl text-brand-primary">
-            ☁
-          </span>
-          <span className="text-[12px] font-medium text-foreground">
-            {arquivo ? arquivo.name : "Arraste a planilha aqui ou clique para anexar"}
-          </span>
-          <span className="text-[10px] text-foreground-muted">XLSX, XLS ou CSV · até 10 MB</span>
-          <input
-            ref={inputRef}
-            type="file"
-            accept=".xlsx,.xls,.csv"
-            className="hidden"
-            onChange={(e) => {
-              setResultado(null);
-              setErro(null);
-              setArquivo(e.target.files?.[0] ?? null);
-            }}
-          />
-        </label>
-
-        {erro && <RiskCallout nivel="critico">{erro}</RiskCallout>}
-        {resultado && (
-          <RiskCallout nivel="sucesso">
-            {resultado.aplicadas} linha(s) aplicada(s)
-            {resultado.descartados.length > 0 && (
-              <>
-                <br />
-                {resultado.descartados.length} linha(s) descartada(s):
-                <ul className="mt-1 list-inside list-disc">
-                  {resultado.descartados.slice(0, 5).map((d, i) => (
-                    <li key={i}>
-                      Linha {d.linha}: {d.motivo}
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </RiskCallout>
-        )}
-      </div>
-    </Modal>
-  );
-}

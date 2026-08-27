@@ -109,6 +109,11 @@ const MIGRACOES: { tabela: string; coluna: string; definicao: string }[] = [
   // e aí o portal volta a deduzir pelo departamento — que é palpite, não
   // classificação contábil.
   { tabela: "colaboradores", coluna: "rateio_d365", definicao: "TEXT" },
+  // Variáveis informadas na planilha de rateio. Substituem o calculado (hoje o
+  // presente de aniversário) em vez de somar: a importação de rateio é
+  // idempotente por competência, e acumular faria reimportar o mesmo arquivo
+  // dobrar o valor.
+  { tabela: "beneficios_rateio_extras", coluna: "variaveis", definicao: "REAL" },
   // Dados pessoais
   { tabela: "colaboradores", coluna: "pis", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "cidade_nascimento", definicao: "TEXT" },

@@ -27,6 +27,7 @@ export async function GET(request: Request) {
     { header: "Cidade", key: "cidade", width: 18 },
     { header: "Transporte", key: "transporte", width: 14 },
     { header: "Alimentação", key: "alimentacao", width: 14 },
+    { header: "Variáveis", key: "variaveis", width: 14 },
     { header: "Total", key: "total", width: 14 },
   ];
   sheet.getRow(1).font = { bold: true };
@@ -40,7 +41,8 @@ export async function GET(request: Request) {
       cidade: l.cidade ?? "",
       transporte: l.valeTransporte,
       alimentacao: l.valeAlimentacao,
-      total: l.valeTransporte + l.valeAlimentacao,
+      variaveis: l.variaveis,
+      total: l.valeTransporte + l.valeAlimentacao + l.variaveis,
     });
   }
   padronizarColunaDeNome(sheet);
