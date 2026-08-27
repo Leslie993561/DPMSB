@@ -290,7 +290,32 @@ export async function listarPeriodosAbertos(base?: BaseControle): Promise<Period
     abertos.push(candidato);
   }
 
-  return abertos;
+  // Período fechado só continua na tela quando é a ÚNICA linha da pessoa.
+  //
+  // Os 30 dias gozados ficam visíveis como "Concluído" para que "Confirmar
+  // gozo" não faça a linha desaparecer — foi por isso que essa regra existe.
+  // Mas quando o colaborador já tem um período com saldo, a linha fechada não
+  // acrescenta nada e o nome aparece duas vezes seguidas, que se lê como
+  // duplicata: a Carolina tinha 2023–2024 fechado logo acima de 2024–2025 com
+  // 15 dias a tirar. O histórico completo continua na exportação por
+  // colaborador e no drawer da pessoa.
+  const temSaldo = new Set(abertos.filter((p) => p.diasATirar > 0).map((p) => p.colaboradorId));
+
+  // Sem saldo em nenhum período, sobra o período fechado MAIS RECENTE. Uma
+  // linha já cumpre o papel de não deixar a pessoa desaparecer da tela; duas
+  // ou três só repetem o nome. A Leildes tinha dois períodos 30/30 seguidos.
+  const fechadoMaisRecente = new Map<number, string>();
+  for (const p of abertos) {
+    if (p.diasATirar > 0 || temSaldo.has(p.colaboradorId)) continue;
+    const atual = fechadoMaisRecente.get(p.colaboradorId);
+    if (!atual || p.dataInicio > atual) fechadoMaisRecente.set(p.colaboradorId, p.dataInicio);
+  }
+
+  return abertos.filter((p) => {
+    if (p.diasATirar > 0) return true;
+    if (temSaldo.has(p.colaboradorId)) return false;
+    return fechadoMaisRecente.get(p.colaboradorId) === p.dataInicio;
+  });
 }
 
 /** Histórico completo (todos os períodos, resolvidos ou não) de um único colaborador — usado na exportação "por colaborador". */
