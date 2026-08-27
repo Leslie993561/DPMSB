@@ -196,8 +196,18 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
   // Um campo só na tela, duas colunas no banco: VT é valor de um dia útil, VM é
   // valor fixo do mês, e cada um entra numa conta diferente. O campo carrega o
   // valor da coluna que corresponde ao tipo escolhido.
+  // O VM pode ser cadastrado por dia útil ou como fixo mensal. O DP raciocina
+  // por dia ("o Iago recebe 18 por dia"), e é assim que as férias podem ser
+  // abatidas em dias; o fixo continua existindo para quem já está cadastrado
+  // desse jeito, e para casos em que o valor do mês não vem de uma diária.
+  const [vmPorDia, setVmPorDia] = useState(
+    editando?.tipoTransporte === "vm_fixo" ? editando.valorTransporteDia !== null : true,
+  );
   const [valorTransporte, setValorTransporte] = useState(() => {
-    const atual = editando?.tipoTransporte === "vm_fixo" ? editando?.valorTransporteFixo : editando?.valorTransporteDia;
+    const atual =
+      editando?.tipoTransporte === "vm_fixo"
+        ? (editando.valorTransporteDia ?? editando.valorTransporteFixo)
+        : editando?.valorTransporteDia;
     return atual ? String(atual) : "";
   });
 
@@ -373,8 +383,12 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
         // Zero é um valor, não "campo vazio": significa que a pessoa não recebe
         // transporte, e é diferente de null, que significa "ninguém informou" e
         // faz o cálculo cair na tarifa da cidade.
-        valorTransporteDia: tipoTransporte === "vt_diario" ? numeroOuNulo(valorTransporte) : null,
-        valorTransporteFixo: tipoTransporte === "vm_fixo" ? numeroOuNulo(valorTransporte) : null,
+        valorTransporteDia:
+          tipoTransporte === "vt_diario" || (tipoTransporte === "vm_fixo" && vmPorDia)
+            ? numeroOuNulo(valorTransporte)
+            : null,
+        valorTransporteFixo:
+          tipoTransporte === "vm_fixo" && !vmPorDia ? numeroOuNulo(valorTransporte) : null,
         cep: cep || null,
         estado: estado || null,
         cidade: cidade || null,
@@ -990,7 +1004,11 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
         </label>
 
         <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
-          {tipoTransporte === "vt_diario" ? "Valor do VT (por dia útil)" : "Valor do VM (fixo mensal)"}
+          {tipoTransporte === "vt_diario"
+            ? "Valor do VT (por dia útil)"
+            : vmPorDia
+              ? "Valor do VM (por dia útil)"
+              : "Valor do VM (fixo mensal)"}
           <input
             type="number"
             min={0}
@@ -1001,6 +1019,29 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
             disabled={bloqueado}
             className={INPUT_CLASS}
           />
+          {tipoTransporte === "vm_fixo" && (
+            <div className="mt-1 flex gap-2">
+              {[
+                { valor: true, rotulo: "por dia útil" },
+                { valor: false, rotulo: "fixo mensal" },
+              ].map((opcao) => (
+                <label
+                  key={opcao.rotulo}
+                  className="flex flex-1 items-center gap-1 rounded border border-hairline px-1.5 py-1 text-[10px] font-light text-foreground dark:border-brand-neutral/30"
+                >
+                  <input
+                    type="radio"
+                    name="vmBase"
+                    checked={vmPorDia === opcao.valor}
+                    onChange={() => setVmPorDia(opcao.valor)}
+                    disabled={bloqueado}
+                    className="accent-brand-primary"
+                  />
+                  {opcao.rotulo}
+                </label>
+              ))}
+            </div>
+          )}
         </label>
       </div>
 

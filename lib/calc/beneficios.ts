@@ -153,9 +153,18 @@ export interface DetalheTransporteDoMes {
  * mudava nada sem que houvesse como saber por quê.
  */
 export function detalharTransporteDoMes(c: TransporteDoColaborador, diasUteis: number): DetalheTransporteDoMes {
-  // Vale mobilidade é valor fixo do mês e não sofre o desconto do VT: não é
-  // vale-transporte, é auxílio, e a Lei 7.418/85 não alcança.
+  // Vale mobilidade não sofre o desconto do VT: não é vale-transporte, é
+  // auxílio, e a Lei 7.418/85 não alcança.
+  //
+  // Aceita as duas formas de cadastro. Com valor POR DIA, o mês é dia × dias
+  // úteis — é assim que o DP raciocina ("o Iago recebe 18 por dia"), e é o que
+  // permite abater férias em dias em vez de em fração. Com valor FIXO mensal,
+  // o valor é o do mês; quem chama abate as férias em cima, proporcionalmente.
   if (c.tipoTransporte === "vm_fixo") {
+    if (c.valorTransporteDia !== null && c.valorTransporteDia > 0) {
+      const mensal = arredondar(c.valorTransporteDia * diasUteis);
+      return { bruto: mensal, descontoEmpregado: 0, custoEmpresa: mensal, origem: "vm-fixo" };
+    }
     const fixo = c.valorTransporteFixo ?? 0;
     return { bruto: fixo, descontoEmpregado: 0, custoEmpresa: fixo, origem: "vm-fixo" };
   }

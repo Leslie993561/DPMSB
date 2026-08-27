@@ -42,3 +42,31 @@ describe("vale-transporte sem valor cadastrado", () => {
     expect(r.origem).toBe("vm-fixo");
   });
 });
+
+describe("vale-mobilidade por dia útil", () => {
+  const iago = {
+    tipoTransporte: "vm_fixo",
+    valorTransporteFixo: null,
+    valorTransporteDia: 18,
+    cidade: "CAMACARI",
+    salarioBase: 3243.75,
+  };
+
+  it("multiplica pelos dias úteis do mês: 18 × 21 em setembro", () => {
+    expect(detalharTransporteDoMes(iago, 21).bruto).toBeCloseTo(378, 2);
+  });
+
+  it("o valor por dia tem prioridade sobre o fixo mensal", () => {
+    expect(detalharTransporteDoMes({ ...iago, valorTransporteFixo: 108 }, 21).bruto).toBeCloseTo(378, 2);
+  });
+
+  it("sem valor por dia, vale o fixo mensal", () => {
+    expect(
+      detalharTransporteDoMes({ ...iago, valorTransporteDia: null, valorTransporteFixo: 108 }, 21).bruto,
+    ).toBeCloseTo(108, 2);
+  });
+
+  it("não sofre o desconto de 6% do vale-transporte", () => {
+    expect(detalharTransporteDoMes(iago, 21).descontoEmpregado).toBe(0);
+  });
+});
