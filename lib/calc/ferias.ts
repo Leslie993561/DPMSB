@@ -1,6 +1,7 @@
 import { getLegalTable } from "../legal-tables";
 import { calcularINSS } from "./inss";
 import { calcularIRRF } from "./irrf";
+import { calcularAdicionais } from "./adicionais";
 import { arredondar, type CalculoResult, type MemoriaCalculoStep } from "./types";
 
 export interface FeriasInput {
@@ -20,9 +21,26 @@ export interface FeriasInput {
    * atraso. Zero (o default) = férias no prazo.
    */
   diasEmDobro?: number;
+  /**
+   * Médias e vantagens que integram a remuneração de férias (Art. 142 §5º CLT).
+   *
+   * A remuneração de férias não é o salário base: é o salário mais o que o
+   * empregado recebia com habitualidade. O aviso de férias do DP separa
+   * exatamente estas parcelas, e sem elas o portal pagava menos — no caso do
+   * Iago, R$ 2.162,50 contra os R$ 2.844,21 do aviso, porque faltavam a média
+   * de horas e o adicional de 30% que ele recebe todo mês.
+   *
+   * Ausentes (o default) valem zero: a base fica sendo só o salário, que é o
+   * certo para quem não tem adicional nem hora extra habitual.
+   */
+  mediaHoras?: number;
+  mediaValores?: number;
+  outrasVantagens?: number;
 }
 
 export interface DetalheFerias {
+  /** Salário + médias + vantagens: a remuneração de férias do Art. 142 §5º. */
+  baseDeCalculo: number;
   valorGozado: number;
   tercoConstitucional: number;
   diasVendidos: number;
@@ -48,12 +66,24 @@ export function calcularFerias(input: FeriasInput): CalculoResult<DetalheFerias>
   const diasEmDobro = Math.min(diasGozados, Math.max(0, input.diasEmDobro ?? 0));
   const tabela = getLegalTable(competencia);
 
-  const valorDiario = salarioBase / 30;
+  const mediaHoras = input.mediaHoras ?? 0;
+  const mediaValores = input.mediaValores ?? 0;
+  const outrasVantagens = input.outrasVantagens ?? 0;
+  const baseDeCalculo = salarioBase + mediaHoras + mediaValores + outrasVantagens;
+
+  const valorDiario = baseDeCalculo / 30;
   const valorGozado = arredondar(valorDiario * diasGozados);
   const tercoConstitucional = arredondar(valorGozado / 3);
 
+  // A memória repete a ordem do aviso de férias do DP para poder ser conferida
+  // linha por linha contra o documento.
   const memoriaCalculo: MemoriaCalculoStep[] = [
-    { label: "Valor do dia de férias", formula: `R$ ${salarioBase.toFixed(2)} ÷ 30`, valor: arredondar(valorDiario) },
+    { label: "Salário base", valor: arredondar(salarioBase) },
+    ...(mediaHoras ? [{ label: "Média de horas (Art. 142 §5º CLT)", valor: arredondar(mediaHoras) }] : []),
+    ...(mediaValores ? [{ label: "Média de valores (Art. 142 §5º CLT)", valor: arredondar(mediaValores) }] : []),
+    ...(outrasVantagens ? [{ label: "Outras vantagens (adicionais habituais)", valor: arredondar(outrasVantagens) }] : []),
+    { label: "TOTAL BASE DE CÁLCULO", valor: arredondar(baseDeCalculo) },
+    { label: "Valor do dia de férias", formula: `R$ ${baseDeCalculo.toFixed(2)} ÷ 30`, valor: arredondar(valorDiario) },
     { label: `Férias gozadas (${diasGozados} dias)`, valor: valorGozado },
     { label: "1/3 constitucional (Art. 7º, XVII CF)", formula: "valor gozado ÷ 3", valor: tercoConstitucional },
   ];
@@ -108,6 +138,7 @@ export function calcularFerias(input: FeriasInput): CalculoResult<DetalheFerias>
     memoriaCalculo,
     tabelaLegalVersao: tabela.fonte,
     detalhe: {
+      baseDeCalculo: arredondar(baseDeCalculo),
       valorGozado,
       tercoConstitucional,
       diasVendidos,
@@ -172,4 +203,33 @@ export function avaliarPrazoConcessao(
     limiteInicio: limiteInicio.toISOString().slice(0, 10),
     diasEmDobro: Math.min(dias, diasAtraso),
   };
+}
+
+/** O que o cálculo precisa saber do cadastro para montar a base das férias. */
+export interface VantagensDoColaborador {
+  salarioBase: number;
+  periculosidadePercentual: number | null;
+  insalubridadePercentual: number | null;
+  adicionalFixo: number | null;
+}
+
+/**
+ * Adicionais habituais que integram a remuneração de férias (Art. 142 §5º CLT).
+ *
+ * Periculosidade, insalubridade e adicional fixo são pagos todo mês, então
+ * entram na base das férias — o aviso de férias do DP os traz somados em
+ * "Outras Vantagens". Sem isto o portal calculava férias sobre o salário nu e
+ * pagava menos a quem tem adicional.
+ */
+export function outrasVantagensDeFerias(c: VantagensDoColaborador, competencia: Date): number {
+  const adicionais = calcularAdicionais(
+    {
+      salarioBase: c.salarioBase,
+      periculosidadePercentual: c.periculosidadePercentual,
+      insalubridadePercentual: c.insalubridadePercentual,
+      adicionalFixo: c.adicionalFixo,
+    },
+    competencia,
+  );
+  return arredondar(adicionais.total);
 }

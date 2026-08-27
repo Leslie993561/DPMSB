@@ -3,7 +3,7 @@ import { getDb } from "./client";
 import { listarColaboradores } from "./colaboradores";
 import { listarPeriodosAbertos } from "./periodosAquisitivos";
 import { listarProgramacaoFerias, type ItemProgramacaoFerias } from "./programacaoFerias";
-import { calcularFerias, calcularFGTS, calcularInssPatronal, arredondar } from "@/lib/calc";
+import { calcularFerias, calcularFGTS, calcularInssPatronal, outrasVantagensDeFerias, arredondar } from "@/lib/calc";
 
 export interface LinhaTrimestre {
   colaboradorNome: string;
@@ -274,6 +274,7 @@ export async function obterDashboardFerias(
         abonoPecuniario: false,
         dependentes: colaborador.dependentes,
         competencia: hoje,
+        outrasVantagens: outrasVantagensDeFerias(colaborador, hoje),
       });
     } catch {
       continue;

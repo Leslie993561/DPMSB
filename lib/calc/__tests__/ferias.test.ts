@@ -135,3 +135,36 @@ describe("avaliarPrazoConcessao", () => {
     expect(r.diasEmDobro).toBe(20);
   });
 });
+
+describe("remuneração de férias com adicionais habituais (Art. 142 §5º)", () => {
+  // Confere linha por linha contra o aviso de férias do Iago:
+  // salário 3.243,75 + média de horas 49,44 + outras vantagens 973,13
+  // = base 4.266,32 → 4.266,32 ÷ 30 = 142,21/dia → 20 dias = 2.844,21.
+  const base = {
+    salarioBase: 3243.75,
+    diasDireito: 30,
+    diasGozados: 20,
+    abonoPecuniario: false,
+    dependentes: 0,
+    competencia: new Date("2025-08-17"),
+  };
+
+  it("soma médias e vantagens à base, como no aviso de férias", () => {
+    const r = calcularFerias({ ...base, mediaHoras: 49.44, outrasVantagens: 973.13 });
+    expect(r.detalhe.baseDeCalculo).toBeCloseTo(4266.32, 2);
+    expect(r.detalhe.valorGozado).toBeCloseTo(2844.21, 1);
+    expect(r.detalhe.tercoConstitucional).toBeCloseTo(948.07, 1);
+  });
+
+  it("sem adicionais a base continua sendo o salário, e o valor é menor", () => {
+    const r = calcularFerias(base);
+    expect(r.detalhe.baseDeCalculo).toBeCloseTo(3243.75, 2);
+    expect(r.detalhe.valorGozado).toBeCloseTo(2162.5, 2);
+  });
+
+  it("a dobra do Art. 137 também segue a base cheia", () => {
+    const r = calcularFerias({ ...base, mediaHoras: 49.44, outrasVantagens: 973.13, diasEmDobro: 20 });
+    // Dobra = remuneração dos 20 dias + 1/3 = 2.844,21 + 948,07.
+    expect(r.detalhe.dobra).toBeCloseTo(3792.28, 1);
+  });
+});

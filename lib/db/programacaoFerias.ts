@@ -1,7 +1,14 @@
 import "server-only";
 import { getDb } from "./client";
 import { listarColaboradores } from "./colaboradores";
-import { calcularFerias, calcularFGTS, calcularInssPatronal, avaliarPrazoConcessao, arredondar } from "@/lib/calc";
+import {
+  calcularFerias,
+  calcularFGTS,
+  calcularInssPatronal,
+  avaliarPrazoConcessao,
+  outrasVantagensDeFerias,
+  arredondar,
+} from "@/lib/calc";
 import type { StatusLancamento } from "./lancamentosFerias";
 
 export interface DetalheCalculoFerias {
@@ -133,6 +140,7 @@ export async function listarProgramacaoFerias(): Promise<ItemProgramacaoFerias[]
         dependentes: colaborador.dependentes,
         competencia: dataRef,
         diasEmDobro: prazo.diasEmDobro,
+        outrasVantagens: outrasVantagensDeFerias(colaborador, dataRef),
       });
     } catch {
       calculo = null;
