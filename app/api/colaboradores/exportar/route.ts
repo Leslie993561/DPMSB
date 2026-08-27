@@ -57,7 +57,11 @@ export async function GET() {
       salarioBase: c.salarioBase,
       horario: c.horario ?? "",
       dataAdmissao: c.dataAdmissao,
+      rateioD365: c.rateioD365 ?? "",
       dataDesligamento: c.dataDesligamento ?? "",
+      motivoDesligamento: c.motivoDesligamento ?? "",
+      valorRescisao: c.valorRescisao ?? "",
+      valorFgts: c.valorFgts ?? "",
       banco: c.banco ?? "",
       agencia: c.agencia ?? "",
       conta: c.conta ?? "",
@@ -66,6 +70,10 @@ export async function GET() {
       // A coluna é uma só porque cada pessoa tem um tipo de transporte só; o
       // valor que sai é o da coluna correspondente ao tipo dela.
       valorTransporte: (c.tipoTransporte === "vm_fixo" ? c.valorTransporteFixo : c.valorTransporteDia) ?? "",
+      periculosidadePercentual: c.periculosidadePercentual ?? "",
+      insalubridadePercentual: c.insalubridadePercentual ?? "",
+      adicionalFixo: c.adicionalFixo ?? "",
+      adicionalFixoDescricao: c.adicionalFixoDescricao ?? "",
       cep: c.cep ?? "",
       estado: c.estado ?? "",
       cidade: c.cidade ?? "",
@@ -75,6 +83,7 @@ export async function GET() {
       conjugeNome: c.conjugeNome ?? "",
       conjugeCpf: c.conjugeCpf ?? "",
       conjugeNascimento: c.conjugeNascimento ?? "",
+      conjugeSexo: c.conjugeSexo ? ROTULO_SEXO[c.conjugeSexo] : "",
       ...colunasDep,
     });
   }

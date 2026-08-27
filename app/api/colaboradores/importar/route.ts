@@ -1,7 +1,17 @@
 import { z } from "zod";
 import { parsearPlanilha } from "@/lib/parsing/spreadsheet";
-import { converterParaColaboradoresCadastro, sugerirMapeamentoColaborador } from "@/lib/parsing/mappers";
-import { importarColaboradores, type TipoTransporte, type Vinculo } from "@/lib/db/colaboradores";
+import {
+  CAMPOS_COLABORADOR,
+  converterParaColaboradoresCadastro,
+  sugerirMapeamentoColaborador,
+} from "@/lib/parsing/mappers";
+import {
+  importarColaboradores,
+  type RateioD365,
+  type SexoColaborador,
+  type TipoTransporte,
+  type Vinculo,
+} from "@/lib/db/colaboradores";
 
 export const runtime = "nodejs";
 
@@ -10,47 +20,15 @@ const TAMANHO_MAXIMO = 5 * 1024 * 1024; // 5 MB
 
 const schemaConfirmacao = z.object({
   linhas: z.array(z.record(z.string(), z.union([z.string(), z.number(), z.null()]))),
-  mapeamento: z.object({
-    nome: z.string().nullable().optional(),
-    // Anuláveis: planilha de atualização mexe só em quem já está no quadro e
-    // por isso não precisa repetir admissão nem salário. Ver mappers.ts.
-    dataAdmissao: z.string().nullable().optional(),
-    dataNascimento: z.string().nullable().optional(),
-    salarioBase: z.string().nullable().optional(),
-    dependentes: z.string().nullable().optional(),
-    cpf: z.string().nullable().optional(),
-    email: z.string().nullable().optional(),
-    cargo: z.string().nullable().optional(),
-    departamento: z.string().nullable().optional(),
-    vinculo: z.string().nullable().optional(),
-    liderDireto: z.string().nullable().optional(),
-    alimentacaoValor: z.string().nullable().optional(),
-    tipoTransporte: z.string().nullable().optional(),
-    valorTransporteDia: z.string().nullable().optional(),
-    valorTransporteFixo: z.string().nullable().optional(),
-    cbo: z.string().nullable().optional(),
-    cidade: z.string().nullable().optional(),
-    agencia: z.string().nullable().optional(),
-    conta: z.string().nullable().optional(),
-    pis: z.string().nullable().optional(),
-    cidadeNascimento: z.string().nullable().optional(),
-    ufNascimento: z.string().nullable().optional(),
-    nomePai: z.string().nullable().optional(),
-    nomeMae: z.string().nullable().optional(),
-    telefone: z.string().nullable().optional(),
-    sexo: z.string().nullable().optional(),
-    emailPessoal: z.string().nullable().optional(),
-    horario: z.string().nullable().optional(),
-    banco: z.string().nullable().optional(),
-    cep: z.string().nullable().optional(),
-    estado: z.string().nullable().optional(),
-    bairro: z.string().nullable().optional(),
-    rua: z.string().nullable().optional(),
-    numero: z.string().nullable().optional(),
-    conjugeNome: z.string().nullable().optional(),
-    conjugeCpf: z.string().nullable().optional(),
-    conjugeNascimento: z.string().nullable().optional(),
-  }),
+  // Derivado da lista de campos, nunca escrito à mão: um campo novo no
+  // mapeamento passa a ser aceito sozinho. Enumerar aqui já fez a importação
+  // descartar em silêncio o VT por dia, os adicionais e o rateio D365.
+  mapeamento: z.object(
+    Object.fromEntries(CAMPOS_COLABORADOR.map((campo) => [campo, z.string().nullable().optional()])) as Record<
+      (typeof CAMPOS_COLABORADOR)[number],
+      z.ZodOptional<z.ZodNullable<z.ZodString>>
+    >,
+  ),
 });
 
 /**
@@ -117,6 +95,8 @@ export async function POST(request: Request) {
       // Coluna de transporte ausente na planilha vira undefined, não null: a
       // regra da importação é que campo em branco não apaga o que já existe.
       tipoTransporte: (c.tipoTransporte as TipoTransporte | null) ?? undefined,
+      rateioD365: (c.rateioD365 as RateioD365 | null) ?? undefined,
+      conjugeSexo: (c.conjugeSexo as SexoColaborador | null) ?? undefined,
     })),
   );
   return Response.json({

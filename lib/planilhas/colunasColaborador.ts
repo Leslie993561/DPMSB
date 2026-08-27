@@ -1,7 +1,8 @@
 /**
  * Definição única das colunas da planilha de colaboradores, na mesma ordem e
  * agrupamento dos blocos da ficha (Dados pessoais → Dados profissionais →
- * Dados bancários → Benefícios → Endereço → Cônjuge → Dependentes).
+ * Dados bancários → Benefícios → Adicionais → Endereço → Cônjuge →
+ * Dependentes).
  *
  * Compartilhada pela exportação e pelo modelo de importação de propósito: se
  * as duas listas fossem separadas, uma coluna nova entraria em uma e não na
@@ -30,7 +31,11 @@ export const COLUNAS_COLABORADOR = [
   { header: "Salário", key: "salarioBase", width: 12 },
   { header: "Horário", key: "horario", width: 26 },
   { header: "Data de admissão", key: "dataAdmissao", width: 16 },
+  { header: "Rateio D365", key: "rateioD365", width: 14 },
   { header: "Data de desligamento", key: "dataDesligamento", width: 18 },
+  { header: "Motivo do desligamento", key: "motivoDesligamento", width: 30 },
+  { header: "Valor da rescisão", key: "valorRescisao", width: 16 },
+  { header: "Valor do FGTS", key: "valorFgts", width: 16 },
   // Dados bancários
   { header: "Banco", key: "banco", width: 16 },
   { header: "Agência", key: "agencia", width: 12 },
@@ -39,6 +44,11 @@ export const COLUNAS_COLABORADOR = [
   { header: "Alimentação", key: "alimentacaoValor", width: 14 },
   { header: "Tipo de transporte", key: "tipoTransporte", width: 18 },
   { header: "Valor do transporte", key: "valorTransporte", width: 18 },
+  // Adicionais
+  { header: "Periculosidade (%)", key: "periculosidadePercentual", width: 16 },
+  { header: "Insalubridade (%)", key: "insalubridadePercentual", width: 16 },
+  { header: "Adicional fixo (R$)", key: "adicionalFixo", width: 16 },
+  { header: "Adicional fixo — descrição", key: "adicionalFixoDescricao", width: 28 },
   // Endereço
   { header: "CEP", key: "cep", width: 12 },
   { header: "Estado", key: "estado", width: 10 },
@@ -50,6 +60,7 @@ export const COLUNAS_COLABORADOR = [
   { header: "Cônjuge — Nome", key: "conjugeNome", width: 28 },
   { header: "Cônjuge — CPF", key: "conjugeCpf", width: 16 },
   { header: "Cônjuge — Nascimento", key: "conjugeNascimento", width: 20 },
+  { header: "Cônjuge — Sexo", key: "conjugeSexo", width: 14 },
 ];
 
 /**

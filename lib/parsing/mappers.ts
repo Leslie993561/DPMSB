@@ -161,6 +161,12 @@ export type CampoColaborador =
   | "tipoTransporte"
   | "valorTransporteDia"
   | "valorTransporteFixo"
+  | "rateioD365"
+  | "periculosidadePercentual"
+  | "insalubridadePercentual"
+  | "adicionalFixo"
+  | "adicionalFixoDescricao"
+  | "conjugeSexo"
   | "cbo"
   | "cidade"
   | "agencia"
@@ -213,6 +219,12 @@ const SINONIMOS_COLABORADOR: Record<CampoColaborador, string[]> = {
   tipoTransporte: ["vale", "tipo de transporte", "tipo transporte", "transporte", "beneficio transporte"],
   valorTransporteDia: ["valor por dia util", "valor por dia", "valor dia", "vt dia", "vt por dia"],
   valorTransporteFixo: ["valor fixo", "vm", "vale mobilidade", "transporte fixo", "valor mensal transporte"],
+  rateioD365: ["rateio d365", "rateio", "d365", "centro de custo", "centro de rateio"],
+  periculosidadePercentual: ["periculosidade", "periculosidade %", "adicional de periculosidade"],
+  insalubridadePercentual: ["insalubridade", "insalubridade %", "adicional de insalubridade"],
+  adicionalFixo: ["adicional fixo", "adicional fixo r$", "outros adicionais"],
+  adicionalFixoDescricao: ["adicional fixo descricao", "descricao do adicional fixo", "adicional fixo — descricao"],
+  conjugeSexo: ["conjuge sexo", "sexo do conjuge", "conjunge sexo"],
   cbo: ["cbo"],
   cidade: ["cidade", "municipio"],
   agencia: ["agencia"],
@@ -255,6 +267,12 @@ const OBRIGATORIOS_COLABORADOR: Record<CampoColaborador, boolean> = {
   tipoTransporte: false,
   valorTransporteDia: false,
   valorTransporteFixo: false,
+  rateioD365: false,
+  periculosidadePercentual: false,
+  insalubridadePercentual: false,
+  adicionalFixo: false,
+  adicionalFixoDescricao: false,
+  conjugeSexo: false,
   cbo: false,
   cidade: false,
   agencia: false,
@@ -278,6 +296,16 @@ const OBRIGATORIOS_COLABORADOR: Record<CampoColaborador, boolean> = {
   conjugeCpf: false,
   conjugeNascimento: false,
 };
+
+/**
+ * Todos os campos que a importação de colaborador reconhece.
+ *
+ * Existe para que o schema da rota seja DERIVADO daqui, e não uma segunda
+ * lista escrita à mão. Três campos já foram perdidos exatamente assim: o valor
+ * do VT por dia, os adicionais e o rateio D365 chegavam da planilha, o zod da
+ * rota não os declarava, e a importação respondia "atualizado" sem gravar.
+ */
+export const CAMPOS_COLABORADOR = Object.keys(OBRIGATORIOS_COLABORADOR) as CampoColaborador[];
 
 export function sugerirMapeamentoColaborador(cabecalhos: string[]): SugestaoColuna<CampoColaborador>[] {
   return sugerirMapeamentoGenerico(cabecalhos, SINONIMOS_COLABORADOR, OBRIGATORIOS_COLABORADOR);
@@ -308,6 +336,13 @@ export interface ColaboradorImportado {
   tipoTransporte: string | null;
   valorTransporteDia: number | null;
   valorTransporteFixo: number | null;
+  /** "ADM" ou "PRO"; qualquer outro texto vira null, para não classificar por engano. */
+  rateioD365: string | null;
+  periculosidadePercentual: number | null;
+  insalubridadePercentual: number | null;
+  adicionalFixo: number | null;
+  adicionalFixoDescricao: string | null;
+  conjugeSexo: string | null;
   cbo: string | null;
   cidade: string | null;
   agencia: string | null;
@@ -451,6 +486,18 @@ export function converterParaColaboradoresCadastro(
         ? "vt_diario"
         : null;
 
+    // Só "ADM" e "PRO" existem no D365; qualquer outra coisa fica null, para o
+    // cadastro não ser reclassificado por um texto que ninguém sabe ler.
+    const rateioBruto = (opcional("rateioD365") ?? "").trim().toUpperCase();
+    const rateioD365 = rateioBruto === "ADM" || rateioBruto === "PRO" ? rateioBruto : null;
+
+    const sexoConjugeBruto = (opcional("conjugeSexo") ?? "").trim().toUpperCase();
+    const sexoDoConjuge = sexoConjugeBruto.startsWith("M")
+      ? "M"
+      : sexoConjugeBruto.startsWith("F")
+        ? "F"
+        : null;
+
     const dependentesLista = lerDependentesDaLinha(linha);
 
     colaboradores.push({
@@ -476,6 +523,12 @@ export function converterParaColaboradoresCadastro(
       tipoTransporte,
       valorTransporteDia: numero("valorTransporteDia"),
       valorTransporteFixo: numero("valorTransporteFixo"),
+      rateioD365,
+      periculosidadePercentual: numero("periculosidadePercentual"),
+      insalubridadePercentual: numero("insalubridadePercentual"),
+      adicionalFixo: numero("adicionalFixo"),
+      adicionalFixoDescricao: opcional("adicionalFixoDescricao"),
+      conjugeSexo: sexoDoConjuge,
       cbo: opcional("cbo"),
       cidade: opcional("cidade"),
       agencia: opcional("agencia"),
