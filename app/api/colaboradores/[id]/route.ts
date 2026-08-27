@@ -59,6 +59,14 @@ const schema = z.object({
   conjugeCpf: z.string().nullable().optional(),
   conjugeNascimento: z.iso.date().nullable().optional(),
   conjugeSexo: z.enum(["M", "F"]).nullable().optional(),
+  // Sem estes quatro o zod descartava o bloco "Adicionais" em silêncio e a
+  // rota devolvia 200 sem gravar nada: o formulário existia, o campo aceitava
+  // o valor e nada chegava ao banco. É por isso que 74 colaboradores estavam
+  // sem adicional enquanto a folha do DP pagava periculosidade.
+  periculosidadePercentual: z.coerce.number().min(0).max(100).nullable().optional(),
+  insalubridadePercentual: z.coerce.number().min(0).max(100).nullable().optional(),
+  adicionalFixo: z.coerce.number().min(0).nullable().optional(),
+  adicionalFixoDescricao: z.string().nullable().optional(),
   dependentesLista: z.array(schemaDependente).optional(),
 });
 

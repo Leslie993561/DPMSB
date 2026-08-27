@@ -72,6 +72,11 @@ interface LinhaProgramacao {
   data_inicio_prevista: string | null;
   data_inicio_gozo: string | null;
   data_retorno: string | null;
+  /** Base do aviso de férias emitido pelo DP; null = não informado. */
+  media_horas: number | null;
+  media_valores: number | null;
+  outras_vantagens: number | null;
+  salario_base_aviso: number | null;
   periodo_aquisitivo_id: number;
   periodo_inicio: string;
   periodo_fim: string;
@@ -99,6 +104,7 @@ export async function listarProgramacaoFerias(): Promise<ItemProgramacaoFerias[]
   const resultado = await db.execute(
     `SELECT l.id, l.status, l.dias, l.abono, l.dias_abono,
               l.data_inicio_prevista, l.data_inicio_gozo, l.data_retorno,
+              l.media_horas, l.media_valores, l.outras_vantagens, l.salario_base_aviso,
               p.id AS periodo_aquisitivo_id, p.data_inicio AS periodo_inicio, p.data_fim AS periodo_fim,
               p.dias_direito, p.colaborador_id
        FROM lancamentos_ferias l
@@ -132,15 +138,24 @@ export async function listarProgramacaoFerias(): Promise<ItemProgramacaoFerias[]
     // em vez de derrubar a listagem inteira. Nada é estimado.
     let calculo: ReturnType<typeof calcularFerias> | null = null;
     try {
+      // Quando o aviso de férias do DP foi registrado, é ele que manda: o
+      // portal reproduz o documento que o colaborador assinou em vez de
+      // recalcular a base com o cadastro de hoje, que daria outro número.
+      const temAviso = linha.media_horas !== null || linha.outras_vantagens !== null;
+
       calculo = calcularFerias({
-        salarioBase: colaborador.salarioBase,
+        salarioBase: linha.salario_base_aviso ?? colaborador.salarioBase,
         diasDireito: linha.dias_direito,
         diasGozados: linha.dias,
         abonoPecuniario: Boolean(linha.abono),
         dependentes: colaborador.dependentes,
         competencia: dataRef,
         diasEmDobro: prazo.diasEmDobro,
-        outrasVantagens: outrasVantagensDeFerias(colaborador, dataRef),
+        mediaHoras: linha.media_horas ?? 0,
+        mediaValores: linha.media_valores ?? 0,
+        outrasVantagens: temAviso
+          ? (linha.outras_vantagens ?? 0)
+          : outrasVantagensDeFerias(colaborador, dataRef),
       });
     } catch {
       calculo = null;

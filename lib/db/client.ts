@@ -65,6 +65,20 @@ const MIGRACOES: { tabela: string; coluna: string; definicao: string }[] = [
   // quando o abono foi pago.
   { tabela: "lancamentos_ferias", coluna: "abono_inicio", definicao: "TEXT" },
   { tabela: "lancamentos_ferias", coluna: "abono_fim", definicao: "TEXT" },
+  // Base de cálculo do AVISO DE FÉRIAS, como o DP emitiu.
+  //
+  // A média de horas do Art. 142 §5º varia de aviso para aviso — o Iago tem
+  // 49,44 num e 38,03 noutro, para o mesmo período aquisitivo — e o portal não
+  // tem histórico de horas fundo o bastante para reproduzi-la. Guardar o que o
+  // documento diz é a única forma de o portal responder o mesmo número que o
+  // recibo que o colaborador assinou; recalcular por conta própria daria um
+  // valor diferente do que foi pago.
+  //
+  // Vazio = nada informado, e aí o cálculo usa o cadastro de hoje.
+  { tabela: "lancamentos_ferias", coluna: "media_horas", definicao: "REAL" },
+  { tabela: "lancamentos_ferias", coluna: "media_valores", definicao: "REAL" },
+  { tabela: "lancamentos_ferias", coluna: "outras_vantagens", definicao: "REAL" },
+  { tabela: "lancamentos_ferias", coluna: "salario_base_aviso", definicao: "REAL" },
   { tabela: "periodos_aquisitivos", coluna: "status", definicao: "TEXT NOT NULL DEFAULT 'aberto'" },
   { tabela: "colaboradores", coluna: "gestor_id", definicao: "INTEGER REFERENCES colaboradores(id)" },
   { tabela: "colaboradores", coluna: "cidade", definicao: "TEXT" },
