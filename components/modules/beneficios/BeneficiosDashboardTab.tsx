@@ -15,6 +15,8 @@ interface LinhaRateio {
   valeTransporte: number;
   valeAlimentacao: number;
   odontologico: number | null;
+  /** Aniversário e demais lançamentos variáveis do mês. */
+  variaveis: number;
   solides: number | null;
   flash: number | null;
   bonificacao: number | null;
@@ -33,7 +35,10 @@ interface ResumoMensal {
   brindes: number;
   variaveis: number;
   total: number;
-  /** Total conferido com a operadora, informado pelo DP — não é a soma do cadastro. */
+  /** Total informado pelo DP, para conferir contra a fatura; não substitui o rateio. */
+  informadoVt: number | null;
+  informadoVm: number | null;
+  informadoVr: number | null;
   informado: boolean;
   /** Mês fechado no Breakdown — não aceita mais edição em lugar nenhum do portal. */
   fechado: boolean;
@@ -66,6 +71,21 @@ function competenciaAtual(): string {
 function competenciaExibida(competencia: string): string {
   const [ano, mes] = competencia.split("-").map(Number);
   return `${MESES_COMPLETOS[mes - 1].charAt(0).toUpperCase()}${MESES_COMPLETOS[mes - 1].slice(1)}/${ano}`;
+}
+
+/**
+ * Sufixo com o total informado pelo DP e a diferença contra o rateio.
+ *
+ * O cartão mostra o RATEIO, que é a soma que a aba ao lado detalha. O informado
+ * vem ao lado, para conferência — antes ele substituía o rateio, e mexer no
+ * cadastro de alguém não mudava o número do topo.
+ */
+function diferenca(calculado: number, informado: number | null | undefined): string {
+  if (informado === null || informado === undefined) return "";
+  const delta = calculado - informado;
+  if (Math.abs(delta) < 0.01) return ` · informado ${formatarMoeda(informado)} (igual)`;
+  const sinal = delta > 0 ? "+" : "−";
+  return ` · informado ${formatarMoeda(informado)} (${sinal}${formatarMoeda(Math.abs(delta))})`;
 }
 
 function formatarK(valor: number): string {
@@ -175,10 +195,9 @@ export function BeneficiosDashboardTab() {
 
   const mesAtual = Number(competencia.slice(5, 7));
 
-  // Os cartões saem do resumo do mês, não da soma das linhas: quando o DP
-  // informa o total pago no mês, é ele que vale, e o resumo já resolve essa
-  // escolha verba a verba. Somar as linhas aqui faria o topo da tela discordar
-  // do gráfico logo abaixo.
+  // Os cartões saem do resumo do mês, que é a soma do rateio — a mesma que a
+  // aba ao lado detalha. O total informado pelo DP vem junto, só para apontar
+  // a diferença contra a fatura da operadora.
   const resumoDoMes = useMemo(() => resumoAnual.find((m) => m.mes === mesAtual), [resumoAnual, mesAtual]);
 
   const totalVt = resumoDoMes?.vt ?? 0;
@@ -199,21 +218,30 @@ export function BeneficiosDashboardTab() {
   const colaboradoresNaFolha = linhas.length;
 
   const composicaoPorSetor = useMemo(() => {
-    const mapa = new Map<MacroSetor, { vt: number; va: number; brindes: number; colaboradores: number }>([
-      ["Produção", { vt: 0, va: 0, brindes: 0, colaboradores: 0 }],
-      ["Administrativo", { vt: 0, va: 0, brindes: 0, colaboradores: 0 }],
+    const vazio = { vt: 0, vm: 0, vr: 0, variaveis: 0, colaboradores: 0 };
+    const mapa = new Map<MacroSetor, typeof vazio>([
+      ["Produção", { ...vazio }],
+      ["Administrativo", { ...vazio }],
     ]);
     for (const l of linhas) {
       const chave = macroSetor(l.departamento, l.rateioD365);
       const atual = mapa.get(chave)!;
+      // Transporte e mobilidade são verbas diferentes e cada uma tem a sua
+      // linha: somadas, o setor perdia de vista quanto era catraca e quanto
+      // era auxílio fixo.
       mapa.set(chave, {
-        vt: atual.vt + l.valeTransporte,
-        va: atual.va + l.valeAlimentacao,
-        brindes: atual.brindes + totalBrindes(l),
+        vt: atual.vt + (l.tipoTransporte === "vm_fixo" ? 0 : l.valeTransporte),
+        vm: atual.vm + (l.tipoTransporte === "vm_fixo" ? l.valeTransporte : 0),
+        vr: atual.vr + l.valeAlimentacao,
+        variaveis: atual.variaveis + l.variaveis + totalBrindes(l),
         colaboradores: atual.colaboradores + 1,
       });
     }
-    return Array.from(mapa.entries()).map(([setor, v]) => ({ setor, ...v, total: v.vt + v.va + v.brindes }));
+    return Array.from(mapa.entries()).map(([setor, v]) => ({
+      setor,
+      ...v,
+      total: v.vt + v.vm + v.vr + v.variaveis,
+    }));
   }, [linhas]);
 
   // Os dois cartões acima agrupam em Produção/Administrativo, que é mapeamento
@@ -221,19 +249,21 @@ export function BeneficiosDashboardTab() {
   // "(sem setor)", que no agrupamento cai em Administrativo por default e
   // desaparecia da vista.
   const detalhePorSetor = useMemo(() => {
-    const mapa = new Map<string, { vt: number; va: number; brindes: number; colaboradores: number }>();
+    const vazio = { vt: 0, vm: 0, vr: 0, variaveis: 0, colaboradores: 0 };
+    const mapa = new Map<string, typeof vazio>();
     for (const l of linhas) {
       const setor = l.departamento?.trim() || "(sem setor)";
-      const atual = mapa.get(setor) ?? { vt: 0, va: 0, brindes: 0, colaboradores: 0 };
+      const atual = mapa.get(setor) ?? { ...vazio };
       mapa.set(setor, {
-        vt: atual.vt + l.valeTransporte,
-        va: atual.va + l.valeAlimentacao,
-        brindes: atual.brindes + totalBrindes(l),
+        vt: atual.vt + (l.tipoTransporte === "vm_fixo" ? 0 : l.valeTransporte),
+        vm: atual.vm + (l.tipoTransporte === "vm_fixo" ? l.valeTransporte : 0),
+        vr: atual.vr + l.valeAlimentacao,
+        variaveis: atual.variaveis + l.variaveis + totalBrindes(l),
         colaboradores: atual.colaboradores + 1,
       });
     }
     return Array.from(mapa.entries())
-      .map(([setor, v]) => ({ setor, ...v, total: v.vt + v.va + v.brindes }))
+      .map(([setor, v]) => ({ setor, ...v, total: v.vt + v.vm + v.vr + v.variaveis }))
       .sort((a, z) => z.total - a.total);
   }, [linhas]);
 
@@ -282,17 +312,17 @@ export function BeneficiosDashboardTab() {
         <StatCard
           titulo="Vale-transporte"
           valor={formatarMoeda(totalVt)}
-          subtitulo={`${elegiveisVt} elegíveis${resumoDoMes?.informado ? " · informado" : ""}`}
+          subtitulo={`${elegiveisVt} elegíveis${diferenca(totalVt, resumoDoMes?.informadoVt)}`}
         />
         <StatCard
           titulo="Vale-mobilidade"
           valor={formatarMoeda(totalVm)}
-          subtitulo={`${elegiveisVm} elegíveis${resumoDoMes?.informado ? " · informado" : ""}`}
+          subtitulo={`${elegiveisVm} elegíveis${diferenca(totalVm, resumoDoMes?.informadoVm)}`}
         />
         <StatCard
           titulo="Vale-refeição"
           valor={formatarMoeda(totalVa)}
-          subtitulo={`${elegiveisVa} elegíveis${resumoDoMes?.informado ? " · informado" : ""}`}
+          subtitulo={`${elegiveisVa} elegíveis${diferenca(totalVa, resumoDoMes?.informadoVr)}`}
         />
         <StatCard titulo="Odonto + plataformas" valor={formatarMoeda(totalOdonto)} subtitulo={`${elegiveisOdonto} elegíveis`} />
       </div>
@@ -307,8 +337,9 @@ export function BeneficiosDashboardTab() {
 
       {resumoDoMes?.informado && (
         <p className="text-[10.5px] text-foreground-muted">
-          VT/VM/VR de {competenciaExibida(competencia)} vêm do total informado pelo DP, conferido com a operadora — o
-          rateio por colaborador abaixo continua calculado pelo cadastro e pode não fechar exatamente com esse total.
+          Os valores acima são a soma do rateio por colaborador. Entre parênteses, o total que o DP informou para{" "}
+          {competenciaExibida(competencia)}: divergir é esperado (recarga proporcional, catraca não usada, ajuste de
+          crédito), e a diferença fica à vista para ser conferida com a fatura da operadora.
         </p>
       )}
 
@@ -332,12 +363,16 @@ export function BeneficiosDashboardTab() {
                   <span className="text-foreground-muted">{formatarMoeda(s.vt)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-brand-primary-800">Vale-refeição/alimentação</span>
-                  <span className="text-brand-primary-800">{formatarMoeda(s.va)}</span>
+                  <span className="text-foreground-muted">Vale-mobilidade</span>
+                  <span className="text-foreground-muted">{formatarMoeda(s.vm)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-foreground">Brindes/Presentes</span>
-                  <span className="text-foreground">{formatarMoeda(s.brindes)}</span>
+                  <span className="text-brand-primary-800">Vale-refeição</span>
+                  <span className="text-brand-primary-800">{formatarMoeda(s.vr)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-foreground">Variáveis</span>
+                  <span className="text-foreground">{formatarMoeda(s.variaveis)}</span>
                 </div>
                 <div className="flex justify-between border-t border-hairline pt-1 font-bold">
                   <span className="text-foreground">Total</span>
@@ -368,9 +403,10 @@ export function BeneficiosDashboardTab() {
                   <tr className="border-b border-hairline bg-surface-page text-left text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">
                     <th className="px-3 py-1.5">Setor</th>
                     <th className="px-3 py-1.5 text-right">Pessoas</th>
-                    <th className="px-3 py-1.5 text-right">Transporte</th>
-                    <th className="px-3 py-1.5 text-right">Alimentação</th>
-                    <th className="px-3 py-1.5 text-right">Brindes</th>
+                    <th className="px-3 py-1.5 text-right">Vale-transporte</th>
+                    <th className="px-3 py-1.5 text-right">Vale-mobilidade</th>
+                    <th className="px-3 py-1.5 text-right">Vale-refeição</th>
+                    <th className="px-3 py-1.5 text-right">Variáveis</th>
                     <th className="px-3 py-1.5 text-right">Total</th>
                   </tr>
                 </thead>
@@ -380,8 +416,9 @@ export function BeneficiosDashboardTab() {
                       <td className="px-3 py-1.5 text-foreground uppercase">{s.setor}</td>
                       <td className="px-3 py-1.5 text-right text-foreground-muted">{s.colaboradores}</td>
                       <td className="px-3 py-1.5 text-right text-foreground-muted">{formatarMoeda(s.vt)}</td>
-                      <td className="px-3 py-1.5 text-right text-brand-primary-800">{formatarMoeda(s.va)}</td>
-                      <td className="px-3 py-1.5 text-right text-foreground-muted">{formatarMoeda(s.brindes)}</td>
+                      <td className="px-3 py-1.5 text-right text-foreground-muted">{formatarMoeda(s.vm)}</td>
+                      <td className="px-3 py-1.5 text-right text-brand-primary-800">{formatarMoeda(s.vr)}</td>
+                      <td className="px-3 py-1.5 text-right text-foreground-muted">{formatarMoeda(s.variaveis)}</td>
                       <td className="px-3 py-1.5 text-right font-bold text-brand-primary-800">{formatarMoeda(s.total)}</td>
                     </tr>
                   ))}

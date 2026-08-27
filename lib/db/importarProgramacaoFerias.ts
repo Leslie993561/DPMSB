@@ -1,6 +1,8 @@
 import "server-only";
 import { getDb } from "./client";
 import { listarColaboradores } from "./colaboradores";
+import { competenciaFechada } from "./folhaBreakdown";
+import { competenciaDaData } from "./fechamento";
 
 export interface LinhaImportacaoFerias {
   codigo: string | null;
@@ -67,6 +69,18 @@ export async function importarProgramacaoFerias(
     }
     if (!item.aquisitivoInicio || !item.aquisitivoFim) {
       descartados.push({ linha, motivo: `Período aquisitivo incompleto para "${item.nomeEmpregado}".` });
+      continue;
+    }
+
+    // O gozo importado é datado no fim do período aquisitivo; se esse mês está
+    // fechado, a linha não entra. Sem isto, uma reimportação do relatório do DP
+    // alterava férias de competências já conferidas com a contabilidade.
+    const competencia = competenciaDaData(item.aquisitivoFim);
+    if (item.diasGozados > 0 && (await competenciaFechada(competencia))) {
+      descartados.push({
+        linha,
+        motivo: `Gozo de "${item.nomeEmpregado}" cai em ${competencia}, competência fechada. Reabra o mês no Breakdown de folha para importar esta linha.`,
+      });
       continue;
     }
 

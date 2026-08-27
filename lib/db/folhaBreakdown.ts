@@ -124,6 +124,24 @@ interface LinhaExtras {
 }
 
 /** Extras importadas da competência, por colaborador — independem do mês estar fechado ou não. */
+/**
+ * Competências que têm relatório de folha lançado.
+ *
+ * O breakdown sabe calcular qualquer mês a partir do cadastro, e usava isso
+ * para preencher o ano inteiro. Só que projetar não é lançar: o custo por
+ * trimestre mostrava R$ 795 mil em Q1 e R$ 950 mil em Q4 quando o único mês
+ * lançado era agosto. Número que ninguém informou não pode aparecer como se
+ * tivesse sido — mês sem lançamento vale zero.
+ */
+export async function competenciasComLancamento(ano: number): Promise<Set<string>> {
+  const db = await getDb();
+  const resultado = await db.execute({
+    sql: "SELECT DISTINCT competencia FROM folha_extras WHERE competencia LIKE ?",
+    args: [`${ano}-%`],
+  });
+  return new Set((resultado.rows as unknown as { competencia: string }[]).map((l) => l.competencia));
+}
+
 export async function obterExtras(competencia: string): Promise<Map<number, ExtrasImportadas>> {
   const db = await getDb();
   const resultado = await db.execute({
@@ -589,8 +607,10 @@ export interface ResumoTrimestre {
   trimestre: 1 | 2 | 3 | 4;
   custoTotal: number;
   colaboradores: number;
-  /** true se algum dos 3 meses do trimestre ainda não foi fechado — usa a folha atual projetada, não um fato consumado. */
+  /** true se algum dos meses lançados ainda não foi fechado. */
   projecao: boolean;
+  /** Quantos dos 3 meses têm relatório de folha lançado. Zero = trimestre vazio. */
+  mesesLancados: number;
   porVinculo: { vinculo: string; custoTotal: number }[];
 }
 
@@ -602,21 +622,31 @@ const MESES_POR_TRIMESTRE: Record<1 | 2 | 3 | 4, number[]> = {
 };
 
 /**
- * Custo total por trimestre do ano — soma o breakdown mês a mês (real, se o
- * mês já foi fechado; projeção com a folha/dias úteis atuais, senão), nunca
- * um número estimado à parte. `dias úteis` variam por mês (afeta VT), por
- * isso a projeção recalcula cada mês, em vez de multiplicar um mês por 3.
+ * Custo total por trimestre do ano.
+ *
+ * Soma mês a mês, e SÓ os meses com relatório de folha lançado. Mês sem
+ * lançamento entra como zero em vez de projeção: o portal não inventa número
+ * de folha, e um trimestre cheio de projeção era indistinguível de um
+ * trimestre apurado.
+ *
+ * `dias úteis` variam por mês (afeta o VT), por isso cada mês lançado é
+ * recalculado, em vez de multiplicar um mês por três.
  */
 export async function obterResumoTrimestral(ano: number): Promise<ResumoTrimestre[]> {
+  const lancadas = await competenciasComLancamento(ano);
+
   return Promise.all(
     ([1, 2, 3, 4] as const).map(async (trimestre) => {
       let custoTotal = 0;
       let projecao = false;
+      let mesesLancados = 0;
       const colaboradoresSet = new Set<number>();
       const porVinculoMap = new Map<string, number>();
 
       for (const mes of MESES_POR_TRIMESTRE[trimestre]) {
         const competencia = `${ano}-${String(mes).padStart(2, "0")}`;
+        if (!lancadas.has(competencia)) continue;
+        mesesLancados++;
         const { linhas, fechado } = await obterBreakdown(competencia);
         if (!fechado) projecao = true;
         for (const l of linhas) {
@@ -632,6 +662,7 @@ export async function obterResumoTrimestral(ano: number): Promise<ResumoTrimestr
         custoTotal: arredondar(custoTotal),
         colaboradores: colaboradoresSet.size,
         projecao,
+        mesesLancados,
         porVinculo: Array.from(porVinculoMap.entries()).map(([vinculo, custo]) => ({
           vinculo,
           custoTotal: arredondar(custo),

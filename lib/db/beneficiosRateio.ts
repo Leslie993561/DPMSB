@@ -5,7 +5,7 @@ import { estaNaFolha } from "@/lib/folha/vigencia";
 import { obterDiasUteis } from "./beneficiosDiasUteis";
 import { obterExtras, listarCompetenciasFechadas } from "./folhaBreakdown";
 import { obterVariaveis, type ItemVariavel } from "./beneficiosVariaveis";
-import { detalharTransporteDoMes, arredondar, type OrigemTransporte } from "@/lib/calc";
+import { detalharTransporteDoMes, arredondar, VT_DIARIO_IMPLAUSIVEL, type OrigemTransporte } from "@/lib/calc";
 import { obterTotaisInformados } from "./beneficiosTotais";
 
 export interface LinhaRateio {
@@ -23,6 +23,8 @@ export interface LinhaRateio {
   origemVt: OrigemTransporte;
   /** Parte descontada do empregado (Lei 7.418/85) — o custo líquido da empresa é valeTransporte menos isto. */
   descontoVtEmpregado: number;
+  /** Valor por dia útil alto demais para ser passagem — provável valor mensal na coluna errada. */
+  vtDiarioImplausivel: boolean;
   valeAlimentacao: number;
   /** Odontológico/Sólides/Flash/Bonificação/Outros — vêm da mesma planilha de extras do Breakdown de Folha (Relatório detalhado); `null` = nada importado nesse mês. */
   odontologico: number | null;
@@ -100,6 +102,8 @@ export async function gerarRateio(competencia: string): Promise<{ linhas: LinhaR
       valeTransporte: override?.valeTransporte ?? transporte.bruto,
       descontoVtEmpregado: override?.valeTransporte !== null && override?.valeTransporte !== undefined ? 0 : transporte.descontoEmpregado,
       origemVt: override?.valeTransporte !== null && override?.valeTransporte !== undefined ? "cadastro" : transporte.origem,
+      vtDiarioImplausivel:
+        c.tipoTransporte !== "vm_fixo" && (c.valorTransporteDia ?? 0) > VT_DIARIO_IMPLAUSIVEL,
       valeAlimentacao: override?.valeAlimentacao ?? (c.alimentacaoValor ?? 0),
       odontologico: extraFolha?.odontologico ?? null,
       solides: extraFolha?.solides ?? null,
@@ -127,10 +131,14 @@ export interface ResumoMensalBeneficios {
   variaveis: number;
   total: number;
   /**
-   * VT/VM/VR vieram do total que o DP informou para o mês, não da soma do
-   * cadastro. O dashboard marca a diferença: um número conferido com a
-   * operadora não é a mesma coisa que uma projeção.
+   * Total que o DP informou para o mês, quando existe — para conferência com a
+   * fatura da operadora. NÃO substitui o rateio: o dashboard mostra o rateio e
+   * usa isto para apontar a diferença.
    */
+  informadoVt: number | null;
+  informadoVm: number | null;
+  informadoVr: number | null;
+  /** Há algum total informado neste mês. */
   informado: boolean;
   /** Mês fechado no Breakdown — não aceita mais edição em lugar nenhum do portal. */
   fechado: boolean;
@@ -139,12 +147,15 @@ export interface ResumoMensalBeneficios {
 /**
  * Custo de benefícios por mês do ano.
  *
- * VT/VM/VR saem do cadastro, colaborador a colaborador — é o que permite
- * ratear por setor. Mas quando o DP informa o total que a empresa pagou no mês
- * (`beneficios_totais_mes`), é ESSE número que vale aqui: ele veio da operadora
- * e já embute recarga proporcional, catraca não usada e ajuste de crédito, que
- * a soma teórica não tem como saber. O rateio por pessoa segue calculado — o
- * que muda é só o total do mês.
+ * O número que vale é o do RATEIO: a soma colaborador a colaborador que a aba
+ * ao lado mostra. Antes o total informado pelo DP substituía essa soma, e o
+ * topo do dashboard discordava da tabela logo abaixo sem que houvesse como
+ * saber por quê — ao corrigir o VT de alguém no Quadro, o cartão não se mexia.
+ *
+ * O informado continua guardado e volta como `informadoVt/Vm/Vr`, para o
+ * dashboard mostrar a diferença contra a fatura da operadora. Divergir é
+ * esperado (recarga proporcional, catraca não usada, ajuste de crédito) — o
+ * que não pode é a divergência ficar invisível.
  */
 export async function obterResumoAnualBeneficios(ano: number): Promise<ResumoMensalBeneficios[]> {
   const informados = await obterTotaisInformados(ano);
@@ -171,11 +182,7 @@ export async function obterResumoAnualBeneficios(ano: number): Promise<ResumoMen
         variaveis += l.variaveis;
       }
 
-      // Verba a verba: o informado substitui o calculado só onde existe.
       const t = informados.get(mes);
-      vt = t?.vt ?? vt;
-      vm = t?.vm ?? vm;
-      vr = t?.vr ?? vr;
 
       return {
         mes,
@@ -186,6 +193,9 @@ export async function obterResumoAnualBeneficios(ano: number): Promise<ResumoMen
         brindes: arredondar(brindes),
         variaveis: arredondar(variaveis),
         total: arredondar(vt + vm + vr + odontoPlataformas + brindes + variaveis),
+        informadoVt: t?.vt ?? null,
+        informadoVm: t?.vm ?? null,
+        informadoVr: t?.vr ?? null,
         informado: t !== undefined && (t.vt !== null || t.vm !== null || t.vr !== null),
         fechado: fechadas.has(competencia),
       };

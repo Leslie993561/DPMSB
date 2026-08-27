@@ -81,6 +81,17 @@ export function calcularValeTransporte(
   };
 }
 
+/**
+ * Acima disto, um "valor por dia útil" quase certamente é um valor MENSAL
+ * digitado na coluna errada.
+ *
+ * As passagens reais da empresa vão de R$ 10,40 a R$ 20,80 por dia. A Rebeca
+ * estava com R$ 378,00 por dia — o valor mensal do vale-mobilidade dela — e
+ * isso sozinho somava R$ 7.938 ao VT do mês sem nada na tela indicando erro.
+ * O portal não corrige: aponta.
+ */
+export const VT_DIARIO_IMPLAUSIVEL = 100;
+
 /** O que o cálculo de transporte precisa saber do cadastro. */
 export interface TransporteDoColaborador {
   tipoTransporte: string;

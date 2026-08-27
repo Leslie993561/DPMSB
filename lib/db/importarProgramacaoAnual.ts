@@ -1,6 +1,8 @@
 import "server-only";
 import { getDb } from "./client";
 import { listarColaboradores } from "./colaboradores";
+import { competenciaFechada } from "./folhaBreakdown";
+import { competenciaDaData } from "./fechamento";
 
 export interface LinhaProgramacaoAnual {
   codigo: string | null;
@@ -68,6 +70,20 @@ export async function importarProgramacaoAnual(
     }
     if (item.diasFerias <= 0) {
       descartados.push({ linha, motivo: `"Dias de férias" precisa ser maior que zero para "${item.nomeColaborador}".` });
+      continue;
+    }
+
+    // Mês fechado não recebe escrita de lugar nenhum, e a importação em lote
+    // era a porta que faltava fechar: um arquivo com férias de julho alterava
+    // um custo que a contabilidade já tinha levado como final. A linha é
+    // descartada com o motivo, e as demais do arquivo seguem — recusar o
+    // arquivo inteiro por causa de uma linha seria pior.
+    const competencia = competenciaDaData(item.inicioFerias);
+    if (await competenciaFechada(competencia)) {
+      descartados.push({
+        linha,
+        motivo: `Férias de "${item.nomeColaborador}" começam em ${competencia}, competência fechada. Reabra o mês no Breakdown de folha para importar esta linha.`,
+      });
       continue;
     }
 

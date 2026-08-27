@@ -34,6 +34,7 @@ interface ResumoTrimestre {
   custoTotal: number;
   colaboradores: number;
   projecao: boolean;
+  mesesLancados: number;
   porVinculo: { vinculo: string; custoTotal: number }[];
 }
 
@@ -203,6 +204,7 @@ export function BreakdownDashboardTab() {
         trimestre: t.trimestre,
         custo: t.porVinculo.filter((pv) => !ehPjVinculo(pv.vinculo)).reduce((s, pv) => s + pv.custoTotal, 0),
         projecao: t.projecao,
+        mesesLancados: t.mesesLancados,
       })),
     [trimestres],
   );
@@ -212,6 +214,7 @@ export function BreakdownDashboardTab() {
         trimestre: t.trimestre,
         custo: t.porVinculo.filter((pv) => ehPjVinculo(pv.vinculo)).reduce((s, pv) => s + pv.custoTotal, 0),
         projecao: t.projecao,
+        mesesLancados: t.mesesLancados,
       })),
     [trimestres],
   );
@@ -374,7 +377,14 @@ export function BreakdownDashboardTab() {
                     <p className="mt-1 text-[10.5px] font-semibold text-foreground">Q{t.trimestre}</p>
                     <p className="text-[9px] text-foreground-muted">{FAIXA_TRIMESTRE[t.trimestre]}</p>
                     <p className="text-[10px] font-semibold text-foreground">{formatarMoeda(t.custoExibido)}</p>
-                    {t.projecao && (
+                    {t.mesesLancados === 0 ? (
+                      <p className="text-[10px] text-foreground-muted">sem folha lançada</p>
+                    ) : t.mesesLancados < 3 ? (
+                      <p className="text-[10px] text-foreground-muted">
+                        {t.mesesLancados} de 3 meses lançados
+                      </p>
+                    ) : null}
+                    {t.projecao && t.mesesLancados > 0 && (
                       <p className="mt-0.5 text-[8px] leading-tight text-foreground-muted">
                         projeção sobre a folha atual
                       </p>

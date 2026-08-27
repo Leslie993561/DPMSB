@@ -25,6 +25,7 @@ interface LinhaRateio {
   valeTransporte: number;
   /** "cadastro" = veio do valor por dia do colaborador; o resto é suprimento. */
   origemVt: "cadastro" | "tarifa-cidade" | "sem-valor" | "vm-fixo";
+  vtDiarioImplausivel: boolean;
   valeAlimentacao: number;
   variaveis: number;
   variaveisItens: ItemVariavel[];
@@ -75,6 +76,10 @@ export function RateioTab() {
   const [carregando, setCarregando] = useState(true);
   const [importarAberto, setImportarAberto] = useState(false);
   const [menuMes, setMenuMes] = useState<number | null>(null);
+  // Meses fechados no Breakdown: fechar lá vale para o portal inteiro, então o
+  // cadeado tem de aparecer aqui também. Sem ele a pessoa só descobria que o
+  // mês estava fechado quando a gravação era recusada.
+  const [mesesFechados, setMesesFechados] = useState<number[]>([]);
   const [avisosAbertos, setAvisosAbertos] = useState(false);
   const avisosRef = useRef<HTMLDivElement>(null);
   const [editandoMes, setEditandoMes] = useState<number | null>(null);
@@ -110,6 +115,7 @@ export function RateioTab() {
   // aviso não havia como descobrir isso olhando a tela.
   const semValorNoCadastro = useMemo(() => linhas.filter((l) => l.origemVt === "tarifa-cidade"), [linhas]);
   const semTarifaNenhuma = useMemo(() => linhas.filter((l) => l.origemVt === "sem-valor"), [linhas]);
+  const diarioImplausivel = useMemo(() => linhas.filter((l) => l.vtDiarioImplausivel), [linhas]);
 
   useEffect(() => {
     if (!avisosAbertos) return;
@@ -121,6 +127,20 @@ export function RateioTab() {
   }, [avisosAbertos]);
 
   const ano = competencia.slice(0, 4);
+
+  useEffect(() => {
+    let cancelado = false;
+    fetch(`/api/beneficios/resumo-anual?ano=${ano}`)
+      .then((r) => r.json())
+      .then((d: { meses?: { mes: number; fechado?: boolean }[] }) => {
+        if (cancelado) return;
+        setMesesFechados((d.meses ?? []).filter((m) => m.fechado).map((m) => m.mes));
+      })
+      .catch(() => {});
+    return () => {
+      cancelado = true;
+    };
+  }, [ano]);
 
   async function abrirEdicaoDiasUteis(mesNum: number) {
     setMenuMes(null);
@@ -232,6 +252,11 @@ export function RateioTab() {
                       : "border-hairline bg-background text-foreground-muted hover:border-brand-primary",
                   )}
                 >
+                  {mesesFechados.includes(mesNum) && (
+                    <span aria-label="mês fechado" title="Mês fechado no Breakdown de folha" className="mr-1">
+                      🔒
+                    </span>
+                  )}
                   {m}
                 </button>
 
@@ -316,7 +341,7 @@ export function RateioTab() {
         </label>
       </div>
 
-      {(semValorNoCadastro.length > 0 || semTarifaNenhuma.length > 0) && (
+      {(semValorNoCadastro.length > 0 || semTarifaNenhuma.length > 0 || diarioImplausivel.length > 0) && (
         <div ref={avisosRef} className="relative self-start">
           {/* Os dois avisos ocupavam um terço da tela toda vez que a aba abria.
               Ficam atrás de uma bolinha: o número continua à vista, o texto
@@ -325,10 +350,10 @@ export function RateioTab() {
             type="button"
             onClick={() => setAvisosAbertos((v) => !v)}
             aria-expanded={avisosAbertos}
-            aria-label={`${semValorNoCadastro.length + semTarifaNenhuma.length} aviso(s) sobre vale-transporte`}
+            aria-label={`${semValorNoCadastro.length + semTarifaNenhuma.length + diarioImplausivel.length} aviso(s) sobre vale-transporte`}
             className={cn(
               "flex items-center gap-2 rounded-full border py-1.5 pr-3 pl-2 text-[12px] font-semibold transition-colors",
-              semTarifaNenhuma.length > 0
+              semTarifaNenhuma.length > 0 || diarioImplausivel.length > 0
                 ? "border-status-danger-border bg-status-danger-bg text-status-danger hover:brightness-95"
                 : "border-status-warning-border bg-status-warning-bg text-status-warning hover:brightness-95",
             )}
@@ -337,16 +362,27 @@ export function RateioTab() {
               aria-hidden
               className={cn(
                 "inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold text-brand-white",
-                semTarifaNenhuma.length > 0 ? "bg-status-danger" : "bg-status-warning",
+                semTarifaNenhuma.length > 0 || diarioImplausivel.length > 0 ? "bg-status-danger" : "bg-status-warning",
               )}
             >
-              {semValorNoCadastro.length + semTarifaNenhuma.length}
+              {semValorNoCadastro.length + semTarifaNenhuma.length + diarioImplausivel.length}
             </span>
             Vale-transporte {avisosAbertos ? "▴" : "▾"}
           </button>
 
           {avisosAbertos && (
             <div className="absolute top-full left-0 z-50 mt-1.5 w-[min(46rem,calc(100vw-3rem))] space-y-2 rounded-xl border border-hairline bg-background p-3 shadow-lg dark:border-brand-neutral/30">
+              {diarioImplausivel.length > 0 && (
+                <RiskCallout nivel="critico">
+                  <strong>
+                    {diarioImplausivel.length} colaborador(es) com valor de VT por dia útil acima de R$ 100,00.
+                  </strong>{" "}
+                  Passagem por dia não chega perto disso — quase sempre é o valor MENSAL digitado na coluna do dia, e
+                  cada um deles multiplica por {"~"}21 no total do mês:{" "}
+                  <span className="uppercase">{diarioImplausivel.map((l) => l.nome).join(", ")}</span>.
+                </RiskCallout>
+              )}
+
               {semValorNoCadastro.length > 0 && (
                 <RiskCallout nivel="atencao">
                   <strong>
