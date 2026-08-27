@@ -37,6 +37,8 @@ export interface Colaborador {
   dataDesligamento: string | null;
   motivoDesligamento: string | null;
   valorRescisao: number | null;
+  /** Saldo de FGTS na rescisão, conforme extrato — informado, nunca estimado. */
+  valorFgts: number | null;
   // Dados pessoais
   pis: string | null;
   cidadeNascimento: string | null;
@@ -99,6 +101,7 @@ export interface ColaboradorInput {
   dataDesligamento?: string | null;
   motivoDesligamento?: string | null;
   valorRescisao?: number | null;
+  valorFgts?: number | null;
   pis?: string | null;
   cidadeNascimento?: string | null;
   ufNascimento?: string | null;
@@ -150,6 +153,7 @@ interface LinhaColaborador {
   data_desligamento: string | null;
   motivo_desligamento: string | null;
   valor_rescisao: number | null;
+  valor_fgts: number | null;
   pis: string | null;
   cidade_nascimento: string | null;
   uf_nascimento: string | null;
@@ -202,6 +206,7 @@ function paraColaborador(linha: LinhaColaborador): Colaborador {
     dataDesligamento: linha.data_desligamento,
     motivoDesligamento: linha.motivo_desligamento,
     valorRescisao: linha.valor_rescisao,
+    valorFgts: linha.valor_fgts,
     pis: linha.pis,
     cidadeNascimento: linha.cidade_nascimento,
     ufNascimento: linha.uf_nascimento,
@@ -349,6 +354,7 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
     motivoDesligamento:
       input.motivoDesligamento !== undefined ? input.motivoDesligamento : atual.motivoDesligamento,
     valorRescisao: input.valorRescisao !== undefined ? input.valorRescisao : atual.valorRescisao,
+    valorFgts: input.valorFgts !== undefined ? input.valorFgts : atual.valorFgts,
     pis: input.pis !== undefined ? input.pis : atual.pis,
     cidadeNascimento: input.cidadeNascimento !== undefined ? input.cidadeNascimento : atual.cidadeNascimento,
     ufNascimento: input.ufNascimento !== undefined ? input.ufNascimento : atual.ufNascimento,
@@ -383,7 +389,7 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
        SET nome = ?, data_admissao = ?, salario_base = ?, dependentes = ?, cpf = ?, email = ?, cargo = ?,
            departamento = ?, gestor_id = ?, cidade = ?, vinculo = ?, alimentacao_valor = ?, data_nascimento = ?,
            cbo = ?, agencia = ?, conta = ?, tipo_transporte = ?, valor_transporte_fixo = ?, valor_transporte_dia = ?, lider_direto_nome = ?,
-           status = ?, data_desligamento = ?, motivo_desligamento = ?, valor_rescisao = ?,
+           status = ?, data_desligamento = ?, motivo_desligamento = ?, valor_rescisao = ?, valor_fgts = ?,
            pis = ?, cidade_nascimento = ?, uf_nascimento = ?, nome_pai = ?, nome_mae = ?, telefone = ?, sexo = ?,
            email_pessoal = ?, horario = ?, banco = ?, cep = ?, estado = ?, bairro = ?, rua = ?, numero = ?,
            conjuge_nome = ?, conjuge_cpf = ?, conjuge_nascimento = ?, conjuge_sexo = ?,
@@ -415,6 +421,7 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
       mesclado.dataDesligamento ?? null,
       mesclado.motivoDesligamento ?? null,
       mesclado.valorRescisao ?? null,
+      mesclado.valorFgts ?? null,
       mesclado.pis ?? null,
       mesclado.cidadeNascimento ?? null,
       mesclado.ufNascimento ?? null,

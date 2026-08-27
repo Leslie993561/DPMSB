@@ -286,6 +286,7 @@ export function ColaboradoresTable({
             </CabecalhoFiltravel>
 
             {desligados && <th className="px-3 py-1 text-right">Valor da rescisão</th>}
+            {desligados && <th className="px-3 py-1 text-right">Valor do FGTS</th>}
 
             {/* ANI = aniversário. Clicar agrupa a lista por mês, com separador
                 de mês e a data de cada um; clicar de novo volta ao normal. */}
@@ -317,7 +318,7 @@ export function ColaboradoresTable({
         <tbody>
           {algumFiltroAtivo && (
             <tr>
-              <td colSpan={desligados ? 8 : 7} className="border-b border-hairline bg-brand-primary-050 px-3 py-1 text-[10.5px] text-brand-primary-800">
+              <td colSpan={desligados ? 9 : 7} className="border-b border-hairline bg-brand-primary-050 px-3 py-1 text-[10.5px] text-brand-primary-800">
                 {linhas.length} de {colaboradores.length} colaborador(es) ·{" "}
                 <button type="button" onClick={() => setFiltros(FILTROS_VAZIOS)} className="font-semibold underline">
                   limpar filtros
@@ -327,7 +328,7 @@ export function ColaboradoresTable({
           )}
           {linhas.length === 0 ? (
             <tr>
-              <td colSpan={desligados ? 8 : 7} className="px-3 py-4 text-center text-foreground-muted">
+              <td colSpan={desligados ? 9 : 7} className="px-3 py-4 text-center text-foreground-muted">
                 Nenhum colaborador corresponde aos filtros.
               </td>
             </tr>
@@ -341,7 +342,7 @@ export function ColaboradoresTable({
                   {abreMes && (
                     <tr className="bg-brand-primary-050">
                       <td
-                        colSpan={desligados ? 8 : 7}
+                        colSpan={desligados ? 9 : 7}
                         className="px-3 py-1 text-[10px] font-bold tracking-wide text-brand-primary-800 uppercase"
                       >
                         {mes ?? "Sem data de nascimento"}
@@ -378,6 +379,17 @@ export function ColaboradoresTable({
                   <td className="px-3 py-1 text-right text-foreground">
                     {c.valorRescisao !== null && c.valorRescisao !== undefined ? (
                       formatarMoeda(c.valorRescisao)
+                    ) : (
+                      <span className="text-foreground-muted/50">—</span>
+                    )}
+                  </td>
+                )}
+                {/* Saldo do extrato do FGTS Digital. Traço quando não informado
+                    — o portal não estima saldo de FGTS a partir do salário. */}
+                {desligados && (
+                  <td className="px-3 py-1 text-right text-foreground">
+                    {c.valorFgts !== null && c.valorFgts !== undefined ? (
+                      formatarMoeda(c.valorFgts)
                     ) : (
                       <span className="text-foreground-muted/50">—</span>
                     )}

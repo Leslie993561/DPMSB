@@ -98,6 +98,7 @@ const ROTULO_CAMPO: Record<string, string> = {
   conjugeNascimento: "Nascimento do cônjuge",
   conjugeSexo: "Sexo do cônjuge",
   valorRescisao: "Valor da rescisão",
+  valorFgts: "Valor do FGTS",
   motivoDesligamento: "Motivo do desligamento",
   dependentes: "Dependentes",
   dependentesLista: "Dependente",
@@ -261,6 +262,7 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
   const [desligando, setDesligando] = useState(false);
   const [dataDesligamento, setDataDesligamento] = useState(editando?.dataDesligamento ?? "");
   const [valorRescisao, setValorRescisao] = useState(editando?.valorRescisao ? String(editando.valorRescisao) : "");
+  const [valorFgts, setValorFgts] = useState(editando?.valorFgts ? String(editando.valorFgts) : "");
   const [motivoDesligamento, setMotivoDesligamento] = useState(editando?.motivoDesligamento ?? "");
 
   const [excluindo, setExcluindo] = useState(false);
@@ -392,6 +394,7 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
               dataDesligamento: dataDesligamento || null,
               motivoDesligamento: motivoDesligamento || null,
               valorRescisao: valorRescisao ? Number(valorRescisao) : null,
+              valorFgts: valorFgts ? Number(valorFgts) : null,
             }
           : {}),
       };
@@ -427,6 +430,7 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
           dataDesligamento,
           motivoDesligamento: motivoDesligamento || null,
           valorRescisao: valorRescisao ? Number(valorRescisao) : null,
+          valorFgts: valorFgts ? Number(valorFgts) : null,
         }),
       });
       const data = await res.json();
@@ -494,6 +498,21 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
             step="0.01"
             value={valorRescisao}
             onChange={(e) => setValorRescisao(e.target.value)}
+            placeholder="R$ 0,00"
+            className={INPUT_CLASS}
+          />
+        </label>
+
+        {/* Saldo de extrato do FGTS Digital, com correção e rendimentos: não é
+            derivável do salário, então é informado. */}
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Valor do FGTS
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            value={valorFgts}
+            onChange={(e) => setValorFgts(e.target.value)}
             placeholder="R$ 0,00"
             className={INPUT_CLASS}
           />
@@ -577,6 +596,19 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
                 step="0.01"
                 value={valorRescisao}
                 onChange={(e) => setValorRescisao(e.target.value)}
+                placeholder="R$ 0,00"
+                disabled={bloqueado}
+                className={INPUT_CLASS}
+              />
+            </label>
+            <label className="flex flex-col gap-0 text-[10px] font-normal text-status-danger">
+              Valor do FGTS
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={valorFgts}
+                onChange={(e) => setValorFgts(e.target.value)}
                 placeholder="R$ 0,00"
                 disabled={bloqueado}
                 className={INPUT_CLASS}

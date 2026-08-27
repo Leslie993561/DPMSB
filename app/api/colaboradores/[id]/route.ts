@@ -40,6 +40,7 @@ const schema = z.object({
   dataDesligamento: z.iso.date().nullable().optional(),
   motivoDesligamento: z.string().nullable().optional(),
   valorRescisao: z.coerce.number().min(0).nullable().optional(),
+  valorFgts: z.coerce.number().min(0).nullable().optional(),
   pis: z.string().nullable().optional(),
   cidadeNascimento: z.string().nullable().optional(),
   ufNascimento: z.string().nullable().optional(),

@@ -100,6 +100,11 @@ const MIGRACOES: { tabela: string; coluna: string; definicao: string }[] = [
   { tabela: "colaboradores", coluna: "data_desligamento", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "motivo_desligamento", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "valor_rescisao", definicao: "REAL" },
+  // Saldo de FGTS na rescisão, informado pelo DP. É valor de extrato do FGTS
+  // Digital — com correção monetária e rendimentos — e não se calcula de fora:
+  // o 8% × salário × meses que a rescisão usa como último recurso é estimativa
+  // declarada, não o saldo real.
+  { tabela: "colaboradores", coluna: "valor_fgts", definicao: "REAL" },
   // Dados pessoais
   { tabela: "colaboradores", coluna: "pis", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "cidade_nascimento", definicao: "TEXT" },
