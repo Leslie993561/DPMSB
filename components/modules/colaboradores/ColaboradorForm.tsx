@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Colaborador, SexoColaborador, TipoTransporte, Vinculo } from "@/lib/db/colaboradores";
+import type { Colaborador, RateioD365, SexoColaborador, TipoTransporte, Vinculo } from "@/lib/db/colaboradores";
 import type { SexoDependente } from "@/lib/db/colaboradorDependentes";
 import { RiskCallout } from "@/components/shared/RiskCallout";
 import { cn } from "@/lib/cn";
@@ -99,6 +99,7 @@ const ROTULO_CAMPO: Record<string, string> = {
   conjugeSexo: "Sexo do cônjuge",
   valorRescisao: "Valor da rescisão",
   valorFgts: "Valor do FGTS",
+  rateioD365: "Rateio D365",
   motivoDesligamento: "Motivo do desligamento",
   dependentes: "Dependentes",
   dependentesLista: "Dependente",
@@ -263,6 +264,7 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
   const [dataDesligamento, setDataDesligamento] = useState(editando?.dataDesligamento ?? "");
   const [valorRescisao, setValorRescisao] = useState(editando?.valorRescisao ? String(editando.valorRescisao) : "");
   const [valorFgts, setValorFgts] = useState(editando?.valorFgts ? String(editando.valorFgts) : "");
+  const [rateioD365, setRateioD365] = useState<RateioD365 | "">(editando?.rateioD365 ?? "");
   const [motivoDesligamento, setMotivoDesligamento] = useState(editando?.motivoDesligamento ?? "");
 
   const [excluindo, setExcluindo] = useState(false);
@@ -383,6 +385,7 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
         conjugeCpf: conjugeCpf || null,
         conjugeNascimento: conjugeNascimento || null,
         conjugeSexo: conjugeSexo || null,
+        rateioD365: rateioD365 || null,
         periculosidadePercentual: periculosidade ? Number(periculosidade) : null,
         insalubridadePercentual: insalubridade ? Number(insalubridade) : null,
         adicionalFixo: adicionalFixo ? Number(adicionalFixo) : null,
@@ -874,17 +877,36 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
         </label>
       </div>
 
-      <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
-        Data de admissão
-        <input
-          type="date"
-          value={dataAdmissao}
-          onChange={(e) => setDataAdmissao(e.target.value)}
-          required
-          disabled={bloqueado}
-          className={INPUT_CLASS}
-        />
-      </label>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Data de admissão
+          <input
+            type="date"
+            value={dataAdmissao}
+            onChange={(e) => setDataAdmissao(e.target.value)}
+            required
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+
+        {/* Centro de rateio do D365. Enquanto ficar vazio, o Dashboard de
+            Benefícios continua deduzindo pelo departamento — que é palpite,
+            não classificação contábil. */}
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Rateio D365
+          <select
+            value={rateioD365}
+            onChange={(e) => setRateioD365(e.target.value as RateioD365 | "")}
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          >
+            <option value="">—</option>
+            <option value="ADM">ADM · Administrativo</option>
+            <option value="PRO">PRO · Produção</option>
+          </select>
+        </label>
+      </div>
 
       <Secao titulo="Dados bancários" />
 

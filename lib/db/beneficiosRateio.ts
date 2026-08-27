@@ -14,6 +14,8 @@ export interface LinhaRateio {
   cpf: string | null;
   vinculo: string | null;
   departamento: string | null;
+  /** Centro de rateio informado no D365; `null` = o agrupamento deduz pelo departamento. */
+  rateioD365: string | null;
   cidade: string | null;
   tipoTransporte: string;
   valeTransporte: number;
@@ -90,6 +92,7 @@ export async function gerarRateio(competencia: string): Promise<{ linhas: LinhaR
       cpf: c.cpf,
       vinculo: c.vinculo,
       departamento: c.departamento,
+      rateioD365: c.rateioD365,
       cidade: c.cidade,
       tipoTransporte: c.tipoTransporte,
       // Bruto, não líquido: no rateio o que interessa é o valor do vale, que é

@@ -60,6 +60,7 @@ const schema = z.object({
   conjugeCpf: z.string().nullable().optional(),
   conjugeNascimento: z.iso.date().nullable().optional(),
   conjugeSexo: z.enum(["M", "F"]).nullable().optional(),
+  rateioD365: z.enum(["ADM", "PRO"]).nullable().optional(),
   // Sem estes quatro o zod descartava o bloco "Adicionais" em silêncio e a
   // rota devolvia 200 sem gravar nada: o formulário existia, o campo aceitava
   // o valor e nada chegava ao banco. É por isso que 74 colaboradores estavam

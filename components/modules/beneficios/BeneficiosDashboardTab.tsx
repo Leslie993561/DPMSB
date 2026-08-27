@@ -10,6 +10,7 @@ interface LinhaRateio {
   nome: string;
   vinculo: string | null;
   departamento: string | null;
+  rateioD365: string | null;
   tipoTransporte: string;
   valeTransporte: number;
   valeAlimentacao: number;
@@ -106,7 +107,17 @@ const MACRO_SETOR: Record<string, MacroSetor> = {
   "Tecnologia da Informacao": "Administrativo",
 };
 
-function macroSetor(departamento: string | null): MacroSetor {
+/**
+ * Onde o custo do colaborador é rateado.
+ *
+ * O centro informado no D365 manda: é classificação contábil, feita por quem
+ * responde por ela. O mapa por departamento é só o palpite de quando o campo
+ * está vazio — e "Administrativo" como último caso significa "não sabemos",
+ * que foi como a Ourivania, sem setor nenhum, virou administrativa em silêncio.
+ */
+function macroSetor(departamento: string | null, rateioD365?: string | null): MacroSetor {
+  if (rateioD365 === "PRO") return "Produção";
+  if (rateioD365 === "ADM") return "Administrativo";
   return (departamento && MACRO_SETOR[departamento]) || "Administrativo";
 }
 
@@ -193,7 +204,7 @@ export function BeneficiosDashboardTab() {
       ["Administrativo", { vt: 0, va: 0, brindes: 0, colaboradores: 0 }],
     ]);
     for (const l of linhas) {
-      const chave = macroSetor(l.departamento);
+      const chave = macroSetor(l.departamento, l.rateioD365);
       const atual = mapa.get(chave)!;
       mapa.set(chave, {
         vt: atual.vt + l.valeTransporte,

@@ -105,6 +105,10 @@ const MIGRACOES: { tabela: string; coluna: string; definicao: string }[] = [
   // o 8% × salário × meses que a rescisão usa como último recurso é estimativa
   // declarada, não o saldo real.
   { tabela: "colaboradores", coluna: "valor_fgts", definicao: "REAL" },
+  // Centro de rateio no D365: "ADM" ou "PRO". Vazio significa não classificado,
+  // e aí o portal volta a deduzir pelo departamento — que é palpite, não
+  // classificação contábil.
+  { tabela: "colaboradores", coluna: "rateio_d365", definicao: "TEXT" },
   // Dados pessoais
   { tabela: "colaboradores", coluna: "pis", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "cidade_nascimento", definicao: "TEXT" },

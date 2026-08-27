@@ -9,6 +9,9 @@ export type TipoTransporte = "vt_diario" | "vm_fixo";
 export type StatusColaborador = "ativo" | "desligado";
 export type SexoColaborador = "M" | "F";
 
+/** Centro de rateio do D365 — administrativo ou produção. */
+export type RateioD365 = "ADM" | "PRO";
+
 export interface Colaborador {
   id: number;
   nome: string;
@@ -39,6 +42,8 @@ export interface Colaborador {
   valorRescisao: number | null;
   /** Saldo de FGTS na rescisão, conforme extrato — informado, nunca estimado. */
   valorFgts: number | null;
+  /** Centro de rateio no D365; `null` = ainda não classificado. */
+  rateioD365: RateioD365 | null;
   // Dados pessoais
   pis: string | null;
   cidadeNascimento: string | null;
@@ -102,6 +107,7 @@ export interface ColaboradorInput {
   motivoDesligamento?: string | null;
   valorRescisao?: number | null;
   valorFgts?: number | null;
+  rateioD365?: RateioD365 | null;
   pis?: string | null;
   cidadeNascimento?: string | null;
   ufNascimento?: string | null;
@@ -154,6 +160,7 @@ interface LinhaColaborador {
   motivo_desligamento: string | null;
   valor_rescisao: number | null;
   valor_fgts: number | null;
+  rateio_d365: string | null;
   pis: string | null;
   cidade_nascimento: string | null;
   uf_nascimento: string | null;
@@ -207,6 +214,7 @@ function paraColaborador(linha: LinhaColaborador): Colaborador {
     motivoDesligamento: linha.motivo_desligamento,
     valorRescisao: linha.valor_rescisao,
     valorFgts: linha.valor_fgts,
+    rateioD365: linha.rateio_d365 as RateioD365 | null,
     pis: linha.pis,
     cidadeNascimento: linha.cidade_nascimento,
     ufNascimento: linha.uf_nascimento,
@@ -270,8 +278,8 @@ export async function criarColaborador(input: ColaboradorInput): Promise<Colabor
           vinculo, alimentacao_valor, data_nascimento, cbo, agencia, conta, tipo_transporte, valor_transporte_fixo, valor_transporte_dia,
           lider_direto_nome, status, pis, cidade_nascimento, uf_nascimento, nome_pai, nome_mae, telefone, sexo,
           email_pessoal, horario, banco, cep, estado, bairro, rua, numero, conjuge_nome, conjuge_cpf, conjuge_nascimento, conjuge_sexo,
-          periculosidade_percentual, insalubridade_percentual, adicional_fixo, adicional_fixo_descricao)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          periculosidade_percentual, insalubridade_percentual, adicional_fixo, adicional_fixo_descricao, rateio_d365)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       input.nome,
       input.dataAdmissao,
@@ -317,6 +325,7 @@ export async function criarColaborador(input: ColaboradorInput): Promise<Colabor
       input.insalubridadePercentual ?? null,
       input.adicionalFixo ?? null,
       input.adicionalFixoDescricao ?? null,
+      input.rateioD365 ?? null,
     ],
   });
   return (await buscarColaborador(Number(info.lastInsertRowid)))!;
@@ -355,6 +364,7 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
       input.motivoDesligamento !== undefined ? input.motivoDesligamento : atual.motivoDesligamento,
     valorRescisao: input.valorRescisao !== undefined ? input.valorRescisao : atual.valorRescisao,
     valorFgts: input.valorFgts !== undefined ? input.valorFgts : atual.valorFgts,
+    rateioD365: input.rateioD365 !== undefined ? input.rateioD365 : atual.rateioD365,
     pis: input.pis !== undefined ? input.pis : atual.pis,
     cidadeNascimento: input.cidadeNascimento !== undefined ? input.cidadeNascimento : atual.cidadeNascimento,
     ufNascimento: input.ufNascimento !== undefined ? input.ufNascimento : atual.ufNascimento,
@@ -389,7 +399,7 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
        SET nome = ?, data_admissao = ?, salario_base = ?, dependentes = ?, cpf = ?, email = ?, cargo = ?,
            departamento = ?, gestor_id = ?, cidade = ?, vinculo = ?, alimentacao_valor = ?, data_nascimento = ?,
            cbo = ?, agencia = ?, conta = ?, tipo_transporte = ?, valor_transporte_fixo = ?, valor_transporte_dia = ?, lider_direto_nome = ?,
-           status = ?, data_desligamento = ?, motivo_desligamento = ?, valor_rescisao = ?, valor_fgts = ?,
+           status = ?, data_desligamento = ?, motivo_desligamento = ?, valor_rescisao = ?, valor_fgts = ?, rateio_d365 = ?,
            pis = ?, cidade_nascimento = ?, uf_nascimento = ?, nome_pai = ?, nome_mae = ?, telefone = ?, sexo = ?,
            email_pessoal = ?, horario = ?, banco = ?, cep = ?, estado = ?, bairro = ?, rua = ?, numero = ?,
            conjuge_nome = ?, conjuge_cpf = ?, conjuge_nascimento = ?, conjuge_sexo = ?,
@@ -422,6 +432,7 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
       mesclado.motivoDesligamento ?? null,
       mesclado.valorRescisao ?? null,
       mesclado.valorFgts ?? null,
+      mesclado.rateioD365 ?? null,
       mesclado.pis ?? null,
       mesclado.cidadeNascimento ?? null,
       mesclado.ufNascimento ?? null,
