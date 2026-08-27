@@ -120,7 +120,7 @@ export function calcularTransporteDoMes(c: TransporteDoColaborador, diasUteis: n
 }
 
 /** De onde veio o valor do dia usado no cálculo do VT. */
-export type OrigemTransporte = "cadastro" | "tarifa-cidade" | "sem-valor" | "vm-fixo";
+export type OrigemTransporte = "cadastro" | "sem-valor" | "vm-fixo";
 
 /**
  * Mesmo cálculo, dizendo também de onde saiu o número.
@@ -160,17 +160,24 @@ export function detalharTransporteDoMes(c: TransporteDoColaborador, diasUteis: n
     return { bruto: fixo, descontoEmpregado: 0, custoEmpresa: fixo, origem: "vm-fixo" };
   }
 
-  // O valor cadastrado é o do dia inteiro (ida + volta), como o DP informa; a
-  // tarifa da cidade é de um trecho só. Daí a divisão por 2 de um lado.
+  // Sem valor cadastrado, o VT é ZERO. Havia um recurso à tarifa média da
+  // cidade, e ele arbitrava folha: a Tainara aparecia com R$ 208,00 no rateio
+  // com o campo vazio no Quadro, e nada na linha dizia que aquele número não
+  // vinha do cadastro dela. Quem está sem valor fica em zero, e o aviso da
+  // tela cobra o preenchimento.
+  //
+  // O valor cadastrado é o do dia inteiro (ida + volta), como o DP informa,
+  // enquanto calcularValeTransporte espera o de um trecho — daí a divisão por 2.
   const valorDia = c.valorTransporteDia;
-  const tarifa = valorDia === null ? tarifaVtPorCidade(c.cidade ?? "") : valorDia / 2;
-  if (tarifa <= 0) return { bruto: 0, descontoEmpregado: 0, custoEmpresa: 0, origem: "sem-valor" };
+  if (valorDia === null || valorDia <= 0) {
+    return { bruto: 0, descontoEmpregado: 0, custoEmpresa: 0, origem: "sem-valor" };
+  }
 
-  const { detalhe } = calcularValeTransporte(tarifa, c.salarioBase, diasUteis);
+  const { detalhe } = calcularValeTransporte(valorDia / 2, c.salarioBase, diasUteis);
   return {
     bruto: detalhe.valorBruto,
     descontoEmpregado: detalhe.descontoEmpregado,
     custoEmpresa: detalhe.custoEmpresa,
-    origem: valorDia === null ? "tarifa-cidade" : "cadastro",
+    origem: "cadastro",
   };
 }

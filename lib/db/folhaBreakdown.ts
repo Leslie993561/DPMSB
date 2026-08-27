@@ -5,13 +5,16 @@ import { obterDiasUteis } from "./beneficiosDiasUteis";
 import {
   calcularINSS,
   calcularIRRF,
-  calcularTransporteDoMes,
+  detalharTransporteDoMes,
   calcularCustoMensalEmpregador,
   arredondar,
   type RegimeEncargos,
 } from "@/lib/calc";
 import type { LinhaExtrasImportada, CampoExtra } from "@/lib/parsing/folhaExtras";
 import { estaNaFolha } from "@/lib/folha/vigencia";
+import { obterOverridesRateio } from "./beneficiosOverrides";
+import { diasUteisDeFeriasNoMes, proporcionalAosDiasTrabalhados, type JanelaDeFerias } from "@/lib/folha/feriasNoMes";
+import { listarProgramacaoFerias } from "./programacaoFerias";
 import { casarPorNome } from "@/lib/folha/casarNome";
 import {
   calcularSalarioFamilia,
@@ -246,6 +249,31 @@ function competenciaParaAnoMes(competencia: string): { ano: number; mes: number 
 }
 
 /**
+ * Janelas de gozo por colaborador, da Programação/Controle de Férias.
+ *
+ * Fica separado para poder ser carregado UMA vez e reaproveitado: o resumo
+ * trimestral monta o breakdown de até doze meses, e recarregar a programação
+ * em cada um esgotava o pool de conexões do Supabase.
+ */
+export async function carregarJanelasDeFerias(): Promise<Map<number, JanelaDeFerias[]>> {
+  const mapa = new Map<number, JanelaDeFerias[]>();
+  for (const item of await listarProgramacaoFerias()) {
+    if (item.status === "cancelada" || !item.dataInicio) continue;
+    // Sem data de retorno registrada, o fim sai dos dias do lançamento: férias
+    // contam dias corridos a partir do início (Art. 130 CLT).
+    const fim =
+      item.dataRetorno ??
+      new Date(new Date(`${item.dataInicio}T00:00:00Z`).getTime() + (item.dias - 1) * 86400000)
+        .toISOString()
+        .slice(0, 10);
+    const atual = mapa.get(item.colaboradorId) ?? [];
+    atual.push({ inicio: item.dataInicio, fim });
+    mapa.set(item.colaboradorId, atual);
+  }
+  return mapa;
+}
+
+/**
  * Monta o breakdown "verba a verba" a partir do cadastro de colaboradores —
  * fonte única de verdade (mesma usada por Férias), sem depender de
  * casamento por nome com uma planilha solta. `premiacao` é sempre 0 aqui
@@ -253,7 +281,11 @@ function competenciaParaAnoMes(competencia: string): { ano: number; mes: number 
  * interface para o operador ajustar manualmente antes de fechar o mês, caso
  * o módulo evolua para permitir edição.
  */
-export async function gerarBreakdown(competencia: string, colaboradores?: Colaborador[]): Promise<VerbaColaborador[]> {
+export async function gerarBreakdown(
+  competencia: string,
+  colaboradores?: Colaborador[],
+  janelasDeFerias?: Map<number, JanelaDeFerias[]>,
+): Promise<VerbaColaborador[]> {
   const listaColaboradores = colaboradores ?? (await listarColaboradores());
   const { ano, mes } = competenciaParaAnoMes(competencia);
   const diasUteis = await obterDiasUteis(ano, mes);
@@ -270,6 +302,14 @@ export async function gerarBreakdown(competencia: string, colaboradores?: Colabo
     obterExtras(competencia),
     listarDependentesPorColaborador(),
   ]);
+
+  // Benefícios saem da mesma fonte que o módulo de Benefícios: overrides da
+  // planilha de rateio e abatimento dos dias de férias. Antes o Breakdown
+  // recalculava por conta própria e os dois módulos davam totais diferentes
+  // para o mesmo mês, sem nada explicando a diferença.
+  const overrides = await obterOverridesRateio(competencia);
+
+  const feriasPorColaborador = janelasDeFerias ?? (await carregarJanelasDeFerias());
 
   return listaColaboradores.filter((c) => estaNaFolha(c, competencia)).map((c) => {
     // PJ é pessoa jurídica prestando serviço, não empregado CLT — não há FGTS,
@@ -315,8 +355,20 @@ export async function gerarBreakdown(competencia: string, colaboradores?: Colabo
 
     const fgts = { valor: encargos?.fgts ?? 0 };
     const provisaoDecimoTerceiro = encargos?.provisaoDecimoTerceiro ?? 0;
-    const valeTransporte = ehPj ? 0 : calcularTransporteDoMes(c, diasUteis);
-    const valeAlimentacao = ehPj ? 0 : (c.alimentacaoValor ?? 0);
+    const override = overrides.get(c.id);
+    const diasDeFerias = diasUteisDeFeriasNoMes(competencia, feriasPorColaborador.get(c.id) ?? []);
+
+    // Transporte: bruto (valor do vale), abatido pelos dias de férias. O
+    // desconto de 6% do empregado NÃO entra aqui — o Rateio mostra o valor
+    // integral, e os dois precisam fechar.
+    const transporteCalculado = ehPj ? 0 : detalharTransporteDoMes(c, diasUteis).bruto;
+    const valeTransporte = ehPj
+      ? 0
+      : (override?.valeTransporte ??
+        (diasDeFerias > 0
+          ? arredondar(proporcionalAosDiasTrabalhados(transporteCalculado, diasUteis, diasDeFerias))
+          : transporteCalculado));
+    const valeAlimentacao = ehPj ? 0 : (override?.valeAlimentacao ?? c.alimentacaoValor ?? 0);
     const extras = extrasPorColaborador.get(c.id) ?? EXTRAS_VAZIAS;
     const premiacao = extras.premiacao ?? 0;
 
@@ -588,12 +640,22 @@ export async function listarBreakdownPersistido(competencia: string): Promise<Ve
   });
 }
 
-/** Breakdown da competência: se o mês já foi fechado, retorna o retrato salvo; senão, uma prévia calculada ao vivo. */
-export async function obterBreakdown(competencia: string): Promise<{ linhas: VerbaColaborador[]; fechado: boolean }> {
+/**
+ * Breakdown da competência: se o mês já foi fechado, retorna o retrato salvo;
+ * senão, uma prévia calculada ao vivo.
+ *
+ * `janelasDeFerias` e `colaboradores` são passados por quem monta vários
+ * meses seguidos, para carregar cada coisa uma vez só.
+ */
+export async function obterBreakdown(
+  competencia: string,
+  colaboradores?: Colaborador[],
+  janelasDeFerias?: Map<number, JanelaDeFerias[]>,
+): Promise<{ linhas: VerbaColaborador[]; fechado: boolean }> {
   if (await competenciaFechada(competencia)) {
     return { linhas: await listarBreakdownPersistido(competencia), fechado: true };
   }
-  return { linhas: await gerarBreakdown(competencia), fechado: false };
+  return { linhas: await gerarBreakdown(competencia, colaboradores, janelasDeFerias), fechado: false };
 }
 
 export async function listarCompetenciasFechadas(): Promise<string[]> {
@@ -634,6 +696,9 @@ const MESES_POR_TRIMESTRE: Record<1 | 2 | 3 | 4, number[]> = {
  */
 export async function obterResumoTrimestral(ano: number): Promise<ResumoTrimestre[]> {
   const lancadas = await competenciasComLancamento(ano);
+  // Colaboradores e programação de férias não mudam entre os meses: carregados
+  // uma vez, evitam doze recargas simultâneas e o pool esgotado que vinha daí.
+  const [colaboradores, janelas] = await Promise.all([listarColaboradores(), carregarJanelasDeFerias()]);
 
   return Promise.all(
     ([1, 2, 3, 4] as const).map(async (trimestre) => {
@@ -647,7 +712,7 @@ export async function obterResumoTrimestral(ano: number): Promise<ResumoTrimestr
         const competencia = `${ano}-${String(mes).padStart(2, "0")}`;
         if (!lancadas.has(competencia)) continue;
         mesesLancados++;
-        const { linhas, fechado } = await obterBreakdown(competencia);
+        const { linhas, fechado } = await obterBreakdown(competencia, colaboradores, janelas);
         if (!fechado) projecao = true;
         for (const l of linhas) {
           custoTotal += l.custoTotal;

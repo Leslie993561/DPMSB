@@ -1,5 +1,6 @@
 import "server-only";
 import { getDb } from "./client";
+import { obterOverridesRateio, type OverrideRateio } from "./beneficiosOverrides";
 import { listarColaboradores } from "./colaboradores";
 import { estaNaFolha } from "@/lib/folha/vigencia";
 import { diasUteisDeFeriasNoMes, proporcionalAosDiasTrabalhados, type JanelaDeFerias } from "@/lib/folha/feriasNoMes";
@@ -31,6 +32,14 @@ export interface LinhaRateio {
   diasUteisDeFerias: number;
   /** Datas do gozo que causou o abatimento, para a tela poder explicar. */
   feriasNoMes: JanelaDeFerias[];
+  /**
+   * Dias úteis do mesmo gozo que caem em OUTRAS competências.
+   *
+   * A Edilcelia sai em 31/08 e volta em 13/09: um dia útil em agosto e nove em
+   * setembro. Mostrar a janela inteira ao lado de "1 dia" parecia erro de
+   * conta; este número deixa explícito onde estão os outros.
+   */
+  feriasFora: number;
   valeAlimentacao: number;
   /** Odontológico/Sólides/Flash/Bonificação/Outros — vêm da mesma planilha de extras do Breakdown de Folha (Relatório detalhado); `null` = nada importado nesse mês. */
   odontologico: number | null;
@@ -43,39 +52,13 @@ export interface LinhaRateio {
   variaveisItens: ItemVariavel[];
 }
 
-interface ExtrasRateio {
-  valeTransporte: number | null;
-  valeAlimentacao: number | null;
-  /** Variáveis informadas na planilha; substituem o calculado do mês. */
-  variaveis: number | null;
-}
+
 
 function competenciaParaAnoMes(competencia: string): { ano: number; mes: number } {
   const [ano, mes] = competencia.split("-").map(Number);
   return { ano, mes };
 }
 
-interface LinhaExtrasRateio {
-  colaborador_id: number;
-  vale_transporte: number | null;
-  vale_alimentacao: number | null;
-  variaveis: number | null;
-}
-
-async function obterExtrasRateio(competencia: string): Promise<Map<number, ExtrasRateio>> {
-  const db = await getDb();
-  const resultado = await db.execute({
-    sql: "SELECT colaborador_id, vale_transporte, vale_alimentacao, variaveis FROM beneficios_rateio_extras WHERE competencia = ?",
-    args: [competencia],
-  });
-  const linhas = resultado.rows as unknown as LinhaExtrasRateio[];
-  return new Map(
-    linhas.map((l) => [
-      l.colaborador_id,
-      { valeTransporte: l.vale_transporte, valeAlimentacao: l.vale_alimentacao, variaveis: l.variaveis },
-    ]),
-  );
-}
 
 /**
  * Rateio de benefícios do mês — VT/VA calculados a partir do cadastro (fonte
@@ -85,7 +68,7 @@ async function obterExtrasRateio(competencia: string): Promise<Map<number, Extra
 export async function gerarRateio(competencia: string): Promise<{ linhas: LinhaRateio[]; diasUteis: number }> {
   const { ano, mes } = competenciaParaAnoMes(competencia);
   const diasUteis = await obterDiasUteis(ano, mes);
-  const extras = await obterExtrasRateio(competencia);
+  const extras = await obterOverridesRateio(competencia);
 
   // Janelas de gozo vindas da Programação/Controle de Férias — a mesma fonte
   // que as duas telas usam. Cancelada não conta: as férias não vão acontecer.
@@ -112,6 +95,17 @@ export async function gerarRateio(competencia: string): Promise<{ linhas: LinhaR
   // alerta de "sem valor de VT cadastrado" cobrava cadastro de gente que não
   // deveria estar na conta.
   const doMes = (await listarColaboradores()).filter((c) => c.vinculo !== "PJ" && estaNaFolha(c, competencia));
+
+  /** Dias úteis de todas as janelas, sem recorte de competência. */
+  const diasUteisDeTodoOGozo = (janelas: JanelaDeFerias[]): number =>
+    janelas.reduce((soma, j) => {
+      // Um mês por vez, para reusar a mesma contagem de dias úteis.
+      const meses = new Set<string>();
+      for (let d = new Date(`${j.inicio}T00:00:00Z`); d <= new Date(`${j.fim}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + 1)) {
+        meses.add(d.toISOString().slice(0, 7));
+      }
+      return soma + Array.from(meses).reduce((s, m) => s + diasUteisDeFeriasNoMes(m, [j]), 0);
+    }, 0);
 
   const linhas: LinhaRateio[] = doMes.map((c) => {
     const transporte = detalharTransporteDoMes(c, diasUteis);
@@ -149,6 +143,13 @@ export async function gerarRateio(competencia: string): Promise<{ linhas: LinhaR
       diasUteisDeFerias:
         override?.valeTransporte !== null && override?.valeTransporte !== undefined ? 0 : diasDeFerias,
       feriasNoMes: janelas.filter((j) => diasUteisDeFeriasNoMes(competencia, [j]) > 0),
+      // Só as janelas que tocam ESTE mês entram na conta: contar as outras
+      // férias da pessoa fazia a Elen, cujo gozo cabe todo em agosto, dizer que
+      // tinha 21 dias úteis fora da competência.
+      feriasFora: Math.max(
+        0,
+        diasUteisDeTodoOGozo(janelas.filter((j) => diasUteisDeFeriasNoMes(competencia, [j]) > 0)) - diasDeFerias,
+      ),
       valeAlimentacao: override?.valeAlimentacao ?? (c.alimentacaoValor ?? 0),
       odontologico: extraFolha?.odontologico ?? null,
       solides: extraFolha?.solides ?? null,
@@ -250,7 +251,7 @@ export async function obterResumoAnualBeneficios(ano: number): Promise<ResumoMen
   );
 }
 
-export async function upsertExtrasRateio(colaboradorId: number, competencia: string, extras: ExtrasRateio): Promise<void> {
+export async function upsertOverrideRateio(colaboradorId: number, competencia: string, extras: OverrideRateio): Promise<void> {
   const db = await getDb();
   await db.execute({
     sql: `INSERT INTO beneficios_rateio_extras (colaborador_id, competencia, vale_transporte, vale_alimentacao, variaveis)
@@ -296,7 +297,7 @@ export async function importarRateio(itens: LinhaImportacaoRateio[], competencia
       continue;
     }
 
-    await upsertExtrasRateio(colaborador.id, competencia, {
+    await upsertOverrideRateio(colaborador.id, competencia, {
       valeTransporte: item.valeTransporte,
       valeAlimentacao: item.valeAlimentacao,
       variaveis: item.variaveis,

@@ -24,10 +24,12 @@ interface LinhaRateio {
   tipoTransporte: string;
   valeTransporte: number;
   /** "cadastro" = veio do valor por dia do colaborador; o resto é suprimento. */
-  origemVt: "cadastro" | "tarifa-cidade" | "sem-valor" | "vm-fixo";
+  origemVt: "cadastro" | "sem-valor" | "vm-fixo";
   vtDiarioImplausivel: boolean;
   diasUteisDeFerias: number;
   feriasNoMes: { inicio: string; fim: string }[];
+  /** Dias úteis do mesmo gozo que caem em outras competências. */
+  feriasFora: number;
   valeAlimentacao: number;
   variaveis: number;
   variaveisItens: ItemVariavel[];
@@ -113,8 +115,9 @@ export function RateioTab() {
   // Quem tem VT calculado por tarifa da cidade em vez do valor cadastrado: para
   // essas pessoas, mexer no Quadro de Colaboradores não muda nada aqui, e sem
   // aviso não havia como descobrir isso olhando a tela.
-  const semValorNoCadastro = useMemo(() => linhas.filter((l) => l.origemVt === "tarifa-cidade"), [linhas]);
-  const semTarifaNenhuma = useMemo(() => linhas.filter((l) => l.origemVt === "sem-valor"), [linhas]);
+  // Quem não tem valor de VT no Quadro fica com R$ 0,00: o portal deixou de
+  // recorrer à tarifa média da cidade, que arbitrava folha em silêncio.
+  const semValorNoCadastro = useMemo(() => linhas.filter((l) => l.origemVt === "sem-valor"), [linhas]);
   const diarioImplausivel = useMemo(() => linhas.filter((l) => l.vtDiarioImplausivel), [linhas]);
 
   useEffect(() => {
@@ -306,7 +309,7 @@ export function RateioTab() {
         </label>
       </div>
 
-      {(semValorNoCadastro.length > 0 || semTarifaNenhuma.length > 0 || diarioImplausivel.length > 0) && (
+      {(semValorNoCadastro.length > 0 || diarioImplausivel.length > 0) && (
         <div ref={avisosRef} className="relative self-start">
           {/* Os dois avisos ocupavam um terço da tela toda vez que a aba abria.
               Ficam atrás de uma bolinha: o número continua à vista, o texto
@@ -315,10 +318,10 @@ export function RateioTab() {
             type="button"
             onClick={() => setAvisosAbertos((v) => !v)}
             aria-expanded={avisosAbertos}
-            aria-label={`${semValorNoCadastro.length + semTarifaNenhuma.length + diarioImplausivel.length} aviso(s) sobre vale-transporte`}
+            aria-label={`${semValorNoCadastro.length + diarioImplausivel.length} aviso(s) sobre vale-transporte`}
             className={cn(
               "flex items-center gap-2 rounded-full border py-1.5 pr-3 pl-2 text-[12px] font-semibold transition-colors",
-              semTarifaNenhuma.length > 0 || diarioImplausivel.length > 0
+              diarioImplausivel.length > 0
                 ? "border-status-danger-border bg-status-danger-bg text-status-danger hover:brightness-95"
                 : "border-status-warning-border bg-status-warning-bg text-status-warning hover:brightness-95",
             )}
@@ -327,10 +330,10 @@ export function RateioTab() {
               aria-hidden
               className={cn(
                 "inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold text-brand-white",
-                semTarifaNenhuma.length > 0 || diarioImplausivel.length > 0 ? "bg-status-danger" : "bg-status-warning",
+                diarioImplausivel.length > 0 ? "bg-status-danger" : "bg-status-warning",
               )}
             >
-              {semValorNoCadastro.length + semTarifaNenhuma.length + diarioImplausivel.length}
+              {semValorNoCadastro.length + diarioImplausivel.length}
             </span>
             Vale-transporte {avisosAbertos ? "▴" : "▾"}
           </button>
@@ -350,24 +353,13 @@ export function RateioTab() {
 
               {semValorNoCadastro.length > 0 && (
                 <RiskCallout nivel="atencao">
-                  <strong>
-                    {semValorNoCadastro.length} colaborador(es) com VT sem valor por dia útil no Quadro de
-                    Colaboradores.
-                  </strong>{" "}
-                  O cálculo abaixo está usando a tarifa padrão da cidade para essas pessoas, então alterar o cadastro
-                  delas não muda o valor aqui enquanto o campo continuar vazio:{" "}
+                  <strong>{semValorNoCadastro.length} colaborador(es) com VT R$ 0,00.</strong> Não há valor por dia útil
+                  no Quadro de Colaboradores, e o portal não arbitra valor de folha:{" "}
                   <span className="uppercase">{semValorNoCadastro.map((l) => l.nome).join(", ")}</span>.
                 </RiskCallout>
               )}
 
-              {semTarifaNenhuma.length > 0 && (
-                <RiskCallout nivel="critico">
-                  <strong>{semTarifaNenhuma.length} colaborador(es) estão com VT R$ 0,00.</strong> Não há valor por dia
-                  no cadastro nem tarifa conhecida para a cidade, e o portal não arbitra valor de folha:{" "}
-                  <span className="uppercase">{semTarifaNenhuma.map((l) => l.nome).join(", ")}</span>.
-                </RiskCallout>
-              )}
-            </div>
+           </div>
           )}
         </div>
       )}
@@ -414,15 +406,29 @@ export function RateioTab() {
                             !
                           </span>
                           <span className="pointer-events-none absolute top-full left-0 z-50 hidden w-[min(24rem,calc(100vw-3rem))] rounded-lg border border-status-warning-border bg-status-warning-bg px-3 py-2 text-[11px] leading-snug font-normal text-status-warning shadow-lg group-hover:block group-focus-within:block">
-                            Transporte e mobilidade reduzidos: {l.diasUteisDeFerias} dia(s) útil(eis) de férias neste
-                            mês
+                            Transporte e mobilidade reduzidos em{" "}
+                            <strong>
+                              {l.diasUteisDeFerias} dia(s) útil(eis)
+                            </strong>{" "}
+                            de férias neste mês.
                             {l.feriasNoMes.length > 0 && (
                               <>
                                 {" "}
-                                ({l.feriasNoMes.map((f) => `${formatarDataBr(f.inicio)} a ${formatarDataBr(f.fim)}`).join("; ")})
+                                Gozo de{" "}
+                                {l.feriasNoMes
+                                  .map((f) => `${formatarDataBr(f.inicio)} a ${formatarDataBr(f.fim)}`)
+                                  .join("; ")}
+                                {l.feriasFora > 0 && (
+                                  <>
+                                    {" "}
+                                    — os outros {l.feriasFora} dia(s) útil(eis) caem fora desta competência e são
+                                    abatidos no mês em que ocorrem
+                                  </>
+                                )}
+                                .
                               </>
-                            )}
-                            . A alimentação não é abatida.
+                            )}{" "}
+                            A alimentação não é abatida.
                           </span>
                         </span>
                       )}
