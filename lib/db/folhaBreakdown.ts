@@ -2,7 +2,14 @@ import "server-only";
 import { getDb } from "./client";
 import { listarColaboradores, type Colaborador } from "./colaboradores";
 import { obterDiasUteis } from "./beneficiosDiasUteis";
-import { calcularINSS, calcularIRRF, calcularFGTS, calcularTransporteDoMes, arredondar } from "@/lib/calc";
+import {
+  calcularINSS,
+  calcularIRRF,
+  calcularTransporteDoMes,
+  calcularCustoMensalEmpregador,
+  arredondar,
+  type RegimeEncargos,
+} from "@/lib/calc";
 import type { LinhaExtrasImportada, CampoExtra } from "@/lib/parsing/folhaExtras";
 import { estaNaFolha } from "@/lib/folha/vigencia";
 import { casarPorNome } from "@/lib/folha/casarNome";
@@ -276,8 +283,20 @@ export async function gerarBreakdown(competencia: string, colaboradores?: Colabo
     const irrf = ehPj
       ? { valor: 0 }
       : calcularIRRF(remuneracao - inss.valor, c.dependentes, dataCompetencia);
-    const fgts = ehPj ? { valor: 0 } : calcularFGTS(remuneracao, dataCompetencia);
-    const provisaoDecimoTerceiro = ehPj ? 0 : arredondar(remuneracao / 12);
+    // Jovem aprendiz recolhe FGTS de 2%, não de 8% (Lei 10.097/2000). O resto
+    // dos encargos é igual ao do celetista.
+    const regime: RegimeEncargos = c.vinculo === "JÁ" ? "aprendiz" : "celetista";
+
+    // Custo do empregador completo: INSS patronal, RAT efetivo, Terceiros,
+    // FGTS, as três provisões e os encargos que incidem sobre elas. Antes o
+    // relatório somava só FGTS e provisão de 13º e subestimava cada celetista
+    // em quase um terço do salário.
+    const encargos = ehPj
+      ? null
+      : calcularCustoMensalEmpregador(remuneracao, dataCompetencia, regime);
+
+    const fgts = { valor: encargos?.fgts ?? 0 };
+    const provisaoDecimoTerceiro = encargos?.provisaoDecimoTerceiro ?? 0;
     const valeTransporte = ehPj ? 0 : calcularTransporteDoMes(c, diasUteis);
     const valeAlimentacao = ehPj ? 0 : (c.alimentacaoValor ?? 0);
     const extras = extrasPorColaborador.get(c.id) ?? EXTRAS_VAZIAS;
@@ -310,9 +329,10 @@ export async function gerarBreakdown(competencia: string, colaboradores?: Colabo
     // plano, então o desembolso líquido dela é zero — somá-lo inflava o custo
     // de cada pessoa pelo valor do plano.
     const custoTotal = arredondar(
-      c.salarioBase +
-        fgts.valor +
-        provisaoDecimoTerceiro +
+      // encargos.total já é remuneração (salário + adicionais) com todos os
+      // encargos e provisões em cima; somar adicionais de novo aqui contaria
+      // duas vezes. Para PJ, o custo é o valor pago pela nota.
+      (encargos?.total ?? arredondar(c.salarioBase + adicionais.total)) +
         valeTransporte +
         valeAlimentacao +
         premiacao +
@@ -321,8 +341,7 @@ export async function gerarBreakdown(competencia: string, colaboradores?: Colabo
         (extras.flash ?? 0) +
         (extras.bonificacao ?? 0) +
         (extras.outrosCustos ?? 0) +
-        valorHoras.liquido +
-        adicionais.total,
+        valorHoras.liquido,
     );
 
     return {

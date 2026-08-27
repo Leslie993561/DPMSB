@@ -125,6 +125,7 @@ export function BeneficiosDashboardTab() {
   const [meses, setMeses] = useState<MesDiasUteis[]>([]);
   const [editando, setEditando] = useState<number | null>(null);
   const [valorEdicao, setValorEdicao] = useState("");
+  const [detalheSetorAberto, setDetalheSetorAberto] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [diasUteisAberto, setDiasUteisAberto] = useState(false);
 
@@ -202,6 +203,27 @@ export function BeneficiosDashboardTab() {
       });
     }
     return Array.from(mapa.entries()).map(([setor, v]) => ({ setor, ...v, total: v.vt + v.va + v.brindes }));
+  }, [linhas]);
+
+  // Os dois cartões acima agrupam em Produção/Administrativo, que é mapeamento
+  // nosso. Este detalhe usa o departamento REAL do cadastro — inclusive o
+  // "(sem setor)", que no agrupamento cai em Administrativo por default e
+  // desaparecia da vista.
+  const detalhePorSetor = useMemo(() => {
+    const mapa = new Map<string, { vt: number; va: number; brindes: number; colaboradores: number }>();
+    for (const l of linhas) {
+      const setor = l.departamento?.trim() || "(sem setor)";
+      const atual = mapa.get(setor) ?? { vt: 0, va: 0, brindes: 0, colaboradores: 0 };
+      mapa.set(setor, {
+        vt: atual.vt + l.valeTransporte,
+        va: atual.va + l.valeAlimentacao,
+        brindes: atual.brindes + totalBrindes(l),
+        colaboradores: atual.colaboradores + 1,
+      });
+    }
+    return Array.from(mapa.entries())
+      .map(([setor, v]) => ({ setor, ...v, total: v.vt + v.va + v.brindes }))
+      .sort((a, z) => z.total - a.total);
   }, [linhas]);
 
   const maxMensal = Math.max(1, ...resumoAnual.map((m) => m.total));
@@ -314,6 +336,54 @@ export function BeneficiosDashboardTab() {
             </div>
           ))}
         </div>
+
+        <div className="mt-3">
+          {/* Os dois blocos acima são macro-categorias nossas. Quem precisa do
+              número do próprio setor abre aqui, sem ocupar a tela de quem não
+              precisa. */}
+          <button
+            type="button"
+            onClick={() => setDetalheSetorAberto((v) => !v)}
+            aria-expanded={detalheSetorAberto}
+            className="text-[11.5px] font-semibold text-brand-primary-800 hover:underline"
+          >
+            {detalheSetorAberto ? "Ocultar" : "Ver"} valor por setor {detalheSetorAberto ? "▴" : "▾"}
+          </button>
+
+          {detalheSetorAberto && (
+            <div className="mt-2 overflow-x-auto rounded-lg border border-hairline">
+              <table className="w-full min-w-[34rem] border-collapse text-[11.5px]">
+                <thead>
+                  <tr className="border-b border-hairline bg-surface-page text-left text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">
+                    <th className="px-3 py-1.5">Setor</th>
+                    <th className="px-3 py-1.5 text-right">Pessoas</th>
+                    <th className="px-3 py-1.5 text-right">Transporte</th>
+                    <th className="px-3 py-1.5 text-right">Alimentação</th>
+                    <th className="px-3 py-1.5 text-right">Brindes</th>
+                    <th className="px-3 py-1.5 text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {detalhePorSetor.map((s) => (
+                    <tr key={s.setor} className="border-b border-hairline last:border-0">
+                      <td className="px-3 py-1.5 text-foreground uppercase">{s.setor}</td>
+                      <td className="px-3 py-1.5 text-right text-foreground-muted">{s.colaboradores}</td>
+                      <td className="px-3 py-1.5 text-right text-foreground-muted">{formatarMoeda(s.vt)}</td>
+                      <td className="px-3 py-1.5 text-right text-brand-primary-800">{formatarMoeda(s.va)}</td>
+                      <td className="px-3 py-1.5 text-right text-foreground-muted">{formatarMoeda(s.brindes)}</td>
+                      <td className="px-3 py-1.5 text-right font-bold text-brand-primary-800">{formatarMoeda(s.total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="border-t border-hairline px-3 py-1.5 text-[10.5px] text-foreground-muted">
+                Setor conforme o Quadro de Colaboradores. Quem está sem setor aparece como “(sem setor)” — nos dois
+                blocos acima ele entra em Administrativo, que é o default do agrupamento.
+              </p>
+            </div>
+          )}
+        </div>
+
 
         <div className="mt-5 border-t border-hairline pt-4">
           <div className="flex items-center justify-between">

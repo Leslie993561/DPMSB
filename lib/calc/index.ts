@@ -12,3 +12,4 @@ export * from "./adicionais";
 export * from "./horasLancadas";
 export * from "./rescisao";
 export * from "./beneficios";
+export * from "./custoEmpregador";
