@@ -7,6 +7,7 @@ import {
 import { listarHistoricoFerias } from "@/lib/db/historicoFerias";
 import { listarColaboradores } from "@/lib/db/colaboradores";
 import { formatarDataBr } from "@/lib/format";
+import { nomeParaPlanilha, padronizarColunaDeNome } from "@/lib/planilhas/nomeColaborador";
 
 export const runtime = "nodejs";
 
@@ -130,7 +131,7 @@ function montarPlanilhaResumo(workbook: ExcelJS.Workbook, linhas: Awaited<Return
   sheet.getRow(1).font = { bold: true };
   for (const p of linhas) {
     sheet.addRow({
-      nome: p.colaboradorNome,
+      nome: nomeParaPlanilha(p.colaboradorNome),
       admissao: formatarDataBr(p.colaboradorAdmissao),
       aquisitivo: `${formatarDataBr(p.dataInicio)} – ${formatarDataBr(p.dataFim)}`,
       concessivo: `${formatarDataBr(p.concessivoInicio)} – ${formatarDataBr(p.concessivoFim)}`,
@@ -140,6 +141,7 @@ function montarPlanilhaResumo(workbook: ExcelJS.Workbook, linhas: Awaited<Return
       situacao: ROTULO_SITUACAO[p.situacao],
     });
   }
+  padronizarColunaDeNome(sheet);
 }
 
 /**
@@ -243,7 +245,7 @@ async function montarSituacaoAtual(workbook: ExcelJS.Workbook) {
   const linhas = [
     ...abertos.map((p) => ({
       cod: p.colaboradorId,
-      nome: p.colaboradorNome,
+      nome: nomeParaPlanilha(p.colaboradorNome),
       cargo: p.colaboradorCargo ?? "—",
       setor: p.colaboradorDepartamento ?? "—",
       admissao: formatarDataBr(p.colaboradorAdmissao),
@@ -257,7 +259,7 @@ async function montarSituacaoAtual(workbook: ExcelJS.Workbook) {
     })),
     ...emCurso.map((e) => ({
       cod: e.colaboradorId,
-      nome: e.colaboradorNome,
+      nome: nomeParaPlanilha(e.colaboradorNome),
       cargo: e.colaboradorCargo ?? "—",
       setor: e.colaboradorDepartamento ?? "—",
       admissao: formatarDataBr(e.colaboradorAdmissao),
@@ -276,4 +278,5 @@ async function montarSituacaoAtual(workbook: ExcelJS.Workbook) {
   ].sort((a, z) => a.nome.localeCompare(z.nome, "pt-BR"));
 
   for (const linha of linhas) sheet.addRow(linha);
+  padronizarColunaDeNome(sheet);
 }

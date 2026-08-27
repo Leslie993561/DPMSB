@@ -21,7 +21,11 @@ export function BeneficiosPageClient() {
 
   return (
     <div className="space-y-5">
-      <PageHeader eyebrow="Benefícios" titulo={INFO[aba].titulo} subtitulo={INFO[aba].subtitulo} />
+      {/* A aba de rateio desenha o próprio cabeçalho, com Exportar/Importar
+          na mesma linha do título. */}
+      {aba === "dashboard" && (
+        <PageHeader eyebrow="Benefícios" titulo={INFO[aba].titulo} subtitulo={INFO[aba].subtitulo} />
+      )}
 
       {aba === "dashboard" && <BeneficiosDashboardTab />}
       {aba === "rateio" && <RateioTab />}

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatarNumero, formatarNumeroOuTraco, formatarMoeda } from "@/lib/format";
+import { PageHeader } from "@/components/shared/PageHeader";
 import { Card } from "@/components/shared/Card";
 import { RiskCallout } from "@/components/shared/RiskCallout";
 import { cn } from "@/lib/cn";
@@ -237,15 +238,15 @@ export function RelatorioDetalhadoTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-[10px] font-bold tracking-[0.1em] text-[#c2540a] uppercase">Breakdown · custo da folha</p>
-          <h1 className="mt-0.5 text-[19px] font-bold text-foreground">Relatório detalhado da folha</h1>
-          <p className="text-[12px] text-foreground-muted">
-            Importe o relatório da folha para atualizar o breakdown de custo por colaborador
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+      {/* Mesmo cabeçalho do resto do portal: trilha, título e subtítulo à
+          esquerda, ações na mesma linha à direita. Antes esta aba desenhava um
+          cabeçalho próprio, com outro tamanho de título e sem o cartão. */}
+      <PageHeader
+        eyebrow="Breakdown · custo da folha"
+        titulo="Relatório detalhado da folha"
+        subtitulo="Importe o relatório da folha para atualizar o breakdown de custo por colaborador"
+        acao={
+          <div className="flex flex-wrap items-center gap-2">
           <ExportarPopover
             aberto={exportarAberto}
             onAbrir={() => {
@@ -267,8 +268,9 @@ export function RelatorioDetalhadoTab() {
             competenciaInicial={competencia}
             onImportado={() => void recarregar()}
           />
-        </div>
-      </div>
+          </div>
+        }
+      />
 
       <Card className="overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hairline px-4 py-3">

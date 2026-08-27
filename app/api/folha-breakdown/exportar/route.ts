@@ -2,6 +2,7 @@ import ExcelJS from "exceljs";
 import { z } from "zod";
 import { obterBreakdown } from "@/lib/db/folhaBreakdown";
 import { formatarHoras } from "@/lib/folha/horas";
+import { nomeParaPlanilha, padronizarColunaDeNome } from "@/lib/planilhas/nomeColaborador";
 
 export const runtime = "nodejs";
 
@@ -57,7 +58,7 @@ export async function GET(request: Request) {
   for (const l of filtradas) {
     sheet.addRow({
       codigo: l.colaboradorId,
-      nome: l.nome,
+      nome: nomeParaPlanilha(l.nome),
       cargo: l.cargo ?? "",
       departamento: l.departamento ?? "",
       salarioBase: l.salarioBase,
@@ -88,6 +89,8 @@ export async function GET(request: Request) {
       custoTotal: l.custoTotal,
     });
   }
+
+  padronizarColunaDeNome(sheet);
 
   const nomeArquivo = `folha-por-colaborador-${parsed.data.competencia}${parsed.data.setor ? `-${parsed.data.setor.replace(/\s+/g, "-").toLowerCase()}` : ""}.xlsx`;
   const buffer = await workbook.xlsx.writeBuffer();

@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { formatarMoeda } from "@/lib/format";
 import { Card } from "@/components/shared/Card";
-import { FilterChip } from "@/components/shared/FilterChip";
 import { RiskCallout } from "@/components/shared/RiskCallout";
 import { cn } from "@/lib/cn";
 
@@ -80,6 +79,18 @@ interface ResumoGrupo {
 }
 
 /** VT/VA + extras do tipo "benefício" (VM, odontológico, plataformas) importadas para o mês. */
+/**
+ * Só dois regimes importam no custo: quem é empregado e quem é prestador.
+ *
+ * O cadastro escreve o vínculo de várias formas — "CLT", "CLT - bio", "JÁ"
+ * (jovem aprendiz), "EST" (estagiário) e às vezes nada. Todas são contratação
+ * com encargos; agrupá-las pelo texto literal deixava dez pessoas fora da
+ * conta de CLT. PJ é o único caso à parte: recebe nota, não folha.
+ */
+function ehPjVinculo(vinculo: string | null): boolean {
+  return (vinculo ?? "").trim().toUpperCase() === "PJ";
+}
+
 function totalBeneficios(l: VerbaColaborador): number {
   return l.valeTransporte + l.valeAlimentacao + (l.vm ?? 0) + (l.odontologico ?? 0) + (l.solides ?? 0) + (l.flash ?? 0);
 }
@@ -108,7 +119,6 @@ export function BreakdownDashboardTab() {
   const [linhas, setLinhas] = useState<VerbaColaborador[]>([]);
   const [fechado, setFechado] = useState(false);
   const [carregando, setCarregando] = useState(true);
-  const [modoVinculo, setModoVinculo] = useState<"todos" | "clt_pj">("todos");
   const [fechando, setFechando] = useState(false);
   const [leitura, setLeitura] = useState<string | null>(null);
   const [leituraErro, setLeituraErro] = useState<string | null>(null);
@@ -143,32 +153,26 @@ export function BreakdownDashboardTab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [competencia]);
 
-  const filtrados = useMemo(
-    () => (modoVinculo === "clt_pj" ? linhas.filter((l) => l.vinculo === "CLT" || l.vinculo === "PJ") : linhas),
-    [linhas, modoVinculo],
-  );
+  const filtrados = linhas;
 
   const totais = useMemo(() => resumirGrupo(filtrados), [filtrados]);
 
-  const porVinculo = useMemo(() => {
-    const mapa = new Map<string, { colaboradores: number; custo: number }>();
-    for (const l of filtrados) {
-      const chave = l.vinculo ?? "Não informado";
-      const atual = mapa.get(chave) ?? { colaboradores: 0, custo: 0 };
-      mapa.set(chave, { colaboradores: atual.colaboradores + 1, custo: atual.custo + l.custoTotal });
-    }
-    return Array.from(mapa.entries())
-      .map(([vinculo, v]) => ({ vinculo, ...v }))
-      .sort((a, b) => b.custo - a.custo);
+  // Duas linhas fixas: CLT (com jovem aprendiz e estagiário) e PJ. Antes eram
+  // as grafias literais do cadastro, e quem estava como "CLT - bio", "JÁ" ou
+  // "EST" não aparecia em nenhuma das duas.
+  const linhasVinculo = useMemo(() => {
+    const grupos = [
+      { rotulo: "CLT", itens: filtrados.filter((l) => !ehPjVinculo(l.vinculo)) },
+      { rotulo: "PJ", itens: filtrados.filter((l) => ehPjVinculo(l.vinculo)) },
+    ];
+    return grupos
+      .filter((g) => g.itens.length > 0)
+      .map((g) => ({
+        rotulo: g.rotulo,
+        colaboradores: g.itens.length,
+        custo: g.itens.reduce((soma, l) => soma + l.custoTotal, 0),
+      }));
   }, [filtrados]);
-
-  const linhasVinculo = useMemo(
-    () =>
-      porVinculo
-        .filter((v) => v.vinculo === "CLT" || v.vinculo === "PJ")
-        .map((v) => ({ rotulo: `Apenas ${v.vinculo}`, colaboradores: v.colaboradores, custo: v.custo })),
-    [porVinculo],
-  );
 
   const maxLinhaVinculo = Math.max(1, ...linhasVinculo.map((l) => l.custo));
 
@@ -187,8 +191,8 @@ export function BreakdownDashboardTab() {
       .sort((a, b) => b.folha + b.beneficios - (a.folha + a.beneficios));
   }, [filtrados]);
 
-  const cltItens = useMemo(() => filtrados.filter((l) => l.vinculo === "CLT"), [filtrados]);
-  const pjItens = useMemo(() => filtrados.filter((l) => l.vinculo === "PJ"), [filtrados]);
+  const cltItens = useMemo(() => filtrados.filter((l) => !ehPjVinculo(l.vinculo)), [filtrados]);
+  const pjItens = useMemo(() => filtrados.filter((l) => ehPjVinculo(l.vinculo)), [filtrados]);
 
   const resumoCLT = useMemo(() => resumirGrupo(cltItens), [cltItens]);
   const resumoPJ = useMemo(() => resumirGrupo(pjItens), [pjItens]);
@@ -197,7 +201,7 @@ export function BreakdownDashboardTab() {
     () =>
       trimestres.map((t) => ({
         trimestre: t.trimestre,
-        custo: t.porVinculo.filter((pv) => pv.vinculo === "CLT").reduce((s, pv) => s + pv.custoTotal, 0),
+        custo: t.porVinculo.filter((pv) => !ehPjVinculo(pv.vinculo)).reduce((s, pv) => s + pv.custoTotal, 0),
         projecao: t.projecao,
       })),
     [trimestres],
@@ -206,21 +210,14 @@ export function BreakdownDashboardTab() {
     () =>
       trimestres.map((t) => ({
         trimestre: t.trimestre,
-        custo: t.porVinculo.filter((pv) => pv.vinculo === "PJ").reduce((s, pv) => s + pv.custoTotal, 0),
+        custo: t.porVinculo.filter((pv) => ehPjVinculo(pv.vinculo)).reduce((s, pv) => s + pv.custoTotal, 0),
         projecao: t.projecao,
       })),
     [trimestres],
   );
   const trimestresExibidos = useMemo(
-    () =>
-      trimestres.map((t) => ({
-        ...t,
-        custoExibido:
-          modoVinculo === "clt_pj"
-            ? t.porVinculo.filter((pv) => pv.vinculo === "CLT" || pv.vinculo === "PJ").reduce((s, pv) => s + pv.custoTotal, 0)
-            : t.custoTotal,
-      })),
-    [trimestres, modoVinculo],
+    () => trimestres.map((t) => ({ ...t, custoExibido: t.custoTotal })),
+    [trimestres],
   );
   const maxTrimestreExibido = Math.max(1, ...trimestresExibidos.map((t) => t.custoExibido));
 
@@ -332,20 +329,10 @@ export function BreakdownDashboardTab() {
         <>
           <div className="grid gap-3 lg:grid-cols-2">
             <Card className="p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-[13px] font-medium text-foreground">Todos</span>
-                <div className="flex gap-1.5">
-                  <FilterChip ativo={modoVinculo === "todos"} onClick={() => setModoVinculo("todos")}>
-                    Todos
-                  </FilterChip>
-                  <FilterChip ativo={modoVinculo === "clt_pj"} onClick={() => setModoVinculo("clt_pj")}>
-                    CLT + PJ
-                  </FilterChip>
-                </div>
-              </div>
+              <span className="text-[13px] font-medium text-foreground">Todos</span>
 
               <p className="mt-3 text-[11px] font-medium tracking-wide text-foreground-muted uppercase">
-                Custo total da folha
+                Custo total Caixa
               </p>
               <p className="text-[28px] leading-tight font-bold text-foreground">{formatarMoeda(totais.custoTotal)}</p>
               <p className="text-[11.5px] text-foreground-muted">
@@ -439,8 +426,8 @@ export function BreakdownDashboardTab() {
           <div className="grid gap-3 lg:grid-cols-2">
             {cltItens.length > 0 && (
               <VinculoDetalheCard
-                titulo="Apenas CLT"
-                badge="vínculo empregatício"
+                titulo="CLT"
+                badge="CLT, jovem aprendiz e estagiário"
                 resumo={resumoCLT}
                 trimestres={trimestreCLT}
                 campos={[
@@ -457,7 +444,7 @@ export function BreakdownDashboardTab() {
             )}
             {pjItens.length > 0 && (
               <VinculoDetalheCard
-                titulo="Apenas PJ"
+                titulo="PJ"
                 badge="prestadores de serviço"
                 resumo={resumoPJ}
                 trimestres={trimestrePJ}

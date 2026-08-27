@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { formatarMoeda } from "@/lib/format";
 import { Modal } from "@/components/shared/Modal";
 import { RiskCallout } from "@/components/shared/RiskCallout";
+import { PageHeader } from "@/components/shared/PageHeader";
 import { cn } from "@/lib/cn";
 
 interface ItemVariavel {
@@ -146,45 +147,71 @@ export function RateioTab() {
     }
   }
 
+  // As ações da aba ficam na mesma linha do título, como no Quadro de
+  // Colaboradores. Por isso a aba desenha o próprio cabeçalho: os botões
+  // dependem da competência e do estado de importação, que vivem aqui.
+  const acoes = (
+    <div className="flex flex-wrap items-center gap-2">
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setMenuVariavelAberto((v) => !v)}
+              className="flex items-center gap-1.5 rounded-md border border-hairline bg-background px-3 py-1.5 text-[12px] font-semibold text-foreground transition-colors hover:border-brand-primary hover:text-brand-primary-800 dark:border-brand-neutral/30"
+            >
+              <span aria-hidden>🧮</span> Variável
+            </button>
+
+            {menuVariavelAberto && (
+              <>
+                <div className="fixed inset-0 z-20" onClick={() => setMenuVariavelAberto(false)} />
+                <div className="absolute top-full right-0 z-30 mt-1.5 w-56 rounded-md border border-hairline bg-background py-1 shadow-drawer">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuVariavelAberto(false);
+                      setImportarVariaveisAberto(true);
+                    }}
+                    className="block w-full px-3 py-1.5 text-left text-[12px] text-foreground hover:bg-surface-page"
+                  >
+                    Importar planilha
+                  </button>
+                  <a
+                    href="/api/beneficios/variaveis/modelo"
+                    download
+                    onClick={() => setMenuVariavelAberto(false)}
+                    className="block w-full px-3 py-1.5 text-left text-[12px] text-foreground hover:bg-surface-page"
+                  >
+                    Baixar planilha modelo
+                  </a>
+                </div>
+              </>
+            )}
+          </div>
+      <a
+        href={`/api/beneficios/rateio/exportar?competencia=${competencia}`}
+        download
+        className="flex items-center gap-1.5 rounded border border-hairline px-3 py-2 text-[12.5px] font-medium text-foreground-muted transition-colors hover:bg-surface-page dark:border-brand-neutral/30"
+      >
+        <span aria-hidden>📄</span> Exportar rateio
+      </a>
+      <button
+        type="button"
+        onClick={() => setImportarAberto(true)}
+        className="flex items-center gap-1.5 rounded bg-brand-primary px-3 py-2 text-[12.5px] font-medium text-brand-white shadow-card transition-colors hover:bg-brand-primary-hover"
+      >
+        <span aria-hidden>⬆</span> Importar rateio
+      </button>
+    </div>
+  );
+
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setMenuVariavelAberto((v) => !v)}
-            className="flex items-center gap-1.5 rounded-md border border-hairline bg-background px-3 py-1.5 text-[12px] font-semibold text-foreground transition-colors hover:border-brand-primary hover:text-brand-primary-800 dark:border-brand-neutral/30"
-          >
-            <span aria-hidden>🧮</span> Variável
-          </button>
-
-          {menuVariavelAberto && (
-            <>
-              <div className="fixed inset-0 z-20" onClick={() => setMenuVariavelAberto(false)} />
-              <div className="absolute top-full right-0 z-30 mt-1.5 w-56 rounded-md border border-hairline bg-background py-1 shadow-drawer">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMenuVariavelAberto(false);
-                    setImportarVariaveisAberto(true);
-                  }}
-                  className="block w-full px-3 py-1.5 text-left text-[12px] text-foreground hover:bg-surface-page"
-                >
-                  Importar planilha
-                </button>
-                <a
-                  href="/api/beneficios/variaveis/modelo"
-                  download
-                  onClick={() => setMenuVariavelAberto(false)}
-                  className="block w-full px-3 py-1.5 text-left text-[12px] text-foreground hover:bg-surface-page"
-                >
-                  Baixar planilha modelo
-                </a>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Benefícios"
+        titulo="Rateio de benefícios"
+        subtitulo="Distribuição do custo de cada benefício entre setores e colaboradores"
+        acao={acoes}
+      />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-1.5">
@@ -287,23 +314,6 @@ export function RateioTab() {
             className="w-56 rounded-md border border-hairline bg-background py-1.5 pl-8 pr-3 text-[12.5px] text-foreground dark:border-brand-neutral/30"
           />
         </label>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <a
-          href={`/api/beneficios/rateio/exportar?competencia=${competencia}`}
-          download
-          className="flex items-center gap-1.5 rounded-md border border-hairline bg-background px-3 py-2 text-[12.5px] font-semibold text-foreground transition-colors hover:border-brand-primary hover:text-brand-primary-800 dark:border-brand-neutral/30"
-        >
-          <span aria-hidden>📄</span> Exportar rateio
-        </a>
-        <button
-          type="button"
-          onClick={() => setImportarAberto(true)}
-          className="flex items-center gap-1.5 rounded-md bg-brand-primary px-3 py-2 text-[12.5px] font-semibold text-brand-white transition-colors hover:bg-brand-primary-700"
-        >
-          <span aria-hidden>⬆</span> Importar rateio
-        </button>
       </div>
 
       {(semValorNoCadastro.length > 0 || semTarifaNenhuma.length > 0) && (

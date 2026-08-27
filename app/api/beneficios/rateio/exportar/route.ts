@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 import { z } from "zod";
 import { gerarRateio } from "@/lib/db/beneficiosRateio";
+import { nomeParaPlanilha, padronizarColunaDeNome } from "@/lib/planilhas/nomeColaborador";
 
 export const runtime = "nodejs";
 
@@ -32,7 +33,7 @@ export async function GET(request: Request) {
   for (const l of linhas) {
     sheet.addRow({
       codigo: l.colaboradorId,
-      nome: l.nome,
+      nome: nomeParaPlanilha(l.nome),
       cpf: l.cpf ?? "",
       vinculo: l.vinculo ?? "",
       departamento: l.departamento ?? "",
@@ -42,6 +43,7 @@ export async function GET(request: Request) {
       total: l.valeTransporte + l.valeAlimentacao,
     });
   }
+  padronizarColunaDeNome(sheet);
 
   const buffer = await workbook.xlsx.writeBuffer();
   return new Response(buffer, {

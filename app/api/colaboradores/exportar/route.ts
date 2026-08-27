@@ -2,6 +2,7 @@ import ExcelJS from "exceljs";
 import { listarColaboradores } from "@/lib/db/colaboradores";
 import { listarDependentesPorColaborador } from "@/lib/db/colaboradorDependentes";
 import { COLUNAS_COLABORADOR, colunasDependentes } from "@/lib/planilhas/colunasColaborador";
+import { nomeParaPlanilha, padronizarColunaDeNome } from "@/lib/planilhas/nomeColaborador";
 
 export const runtime = "nodejs";
 
@@ -36,7 +37,7 @@ export async function GET() {
     });
 
     sheet.addRow({
-      nome: c.nome,
+      nome: nomeParaPlanilha(c.nome),
       cpf: c.cpf ?? "",
       pis: c.pis ?? "",
       dataNascimento: c.dataNascimento ?? "",
@@ -77,6 +78,8 @@ export async function GET() {
       ...colunasDep,
     });
   }
+
+  padronizarColunaDeNome(sheet);
 
   const buffer = await workbook.xlsx.writeBuffer();
   const dataHoje = new Date().toISOString().slice(0, 10);

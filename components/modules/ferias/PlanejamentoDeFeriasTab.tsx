@@ -253,13 +253,6 @@ export function PlanejamentoDeFeriasTab({
         )}
       </Card>
 
-      {conflitos.length > 0 && (
-        <RiskCallout nivel="atencao">
-          <strong>{conflitos.length}</strong> conflito(s) de agenda entre colaboradores do mesmo departamento —
-          destacados abaixo com <span className="font-semibold">⚠</span>.
-        </RiskCallout>
-      )}
-
       {erroAcao && <RiskCallout nivel="critico">{erroAcao}</RiskCallout>}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -309,11 +302,33 @@ export function PlanejamentoDeFeriasTab({
 
       <Card className="overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hairline px-4 py-3">
-          <h3 className="text-sm font-medium text-foreground">
-            Programação do {trimestreAtivo}º trimestre{" "}
-            <span className="ml-1 rounded-full bg-brand-primary-100 px-2 py-0.5 text-[10.5px] font-bold text-brand-primary-800">
-              {bucketAtivo.colaboradores.size} empregado(s)
+          <h3 className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+            <span>
+              Programação do {trimestreAtivo}º trimestre{" "}
+              <span className="ml-1 rounded-full bg-brand-primary-100 px-2 py-0.5 text-[10.5px] font-bold text-brand-primary-800">
+                {bucketAtivo.colaboradores.size} empregado(s)
+              </span>
             </span>
+
+            {/* O aviso ocupava uma faixa de largura inteira acima dos
+                trimestres, para uma frase. Vira um ponto ao lado da contagem:
+                o número fica à vista e o texto aparece ao passar o mouse. */}
+            {conflitos.length > 0 && (
+              <span className="group relative inline-flex">
+                <span
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`${conflitos.length} conflito(s) de agenda entre colaboradores do mesmo departamento`}
+                  className="flex h-4 w-4 cursor-help items-center justify-center rounded-full bg-status-warning text-[10px] font-bold text-brand-white"
+                >
+                  {conflitos.length}
+                </span>
+                <span className="pointer-events-none absolute top-full left-0 z-50 mt-1.5 hidden w-[min(26rem,calc(100vw-3rem))] rounded-lg border border-status-warning-border bg-status-warning-bg px-3 py-2 text-[11.5px] font-normal text-status-warning shadow-lg group-hover:block group-focus-within:block">
+                  <strong>{conflitos.length}</strong> conflito(s) de agenda entre colaboradores do mesmo departamento —
+                  destacados abaixo com <span className="font-semibold">⚠</span>.
+                </span>
+              </span>
+            )}
           </h3>
           <div className="flex items-center gap-1.5">
             {([1, 2, 3, 4] as const).map((q) => (
