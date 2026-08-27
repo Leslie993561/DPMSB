@@ -147,7 +147,9 @@ describe("validarNovoLancamentoCalculado", () => {
     const estado = calcularEstadoPeriodo(periodoNovo, []);
     const r = validarNovoLancamentoCalculado(periodoNovo, estado, 21, true);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.erro).toMatch(/excede os dias de direito/);
+    // A mensagem diz o saldo, o pedido e quantos dias tirar.
+    if (!r.ok) expect(r.erro).toContain("Restam 20 dia(s)");
+    if (!r.ok) expect(r.erro).toContain("Retire 1 dia(s)");
   });
 
   it("rejeita quando a soma com lançamentos anteriores ultrapassa os dias de direito", () => {

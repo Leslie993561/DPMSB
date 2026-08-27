@@ -79,12 +79,20 @@ function verificarTeto(
   const limite = estado.diasDireitoEfetivo - reducaoAbonoNovo;
 
   if (estado.diasTirados + diasNovoGozo > limite) {
+    // Dizer o saldo, o pedido e QUANTOS DIAS TIRAR. A mensagem antiga somava
+    // números e concluía "excede o direito", deixando a conta de quanto cortar
+    // para quem estava preenchendo o formulário.
+    const saldo = limite - estado.diasTirados;
+    if (saldo <= 0) {
+      return {
+        ok: false,
+        erro: `Este período aquisitivo já está com os ${periodo.diasDireito} dias alocados.`,
+      };
+    }
+    const complementoAbono = abonoNestaSolicitacao ? ` (fora os ${diasAbonoNestaSolicitacao} de abono)` : "";
     return {
       ok: false,
-      erro:
-        `A soma dos dias já tirados (${estado.diasTirados}) com os dias solicitados ` +
-        `(${diasNovoGozo}${abonoNestaSolicitacao ? ` + ${diasAbonoNestaSolicitacao} de abono` : ""}) ` +
-        `excede os dias de direito do período aquisitivo (${periodo.diasDireito}).`,
+      erro: `Restam ${saldo} dia(s) neste período${complementoAbono} e o pedido é de ${diasNovoGozo}. Retire ${diasNovoGozo - saldo} dia(s).`,
     };
   }
   return { ok: true };
@@ -155,12 +163,15 @@ export function validarNovoLancamentoCalculado(
     const aindaCabeUmLongo = vagasRestantes >= 1 && saldoRestante >= MIN_DIAS_PRIMEIRO_PERIODO;
 
     if (!aindaCabeUmLongo) {
+      // Quanto encurtar este pedido para ainda caber um período de 14+ dias.
+      const aCortar = MIN_DIAS_PRIMEIRO_PERIODO - saldoRestante;
+      const comoResolver =
+        vagasRestantes >= 1 && aCortar > 0 && diasSolicitados - aCortar >= MIN_DIAS_DEMAIS_PERIODOS
+          ? ` Retire ${aCortar} dia(s).`
+          : ` Peça ${MIN_DIAS_PRIMEIRO_PERIODO} dias ou mais neste lançamento.`;
       return {
         ok: false,
-        erro:
-          `Um dos períodos precisa ter no mínimo ${MIN_DIAS_PRIMEIRO_PERIODO} dias (Art. 134, §1º CLT), ` +
-          `e com este lançamento não sobra saldo nem período para ele. ` +
-          `Sobrariam ${saldoRestante} dia(s) em ${vagasRestantes} período(s).`,
+        erro: `Um dos períodos precisa ter ${MIN_DIAS_PRIMEIRO_PERIODO} dias ou mais (Art. 134, §1º CLT), e assim sobrariam ${saldoRestante} dia(s).${comoResolver}`,
       };
     }
   }
