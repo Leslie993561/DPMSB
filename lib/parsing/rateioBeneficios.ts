@@ -21,7 +21,17 @@ const SINONIMOS: Record<CampoRateio, string[]> = {
   nomeColaborador: ["nome do colaborador", "colaborador", "nome", "empregado", "funcionario"],
   valeTransporte: ["transporte", "vale transporte", "vt", "vm"],
   valeAlimentacao: ["alimentacao", "vale alimentacao", "va", "vr"],
-  variaveis: ["variaveis", "variavel", "aniversario", "premiacao"],
+  variaveis: [
+    "variaveis",
+    "variavel",
+    "valor variavel",
+    "beneficio variavel",
+    "beneficios variaveis",
+    "aniversario",
+    "premiacao",
+    "premio",
+    "extras",
+  ],
 };
 
 function mapearCabecalhos(cabecalhos: string[]): Partial<Record<CampoRateio, string>> {

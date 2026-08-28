@@ -3,6 +3,7 @@ import { getDb } from "./client";
 import { obterOverridesRateio, type OverrideRateio } from "./beneficiosOverrides";
 import { listarColaboradores } from "./colaboradores";
 import { estaNaFolha } from "@/lib/folha/vigencia";
+import { casarPorNome } from "@/lib/folha/casarNome";
 import { diasUteisDeFeriasNoMes, proporcionalAosDiasTrabalhados, type JanelaDeFerias } from "@/lib/folha/feriasNoMes";
 import { listarProgramacaoFerias } from "./programacaoFerias";
 import { obterDiasUteis } from "./beneficiosDiasUteis";
@@ -291,7 +292,6 @@ export interface ResultadoImportacaoRateio {
 export async function importarRateio(itens: LinhaImportacaoRateio[], competencia: string): Promise<ResultadoImportacaoRateio> {
   const colaboradores = await listarColaboradores();
   const porCodigo = new Map(colaboradores.map((c) => [String(c.id), c]));
-  const porNome = new Map(colaboradores.map((c) => [c.nome.trim().toLowerCase(), c]));
 
   let aplicadas = 0;
   const aplicadasPorCampo = { transporte: 0, alimentacao: 0, variaveis: 0 };
@@ -299,14 +299,24 @@ export async function importarRateio(itens: LinhaImportacaoRateio[], competencia
 
   for (const [indice, item] of itens.entries()) {
     const linha = indice + 2;
-    const colaborador =
-      (item.codigo ? porCodigo.get(item.codigo.trim()) : undefined) ??
-      porNome.get(item.nomeColaborador.trim().toLowerCase());
+    // Casamento tolerante a acento, caixa e conectivos — o mesmo do Quadro de
+    // Colaboradores. A comparação era por texto exato em minúsculas, e um
+    // acento a menos na planilha descartava a linha em silêncio.
+    const porCodigoAchado = item.codigo ? porCodigo.get(item.codigo.trim()) : undefined;
+    const casamento = porCodigoAchado
+      ? { encontrado: porCodigoAchado, ambiguo: false }
+      : casarPorNome(item.nomeColaborador, colaboradores, (c) => c.nome);
 
-    if (!colaborador) {
-      descartados.push({ linha, motivo: `Colaborador "${item.nomeColaborador}" não encontrado no cadastro.` });
+    if (!casamento.encontrado) {
+      descartados.push({
+        linha,
+        motivo: casamento.ambiguo
+          ? `"${item.nomeColaborador}" casa com mais de um colaborador — informe o código para não aplicar na pessoa errada.`
+          : `Colaborador "${item.nomeColaborador}" não encontrado no cadastro.`,
+      });
       continue;
     }
+    const colaborador = casamento.encontrado;
 
     await upsertOverrideRateio(colaborador.id, competencia, {
       valeTransporte: item.valeTransporte,

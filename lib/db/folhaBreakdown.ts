@@ -13,6 +13,7 @@ import {
 import type { LinhaExtrasImportada, CampoExtra } from "@/lib/parsing/folhaExtras";
 import { estaNaFolha } from "@/lib/folha/vigencia";
 import { obterOverridesRateio } from "./beneficiosOverrides";
+import { obterVariaveis } from "./beneficiosVariaveis";
 import { diasUteisDeFeriasNoMes, proporcionalAosDiasTrabalhados, type JanelaDeFerias } from "@/lib/folha/feriasNoMes";
 import { listarProgramacaoFerias } from "./programacaoFerias";
 import { casarPorNome } from "@/lib/folha/casarNome";
@@ -36,6 +37,8 @@ export interface VerbaColaborador {
   irrf: number;
   fgts: number;
   provisaoDecimoTerceiro: number;
+  /** Benefícios variáveis do mês (aniversário e o que veio na planilha de rateio). */
+  variaveis: number;
   /** Composição do custo do empregador, para a tela poder abrir o número. */
   encargosDiretos: number;
   provisoes: number;
@@ -324,6 +327,9 @@ export async function gerarBreakdown(
   // recalculava por conta própria e os dois módulos davam totais diferentes
   // para o mesmo mês, sem nada explicando a diferença.
   const overrides = await obterOverridesRateio(competencia);
+  // Variáveis do mês: presente de aniversário calculado do cadastro e o que
+  // veio na planilha de rateio. É custo da empresa e faltava no relatório.
+  const variaveisPorColaborador = await obterVariaveis(competencia);
 
   const feriasPorColaborador = janelasDeFerias ?? (await carregarJanelasDeFerias());
 
@@ -387,6 +393,12 @@ export async function gerarBreakdown(
           ? arredondar(proporcionalAosDiasTrabalhados(transporteCalculado, diasUteis, diasDeFerias))
           : transporteCalculado));
     const valeAlimentacao = ehPj ? 0 : (override?.valeAlimentacao ?? c.alimentacaoValor ?? 0);
+
+    // PJ não recebe benefício variável; para os demais, o informado na planilha
+    // manda sobre o calculado, igual ao Rateio de Benefícios.
+    const variaveis = ehPj
+      ? 0
+      : (override?.variaveis ?? variaveisPorColaborador.get(c.id)?.total ?? 0);
     const extras = extrasPorColaborador.get(c.id) ?? EXTRAS_VAZIAS;
     const premiacao = extras.premiacao ?? 0;
 
@@ -429,6 +441,7 @@ export async function gerarBreakdown(
         (extras.flash ?? 0) +
         (extras.bonificacao ?? 0) +
         (extras.outrosCustos ?? 0) +
+        variaveis +
         valorHoras.liquido,
     );
 
@@ -443,6 +456,7 @@ export async function gerarBreakdown(
       irrf: irrf.valor,
       fgts: fgts.valor,
       provisaoDecimoTerceiro,
+      variaveis,
       encargosDiretos: encargos?.encargosDiretos ?? 0,
       provisoes: encargos?.provisoes ?? 0,
       encargosSobreProvisoes: encargos?.encargosSobreProvisoes ?? 0,
@@ -638,6 +652,7 @@ export async function listarBreakdownPersistido(competencia: string): Promise<Ve
       irrf: l.irrf,
       fgts: l.fgts,
       provisaoDecimoTerceiro: l.provisao_decimo_terceiro,
+      variaveis: 0,
       // O retrato do mês fechado guarda só salário, encargos e benefícios; a
       // abertura em diretos/provisões não foi persistida quando o mês fechou.
       // Zerar é o honesto: melhor a tela não mostrar composição do que mostrar

@@ -48,6 +48,7 @@ interface VerbaColaborador {
   insalubridade: number;
   adicionalFixo: number;
   custoTotal: number;
+  variaveis: number;
   encargosDiretos: number;
   provisoes: number;
   encargosSobreProvisoes: number;
@@ -211,6 +212,7 @@ export function RelatorioDetalhadoTab() {
           flash: acc.flash + (l.flash ?? 0),
           premiacao: acc.premiacao + l.premiacao,
           bonificacao: acc.bonificacao + (l.bonificacao ?? 0),
+          variaveis: acc.variaveis + (l.variaveis ?? 0),
           salarioFamilia: acc.salarioFamilia + l.salarioFamilia,
           periculosidade: acc.periculosidade + l.periculosidade,
           insalubridade: acc.insalubridade + l.insalubridade,
@@ -247,6 +249,7 @@ export function RelatorioDetalhadoTab() {
           flash: 0,
           premiacao: 0,
           bonificacao: 0,
+          variaveis: 0,
           custoTotal: 0,
         },
       ),
@@ -417,7 +420,7 @@ export function RelatorioDetalhadoTab() {
                   >
                     Hora extra
                   </th>
-                  <th colSpan={5} className={cn(TH_GRUPO, DIVISOR, "border-b border-hairline", GRUPO_OUTROS, "text-foreground-muted")}>
+                  <th colSpan={6} className={cn(TH_GRUPO, DIVISOR, "border-b border-hairline", GRUPO_OUTROS, "text-foreground-muted")}>
                     Outros
                   </th>
                   <th rowSpan={2} className={cn(DIVISOR, "min-w-[130px] bg-brand-dark-900 px-3 py-2 text-right align-bottom text-[9.5px] font-bold tracking-wide text-white uppercase")}>
@@ -471,6 +474,9 @@ export function RelatorioDetalhadoTab() {
                   </th>
                   <th className={cn(TH_COL, DIVISOR, GRUPO_OUTROS, "text-foreground-muted")}>Premiação</th>
                   <th className={cn(TH_COL, GRUPO_OUTROS, "text-foreground-muted")}>Bonificação</th>
+                  {/* Vem do Rateio de Benefícios: aniversário do mês e o que
+                      foi informado na planilha de rateio. */}
+                  <th className={cn(TH_COL, GRUPO_OUTROS, "text-foreground-muted")}>Variáveis</th>
                   <th
                     className={cn(TH_COL, GRUPO_OUTROS, "text-foreground-muted")}
                     title="30% sobre o salário base (Art. 193 CLT) — vem do cadastro do colaborador"
@@ -574,6 +580,7 @@ export function RelatorioDetalhadoTab() {
                     </td>
                     <td className={cn(TD_NUM, DIVISOR, GRUPO_OUTROS)}>{formatarNumero(l.premiacao)}</td>
                     <td className={cn(TD_NUM, GRUPO_OUTROS)}>{formatarNumeroOuTraco(l.bonificacao)}</td>
+                    <td className={cn(TD_NUM, GRUPO_OUTROS)}>{formatarNumeroOuTraco(l.variaveis || null)}</td>
                     <td className={cn(TD_NUM, GRUPO_OUTROS)}>{formatarNumeroOuTraco(l.periculosidade || null)}</td>
                     <td className={cn(TD_NUM, GRUPO_OUTROS)}>{formatarNumeroOuTraco(l.insalubridade || null)}</td>
                     <td className={cn(TD_NUM, GRUPO_OUTROS)}>{formatarNumeroOuTraco(l.adicionalFixo || null)}</td>
@@ -654,6 +661,7 @@ export function RelatorioDetalhadoTab() {
                   </td>
                   <td className={cn(TD_NUM, DIVISOR, "bg-surface-page")}>{formatarNumero(totais.premiacao)}</td>
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.bonificacao)}</td>
+                  <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.variaveis)}</td>
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.periculosidade)}</td>
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.insalubridade)}</td>
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.adicionalFixo)}</td>
