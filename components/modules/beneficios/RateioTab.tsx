@@ -520,6 +520,10 @@ function ImportarRateioModal({
   const [erro, setErro] = useState<string | null>(null);
   const [resultado, setResultado] = useState<{
     aplicadas: number;
+    aplicadasPorCampo?: { transporte: number; alimentacao: number; variaveis: number };
+    colunasReconhecidas?: string[];
+    colunasIgnoradas?: string[];
+    totalLinhas?: number;
     descartados: { linha: number; motivo: string }[];
   } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -625,8 +629,32 @@ function ImportarRateioModal({
 
         {erro && <RiskCallout nivel="critico">{erro}</RiskCallout>}
         {resultado && (
-          <RiskCallout nivel="sucesso">
-            {resultado.aplicadas} linha(s) aplicada(s)
+          <RiskCallout nivel={resultado.aplicadas === 0 ? "atencao" : "sucesso"}>
+            {/* A importação dizia só "N aplicadas". Quando o valor não
+                aparecia depois, não havia como saber se a coluna não foi
+                reconhecida, se o nome não casou ou se o arquivo veio vazio. */}
+            {resultado.aplicadas} de {resultado.totalLinhas ?? resultado.aplicadas} linha(s) aplicada(s)
+            {resultado.aplicadasPorCampo && (
+              <>
+                {" — "}
+                {[
+                  `transporte: ${resultado.aplicadasPorCampo.transporte}`,
+                  `alimentação: ${resultado.aplicadasPorCampo.alimentacao}`,
+                  `variáveis: ${resultado.aplicadasPorCampo.variaveis}`,
+                ].join(" · ")}
+              </>
+            )}
+            {resultado.colunasReconhecidas && resultado.colunasReconhecidas.length > 0 && (
+              <span className="mt-1 block text-foreground-muted">
+                Colunas lidas: {resultado.colunasReconhecidas.join(", ")}.
+              </span>
+            )}
+            {resultado.colunasIgnoradas && resultado.colunasIgnoradas.length > 0 && (
+              <span className="mt-0.5 block font-semibold text-status-warning">
+                ⚠ Colunas ignoradas (o portal não reconheceu o cabeçalho):{" "}
+                {resultado.colunasIgnoradas.join(", ")}.
+              </span>
+            )}
             {resultado.descartados.length > 0 && (
               <>
                 <br />

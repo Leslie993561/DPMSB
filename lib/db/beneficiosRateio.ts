@@ -251,15 +251,23 @@ export async function obterResumoAnualBeneficios(ano: number): Promise<ResumoMen
   );
 }
 
+/**
+ * Grava os valores informados para a competência.
+ *
+ * Célula em branco NÃO apaga o que já estava lá: uma planilha só com a coluna
+ * Variáveis preenchida zerava o transporte e a alimentação importados antes. É
+ * a mesma regra da importação de verbas — o que não vem na planilha fica como
+ * está. Para zerar de propósito, informe 0.
+ */
 export async function upsertOverrideRateio(colaboradorId: number, competencia: string, extras: OverrideRateio): Promise<void> {
   const db = await getDb();
   await db.execute({
     sql: `INSERT INTO beneficios_rateio_extras (colaborador_id, competencia, vale_transporte, vale_alimentacao, variaveis)
        VALUES (?, ?, ?, ?, ?)
        ON CONFLICT(colaborador_id, competencia) DO UPDATE SET
-         vale_transporte = excluded.vale_transporte,
-         vale_alimentacao = excluded.vale_alimentacao,
-         variaveis = excluded.variaveis`,
+         vale_transporte = COALESCE(excluded.vale_transporte, beneficios_rateio_extras.vale_transporte),
+         vale_alimentacao = COALESCE(excluded.vale_alimentacao, beneficios_rateio_extras.vale_alimentacao),
+         variaveis = COALESCE(excluded.variaveis, beneficios_rateio_extras.variaveis)`,
     args: [colaboradorId, competencia, extras.valeTransporte, extras.valeAlimentacao, extras.variaveis],
   });
 }
@@ -274,6 +282,8 @@ export interface LinhaImportacaoRateio {
 
 export interface ResultadoImportacaoRateio {
   aplicadas: number;
+  /** Quantas linhas trouxeram valor em cada coluna — para a tela poder dizer o que entrou. */
+  aplicadasPorCampo: { transporte: number; alimentacao: number; variaveis: number };
   descartados: { linha: number; motivo: string }[];
 }
 
@@ -284,6 +294,7 @@ export async function importarRateio(itens: LinhaImportacaoRateio[], competencia
   const porNome = new Map(colaboradores.map((c) => [c.nome.trim().toLowerCase(), c]));
 
   let aplicadas = 0;
+  const aplicadasPorCampo = { transporte: 0, alimentacao: 0, variaveis: 0 };
   const descartados: ResultadoImportacaoRateio["descartados"] = [];
 
   for (const [indice, item] of itens.entries()) {
@@ -302,8 +313,11 @@ export async function importarRateio(itens: LinhaImportacaoRateio[], competencia
       valeAlimentacao: item.valeAlimentacao,
       variaveis: item.variaveis,
     });
+    if (item.valeTransporte !== null) aplicadasPorCampo.transporte++;
+    if (item.valeAlimentacao !== null) aplicadasPorCampo.alimentacao++;
+    if (item.variaveis !== null) aplicadasPorCampo.variaveis++;
     aplicadas++;
   }
 
-  return { aplicadas, descartados };
+  return { aplicadas, aplicadasPorCampo, descartados };
 }

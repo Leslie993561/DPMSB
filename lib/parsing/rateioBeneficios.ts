@@ -44,12 +44,22 @@ function paraNumeroOuNulo(valor: string | number | null): number | null {
 
 export interface ConversaoRateio {
   itens: LinhaImportacaoRateio[];
+  /** Colunas que o portal reconheceu no arquivo, pelo nome do cabeçalho. */
+  colunasReconhecidas: string[];
+  /** Cabeçalhos do arquivo que não corresponderam a nenhum campo. */
+  colunasIgnoradas: string[];
   descartadas: { linha: number; motivo: string }[];
 }
 
 /** Casamento por cabeçalho de coluna (não posição) — Transporte e Alimentação identificados pelo nome da coluna. */
 export function converterRateioImportado(cabecalhos: string[], linhas: LinhaPlanilha[]): ConversaoRateio {
   const mapa = mapearCabecalhos(cabecalhos);
+  // Sem isto, uma coluna com nome inesperado era simplesmente ignorada e a
+  // importação dizia "aplicadas: N" sem nenhum sinal de que o valor não entrou.
+  const usadas = new Set(Object.values(mapa).filter(Boolean) as string[]);
+  const colunasReconhecidas = Array.from(usadas);
+  const colunasIgnoradas = cabecalhos.filter((c) => c && !usadas.has(c));
+
   if (!mapa.nomeColaborador) {
     throw new Error('Não foi possível identificar a coluna do colaborador (ex.: "Nome do colaborador").');
   }
@@ -74,5 +84,5 @@ export function converterRateioImportado(cabecalhos: string[], linhas: LinhaPlan
     });
   });
 
-  return { itens, descartadas };
+  return { itens, colunasReconhecidas, colunasIgnoradas, descartadas };
 }

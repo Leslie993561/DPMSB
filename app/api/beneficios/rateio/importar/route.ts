@@ -35,6 +35,9 @@ export async function POST(request: Request) {
 
     return Response.json({
       aplicadas: resultado.aplicadas,
+      aplicadasPorCampo: resultado.aplicadasPorCampo,
+      colunasReconhecidas: conversao.colunasReconhecidas,
+      colunasIgnoradas: conversao.colunasIgnoradas,
       descartados: [...conversao.descartadas, ...resultado.descartados],
       totalLinhas: linhas.length,
     });
