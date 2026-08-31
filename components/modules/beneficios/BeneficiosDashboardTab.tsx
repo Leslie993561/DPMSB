@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { buscarSemCache, useAtualizacaoAoVoltar } from "@/lib/useAtualizacaoAoVoltar";
 import { Card, StatCard } from "@/components/shared/Card";
 import { cn } from "@/lib/cn";
 import { formatarMoeda } from "@/lib/format";
@@ -162,11 +163,13 @@ export function BeneficiosDashboardTab() {
 
   const ano = Number(competencia.slice(0, 4));
 
-  async function recarregar() {
+  // useCallback porque o hook de atualização depende dela: sem isso a função
+  // muda a cada render e o listener seria re-registrado sem parar.
+  const recarregar = useCallback(async function recarregar() {
     try {
       const [rateioRes, resumoRes] = await Promise.all([
-        fetch(`/api/beneficios/rateio?competencia=${competencia}`),
-        fetch(`/api/beneficios/resumo-anual?ano=${ano}`),
+        buscarSemCache(`/api/beneficios/rateio?competencia=${competencia}`),
+        buscarSemCache(`/api/beneficios/resumo-anual?ano=${ano}`),
       ]);
       const [rateioData, resumoData] = await Promise.all([rateioRes.json(), resumoRes.json()]);
       setLinhas(rateioData.linhas ?? []);
@@ -174,12 +177,15 @@ export function BeneficiosDashboardTab() {
     } finally {
       setCarregando(false);
     }
-  }
+  }, [competencia, ano]);
 
   useEffect(() => {
     void recarregar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [competencia]);
+
+  // Voltar para o Dashboard depois de mexer no Rateio traz o número novo.
+  useAtualizacaoAoVoltar(recarregar);
 
   async function recarregarDiasUteis() {
     const res = await fetch(`/api/beneficios/dias-uteis?ano=${diasUteisAno}`);

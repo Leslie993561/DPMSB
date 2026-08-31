@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { buscarSemCache, useAtualizacaoAoVoltar } from "@/lib/useAtualizacaoAoVoltar";
 import { formatarDataBr, formatarMoeda } from "@/lib/format";
 import { Modal } from "@/components/shared/Modal";
 import { RiskCallout } from "@/components/shared/RiskCallout";
@@ -91,21 +92,24 @@ export function RateioTab() {
   const [salvandoDiasUteis, setSalvandoDiasUteis] = useState(false);
   const [colaboradorHover, setColaboradorHover] = useState<number | null>(null);
 
-  async function recarregar() {
+  const recarregar = useCallback(async function recarregar() {
     try {
-      const res = await fetch(`/api/beneficios/rateio?competencia=${competencia}`);
+      const res = await buscarSemCache(`/api/beneficios/rateio?competencia=${competencia}`);
       const data = await res.json();
       setLinhas(data.linhas ?? []);
       setDiasUteis(data.diasUteis ?? 0);
     } finally {
       setCarregando(false);
     }
-  }
+  }, [competencia]);
 
   useEffect(() => {
     void recarregar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [competencia]);
+
+  // Importar planilha e voltar para a aba traz o número novo, sem F5.
+  useAtualizacaoAoVoltar(recarregar);
 
   const filtrados = useMemo(() => {
     const buscaNorm = busca.trim().toLowerCase();
