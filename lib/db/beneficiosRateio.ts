@@ -42,10 +42,13 @@ export interface LinhaRateio {
    */
   feriasFora: number;
   valeAlimentacao: number;
-  /** Odontológico/Sólides/Flash/Bonificação/Outros — vêm da mesma planilha de extras do Breakdown de Folha (Relatório detalhado); `null` = nada importado nesse mês. */
+  /** Valor fixo do plano odontológico, cadastrado no Quadro de Colaboradores; sobrescrito quando a planilha de extras do Breakdown de Folha (Relatório detalhado) traz um valor diferente para o mês. */
   odontologico: number | null;
   solides: number | null;
+  solidesSaude: number | null;
   flash: number | null;
+  totalPass: number | null;
+  assistenciaMedica: number | null;
   bonificacao: number | null;
   outrosCustos: number | null;
   /** Soma de todas as planilhas de "Variável" importadas nessa competência para o colaborador — acumula, nunca sobrescreve. */
@@ -152,9 +155,13 @@ export async function gerarRateio(competencia: string): Promise<{ linhas: LinhaR
         diasUteisDeTodoOGozo(janelas.filter((j) => diasUteisDeFeriasNoMes(competencia, [j]) > 0)) - diasDeFerias,
       ),
       valeAlimentacao: override?.valeAlimentacao ?? (c.alimentacaoValor ?? 0),
-      odontologico: extraFolha?.odontologico ?? null,
+      // Planilha importada manda; sem ela, vale o plano fixo do cadastro.
+      odontologico: extraFolha?.odontologico ?? c.odontologicoValor ?? null,
       solides: extraFolha?.solides ?? null,
+      solidesSaude: extraFolha?.solidesSaude ?? null,
       flash: extraFolha?.flash ?? null,
+      totalPass: extraFolha?.totalPass ?? null,
+      assistenciaMedica: extraFolha?.assistenciaMedica ?? null,
       bonificacao: extraFolha?.bonificacao ?? null,
       outrosCustos: extraFolha?.outrosCustos ?? null,
       // Informado na planilha de rateio manda; senão, o calculado do mês (hoje,
@@ -226,7 +233,13 @@ export async function obterResumoAnualBeneficios(ano: number): Promise<ResumoMen
         if (l.tipoTransporte === "vm_fixo") vm += l.valeTransporte;
         else vt += l.valeTransporte;
         vr += l.valeAlimentacao;
-        odontoPlataformas += (l.odontologico ?? 0) + (l.solides ?? 0) + (l.flash ?? 0);
+        odontoPlataformas +=
+          (l.odontologico ?? 0) +
+          (l.solides ?? 0) +
+          (l.solidesSaude ?? 0) +
+          (l.flash ?? 0) +
+          (l.totalPass ?? 0) +
+          (l.assistenciaMedica ?? 0);
         brindes += (l.bonificacao ?? 0) + (l.outrosCustos ?? 0);
         variaveis += l.variaveis;
       }

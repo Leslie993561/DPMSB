@@ -21,10 +21,14 @@ interface VerbaColaborador {
   provisaoDecimoTerceiro: number;
   valeTransporte: number;
   valeAlimentacao: number;
+  auxilioEducacao: number;
   vm: number | null;
   odontologico: number | null;
   solides: number | null;
+  solidesSaude: number | null;
   flash: number | null;
+  totalPass: number | null;
+  assistenciaMedica: number | null;
   bonificacao: number | null;
   outrosCustos: number | null;
   premiacao: number;
@@ -206,10 +210,14 @@ export function RelatorioDetalhadoTab() {
           encargos: acc.encargos + totalEncargos(l),
           vt: acc.vt + l.valeTransporte,
           va: acc.va + l.valeAlimentacao,
+          auxilioEducacao: acc.auxilioEducacao + l.auxilioEducacao,
           vm: acc.vm + (l.vm ?? 0),
           odontologico: acc.odontologico + (l.odontologico ?? 0),
           solides: acc.solides + (l.solides ?? 0),
+          solidesSaude: acc.solidesSaude + (l.solidesSaude ?? 0),
           flash: acc.flash + (l.flash ?? 0),
+          totalPass: acc.totalPass + (l.totalPass ?? 0),
+          assistenciaMedica: acc.assistenciaMedica + (l.assistenciaMedica ?? 0),
           premiacao: acc.premiacao + l.premiacao,
           bonificacao: acc.bonificacao + (l.bonificacao ?? 0),
           variaveis: acc.variaveis + (l.variaveis ?? 0),
@@ -243,10 +251,14 @@ export function RelatorioDetalhadoTab() {
           encargos: 0,
           vt: 0,
           va: 0,
+          auxilioEducacao: 0,
           vm: 0,
           odontologico: 0,
           solides: 0,
+          solidesSaude: 0,
           flash: 0,
+          totalPass: 0,
+          assistenciaMedica: 0,
           premiacao: 0,
           bonificacao: 0,
           variaveis: 0,
@@ -407,10 +419,10 @@ export function RelatorioDetalhadoTab() {
                   <th colSpan={4} className={cn(TH_GRUPO, DIVISOR, "border-b border-hairline", GRUPO_ENCARGOS, "text-status-warning")}>
                     Encargos
                   </th>
-                  <th colSpan={5} className={cn(TH_GRUPO, DIVISOR, "border-b border-hairline", GRUPO_BENEFICIOS, "text-brand-primary-800")}>
+                  <th colSpan={6} className={cn(TH_GRUPO, DIVISOR, "border-b border-hairline", GRUPO_BENEFICIOS, "text-brand-primary-800")}>
                     Benefícios
                   </th>
-                  <th colSpan={2} className={cn(TH_GRUPO, DIVISOR, "border-b border-hairline", GRUPO_PLATAFORMAS, "text-brand-primary-800")}>
+                  <th colSpan={5} className={cn(TH_GRUPO, DIVISOR, "border-b border-hairline", GRUPO_PLATAFORMAS, "text-brand-primary-800")}>
                     Plataformas
                   </th>
                   <th
@@ -434,6 +446,7 @@ export function RelatorioDetalhadoTab() {
                   <th className={cn(TH_COL, GRUPO_ENCARGOS, "text-status-warning")}>Total encargos</th>
                   <th className={cn(TH_COL, DIVISOR, GRUPO_BENEFICIOS, "text-brand-primary-800")}>VT</th>
                   <th className={cn(TH_COL, GRUPO_BENEFICIOS, "text-brand-primary-800")}>VA</th>
+                  <th className={cn(TH_COL, GRUPO_BENEFICIOS, "text-brand-primary-800")}>Auxílio educação</th>
                   <th className={cn(TH_COL, GRUPO_BENEFICIOS, "text-brand-primary-800")}>VM</th>
                   <th
                     className={cn(TH_COL, GRUPO_BENEFICIOS, "text-brand-primary-800")}
@@ -449,6 +462,9 @@ export function RelatorioDetalhadoTab() {
                   </th>
                   <th className={cn(TH_COL, DIVISOR, GRUPO_PLATAFORMAS, "text-brand-primary-800")}>Sólides</th>
                   <th className={cn(TH_COL, GRUPO_PLATAFORMAS, "text-brand-primary-800")}>Flash</th>
+                  <th className={cn(TH_COL, GRUPO_PLATAFORMAS, "text-brand-primary-800")}>TotalPass</th>
+                  <th className={cn(TH_COL, GRUPO_PLATAFORMAS, "text-brand-primary-800")}>Assistência médica</th>
+                  <th className={cn(TH_COL, GRUPO_PLATAFORMAS, "text-brand-primary-800")}>Sólides (Saúde)</th>
                   <th className={cn(TH_COL, DIVISOR, GRUPO_HORAS, "text-foreground-muted")}>Hora extra 50% (h)</th>
                   <th className={cn(TH_COL, GRUPO_HORAS, "text-foreground-muted")}>Hora extra 100% (h)</th>
                   <th className={cn(TH_COL, GRUPO_HORAS, "text-foreground-muted")} title="Subtrai do total do colaborador">
@@ -510,6 +526,7 @@ export function RelatorioDetalhadoTab() {
                     <td className={cn(TD_NUM, GRUPO_ENCARGOS, "font-bold")}>{formatarNumero(totalEncargos(l))}</td>
                     <td className={cn(TD_NUM, DIVISOR, GRUPO_BENEFICIOS)}>{formatarNumero(l.valeTransporte)}</td>
                     <td className={cn(TD_NUM, GRUPO_BENEFICIOS)}>{formatarNumero(l.valeAlimentacao)}</td>
+                    <td className={cn(TD_NUM, GRUPO_BENEFICIOS)}>{formatarNumeroOuTraco(l.auxilioEducacao || null)}</td>
                     <td className={cn(TD_NUM, GRUPO_BENEFICIOS)}>{formatarNumeroOuTraco(l.vm)}</td>
                     <td className={cn(TD_NUM, GRUPO_BENEFICIOS, l.odontologico ? "text-status-danger" : undefined)}>
                       {l.odontologico ? `-${formatarNumero(l.odontologico)}` : "—"}
@@ -526,6 +543,9 @@ export function RelatorioDetalhadoTab() {
                     </td>
                     <td className={cn(TD_NUM, DIVISOR, GRUPO_PLATAFORMAS)}>{formatarNumeroOuTraco(l.solides)}</td>
                     <td className={cn(TD_NUM, GRUPO_PLATAFORMAS)}>{formatarNumeroOuTraco(l.flash)}</td>
+                    <td className={cn(TD_NUM, GRUPO_PLATAFORMAS)}>{formatarNumeroOuTraco(l.totalPass)}</td>
+                    <td className={cn(TD_NUM, GRUPO_PLATAFORMAS)}>{formatarNumeroOuTraco(l.assistenciaMedica)}</td>
+                    <td className={cn(TD_NUM, GRUPO_PLATAFORMAS)}>{formatarNumeroOuTraco(l.solidesSaude)}</td>
                     <td
                       className={cn(TD_NUM, DIVISOR, GRUPO_HORAS)}
                       title={l.horaExtra50 ? `${formatarMoeda(l.valorHoras.extra50)} — hora normal ${formatarMoeda(l.valorHoras.valorHoraNormal)} × 1,5` : undefined}
@@ -637,6 +657,7 @@ export function RelatorioDetalhadoTab() {
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.encargos)}</td>
                   <td className={cn(TD_NUM, DIVISOR, "bg-surface-page")}>{formatarNumero(totais.vt)}</td>
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.va)}</td>
+                  <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.auxilioEducacao)}</td>
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.vm)}</td>
                   <td className={cn(TD_NUM, "bg-surface-page", totais.odontologico ? "text-status-danger" : undefined)}>
                     {totais.odontologico ? `-${formatarNumero(totais.odontologico)}` : "0,00"}
@@ -644,6 +665,9 @@ export function RelatorioDetalhadoTab() {
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.salarioFamilia)}</td>
                   <td className={cn(TD_NUM, DIVISOR, "bg-surface-page")}>{formatarNumero(totais.solides)}</td>
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.flash)}</td>
+                  <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.totalPass)}</td>
+                  <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.assistenciaMedica)}</td>
+                  <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.solidesSaude)}</td>
                   <td
                     className={cn(TD_NUM, DIVISOR, "bg-surface-page")}
                     title={`Efeito líquido das horas no custo: ${formatarMoeda(totais.valorHoras)}`}
@@ -716,14 +740,15 @@ function ExportarPopover({
             <div className="flex items-start justify-between gap-2">
               <p className="text-[12.5px] font-bold text-foreground">Opção 1 · Exportar planilha</p>
               <span className="shrink-0 rounded-full bg-brand-primary-100 px-2 py-0.5 text-[9.5px] font-bold text-brand-primary-800">
-                Excel · 28 colunas
+                Excel · 35 colunas
               </span>
             </div>
             <p className="mt-2 text-[11px] leading-relaxed text-foreground-muted">
               Gera um arquivo .xlsx com uma linha por colaborador e uma coluna para cada verba: salário base, INSS,
-              FGTS, provisão de 13º, total de encargos, VT, VA, VM, odontológico, salário família, Sólides, Flash,
-              hora extra 50% e 100%, desconto de horas, hora noturna, premiação, bonificação, periculosidade,
-              insalubridade, adicional fixo e custo total.
+              FGTS, provisão de 13º, total de encargos, VT, VA, auxílio educação, VM, odontológico, salário família,
+              Sólides, Flash, TotalPass, Assistência médica, Sólides (Saúde), hora extra 50% e 100%, desconto de
+              horas, hora noturna, premiação, bonificação, variáveis, periculosidade, insalubridade, adicional fixo e
+              custo total.
             </p>
 
             <label className="mt-3 block text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">

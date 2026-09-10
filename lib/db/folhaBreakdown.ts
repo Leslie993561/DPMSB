@@ -47,11 +47,17 @@ export interface VerbaColaborador {
   regimeEncargos: RegimeEncargos | null;
   valeTransporte: number;
   valeAlimentacao: number;
+  /** Valor fixo do cadastro — mesmo padrão de valeAlimentacao/odontologico, sem override mensal. */
+  auxilioEducacao: number;
   /** Verbas "extras" do mês — vêm só de planilha importada (Relatório detalhado), nunca calculadas; `null` = nada importado ainda para esse mês. */
   vm: number | null;
   odontologico: number | null;
   solides: number | null;
+  /** Produto de saúde da mesma plataforma do Sólides — verba própria, não soma com `solides`. */
+  solidesSaude: number | null;
   flash: number | null;
+  totalPass: number | null;
+  assistenciaMedica: number | null;
   bonificacao: number | null;
   outrosCustos: number | null;
   premiacao: number;
@@ -95,7 +101,10 @@ export interface ExtrasImportadas {
   vm: number | null;
   odontologico: number | null;
   solides: number | null;
+  solidesSaude: number | null;
   flash: number | null;
+  totalPass: number | null;
+  assistenciaMedica: number | null;
   bonificacao: number | null;
   premiacao: number | null;
   /** HORAS decimais (8,0167 = 08:01), não reais. */
@@ -110,7 +119,10 @@ const EXTRAS_VAZIAS: ExtrasImportadas = {
   vm: null,
   odontologico: null,
   solides: null,
+  solidesSaude: null,
   flash: null,
+  totalPass: null,
+  assistenciaMedica: null,
   bonificacao: null,
   premiacao: null,
   horaExtra50: null,
@@ -125,7 +137,10 @@ interface LinhaExtras {
   vm: number | null;
   odontologico: number | null;
   solides: number | null;
+  solides_saude: number | null;
   flash: number | null;
+  total_pass: number | null;
+  assistencia_medica: number | null;
   bonificacao: number | null;
   premiacao: number | null;
   horas_extra_50: number | null;
@@ -157,7 +172,8 @@ export async function competenciasComLancamento(ano: number): Promise<Set<string
 export async function obterExtras(competencia: string): Promise<Map<number, ExtrasImportadas>> {
   const db = await getDb();
   const resultado = await db.execute({
-    sql: `SELECT colaborador_id, vm, odontologico, solides, flash, bonificacao, premiacao, outros_custos,
+    sql: `SELECT colaborador_id, vm, odontologico, solides, solides_saude, flash, total_pass, assistencia_medica,
+                 bonificacao, premiacao, outros_custos,
                  horas_extra_50, horas_extra_100, horas_desconto, horas_noturnas
           FROM folha_extras WHERE competencia = ?`,
     args: [competencia],
@@ -175,7 +191,10 @@ export async function obterExtras(competencia: string): Promise<Map<number, Extr
         descontoHoras: l.horas_desconto,
         horaNoturna: l.horas_noturnas,
         solides: l.solides,
+        solidesSaude: l.solides_saude,
         flash: l.flash,
+        totalPass: l.total_pass,
+        assistenciaMedica: l.assistencia_medica,
         bonificacao: l.bonificacao,
         premiacao: l.premiacao,
         outrosCustos: l.outros_custos,
@@ -194,7 +213,10 @@ const COLUNA_DE = {
   vm: "vm",
   odontologico: "odontologico",
   solides: "solides",
+  solidesSaude: "solides_saude",
   flash: "flash",
+  totalPass: "total_pass",
+  assistenciaMedica: "assistencia_medica",
   bonificacao: "bonificacao",
   premiacao: "premiacao",
   horaExtra50: "horas_extra_50",
@@ -393,6 +415,8 @@ export async function gerarBreakdown(
           ? arredondar(proporcionalAosDiasTrabalhados(transporteCalculado, diasUteis, diasDeFerias))
           : transporteCalculado));
     const valeAlimentacao = ehPj ? 0 : (override?.valeAlimentacao ?? c.alimentacaoValor ?? 0);
+    // Valor fixo do cadastro, sem override mensal — mesmo tratamento de valeAlimentacao.
+    const auxilioEducacao = ehPj ? 0 : (c.auxilioEducacaoValor ?? 0);
 
     // PJ não recebe benefício variável; para os demais, o informado na planilha
     // manda sobre o calculado, igual ao Rateio de Benefícios.
@@ -435,10 +459,14 @@ export async function gerarBreakdown(
       (encargos?.total ?? arredondar(c.salarioBase + adicionais.total)) +
         valeTransporte +
         valeAlimentacao +
+        auxilioEducacao +
         premiacao +
         (extras.vm ?? 0) +
         (extras.solides ?? 0) +
+        (extras.solidesSaude ?? 0) +
         (extras.flash ?? 0) +
+        (extras.totalPass ?? 0) +
+        (extras.assistenciaMedica ?? 0) +
         (extras.bonificacao ?? 0) +
         (extras.outrosCustos ?? 0) +
         variaveis +
@@ -463,10 +491,17 @@ export async function gerarBreakdown(
       regimeEncargos: encargos ? regime : null,
       valeTransporte,
       valeAlimentacao,
+      auxilioEducacao,
       vm: extras.vm,
-      odontologico: extras.odontologico,
+      // Planilha importada manda; sem ela, vale o plano fixo do cadastro —
+      // mesma fonte que o Rateio de Benefícios usa, para os dois módulos não
+      // divergirem no "Total de benefícios" do mês.
+      odontologico: extras.odontologico ?? c.odontologicoValor ?? null,
       solides: extras.solides,
+      solidesSaude: extras.solidesSaude,
       flash: extras.flash,
+      totalPass: extras.totalPass,
+      assistenciaMedica: extras.assistenciaMedica,
       bonificacao: extras.bonificacao,
       outrosCustos: extras.outrosCustos,
       premiacao,
@@ -629,12 +664,20 @@ export async function listarBreakdownPersistido(competencia: string): Promise<Ve
             dataCompetencia,
           )
         : { valor: 0, filhosComCota: 0 };
+    // Valor fixo do cadastro, igual ao caminho ao vivo — não fica congelado
+    // porque nunca fez parte do "núcleo" gravado em folha_breakdown.
+    const auxilioEducacao =
+      colaborador && colaborador.vinculo !== "PJ" ? (colaborador.auxilioEducacaoValor ?? 0) : 0;
     const custoTotal = arredondar(
       nucleoCongelado +
+        auxilioEducacao +
         premiacao +
         (extras.vm ?? 0) +
         (extras.solides ?? 0) +
+        (extras.solidesSaude ?? 0) +
         (extras.flash ?? 0) +
+        (extras.totalPass ?? 0) +
+        (extras.assistenciaMedica ?? 0) +
         (extras.bonificacao ?? 0) +
         (extras.outrosCustos ?? 0) +
         valorHoras.liquido +
@@ -663,10 +706,14 @@ export async function listarBreakdownPersistido(competencia: string): Promise<Ve
       regimeEncargos: null,
       valeTransporte: l.vale_transporte,
       valeAlimentacao: l.vale_alimentacao,
+      auxilioEducacao,
       vm: extras.vm,
-      odontologico: extras.odontologico,
+      odontologico: extras.odontologico ?? colaborador?.odontologicoValor ?? null,
       solides: extras.solides,
+      solidesSaude: extras.solidesSaude,
       flash: extras.flash,
+      totalPass: extras.totalPass,
+      assistenciaMedica: extras.assistenciaMedica,
       bonificacao: extras.bonificacao,
       outrosCustos: extras.outrosCustos,
       premiacao,
@@ -788,8 +835,8 @@ export interface ResultadoImportacaoExtras {
 }
 
 /**
- * Aplica as verbas extras (VM, odontológico, Sólides, Flash, bonificação,
- * premiação, outros custos) de uma planilha importada à competência —
+ * Aplica as verbas extras (VM, odontológico, Sólides, Flash, TotalPass,
+ * Assistência médica, bonificação, premiação, outros custos) de uma planilha importada à competência —
  * casamento por código (se houver) e, senão, por nome do colaborador.
  */
 export async function importarExtras(
@@ -826,7 +873,10 @@ export async function importarExtras(
       vm: item.vm,
       odontologico: item.odontologico,
       solides: item.solides,
+      solidesSaude: item.solidesSaude,
       flash: item.flash,
+      totalPass: item.totalPass,
+      assistenciaMedica: item.assistenciaMedica,
       bonificacao: item.bonificacao,
       premiacao: item.premiacao,
       horaExtra50: item.horaExtra50,

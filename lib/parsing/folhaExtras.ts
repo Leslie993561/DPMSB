@@ -20,7 +20,10 @@ export interface LinhaExtrasImportada {
   vm: number | null;
   odontologico: number | null;
   solides: number | null;
+  solidesSaude: number | null;
   flash: number | null;
+  totalPass: number | null;
+  assistenciaMedica: number | null;
   bonificacao: number | null;
   premiacao: number | null;
   /**
@@ -40,8 +43,11 @@ type CampoExtra =
   | "nomeColaborador"
   | "vm"
   | "odontologico"
+  | "solidesSaude"
   | "solides"
   | "flash"
+  | "totalPass"
+  | "assistenciaMedica"
   | "bonificacao"
   | "premiacao"
   | "horaExtra50"
@@ -54,8 +60,14 @@ const SINONIMOS: Record<CampoExtra, string[]> = {
   nomeColaborador: ["nome do colaborador", "colaborador", "nome", "empregado", "funcionario"],
   vm: ["vm", "vale mercado", "vale refeicao"],
   odontologico: ["odontologico", "odonto", "plano odontologico"],
+  // Mais específico primeiro (mesmo motivo do 100% antes do 50% abaixo): sem
+  // isso, "solides" sozinho casaria com a coluna de saúde antes dela ser
+  // reconhecida como a mais específica das duas.
+  solidesSaude: ["solides saude"],
   solides: ["solides"],
   flash: ["flash"],
+  totalPass: ["totalpass", "total pass"],
+  assistenciaMedica: ["assistencia medica", "ass medica", "assist medica", "plano de saude", "plano medico"],
   bonificacao: ["bonificacao", "bonificacao fixa"],
   premiacao: ["premiacao", "premiacao do mes", "premio"],
   // Os sinônimos de 100% vêm antes na busca por casarem com o texto mais
@@ -105,8 +117,11 @@ const ROTULO_CAMPO: Record<CampoExtra, string> = {
   nomeColaborador: "Nome do colaborador",
   vm: "VM",
   odontologico: "Odontológico",
+  solidesSaude: "Sólides (Saúde)",
   solides: "Sólides",
   flash: "Flash",
+  totalPass: "TotalPass",
+  assistenciaMedica: "Assistência médica",
   bonificacao: "Bonificação",
   premiacao: "Premiação",
   horaExtra50: "Hora extra 50% (horas)",
@@ -151,13 +166,22 @@ function mapearCabecalhos(cabecalhos: string[]): { mapa: Partial<Record<CampoExt
   // Comparação por palavra inteira (não substring solta) — "va" não pode casar dentro de "vale cultura".
   const bate = (norm: string, sinonimo: string) => norm === sinonimo || new RegExp(`\\b${sinonimo}\\b`).test(norm);
 
+  // Um cabeçalho já usado por um campo mais específico sai da disputa dos
+  // campos seguintes — sem isso, "solides" (genérico) podia roubar a coluna
+  // "Sólides Saúde" quando ela aparecia antes da "Sólides" normal no arquivo,
+  // porque a palavra "solides" é substring das duas.
   const mapa: Partial<Record<CampoExtra, string>> = {};
+  const usadas = new Set<string>();
   (Object.keys(SINONIMOS) as CampoExtra[]).forEach((campo) => {
-    const encontrado = normalizados.find((c) => SINONIMOS[campo].some((s) => bate(c.norm, s)));
-    if (encontrado) mapa[campo] = encontrado.original;
+    const encontrado = normalizados.find(
+      (c) => !usadas.has(c.original) && SINONIMOS[campo].some((s) => bate(c.norm, s)),
+    );
+    if (encontrado) {
+      mapa[campo] = encontrado.original;
+      usadas.add(encontrado.original);
+    }
   });
 
-  const usadas = new Set(Object.values(mapa));
   const naoReconhecidas = normalizados
     .filter((c) => !usadas.has(c.original) && !SINONIMOS_NUCLEO.some((s) => bate(c.norm, s)))
     .map((c) => c.original);
@@ -266,8 +290,11 @@ export function converterExtrasImportadas(cabecalhos: string[], linhas: LinhaPla
       nomeColaborador,
       vm: mapa.vm ? paraNumeroOuNulo(linha[mapa.vm]) : null,
       odontologico: mapa.odontologico ? paraNumeroOuNulo(linha[mapa.odontologico]) : null,
+      solidesSaude: mapa.solidesSaude ? paraNumeroOuNulo(linha[mapa.solidesSaude]) : null,
       solides: mapa.solides ? paraNumeroOuNulo(linha[mapa.solides]) : null,
       flash: mapa.flash ? paraNumeroOuNulo(linha[mapa.flash]) : null,
+      totalPass: mapa.totalPass ? paraNumeroOuNulo(linha[mapa.totalPass]) : null,
+      assistenciaMedica: mapa.assistenciaMedica ? paraNumeroOuNulo(linha[mapa.assistenciaMedica]) : null,
       bonificacao: mapa.bonificacao ? paraNumeroOuNulo(linha[mapa.bonificacao]) : null,
       premiacao: mapa.premiacao ? paraNumeroOuNulo(linha[mapa.premiacao]) : null,
       // Estas quatro passam por parsearHoras, não por paraNumeroOuNulo:

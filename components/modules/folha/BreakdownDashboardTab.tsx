@@ -19,13 +19,18 @@ interface VerbaColaborador {
   provisaoDecimoTerceiro: number;
   valeTransporte: number;
   valeAlimentacao: number;
+  auxilioEducacao: number;
   vm: number | null;
   odontologico: number | null;
   solides: number | null;
+  solidesSaude: number | null;
   flash: number | null;
+  totalPass: number | null;
+  assistenciaMedica: number | null;
   bonificacao: number | null;
   outrosCustos: number | null;
   premiacao: number;
+  variaveis: number;
   custoTotal: number;
 }
 
@@ -93,7 +98,46 @@ function ehPjVinculo(vinculo: string | null): boolean {
 }
 
 function totalBeneficios(l: VerbaColaborador): number {
-  return l.valeTransporte + l.valeAlimentacao + (l.vm ?? 0) + (l.odontologico ?? 0) + (l.solides ?? 0) + (l.flash ?? 0);
+  return (
+    l.valeTransporte +
+    l.valeAlimentacao +
+    (l.vm ?? 0) +
+    (l.odontologico ?? 0) +
+    (l.solides ?? 0) +
+    (l.solidesSaude ?? 0) +
+    (l.flash ?? 0) +
+    (l.totalPass ?? 0) +
+    (l.assistenciaMedica ?? 0)
+  );
+}
+
+/**
+ * Total de benefícios para o cartão "Total de benefícios" — mesma composição
+ * do "Total em benefícios" do módulo de Benefícios (vale-transporte,
+ * vale-alimentação, odonto/Sólides/Sólides Saúde/Flash, bonificação/outros
+ * custos e variáveis do mês). Antes faltavam bonificação, outros custos e
+ * variáveis aqui, e os dois módulos mostravam totais diferentes para o mesmo
+ * mês sem nenhuma explicação para a diferença.
+ *
+ * `vm` (extra "vale mercado" importado da planilha de folha) e `auxilioEducacao`
+ * (valor fixo do cadastro) ficam de fora de propósito: são verbas que só
+ * existem no Breakdown, sem contrapartida no rateio de Benefícios, e somá-las
+ * aqui reabria a divergência entre os dois módulos.
+ */
+function totalBeneficiosCompleto(l: VerbaColaborador): number {
+  return (
+    l.valeTransporte +
+    l.valeAlimentacao +
+    (l.odontologico ?? 0) +
+    (l.solides ?? 0) +
+    (l.solidesSaude ?? 0) +
+    (l.flash ?? 0) +
+    (l.totalPass ?? 0) +
+    (l.assistenciaMedica ?? 0) +
+    (l.bonificacao ?? 0) +
+    (l.outrosCustos ?? 0) +
+    l.variaveis
+  );
 }
 
 /** Premiação + bonificação + outros custos importados para o mês. */
@@ -107,7 +151,7 @@ function resumirGrupo(itens: VerbaColaborador[]): ResumoGrupo {
       colaboradores: acc.colaboradores + 1,
       salarial: acc.salarial + l.salarioBase,
       encargos: acc.encargos + l.fgts + l.provisaoDecimoTerceiro,
-      beneficios: acc.beneficios + totalBeneficios(l),
+      beneficios: acc.beneficios + totalBeneficiosCompleto(l),
       premiacao: acc.premiacao + totalPremiacaoExtras(l),
       custoTotal: acc.custoTotal + l.custoTotal,
     }),
@@ -447,7 +491,7 @@ export function BreakdownDashboardTab() {
                     label: "Total de benefícios",
                     valor: resumoCLT.beneficios,
                     tooltip:
-                      "Vale-transporte, Mobilidade, Vale-refeição (JÁ · CLT · EST), Plano odontológico, TotalPass, Flash, Sólides",
+                      "Vale-transporte, Mobilidade, Vale-refeição (JÁ · CLT · EST), Plano odontológico, TotalPass, Assistência médica, Flash, Sólides, Sólides (Saúde), bonificação, outros custos e variáveis do mês — mesma composição do Total em benefícios do módulo de Benefícios",
                   },
                 ]}
               />

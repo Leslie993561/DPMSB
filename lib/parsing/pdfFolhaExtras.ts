@@ -6,7 +6,19 @@ export interface TabelaPdfParseada {
   linhas: LinhaPlanilha[];
 }
 
-const TERMOS_CABECALHO = ["colaborador", "nome", "vm", "odontologico", "solides", "flash", "bonificacao", "premiacao", "codigo"];
+const TERMOS_CABECALHO = [
+  "colaborador",
+  "nome",
+  "vm",
+  "odontologico",
+  "solides",
+  "flash",
+  "totalpass",
+  "assistencia medica",
+  "bonificacao",
+  "premiacao",
+  "codigo",
+];
 
 const DIACRITICOS = new RegExp("[\\u0300-\\u036f]", "g");
 

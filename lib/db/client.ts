@@ -84,6 +84,13 @@ const MIGRACOES: { tabela: string; coluna: string; definicao: string }[] = [
   { tabela: "colaboradores", coluna: "cidade", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "vinculo", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "alimentacao_valor", definicao: "REAL" },
+  // Valor fixo do plano odontológico do colaborador — mesmo padrão de
+  // alimentacao_valor: cadastro é a fonte, e o rateio de Benefícios só usa
+  // outro valor quando uma planilha de extras importar algo diferente.
+  { tabela: "colaboradores", coluna: "odontologico_valor", definicao: "REAL" },
+  // Auxílio educação: mesmo padrão de alimentacao_valor/odontologico_valor —
+  // valor fixo mensal cadastrado por pessoa, sem planilha de importação.
+  { tabela: "colaboradores", coluna: "auxilio_educacao_valor", definicao: "REAL" },
   { tabela: "colaboradores", coluna: "data_nascimento", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "cbo", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "agencia", definicao: "TEXT" },
@@ -161,6 +168,11 @@ const MIGRACOES: { tabela: string; coluna: string; definicao: string }[] = [
   { tabela: "folha_extras", coluna: "horas_extra_100", definicao: "REAL" },
   { tabela: "folha_extras", coluna: "horas_desconto", definicao: "REAL" },
   { tabela: "folha_extras", coluna: "horas_noturnas", definicao: "REAL" },
+  // Verba separada de "solides": mesma plataforma, produto de saúde à parte.
+  { tabela: "folha_extras", coluna: "solides_saude", definicao: "REAL" },
+  // Duas plataformas novas do grupo "Plataformas" do Relatório detalhado.
+  { tabela: "folha_extras", coluna: "total_pass", definicao: "REAL" },
+  { tabela: "folha_extras", coluna: "assistencia_medica", definicao: "REAL" },
 ];
 
 /**
