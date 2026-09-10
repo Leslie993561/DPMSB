@@ -57,7 +57,6 @@ export interface VerbaColaborador {
   solidesSaude: number | null;
   flash: number | null;
   totalPass: number | null;
-  assistenciaMedica: number | null;
   bonificacao: number | null;
   outrosCustos: number | null;
   premiacao: number;
@@ -104,7 +103,6 @@ export interface ExtrasImportadas {
   solidesSaude: number | null;
   flash: number | null;
   totalPass: number | null;
-  assistenciaMedica: number | null;
   bonificacao: number | null;
   premiacao: number | null;
   /** HORAS decimais (8,0167 = 08:01), não reais. */
@@ -122,7 +120,6 @@ const EXTRAS_VAZIAS: ExtrasImportadas = {
   solidesSaude: null,
   flash: null,
   totalPass: null,
-  assistenciaMedica: null,
   bonificacao: null,
   premiacao: null,
   horaExtra50: null,
@@ -140,7 +137,6 @@ interface LinhaExtras {
   solides_saude: number | null;
   flash: number | null;
   total_pass: number | null;
-  assistencia_medica: number | null;
   bonificacao: number | null;
   premiacao: number | null;
   horas_extra_50: number | null;
@@ -172,7 +168,7 @@ export async function competenciasComLancamento(ano: number): Promise<Set<string
 export async function obterExtras(competencia: string): Promise<Map<number, ExtrasImportadas>> {
   const db = await getDb();
   const resultado = await db.execute({
-    sql: `SELECT colaborador_id, vm, odontologico, solides, solides_saude, flash, total_pass, assistencia_medica,
+    sql: `SELECT colaborador_id, vm, odontologico, solides, solides_saude, flash, total_pass,
                  bonificacao, premiacao, outros_custos,
                  horas_extra_50, horas_extra_100, horas_desconto, horas_noturnas
           FROM folha_extras WHERE competencia = ?`,
@@ -194,7 +190,6 @@ export async function obterExtras(competencia: string): Promise<Map<number, Extr
         solidesSaude: l.solides_saude,
         flash: l.flash,
         totalPass: l.total_pass,
-        assistenciaMedica: l.assistencia_medica,
         bonificacao: l.bonificacao,
         premiacao: l.premiacao,
         outrosCustos: l.outros_custos,
@@ -216,7 +211,6 @@ const COLUNA_DE = {
   solidesSaude: "solides_saude",
   flash: "flash",
   totalPass: "total_pass",
-  assistenciaMedica: "assistencia_medica",
   bonificacao: "bonificacao",
   premiacao: "premiacao",
   horaExtra50: "horas_extra_50",
@@ -466,7 +460,6 @@ export async function gerarBreakdown(
         (extras.solidesSaude ?? 0) +
         (extras.flash ?? 0) +
         (extras.totalPass ?? 0) +
-        (extras.assistenciaMedica ?? 0) +
         (extras.bonificacao ?? 0) +
         (extras.outrosCustos ?? 0) +
         variaveis +
@@ -501,7 +494,6 @@ export async function gerarBreakdown(
       solidesSaude: extras.solidesSaude,
       flash: extras.flash,
       totalPass: extras.totalPass,
-      assistenciaMedica: extras.assistenciaMedica,
       bonificacao: extras.bonificacao,
       outrosCustos: extras.outrosCustos,
       premiacao,
@@ -677,7 +669,6 @@ export async function listarBreakdownPersistido(competencia: string): Promise<Ve
         (extras.solidesSaude ?? 0) +
         (extras.flash ?? 0) +
         (extras.totalPass ?? 0) +
-        (extras.assistenciaMedica ?? 0) +
         (extras.bonificacao ?? 0) +
         (extras.outrosCustos ?? 0) +
         valorHoras.liquido +
@@ -713,7 +704,6 @@ export async function listarBreakdownPersistido(competencia: string): Promise<Ve
       solidesSaude: extras.solidesSaude,
       flash: extras.flash,
       totalPass: extras.totalPass,
-      assistenciaMedica: extras.assistenciaMedica,
       bonificacao: extras.bonificacao,
       outrosCustos: extras.outrosCustos,
       premiacao,
@@ -836,7 +826,7 @@ export interface ResultadoImportacaoExtras {
 
 /**
  * Aplica as verbas extras (VM, odontológico, Sólides, Flash, TotalPass,
- * Assistência médica, bonificação, premiação, outros custos) de uma planilha importada à competência —
+ * bonificação, premiação, outros custos) de uma planilha importada à competência —
  * casamento por código (se houver) e, senão, por nome do colaborador.
  */
 export async function importarExtras(
@@ -876,7 +866,6 @@ export async function importarExtras(
       solidesSaude: item.solidesSaude,
       flash: item.flash,
       totalPass: item.totalPass,
-      assistenciaMedica: item.assistenciaMedica,
       bonificacao: item.bonificacao,
       premiacao: item.premiacao,
       horaExtra50: item.horaExtra50,

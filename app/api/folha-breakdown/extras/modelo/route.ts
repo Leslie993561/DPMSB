@@ -48,7 +48,6 @@ const COLUNAS: ColunaModelo[] = [
   { titulo: "Sólides", key: "solides", width: 18, grupo: "Plataformas", origem: "importada" },
   { titulo: "Flash", key: "flash", width: 18, grupo: "Plataformas", origem: "importada" },
   { titulo: "TotalPass", key: "totalPass", width: 18, grupo: "Plataformas", origem: "importada" },
-  { titulo: "Assistência médica", key: "assistenciaMedica", width: 24, grupo: "Plataformas", origem: "importada" },
   { titulo: "Sólides (Saúde)", key: "solidesSaude", width: 20, grupo: "Plataformas", origem: "importada" },
 
   { titulo: "Hora extra 50%", key: "horaExtra50", width: 24, grupo: "Hora extra", origem: "importada" },

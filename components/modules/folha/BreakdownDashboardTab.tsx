@@ -26,7 +26,6 @@ interface VerbaColaborador {
   solidesSaude: number | null;
   flash: number | null;
   totalPass: number | null;
-  assistenciaMedica: number | null;
   bonificacao: number | null;
   outrosCustos: number | null;
   premiacao: number;
@@ -106,8 +105,7 @@ function totalBeneficios(l: VerbaColaborador): number {
     (l.solides ?? 0) +
     (l.solidesSaude ?? 0) +
     (l.flash ?? 0) +
-    (l.totalPass ?? 0) +
-    (l.assistenciaMedica ?? 0)
+    (l.totalPass ?? 0)
   );
 }
 
@@ -133,7 +131,6 @@ function totalBeneficiosCompleto(l: VerbaColaborador): number {
     (l.solidesSaude ?? 0) +
     (l.flash ?? 0) +
     (l.totalPass ?? 0) +
-    (l.assistenciaMedica ?? 0) +
     (l.bonificacao ?? 0) +
     (l.outrosCustos ?? 0) +
     l.variaveis
@@ -491,7 +488,7 @@ export function BreakdownDashboardTab() {
                     label: "Total de benefícios",
                     valor: resumoCLT.beneficios,
                     tooltip:
-                      "Vale-transporte, Mobilidade, Vale-refeição (JÁ · CLT · EST), Plano odontológico, TotalPass, Assistência médica, Flash, Sólides, Sólides (Saúde), bonificação, outros custos e variáveis do mês — mesma composição do Total em benefícios do módulo de Benefícios",
+                      "Vale-transporte, Mobilidade, Vale-refeição (JÁ · CLT · EST), Plano odontológico, TotalPass, Flash, Sólides, Sólides (Saúde), bonificação, outros custos e variáveis do mês — mesma composição do Total em benefícios do módulo de Benefícios",
                   },
                 ]}
               />

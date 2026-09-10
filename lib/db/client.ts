@@ -170,9 +170,8 @@ const MIGRACOES: { tabela: string; coluna: string; definicao: string }[] = [
   { tabela: "folha_extras", coluna: "horas_noturnas", definicao: "REAL" },
   // Verba separada de "solides": mesma plataforma, produto de saúde à parte.
   { tabela: "folha_extras", coluna: "solides_saude", definicao: "REAL" },
-  // Duas plataformas novas do grupo "Plataformas" do Relatório detalhado.
+  // Plataforma nova do grupo "Plataformas" do Relatório detalhado.
   { tabela: "folha_extras", coluna: "total_pass", definicao: "REAL" },
-  { tabela: "folha_extras", coluna: "assistencia_medica", definicao: "REAL" },
 ];
 
 /**

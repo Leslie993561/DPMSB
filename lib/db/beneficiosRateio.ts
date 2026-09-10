@@ -48,7 +48,6 @@ export interface LinhaRateio {
   solidesSaude: number | null;
   flash: number | null;
   totalPass: number | null;
-  assistenciaMedica: number | null;
   bonificacao: number | null;
   outrosCustos: number | null;
   /** Soma de todas as planilhas de "Variável" importadas nessa competência para o colaborador — acumula, nunca sobrescreve. */
@@ -161,7 +160,6 @@ export async function gerarRateio(competencia: string): Promise<{ linhas: LinhaR
       solidesSaude: extraFolha?.solidesSaude ?? null,
       flash: extraFolha?.flash ?? null,
       totalPass: extraFolha?.totalPass ?? null,
-      assistenciaMedica: extraFolha?.assistenciaMedica ?? null,
       bonificacao: extraFolha?.bonificacao ?? null,
       outrosCustos: extraFolha?.outrosCustos ?? null,
       // Informado na planilha de rateio manda; senão, o calculado do mês (hoje,
@@ -238,8 +236,7 @@ export async function obterResumoAnualBeneficios(ano: number): Promise<ResumoMen
           (l.solides ?? 0) +
           (l.solidesSaude ?? 0) +
           (l.flash ?? 0) +
-          (l.totalPass ?? 0) +
-          (l.assistenciaMedica ?? 0);
+          (l.totalPass ?? 0);
         brindes += (l.bonificacao ?? 0) + (l.outrosCustos ?? 0);
         variaveis += l.variaveis;
       }

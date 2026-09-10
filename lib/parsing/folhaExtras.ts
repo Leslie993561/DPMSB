@@ -23,7 +23,6 @@ export interface LinhaExtrasImportada {
   solidesSaude: number | null;
   flash: number | null;
   totalPass: number | null;
-  assistenciaMedica: number | null;
   bonificacao: number | null;
   premiacao: number | null;
   /**
@@ -47,7 +46,6 @@ type CampoExtra =
   | "solides"
   | "flash"
   | "totalPass"
-  | "assistenciaMedica"
   | "bonificacao"
   | "premiacao"
   | "horaExtra50"
@@ -67,7 +65,6 @@ const SINONIMOS: Record<CampoExtra, string[]> = {
   solides: ["solides"],
   flash: ["flash"],
   totalPass: ["totalpass", "total pass"],
-  assistenciaMedica: ["assistencia medica", "ass medica", "assist medica", "plano de saude", "plano medico"],
   bonificacao: ["bonificacao", "bonificacao fixa"],
   premiacao: ["premiacao", "premiacao do mes", "premio"],
   // Os sinônimos de 100% vêm antes na busca por casarem com o texto mais
@@ -121,7 +118,6 @@ const ROTULO_CAMPO: Record<CampoExtra, string> = {
   solides: "Sólides",
   flash: "Flash",
   totalPass: "TotalPass",
-  assistenciaMedica: "Assistência médica",
   bonificacao: "Bonificação",
   premiacao: "Premiação",
   horaExtra50: "Hora extra 50% (horas)",
@@ -294,7 +290,6 @@ export function converterExtrasImportadas(cabecalhos: string[], linhas: LinhaPla
       solides: mapa.solides ? paraNumeroOuNulo(linha[mapa.solides]) : null,
       flash: mapa.flash ? paraNumeroOuNulo(linha[mapa.flash]) : null,
       totalPass: mapa.totalPass ? paraNumeroOuNulo(linha[mapa.totalPass]) : null,
-      assistenciaMedica: mapa.assistenciaMedica ? paraNumeroOuNulo(linha[mapa.assistenciaMedica]) : null,
       bonificacao: mapa.bonificacao ? paraNumeroOuNulo(linha[mapa.bonificacao]) : null,
       premiacao: mapa.premiacao ? paraNumeroOuNulo(linha[mapa.premiacao]) : null,
       // Estas quatro passam por parsearHoras, não por paraNumeroOuNulo:
