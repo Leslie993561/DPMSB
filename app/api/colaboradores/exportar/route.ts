@@ -3,6 +3,7 @@ import { listarColaboradores } from "@/lib/db/colaboradores";
 import { listarDependentesPorColaborador } from "@/lib/db/colaboradorDependentes";
 import { COLUNAS_COLABORADOR, colunasDependentes } from "@/lib/planilhas/colunasColaborador";
 import { nomeParaPlanilha, padronizarColunaDeNome } from "@/lib/planilhas/nomeColaborador";
+import { abreviarNome } from "@/lib/format";
 
 export const runtime = "nodejs";
 
@@ -38,6 +39,7 @@ export async function GET() {
 
     sheet.addRow({
       nome: nomeParaPlanilha(c.nome),
+      nomeAbreviado: abreviarNome(c.nome),
       cpf: c.cpf ?? "",
       pis: c.pis ?? "",
       dataNascimento: c.dataNascimento ?? "",

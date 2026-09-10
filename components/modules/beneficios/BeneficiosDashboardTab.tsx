@@ -15,11 +15,8 @@ interface LinhaRateio {
   tipoTransporte: string;
   valeTransporte: number;
   valeAlimentacao: number;
-  odontologico: number | null;
   /** Aniversário e demais lançamentos variáveis do mês. */
   variaveis: number;
-  solides: number | null;
-  flash: number | null;
   bonificacao: number | null;
   outrosCustos: number | null;
 }
@@ -91,10 +88,6 @@ function diferenca(calculado: number, informado: number | null | undefined): str
 
 function formatarK(valor: number): string {
   return valor >= 1000 ? `${(valor / 1000).toFixed(1)}k` : formatarMoeda(valor);
-}
-
-function totalOdontoPlataformas(l: LinhaRateio): number {
-  return (l.odontologico ?? 0) + (l.solides ?? 0) + (l.flash ?? 0);
 }
 
 function totalBrindes(l: LinhaRateio): number {
@@ -209,13 +202,13 @@ export function BeneficiosDashboardTab() {
   const totalVt = resumoDoMes?.vt ?? 0;
   const totalVm = resumoDoMes?.vm ?? 0;
   const totalVa = resumoDoMes?.vr ?? 0;
-  const totalOdonto = resumoDoMes?.odontoPlataformas ?? 0;
+  const totalVariaveis = resumoDoMes?.variaveis ?? 0;
   const totalGeral = resumoDoMes?.total ?? 0;
 
   const elegiveisVt = linhas.filter((l) => l.tipoTransporte !== "vm_fixo" && l.valeTransporte > 0).length;
   const elegiveisVm = linhas.filter((l) => l.tipoTransporte === "vm_fixo" && l.valeTransporte > 0).length;
   const elegiveisVa = linhas.filter((l) => l.valeAlimentacao > 0).length;
-  const elegiveisOdonto = linhas.filter((l) => totalOdontoPlataformas(l) > 0).length;
+  const elegiveisVariaveis = linhas.filter((l) => l.variaveis > 0).length;
 
   // O rateio já exclui PJ e quem não está na folha do mês, então quem sobrou
   // recebe benefício — contar só vinculo === "CLT" deixava de fora jovem
@@ -330,7 +323,7 @@ export function BeneficiosDashboardTab() {
           valor={formatarMoeda(totalVa)}
           subtitulo={`${elegiveisVa} elegíveis${diferenca(totalVa, resumoDoMes?.informadoVr)}`}
         />
-        <StatCard titulo="Odonto + plataformas" valor={formatarMoeda(totalOdonto)} subtitulo={`${elegiveisOdonto} elegíveis`} />
+        <StatCard titulo="Variáveis" valor={formatarMoeda(totalVariaveis)} subtitulo={`${elegiveisVariaveis} elegíveis`} />
       </div>
 
       {resumoDoMes?.fechado && (

@@ -28,6 +28,8 @@ const schema = z.object({
   cidade: z.string().nullable().optional(),
   vinculo: z.enum(["CLT", "CLT-bio", "PJ", "EST", "JÁ"]).nullable().optional(),
   alimentacaoValor: z.coerce.number().min(0).nullable().optional(),
+  odontologicoValor: z.coerce.number().min(0).nullable().optional(),
+  auxilioEducacaoValor: z.coerce.number().min(0).nullable().optional(),
   dataNascimento: z.iso.date().nullable().optional(),
   cbo: z.string().nullable().optional(),
   agencia: z.string().nullable().optional(),

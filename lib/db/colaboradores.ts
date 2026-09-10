@@ -3,6 +3,7 @@ import { getDb } from "./client";
 import { substituirDependentes } from "./colaboradorDependentes";
 import { casarPorNome } from "@/lib/folha/casarNome";
 import { acharParecido } from "@/lib/folha/parecidos";
+import { formatarCpf } from "@/lib/format";
 
 export type Vinculo = "CLT" | "CLT-bio" | "PJ" | "EST" | "JÁ";
 export type TipoTransporte = "vt_diario" | "vm_fixo";
@@ -26,6 +27,8 @@ export interface Colaborador {
   cidade: string | null;
   vinculo: Vinculo | null;
   alimentacaoValor: number | null;
+  odontologicoValor: number | null;
+  auxilioEducacaoValor: number | null;
   dataNascimento: string | null;
   cbo: string | null;
   agencia: string | null;
@@ -94,6 +97,8 @@ export interface ColaboradorInput {
   cidade?: string | null;
   vinculo?: Vinculo | null;
   alimentacaoValor?: number | null;
+  odontologicoValor?: number | null;
+  auxilioEducacaoValor?: number | null;
   dataNascimento?: string | null;
   cbo?: string | null;
   agencia?: string | null;
@@ -147,6 +152,8 @@ interface LinhaColaborador {
   cidade: string | null;
   vinculo: Vinculo | null;
   alimentacao_valor: number | null;
+  odontologico_valor: number | null;
+  auxilio_educacao_valor: number | null;
   data_nascimento: string | null;
   cbo: string | null;
   agencia: string | null;
@@ -201,6 +208,8 @@ function paraColaborador(linha: LinhaColaborador): Colaborador {
     cidade: linha.cidade,
     vinculo: linha.vinculo,
     alimentacaoValor: linha.alimentacao_valor,
+    odontologicoValor: linha.odontologico_valor,
+    auxilioEducacaoValor: linha.auxilio_educacao_valor,
     dataNascimento: linha.data_nascimento,
     cbo: linha.cbo,
     agencia: linha.agencia,
@@ -275,17 +284,17 @@ export async function criarColaborador(input: ColaboradorInput): Promise<Colabor
   const info = await db.execute({
     sql: `INSERT INTO colaboradores
          (nome, data_admissao, salario_base, dependentes, cpf, email, cargo, departamento, gestor_id, cidade,
-          vinculo, alimentacao_valor, data_nascimento, cbo, agencia, conta, tipo_transporte, valor_transporte_fixo, valor_transporte_dia,
+          vinculo, alimentacao_valor, odontologico_valor, auxilio_educacao_valor, data_nascimento, cbo, agencia, conta, tipo_transporte, valor_transporte_fixo, valor_transporte_dia,
           lider_direto_nome, status, pis, cidade_nascimento, uf_nascimento, nome_pai, nome_mae, telefone, sexo,
           email_pessoal, horario, banco, cep, estado, bairro, rua, numero, conjuge_nome, conjuge_cpf, conjuge_nascimento, conjuge_sexo,
           periculosidade_percentual, insalubridade_percentual, adicional_fixo, adicional_fixo_descricao, rateio_d365)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       input.nome,
       input.dataAdmissao,
       input.salarioBase,
       input.dependentes ?? 0,
-      input.cpf ?? null,
+      formatarCpf(input.cpf),
       input.email ?? null,
       input.cargo ?? null,
       input.departamento ?? null,
@@ -293,6 +302,8 @@ export async function criarColaborador(input: ColaboradorInput): Promise<Colabor
       input.cidade ?? null,
       input.vinculo ?? null,
       input.alimentacaoValor ?? null,
+      input.odontologicoValor ?? null,
+      input.auxilioEducacaoValor ?? null,
       input.dataNascimento ?? null,
       input.cbo ?? null,
       input.agencia ?? null,
@@ -348,6 +359,9 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
     cidade: input.cidade !== undefined ? input.cidade : atual.cidade,
     vinculo: input.vinculo !== undefined ? input.vinculo : atual.vinculo,
     alimentacaoValor: input.alimentacaoValor !== undefined ? input.alimentacaoValor : atual.alimentacaoValor,
+    odontologicoValor: input.odontologicoValor !== undefined ? input.odontologicoValor : atual.odontologicoValor,
+    auxilioEducacaoValor:
+      input.auxilioEducacaoValor !== undefined ? input.auxilioEducacaoValor : atual.auxilioEducacaoValor,
     dataNascimento: input.dataNascimento !== undefined ? input.dataNascimento : atual.dataNascimento,
     cbo: input.cbo !== undefined ? input.cbo : atual.cbo,
     agencia: input.agencia !== undefined ? input.agencia : atual.agencia,
@@ -397,7 +411,7 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
   await db.execute({
     sql: `UPDATE colaboradores
        SET nome = ?, data_admissao = ?, salario_base = ?, dependentes = ?, cpf = ?, email = ?, cargo = ?,
-           departamento = ?, gestor_id = ?, cidade = ?, vinculo = ?, alimentacao_valor = ?, data_nascimento = ?,
+           departamento = ?, gestor_id = ?, cidade = ?, vinculo = ?, alimentacao_valor = ?, odontologico_valor = ?, auxilio_educacao_valor = ?, data_nascimento = ?,
            cbo = ?, agencia = ?, conta = ?, tipo_transporte = ?, valor_transporte_fixo = ?, valor_transporte_dia = ?, lider_direto_nome = ?,
            status = ?, data_desligamento = ?, motivo_desligamento = ?, valor_rescisao = ?, valor_fgts = ?, rateio_d365 = ?,
            pis = ?, cidade_nascimento = ?, uf_nascimento = ?, nome_pai = ?, nome_mae = ?, telefone = ?, sexo = ?,
@@ -411,7 +425,7 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
       mesclado.dataAdmissao,
       mesclado.salarioBase,
       mesclado.dependentes,
-      mesclado.cpf ?? null,
+      formatarCpf(mesclado.cpf),
       mesclado.email ?? null,
       mesclado.cargo ?? null,
       mesclado.departamento ?? null,
@@ -419,6 +433,8 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
       mesclado.cidade ?? null,
       mesclado.vinculo ?? null,
       mesclado.alimentacaoValor ?? null,
+      mesclado.odontologicoValor ?? null,
+      mesclado.auxilioEducacaoValor ?? null,
       mesclado.dataNascimento ?? null,
       mesclado.cbo ?? null,
       mesclado.agencia ?? null,

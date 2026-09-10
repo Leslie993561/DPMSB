@@ -5,6 +5,7 @@ import type { Colaborador, RateioD365, SexoColaborador, TipoTransporte, Vinculo 
 import type { SexoDependente } from "@/lib/db/colaboradorDependentes";
 import { RiskCallout } from "@/components/shared/RiskCallout";
 import { cn } from "@/lib/cn";
+import { abreviarNome } from "@/lib/format";
 
 const INPUT_CLASS =
   "w-full rounded border border-hairline bg-background px-2 py-1 text-[12px] font-light text-foreground placeholder:text-foreground-muted/60 disabled:cursor-not-allowed disabled:border-hairline/70 disabled:bg-surface-page disabled:text-foreground-muted dark:border-brand-neutral/30";
@@ -86,6 +87,8 @@ const ROTULO_CAMPO: Record<string, string> = {
   nomePai: "Nome do pai",
   nomeMae: "Nome da mãe",
   alimentacaoValor: "Alimentação",
+  odontologicoValor: "Odontológico",
+  auxilioEducacaoValor: "Auxílio educação",
   tipoTransporte: "Transporte",
   valorTransporteDia: "Valor do VT (por dia útil)",
   valorTransporteFixo: "Valor do VM (fixo mensal)",
@@ -190,6 +193,12 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
   // Benefícios (VT/VM + VA)
   const [alimentacaoValor, setAlimentacaoValor] = useState(
     editando?.alimentacaoValor ? String(editando.alimentacaoValor) : "",
+  );
+  const [odontologicoValor, setOdontologicoValor] = useState(
+    editando?.odontologicoValor ? String(editando.odontologicoValor) : "",
+  );
+  const [auxilioEducacaoValor, setAuxilioEducacaoValor] = useState(
+    editando?.auxilioEducacaoValor ? String(editando.auxilioEducacaoValor) : "",
   );
   const [tipoTransporte, setTipoTransporte] = useState<TipoTransporte>(editando?.tipoTransporte ?? "vt_diario");
 
@@ -376,6 +385,8 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
         agencia: agencia || null,
         conta: conta || null,
         alimentacaoValor: alimentacaoValor ? Number(alimentacaoValor) : null,
+        odontologicoValor: odontologicoValor ? Number(odontologicoValor) : null,
+        auxilioEducacaoValor: auxilioEducacaoValor ? Number(auxilioEducacaoValor) : null,
         tipoTransporte,
         // A coluna do outro tipo vai a null de propósito: quem passa a receber
         // VT não pode continuar com um valor de VM pendurado no cadastro, senão
@@ -783,6 +794,17 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
 
       <Secao titulo="Dados profissionais" />
 
+      <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+        Nome abreviado
+        <input
+          value={abreviarNome(nome)}
+          readOnly
+          disabled
+          title="Primeiro nome e último sobrenome — calculado a partir do nome completo"
+          className={INPUT_CLASS}
+        />
+      </label>
+
       <div className="grid grid-cols-2 gap-2">
         <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
           E-mail profissional
@@ -960,19 +982,47 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
 
       <Secao titulo="Benefícios" />
 
-      <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
-        Alimentação
-        <input
-          type="number"
-          min={0}
-          step="0.01"
-          value={alimentacaoValor}
-          onChange={(e) => setAlimentacaoValor(e.target.value)}
-          placeholder="R$ 0,00"
-          disabled={bloqueado}
-          className={INPUT_CLASS}
-        />
-      </label>
+      <div className="grid grid-cols-3 gap-2">
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Alimentação
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            value={alimentacaoValor}
+            onChange={(e) => setAlimentacaoValor(e.target.value)}
+            placeholder="R$ 0,00"
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Odontológico
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            value={odontologicoValor}
+            onChange={(e) => setOdontologicoValor(e.target.value)}
+            placeholder="R$ 0,00"
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Auxílio educação
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            value={auxilioEducacaoValor}
+            onChange={(e) => setAuxilioEducacaoValor(e.target.value)}
+            placeholder="R$ 0,00"
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+      </div>
 
       <div className="grid grid-cols-2 gap-2">
         <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">

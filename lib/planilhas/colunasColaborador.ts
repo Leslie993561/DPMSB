@@ -22,6 +22,11 @@ export const COLUNAS_COLABORADOR = [
   { header: "Sexo", key: "sexo", width: 12 },
   { header: "E-mail pessoal", key: "emailPessoal", width: 28 },
   // Dados profissionais
+  // Calculado a partir do "Nome completo" — primeiro nome + último sobrenome.
+  // Vem preenchido só na exportação; no modelo de importação a coluna aparece
+  // vazia como as demais, e um valor digitado aqui é ignorado, porque não há
+  // campo correspondente no cadastro para gravar.
+  { header: "Nome abreviado", key: "nomeAbreviado", width: 22 },
   { header: "E-mail profissional", key: "email", width: 28 },
   { header: "Cargo", key: "cargo", width: 20 },
   { header: "Departamento", key: "departamento", width: 22 },
