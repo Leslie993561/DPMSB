@@ -22,11 +22,19 @@ export function iniciais(nome: string): string {
   return (partes[0][0] + (partes[1]?.[0] ?? "")).toUpperCase();
 }
 
-/** Nome abreviado — primeiro nome e último sobrenome, como o DP identifica o colaborador em telas e planilhas curtas. */
+/**
+ * Nome abreviado — primeiro nome e último sobrenome, como o DP identifica o
+ * colaborador em telas e planilhas curtas. Sempre em Título (primeira letra
+ * maiúscula, resto minúsculo) mesmo quando o cadastro guarda o nome em caixa
+ * alta ("ALICE COUTINHO DA CRUZ" → "Alice Cruz") — diferente do restante do
+ * cadastro, que sai em caixa alta nas planilhas de propósito.
+ */
 export function abreviarNome(nome: string): string {
   const partes = nome.trim().split(/\s+/).filter(Boolean);
-  if (partes.length <= 1) return partes[0] ?? "";
-  return `${partes[0]} ${partes[partes.length - 1]}`;
+  const emTitulo = (parte: string) => parte.charAt(0).toLocaleUpperCase("pt-BR") + parte.slice(1).toLocaleLowerCase("pt-BR");
+  if (partes.length === 0) return "";
+  if (partes.length === 1) return emTitulo(partes[0]);
+  return `${emTitulo(partes[0])} ${emTitulo(partes[partes.length - 1])}`;
 }
 
 /** Formata uma data ISO (AAAA-MM-DD) como dd/mm/aaaa. */
