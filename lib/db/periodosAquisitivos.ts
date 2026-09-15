@@ -452,12 +452,12 @@ export async function listarPeriodosEmCurso(base?: BaseControle): Promise<Period
   const hoje = new Date();
   const dados = base ?? (await carregarBase());
   const { colaboradores, periodos: linhas, lancamentosPorPeriodo } = dados;
-  // Só conta quem tem período com SALDO. Um período apenas "Concluído" não
-  // dispensa a linha do período seguinte: depois de gozar os 30 dias, o que
-  // interessa ver é justamente o que está sendo adquirido agora.
-  const comPeriodoAberto = new Set(
-    (await listarPeriodosAbertos(dados)).filter((p) => p.situacao !== "concluido").map((p) => p.colaboradorId),
-  );
+  // Quem já tem QUALQUER linha em `listarPeriodosAbertos` — mesmo "Concluído"
+  // — não entra aqui de novo. Antes só quem tinha saldo (situacao !==
+  // "concluido") era excluído, e um período fechado por inteiro (os 30 dias
+  // gozados) não tirava a pessoa desta lista: ela aparecia duas vezes no
+  // Controle, uma como "Concluído" e outra como "Em dia" do período seguinte.
+  const comPeriodoAberto = new Set((await listarPeriodosAbertos(dados)).map((p) => p.colaboradorId));
 
   const emCurso: PeriodoEmCurso[] = [];
 
