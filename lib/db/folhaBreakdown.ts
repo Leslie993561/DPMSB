@@ -441,11 +441,8 @@ export async function gerarBreakdown(
       calendarioDsr,
     );
 
-    //
-    // O ODONTOLÓGICO fica fora da conta de propósito: ele é descontado da folha
-    // do colaborador, não pago pela empresa. A empresa recolhe e repassa ao
-    // plano, então o desembolso líquido dela é zero — somá-lo inflava o custo
-    // de cada pessoa pelo valor do plano.
+    const odontologico = extras.odontologico ?? c.odontologicoValor ?? null;
+
     const custoTotal = arredondar(
       // encargos.total já é remuneração (salário + adicionais) com todos os
       // encargos e provisões em cima; somar adicionais de novo aqui contaria
@@ -456,6 +453,7 @@ export async function gerarBreakdown(
         auxilioEducacao +
         premiacao +
         (extras.vm ?? 0) +
+        (odontologico ?? 0) +
         (extras.solides ?? 0) +
         (extras.solidesSaude ?? 0) +
         (extras.flash ?? 0) +
@@ -489,7 +487,7 @@ export async function gerarBreakdown(
       // Planilha importada manda; sem ela, vale o plano fixo do cadastro —
       // mesma fonte que o Rateio de Benefícios usa, para os dois módulos não
       // divergirem no "Total de benefícios" do mês.
-      odontologico: extras.odontologico ?? c.odontologicoValor ?? null,
+      odontologico,
       solides: extras.solides,
       solidesSaude: extras.solidesSaude,
       flash: extras.flash,
@@ -660,11 +658,14 @@ export async function listarBreakdownPersistido(competencia: string): Promise<Ve
     // porque nunca fez parte do "núcleo" gravado em folha_breakdown.
     const auxilioEducacao =
       colaborador && colaborador.vinculo !== "PJ" ? (colaborador.auxilioEducacaoValor ?? 0) : 0;
+    const odontologico = extras.odontologico ?? colaborador?.odontologicoValor ?? null;
+
     const custoTotal = arredondar(
       nucleoCongelado +
         auxilioEducacao +
         premiacao +
         (extras.vm ?? 0) +
+        (odontologico ?? 0) +
         (extras.solides ?? 0) +
         (extras.solidesSaude ?? 0) +
         (extras.flash ?? 0) +
@@ -699,7 +700,7 @@ export async function listarBreakdownPersistido(competencia: string): Promise<Ve
       valeAlimentacao: l.vale_alimentacao,
       auxilioEducacao,
       vm: extras.vm,
-      odontologico: extras.odontologico ?? colaborador?.odontologicoValor ?? null,
+      odontologico,
       solides: extras.solides,
       solidesSaude: extras.solidesSaude,
       flash: extras.flash,
