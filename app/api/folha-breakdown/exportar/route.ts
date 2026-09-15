@@ -20,7 +20,7 @@ export async function GET(request: Request) {
   const filtradas = parsed.data.setor ? linhas.filter((l) => l.departamento === parsed.data.setor) : linhas;
 
   const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet("Folha por colaborador");
+  const sheet = workbook.addWorksheet("Custo total");
   sheet.columns = [
     { header: "Código", key: "codigo", width: 10 },
     { header: "Colaborador", key: "nome", width: 30 },

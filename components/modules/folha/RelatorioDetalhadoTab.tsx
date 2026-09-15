@@ -304,7 +304,7 @@ export function RelatorioDetalhadoTab() {
       <Card className="overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hairline px-4 py-3">
           <div className="flex items-center gap-2">
-            <h3 className="text-[13.5px] font-bold text-foreground">Folha por colaborador</h3>
+            <h3 className="text-[13.5px] font-bold text-foreground">Custo total</h3>
             <span className="rounded-full bg-brand-primary-100 px-2 py-0.5 text-[10.5px] font-bold text-brand-primary-800">
               {competenciaCurta(competencia)}
             </span>
