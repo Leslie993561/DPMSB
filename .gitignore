@@ -46,3 +46,6 @@ popular-banco-*.sql
 *.tsbuildinfo
 next-env.d.ts
 _dev.log
+
+.vercel
+.env*
