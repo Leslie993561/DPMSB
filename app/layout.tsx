@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
 import { Sidebar } from "@/components/nav/Sidebar";
 import { obterNavCounts } from "@/lib/db/navCounts";
+import { obterSessaoAtual } from "@/lib/auth/sessao";
 import "./globals.css";
 
 /**
@@ -36,12 +37,24 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const sessao = await obterSessaoAtual();
+
+  // Sem sessão: é a tela de login (o Proxy já bloqueou qualquer outra rota
+  // antes de chegar aqui) — sem menu lateral nem consulta ao banco à toa.
+  if (!sessao) {
+    return (
+      <html lang="pt-BR" className={`${poppins.variable} h-full antialiased`}>
+        <body className="h-full bg-surface-page text-foreground">{children}</body>
+      </html>
+    );
+  }
+
   const counts = await obterNavCounts();
 
   return (
     <html lang="pt-BR" className={`${poppins.variable} h-full antialiased`}>
       <body className="flex h-full overflow-hidden bg-surface-page text-foreground">
-        <Sidebar counts={counts} />
+        <Sidebar counts={counts} sessao={sessao} />
         <div className="flex h-full flex-1 flex-col overflow-y-auto">
           <main className="flex-1 px-4 py-4">{children}</main>
         </div>

@@ -39,6 +39,17 @@ export async function listarGestoresAcesso(): Promise<GestorAcesso[]> {
   return (resultado.rows as unknown as LinhaGestorAcesso[]).map(paraGestorAcesso);
 }
 
+/** Usado no login: confere se o e-mail está cadastrado e ativo antes de abrir sessão. */
+export async function buscarGestorAcessoPorEmail(email: string): Promise<GestorAcesso | null> {
+  const db = await getDb();
+  const resultado = await db.execute({
+    sql: "SELECT * FROM gestores_acesso WHERE lower(email) = lower(?)",
+    args: [email.trim()],
+  });
+  const linha = resultado.rows[0] as unknown as LinhaGestorAcesso | undefined;
+  return linha ? paraGestorAcesso(linha) : null;
+}
+
 export class ErroValidacaoGestor extends Error {}
 
 /**

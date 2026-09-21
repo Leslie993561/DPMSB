@@ -279,6 +279,17 @@ export async function buscarColaboradorPorNome(nome: string): Promise<Colaborado
   return linha ? paraColaborador(linha) : null;
 }
 
+/** Busca por e-mail (login do portal e controle de acesso de gestores). */
+export async function buscarColaboradorPorEmail(email: string): Promise<Colaborador | null> {
+  const db = await getDb();
+  const resultado = await db.execute({
+    sql: "SELECT * FROM colaboradores WHERE lower(email) = lower(?)",
+    args: [email.trim()],
+  });
+  const linha = resultado.rows[0] as unknown as LinhaColaborador | undefined;
+  return linha ? paraColaborador(linha) : null;
+}
+
 export async function criarColaborador(input: ColaboradorInput): Promise<Colaborador> {
   const db = await getDb();
   const info = await db.execute({

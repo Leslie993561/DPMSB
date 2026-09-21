@@ -14,7 +14,10 @@ export const MODULOS_PORTAL: ModuloAcesso[] = [
   {
     chave: "colaboradores",
     label: "Colaboradores",
-    filhos: [{ chave: "colaboradores.quadro", label: "Quadro de colaboradores" }],
+    filhos: [
+      { chave: "colaboradores.quadro", label: "Quadro de colaboradores" },
+      { chave: "colaboradores.organograma", label: "Organograma" },
+    ],
   },
   {
     chave: "ferias",

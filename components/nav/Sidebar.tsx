@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
 import type { NavCounts } from "@/lib/db/navCounts";
-import { useOperador } from "@/lib/currentUser";
+import type { SessaoPayload } from "@/lib/auth/token";
+import { permiteAcesso } from "@/lib/acesso/rotas";
 import { iniciais } from "@/lib/format";
 import { Logo } from "./Logo";
 import { GerenciarAcessoModal } from "@/components/modules/acesso/GerenciarAcessoModal";
@@ -55,10 +56,20 @@ function IconeBeneficios() {
   );
 }
 
+function IconeSair() {
+  return (
+    <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+      <path d="M6 3a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h4a1 1 0 1 0 0-2H7V5h3a1 1 0 1 0 0-2H6Zm7.29 3.29a1 1 0 0 0 0 1.42L14.59 9H9a1 1 0 1 0 0 2h5.59l-1.3 1.29a1 1 0 0 0 1.42 1.42l3-3a1 1 0 0 0 0-1.42l-3-3a1 1 0 0 0-1.42 0Z" />
+    </svg>
+  );
+}
+
 
 interface SubItem {
   href: string;
   label: string;
+  /** Chave de `lib/acesso/modulos.ts` — decide se o item some pra um gestor sem permissão. */
+  modulo: string;
 }
 
 interface GrupoItem {
@@ -79,7 +90,7 @@ function montarGrupos(counts?: NavCounts): GrupoItem[] {
       badge: counts?.colaboradores,
       base: "/colaboradores",
       itens: [
-        { href: "/colaboradores?aba=quadro", label: "Quadro de colaboradores" },
+        { href: "/colaboradores?aba=quadro", label: "Quadro de colaboradores", modulo: "colaboradores.quadro" },
       ],
     },
     {
@@ -89,9 +100,9 @@ function montarGrupos(counts?: NavCounts): GrupoItem[] {
       badge: counts?.feriasEmAberto,
       base: "/dashboard",
       itens: [
-        { href: "/dashboard", label: "Dashboard" },
-        { href: "/ferias?aba=controle", label: "Controle de Férias" },
-        { href: "/ferias?aba=planejamento", label: "Planejamento de Férias" },
+        { href: "/dashboard", label: "Dashboard", modulo: "ferias.dashboard" },
+        { href: "/ferias?aba=controle", label: "Controle de Férias", modulo: "ferias.controle" },
+        { href: "/ferias?aba=planejamento", label: "Planejamento de Férias", modulo: "ferias.planejamento" },
       ],
     },
     {
@@ -101,8 +112,8 @@ function montarGrupos(counts?: NavCounts): GrupoItem[] {
       badge: counts?.folha,
       base: "/folha",
       itens: [
-        { href: "/folha?aba=dashboard", label: "Dashboard" },
-        { href: "/folha?aba=relatorio", label: "Relatório detalhado" },
+        { href: "/folha?aba=dashboard", label: "Dashboard", modulo: "folha.dashboard" },
+        { href: "/folha?aba=relatorio", label: "Relatório detalhado", modulo: "folha.relatorio" },
       ],
     },
     {
@@ -111,16 +122,27 @@ function montarGrupos(counts?: NavCounts): GrupoItem[] {
       Icone: IconeBeneficios,
       base: "/beneficios",
       itens: [
-        { href: "/beneficios?aba=dashboard", label: "Dashboard" },
-        { href: "/beneficios?aba=rateio", label: "Rateio" },
+        { href: "/beneficios?aba=dashboard", label: "Dashboard", modulo: "beneficios.dashboard" },
+        { href: "/beneficios?aba=rateio", label: "Rateio", modulo: "beneficios.rateio" },
       ],
     },
   ];
 }
 
-export function Sidebar({ counts }: { counts?: NavCounts }) {
+export function Sidebar({ counts, sessao }: { counts?: NavCounts; sessao: SessaoPayload }) {
   const pathname = usePathname();
-  const grupos = montarGrupos(counts);
+  const ehAdmin = sessao.tipo === "administrador";
+  const liberados = new Set(sessao.liberados);
+
+  // Gestor comum só vê o que foi liberado pra ele; item sem permissão some da
+  // lista, e o grupo inteiro some junto se nenhum dos filhos sobrar.
+  const grupos = montarGrupos(counts)
+    .map((grupo) => ({
+      ...grupo,
+      itens: ehAdmin ? grupo.itens : grupo.itens.filter((item) => permiteAcesso(item.modulo, liberados)),
+    }))
+    .filter((grupo) => grupo.itens.length > 0);
+
   const [aberto, setAberto] = useState<string | null>(
     grupos.find((g) => pathname === g.base || pathname?.startsWith(`${g.base}/`))?.id ?? null,
   );
@@ -190,49 +212,42 @@ export function Sidebar({ counts }: { counts?: NavCounts }) {
 
       </nav>
 
-      <UserCard />
+      <UserCard sessao={sessao} />
     </aside>
   );
 }
 
-function UserCard() {
-  const { operador, setOperador } = useOperador();
-  const [editando, setEditando] = useState(false);
+function UserCard({ sessao }: { sessao: SessaoPayload }) {
+  const router = useRouter();
   const [acessoAberto, setAcessoAberto] = useState(false);
-  const nomeExibido = operador || "Leslie Silva Souza";
+  const [saindo, setSaindo] = useState(false);
+  const ehAdmin = sessao.tipo === "administrador";
+
+  async function sair() {
+    setSaindo(true);
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.replace("/login");
+    router.refresh();
+  }
 
   return (
     <div className="border-t border-hairline p-3">
-      {editando ? (
-        <input
-          autoFocus
-          defaultValue={operador}
-          placeholder="Seu nome (operador)"
-          onBlur={(e) => {
-            setOperador(e.target.value);
-            setEditando(false);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") e.currentTarget.blur();
-          }}
-          className="w-full rounded-md border border-brand-primary bg-background px-2 py-1.5 text-xs text-foreground"
-        />
-      ) : (
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => setEditando(true)}
-            title="Clique para editar o nome do operador"
-            className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-left transition-colors hover:bg-surface-page"
-          >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-primary text-xs font-bold text-brand-white">
-              {iniciais(nomeExibido)}
+      <div className="flex items-center gap-1.5">
+        <span
+          title={sessao.email}
+          className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-left"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-primary text-xs font-bold text-brand-white">
+            {iniciais(sessao.nome)}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[13px] font-semibold text-foreground">{sessao.nome}</span>
+            <span className="block truncate text-[11px] text-foreground-muted">
+              {ehAdmin ? "Administrador" : (sessao.cargo ?? "Gestor")}
             </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[13px] font-semibold text-foreground">{nomeExibido}</span>
-              <span className="block truncate text-[11px] text-foreground-muted">Assistente de RH</span>
-            </span>
-          </button>
+          </span>
+        </span>
+        {ehAdmin && (
           <button
             type="button"
             onClick={() => setAcessoAberto(true)}
@@ -241,10 +256,19 @@ function UserCard() {
           >
             <IconeAcesso />
           </button>
-        </div>
-      )}
+        )}
+        <button
+          type="button"
+          onClick={() => void sair()}
+          disabled={saindo}
+          title="Sair do portal"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-foreground-muted transition-colors hover:bg-surface-page hover:text-status-danger disabled:opacity-60"
+        >
+          <IconeSair />
+        </button>
+      </div>
 
-      <GerenciarAcessoModal aberto={acessoAberto} onFechar={() => setAcessoAberto(false)} />
+      {ehAdmin && <GerenciarAcessoModal aberto={acessoAberto} onFechar={() => setAcessoAberto(false)} />}
     </div>
   );
 }

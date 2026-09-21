@@ -102,6 +102,10 @@ export function PermissoesGestorModal({
           <p className="text-[11.5px] text-foreground-muted">
             Marque os módulos e submódulos que {gestor?.nome} pode ver no portal. Tudo começa bloqueado.
           </p>
+          <p className="rounded-md bg-brand-primary-050 px-3 py-2 text-[11px] text-brand-primary-800">
+            A mudança vale a partir do próximo login — se {gestor?.nome} já estiver com o portal aberto, precisa
+            sair e entrar de novo pra ver o efeito.
+          </p>
           {erro && <p className="rounded-md bg-status-danger/10 px-3 py-2 text-[11.5px] text-status-danger">{erro}</p>}
 
           <div className="flex flex-col divide-y divide-hairline rounded-md border border-hairline">
