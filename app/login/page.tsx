@@ -1,5 +1,4 @@
 import { Suspense } from "react";
-import Image from "next/image";
 import { LoginForm } from "./LoginForm";
 
 export const metadata = { title: "Entrar — Portal DP" };
@@ -9,7 +8,9 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-surface-page px-4">
       <div className="w-full max-w-sm overflow-hidden rounded-xl border border-hairline bg-background shadow-drawer">
         <div className="border-b border-hairline px-6 py-5">
-          <Image src="/logo-msb.png" alt="MSB" width={104} height={32} className="block" priority />
+          {/* next/img puro: ver comentário em components/nav/Logo.tsx */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-msb.png" alt="MSB" width={104} height={32} className="block" />
           <div className="mt-4 flex items-center gap-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-brand-primary" />
             <span className="text-[13.5px] font-bold tracking-tight text-foreground">Portal DP</span>
