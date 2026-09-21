@@ -256,6 +256,10 @@ export async function listarPeriodosAbertos(base?: BaseControle): Promise<Period
   for (const periodo of periodos) {
     const colaborador = colaboradoresPorId.get(periodo.colaboradorId);
     if (!colaborador) continue;
+    // Desligado não é mais gestão de férias corrente — some do Controle, do
+    // dashboard e dos alertas, mesmo que o período tenha saldo (o histórico
+    // continua acessível por `listarHistoricoColaborador`).
+    if (colaborador.status === "desligado") continue;
 
     // Ainda dentro do período aquisitivo (não fechou) — não conta como aberto/vencido ainda.
     if (new Date(periodo.dataFim) > hoje) continue;

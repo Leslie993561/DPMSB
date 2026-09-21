@@ -8,6 +8,19 @@ import type { NavCounts } from "@/lib/db/navCounts";
 import { useOperador } from "@/lib/currentUser";
 import { iniciais } from "@/lib/format";
 import { Logo } from "./Logo";
+import { GerenciarAcessoModal } from "@/components/modules/acesso/GerenciarAcessoModal";
+
+function IconeAcesso() {
+  return (
+    <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M10 2a4 4 0 0 0-4 4v2H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1h-1V6a4 4 0 0 0-4-4Zm2 6V6a2 2 0 1 0-4 0v2h4Zm-2 3a1.5 1.5 0 0 1 1 2.62V15a1 1 0 1 1-2 0v-1.38A1.5 1.5 0 0 1 10 11Z"
+      />
+    </svg>
+  );
+}
 
 function IconeFerias() {
   return (
@@ -185,6 +198,7 @@ export function Sidebar({ counts }: { counts?: NavCounts }) {
 function UserCard() {
   const { operador, setOperador } = useOperador();
   const [editando, setEditando] = useState(false);
+  const [acessoAberto, setAcessoAberto] = useState(false);
   const nomeExibido = operador || "Leslie Silva Souza";
 
   return (
@@ -204,21 +218,33 @@ function UserCard() {
           className="w-full rounded-md border border-brand-primary bg-background px-2 py-1.5 text-xs text-foreground"
         />
       ) : (
-        <button
-          type="button"
-          onClick={() => setEditando(true)}
-          title="Clique para editar o nome do operador"
-          className="flex w-full items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-left transition-colors hover:bg-surface-page"
-        >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-primary text-xs font-bold text-brand-white">
-            {iniciais(nomeExibido)}
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-[13px] font-semibold text-foreground">{nomeExibido}</span>
-            <span className="block truncate text-[11px] text-foreground-muted">Assistente de RH</span>
-          </span>
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setEditando(true)}
+            title="Clique para editar o nome do operador"
+            className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-left transition-colors hover:bg-surface-page"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-primary text-xs font-bold text-brand-white">
+              {iniciais(nomeExibido)}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[13px] font-semibold text-foreground">{nomeExibido}</span>
+              <span className="block truncate text-[11px] text-foreground-muted">Assistente de RH</span>
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setAcessoAberto(true)}
+            title="Gerenciar acesso de gestores ao portal"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-foreground-muted transition-colors hover:bg-surface-page hover:text-brand-primary-800"
+          >
+            <IconeAcesso />
+          </button>
+        </div>
       )}
+
+      <GerenciarAcessoModal aberto={acessoAberto} onFechar={() => setAcessoAberto(false)} />
     </div>
   );
 }

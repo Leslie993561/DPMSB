@@ -132,3 +132,18 @@ CREATE TABLE IF NOT EXISTS colaborador_dependentes (
   certidao_data_emissao TEXT,
   criado_em TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')
 );
+
+CREATE TABLE IF NOT EXISTS gestores_acesso (
+  id SERIAL PRIMARY KEY,
+  colaborador_id INTEGER REFERENCES colaboradores(id),
+  nome TEXT NOT NULL,
+  email TEXT NOT NULL UNIQUE,
+  status TEXT NOT NULL DEFAULT 'ativo' CHECK (status IN ('ativo', 'inativo')),
+  criado_em TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')
+);
+
+CREATE TABLE IF NOT EXISTS gestor_permissoes (
+  gestor_id INTEGER NOT NULL REFERENCES gestores_acesso(id) ON DELETE CASCADE,
+  modulo TEXT NOT NULL,
+  PRIMARY KEY (gestor_id, modulo)
+);
