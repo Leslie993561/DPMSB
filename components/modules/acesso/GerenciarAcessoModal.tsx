@@ -1,22 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Modal } from "@/components/shared/Modal";
 import { iniciais } from "@/lib/format";
-import type { GestorAcesso } from "@/lib/db/acessoGestores";
+import type { GestorAcesso, CandidatoGestor } from "@/lib/db/acessoGestores";
 import { PermissoesGestorModal } from "./PermissoesGestorModal";
-
-interface ColaboradorCandidato {
-  id: number;
-  nome: string;
-  email: string | null;
-  cargo: string | null;
-  gestorId: number | null;
-}
 
 export function GerenciarAcessoModal({ aberto, onFechar }: { aberto: boolean; onFechar: () => void }) {
   const [gestores, setGestores] = useState<GestorAcesso[]>([]);
-  const [colaboradores, setColaboradores] = useState<ColaboradorCandidato[]>([]);
+  const [candidatos, setCandidatos] = useState<CandidatoGestor[]>([]);
   const [carregando, setCarregando] = useState(false);
   const [formAberto, setFormAberto] = useState(false);
   const [colaboradorId, setColaboradorId] = useState("");
@@ -27,14 +19,14 @@ export function GerenciarAcessoModal({ aberto, onFechar }: { aberto: boolean; on
   async function recarregar() {
     setCarregando(true);
     try {
-      const [resGestores, resColaboradores] = await Promise.all([
+      const [resGestores, resCandidatos] = await Promise.all([
         fetch("/api/acesso-gestores"),
-        fetch("/api/colaboradores"),
+        fetch("/api/acesso-gestores/candidatos"),
       ]);
       const dataGestores = await resGestores.json();
-      const dataColaboradores = await resColaboradores.json();
+      const dataCandidatos = await resCandidatos.json();
       setGestores(dataGestores.gestores ?? []);
-      setColaboradores(dataColaboradores.colaboradores ?? []);
+      setCandidatos(dataCandidatos.candidatos ?? []);
     } finally {
       setCarregando(false);
     }
@@ -43,16 +35,6 @@ export function GerenciarAcessoModal({ aberto, onFechar }: { aberto: boolean; on
   useEffect(() => {
     if (aberto) void recarregar();
   }, [aberto]);
-
-  // Só quem já é gestor_id de alguém no cadastro — mesma regra que a API
-  // valida no servidor — e que ainda não está na lista de acesso.
-  const candidatos = useMemo(() => {
-    const idsGestores = new Set(colaboradores.map((c) => c.gestorId).filter((id): id is number => id !== null));
-    const emailsJaCadastrados = new Set(gestores.map((g) => g.email.toLowerCase()));
-    return colaboradores
-      .filter((c) => idsGestores.has(c.id) && c.email && !emailsJaCadastrados.has(c.email.toLowerCase()))
-      .sort((a, b) => a.nome.localeCompare(b.nome));
-  }, [colaboradores, gestores]);
 
   const candidatoSelecionado = candidatos.find((c) => String(c.id) === colaboradorId);
 
@@ -201,8 +183,9 @@ export function GerenciarAcessoModal({ aberto, onFechar }: { aberto: boolean; on
           </div>
 
           <p className="text-[10.5px] text-foreground-muted">
-            Só colaboradores que já são gestor de alguém no cadastro podem ser adicionados aqui. Ao cadastrar, nenhum
-            módulo vem liberado — clique no nome do gestor para escolher o que ele pode ver.
+            Só entra aqui quem já é gestor de alguém no quadro de colaboradores (gestor cadastrado ou líder direto de
+            alguém). Ao cadastrar, nenhum módulo vem liberado — clique no nome do gestor para escolher o que ele pode
+            ver.
           </p>
         </div>
       </Modal>
