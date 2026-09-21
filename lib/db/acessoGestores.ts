@@ -60,38 +60,48 @@ function palavrasDoNome(nome: string): Set<string> {
 }
 
 /**
- * Quem conta como "gestor" pro controle de acesso: aparece como `gestor_id`
- * de alguém no cadastro (FK, a mesma relação que monta o organograma) OU é
- * citado como líder direto pelo nome — o cadastro guarda os dois jeitos, e
- * `lider_direto_nome` é texto livre (curto: "Fabiana Sousa") porque foi
- * preenchido quando esse líder ainda não tinha cadastro próprio.
- *
- * O casamento por nome é por SUBCONJUNTO de palavras: toda palavra do nome
- * curto precisa aparecer no nome completo do colaborador. Se mais de um
+ * O líder direto de UM colaborador: `gestor_id` (FK) quando existe, senão
+ * `lider_direto_nome` (texto livre, curto: "Fabiana Sousa") casado por
+ * SUBCONJUNTO de palavras contra o nome completo de todo mundo — toda
+ * palavra do nome curto precisa aparecer no nome completo. Se mais de um
  * colaborador bater com o mesmo nome curto, ninguém é escolhido — mesma
- * regra de `casarPorNome` (lib/folha/casarNome.ts): errar quem é o gestor é
+ * regra de `casarPorNome` (lib/folha/casarNome.ts): errar quem é o líder é
  * pior que deixar de fora.
  */
+function resolverLiderDireto(colaborador: Colaborador, todos: Colaborador[]): number | null {
+  if (colaborador.gestorId !== null) return colaborador.gestorId;
+  const nomeLider = colaborador.liderDiretoNome?.trim();
+  if (!nomeLider) return null;
+
+  const alvo = palavrasDoNome(nomeLider);
+  if (alvo.size === 0) return null;
+  const achados = todos.filter((c) => {
+    const doNome = palavrasDoNome(c.nome);
+    return [...alvo].every((palavra) => doNome.has(palavra));
+  });
+  return achados.length === 1 ? achados[0].id : null;
+}
+
+/** Quem conta como "gestor" pro controle de acesso: é líder direto de pelo menos um colaborador. */
 export async function listarColaboradoresGestores(colaboradores?: Colaborador[]): Promise<Colaborador[]> {
   const todos = colaboradores ?? (await listarColaboradores());
+  const idsGestores = new Set(
+    todos.map((c) => resolverLiderDireto(c, todos)).filter((id): id is number => id !== null),
+  );
+  return todos.filter((c) => idsGestores.has(c.id));
+}
 
-  const idsPorGestorId = new Set(todos.map((c) => c.gestorId).filter((id): id is number => id !== null));
-
-  const nomesLideresDiretos = [
-    ...new Set(todos.map((c) => c.liderDiretoNome?.trim()).filter((n): n is string => Boolean(n))),
-  ];
-  const idsPorLiderDireto = new Set<number>();
-  for (const liderNome of nomesLideresDiretos) {
-    const alvo = palavrasDoNome(liderNome);
-    if (alvo.size === 0) continue;
-    const achados = todos.filter((c) => {
-      const doNome = palavrasDoNome(c.nome);
-      return [...alvo].every((palavra) => doNome.has(palavra));
-    });
-    if (achados.length === 1) idsPorLiderDireto.add(achados[0].id);
+/**
+ * IDs de quem é liderado diretamente por `gestorColaboradorId` — usado para
+ * restringir o Quadro de Colaboradores a "minha equipe" quando quem está
+ * logado é gestor, não administrador.
+ */
+export function idsDaEquipe(gestorColaboradorId: number, todos: Colaborador[]): Set<number> {
+  const ids = new Set<number>();
+  for (const c of todos) {
+    if (resolverLiderDireto(c, todos) === gestorColaboradorId) ids.add(c.id);
   }
-
-  return todos.filter((c) => idsPorGestorId.has(c.id) || idsPorLiderDireto.has(c.id));
+  return ids;
 }
 
 export interface CandidatoGestor {

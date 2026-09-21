@@ -24,6 +24,7 @@ export async function POST(request: Request) {
       cargo: colaborador?.cargo ?? "Administrador",
       tipo: "administrador",
       gestorId: null,
+      colaboradorId: colaborador?.id ?? null,
       liberados: [],
     });
     await definirCookieSessao(token, duracaoSegundos);
@@ -47,6 +48,7 @@ export async function POST(request: Request) {
     cargo: colaborador?.cargo ?? null,
     tipo: "gestor",
     gestorId: gestor.id,
+    colaboradorId: gestor.colaboradorId,
     liberados,
   });
   await definirCookieSessao(token, duracaoSegundos);

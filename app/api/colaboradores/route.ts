@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { atualizarColaborador, criarColaborador, listarColaboradores } from "@/lib/db/colaboradores";
 import { substituirDependentes } from "@/lib/db/colaboradorDependentes";
+import { escopoColaboradoresDoGestor } from "@/lib/acesso/equipeGestor";
 
 export const runtime = "nodejs";
 
@@ -68,8 +69,18 @@ const schema = z.object({
   dependentesLista: z.array(schemaDependente).optional(),
 });
 
-export async function GET() {
-  return Response.json({ colaboradores: await listarColaboradores() });
+export async function GET(request: Request) {
+  const colaboradores = await listarColaboradores();
+
+  // Só restringe quando quem chamou pediu explicitamente (tela de Quadro de
+  // Colaboradores) — Férias e Folha usam esta mesma rota pra outras coisas
+  // (nome/cargo/setor de todo mundo) e não devem ficar presas à equipe.
+  const restringirPorEquipe = new URL(request.url).searchParams.get("equipe") === "1";
+  const escopo = restringirPorEquipe ? await escopoColaboradoresDoGestor() : null;
+
+  return Response.json({
+    colaboradores: escopo ? colaboradores.filter((c) => escopo.has(c.id)) : colaboradores,
+  });
 }
 
 export async function POST(request: Request) {

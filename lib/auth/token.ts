@@ -19,6 +19,8 @@ export interface SessaoPayload {
   cargo: string | null;
   tipo: TipoSessao;
   gestorId: number | null;
+  /** `colaboradores.id` da pessoa logada, quando o e-mail bate com um cadastro — usado para restringir o Quadro de Colaboradores à própria equipe. */
+  colaboradorId: number | null;
   /** Chaves de módulo liberadas (vazio para administrador, que não precisa). */
   liberados: string[];
   /** Expiração, em segundos desde epoch. */

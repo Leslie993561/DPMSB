@@ -1,4 +1,5 @@
 import { buscarColaborador, contarVinculos, excluirColaborador } from "@/lib/db/colaboradores";
+import { dentroDoEscopo } from "@/lib/acesso/equipeGestor";
 
 export const runtime = "nodejs";
 
@@ -15,6 +16,9 @@ export async function POST(_request: Request, ctx: RouteContext<"/api/colaborado
 
   const colaborador = await buscarColaborador(colaboradorId);
   if (!colaborador) {
+    return Response.json({ erro: "Colaborador não encontrado." }, { status: 404 });
+  }
+  if (!(await dentroDoEscopo(colaboradorId))) {
     return Response.json({ erro: "Colaborador não encontrado." }, { status: 404 });
   }
 

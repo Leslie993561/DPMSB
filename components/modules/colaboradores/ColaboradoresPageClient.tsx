@@ -29,7 +29,12 @@ export function ColaboradoresPageClient() {
 
   async function recarregar() {
     try {
-      const res = await fetch("/api/colaboradores");
+      // `equipe=1`: só afeta quem loga como gestor (não administrador) — ver
+      // `escopoColaboradoresDoGestor`. Passa sempre daqui porque é essa a
+      // única tela que deve restringir a "minha equipe"; Férias e Folha
+      // chamam /api/colaboradores sem o parâmetro e continuam vendo todo
+      // mundo, como sempre viram.
+      const res = await fetch("/api/colaboradores?equipe=1");
       const data = await res.json();
       setColaboradores(data.colaboradores ?? []);
     } finally {
