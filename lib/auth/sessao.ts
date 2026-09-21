@@ -1,10 +1,16 @@
 import "server-only";
 import { cookies } from "next/headers";
-import { assinarSessao, verificarSessao, type SessaoPayload } from "./token";
+import { assinarSessao, verificarSessao, type SessaoPayload, type TipoSessao } from "./token";
 
 export const NOME_COOKIE = "portaldp_sessao";
-/** 8h — uma jornada de trabalho. Depois disso o gestor loga de novo e pega permissões atualizadas. */
-const DURACAO_SEGUNDOS = 8 * 60 * 60;
+/** Gestor: 8h, uma jornada — depois disso loga de novo e pega permissões atualizadas. */
+const DURACAO_GESTOR_SEGUNDOS = 8 * 60 * 60;
+/** Administrador (dona do portal): 180 dias — não faz sentido pedir e-mail dela toda hora. */
+const DURACAO_ADMIN_SEGUNDOS = 180 * 24 * 60 * 60;
+
+function duracaoPara(tipo: TipoSessao): number {
+  return tipo === "administrador" ? DURACAO_ADMIN_SEGUNDOS : DURACAO_GESTOR_SEGUNDOS;
+}
 
 function segredo(): string {
   const valor = process.env.AUTH_SECRET;
@@ -12,19 +18,23 @@ function segredo(): string {
   return valor;
 }
 
-export async function criarTokenSessao(dados: Omit<SessaoPayload, "exp">): Promise<string> {
-  const payload: SessaoPayload = { ...dados, exp: Math.floor(Date.now() / 1000) + DURACAO_SEGUNDOS };
-  return assinarSessao(payload, segredo());
+export async function criarTokenSessao(
+  dados: Omit<SessaoPayload, "exp">,
+): Promise<{ token: string; duracaoSegundos: number }> {
+  const duracaoSegundos = duracaoPara(dados.tipo);
+  const payload: SessaoPayload = { ...dados, exp: Math.floor(Date.now() / 1000) + duracaoSegundos };
+  const token = await assinarSessao(payload, segredo());
+  return { token, duracaoSegundos };
 }
 
-export async function definirCookieSessao(token: string): Promise<void> {
+export async function definirCookieSessao(token: string, duracaoSegundos: number): Promise<void> {
   const store = await cookies();
   store.set(NOME_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    maxAge: DURACAO_SEGUNDOS,
+    maxAge: duracaoSegundos,
   });
 }
 

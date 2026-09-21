@@ -18,7 +18,7 @@ export async function POST(request: Request) {
 
   if (ehEmailAdmin(email)) {
     const colaborador = await buscarColaboradorPorEmail(email);
-    const token = await criarTokenSessao({
+    const { token, duracaoSegundos } = await criarTokenSessao({
       email,
       nome: colaborador?.nome ?? email,
       cargo: colaborador?.cargo ?? "Administrador",
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
       gestorId: null,
       liberados: [],
     });
-    await definirCookieSessao(token);
+    await definirCookieSessao(token, duracaoSegundos);
     return Response.json({ ok: true, tipo: "administrador" });
   }
 
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
   const colaborador = gestor.colaboradorId ? await buscarColaboradorPorEmail(gestor.email) : null;
   const liberados = await listarPermissoesGestor(gestor.id);
 
-  const token = await criarTokenSessao({
+  const { token, duracaoSegundos } = await criarTokenSessao({
     email: gestor.email,
     nome: gestor.nome,
     cargo: colaborador?.cargo ?? null,
@@ -49,6 +49,6 @@ export async function POST(request: Request) {
     gestorId: gestor.id,
     liberados,
   });
-  await definirCookieSessao(token);
+  await definirCookieSessao(token, duracaoSegundos);
   return Response.json({ ok: true, tipo: "gestor" });
 }
