@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { FolhaPageClient } from "@/components/modules/folha/FolhaPageClient";
 
-export const metadata = { title: "Breakdown de Folha — Portal de DP" };
+export const metadata = { title: "Breakdown de Folha — Portal Recursos Humanos" };
 
 export default function FolhaPage() {
   return (

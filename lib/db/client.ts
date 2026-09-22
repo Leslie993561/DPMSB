@@ -289,7 +289,7 @@ CREATE TABLE IF NOT EXISTS colaborador_dependentes (
   criado_em TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')
 );
 
--- Controle de acesso de gestores ao Portal DP (ícone "Gerenciar Acesso" no
+-- Controle de acesso de gestores ao Portal Recursos Humanos (ícone "Gerenciar Acesso" no
 -- perfil do administrador). Só quem está aqui pode ser considerado gestor
 -- com acesso ao portal; o e-mail precisa bater com um colaborador que é
 -- gestor de alguém (colaboradores.gestor_id apontando pra ele).

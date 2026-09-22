@@ -34,7 +34,7 @@ export async function POST(request: Request) {
   const gestor = await buscarGestorAcessoPorEmail(email);
   if (!gestor || gestor.status !== "ativo") {
     return Response.json(
-      { erro: "Este e-mail não está autorizado a acessar o Portal DP. Fale com o administrador." },
+      { erro: "Este e-mail não está autorizado a acessar o Portal Recursos Humanos. Fale com o administrador." },
       { status: 403 },
     );
   }

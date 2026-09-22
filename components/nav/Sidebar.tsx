@@ -129,10 +129,18 @@ function montarGrupos(counts?: NavCounts): GrupoItem[] {
   ];
 }
 
+/** Frentes do portal, cada uma com seus próprios módulos — hoje só Departamento Pessoal tem conteúdo. */
+const FRENTES = [
+  { id: "dp", label: "Departamento Pessoal", href: "/" },
+  { id: "sst", label: "SST", href: "/sst" },
+] as const;
+
 export function Sidebar({ counts, sessao }: { counts?: NavCounts; sessao: SessaoPayload }) {
   const pathname = usePathname();
   const ehAdmin = sessao.tipo === "administrador";
   const liberados = new Set(sessao.liberados);
+  const frenteAtual = pathname?.startsWith("/sst") ? "sst" : "dp";
+  const [frenteMenuAberto, setFrenteMenuAberto] = useState(false);
 
   // Gestor comum só vê o que foi liberado pra ele; item sem permissão some da
   // lista, e o grupo inteiro some junto se nenhum dos filhos sobrar.
@@ -150,8 +158,52 @@ export function Sidebar({ counts, sessao }: { counts?: NavCounts; sessao: Sessao
   return (
     <aside className="flex w-64 shrink-0 flex-col overflow-y-auto border-r border-hairline bg-background">
       <Logo />
+
+      <div className="relative px-3 pt-1 pb-2">
+        <button
+          type="button"
+          onClick={() => setFrenteMenuAberto((v) => !v)}
+          className="flex w-full items-center gap-1.5 rounded-md px-1 py-1 text-[10px] font-semibold tracking-[0.14em] text-foreground-muted uppercase transition-colors hover:bg-surface-page hover:text-brand-primary-800"
+        >
+          <span className="flex-1 text-left">{FRENTES.find((f) => f.id === frenteAtual)?.label}</span>
+          <span aria-hidden className="text-brand-primary">
+            {frenteMenuAberto ? "▲" : "▼"}
+          </span>
+        </button>
+
+        {frenteMenuAberto && (
+          <>
+            <div className="fixed inset-0 z-20" onClick={() => setFrenteMenuAberto(false)} />
+            <div className="absolute top-full left-3 z-30 mt-1 w-56 rounded-md border border-hairline bg-background p-1.5 shadow-drawer">
+              <p className="px-2 pt-1 pb-1.5 text-[9.5px] font-semibold tracking-wide text-foreground-muted uppercase">
+                Outras frentes
+              </p>
+              {FRENTES.map((f) => (
+                <Link
+                  key={f.id}
+                  href={f.href}
+                  onClick={() => setFrenteMenuAberto(false)}
+                  className={cn(
+                    "block rounded px-2 py-1.5 text-[12.5px] font-medium transition-colors",
+                    f.id === frenteAtual
+                      ? "bg-brand-primary-100 text-brand-primary-800"
+                      : "text-foreground hover:bg-surface-page",
+                  )}
+                >
+                  {f.label}
+                </Link>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
       <nav className="flex flex-1 flex-col gap-1 px-3 pb-2">
-        {grupos.map((grupo) => {
+        {frenteAtual === "sst" && (
+          <p className="px-2 py-2 text-[11.5px] text-foreground-muted">Nenhum módulo de SST ainda.</p>
+        )}
+        {frenteAtual === "dp" &&
+        grupos.map((grupo) => {
           const grupoAtivo = pathname === grupo.base || pathname?.startsWith(`${grupo.base}/`);
           const expandido = aberto === grupo.id;
           return (

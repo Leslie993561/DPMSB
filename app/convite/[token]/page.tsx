@@ -1,6 +1,6 @@
 import { ConviteForm } from "./ConviteForm";
 
-export const metadata = { title: "Complete seu cadastro — Portal DP" };
+export const metadata = { title: "Complete seu cadastro — Portal Recursos Humanos" };
 
 export default async function ConvitePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
@@ -13,7 +13,7 @@ export default async function ConvitePage({ params }: { params: Promise<{ token:
           <img src="/logo-msb.png" alt="MSB" width={104} height={32} className="block" />
           <div className="mt-4 flex items-center gap-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-brand-primary" />
-            <span className="text-[13.5px] font-bold tracking-tight text-foreground">Portal DP</span>
+            <span className="text-[13.5px] font-bold tracking-tight text-foreground">Portal Recursos Humanos</span>
           </div>
           <p className="mt-0.5 pl-3 text-[11px] text-brand-neutral">Complete seu cadastro</p>
         </div>

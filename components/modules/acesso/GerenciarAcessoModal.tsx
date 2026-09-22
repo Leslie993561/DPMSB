@@ -81,7 +81,7 @@ export function GerenciarAcessoModal({ aberto, onFechar }: { aberto: boolean; on
         onFechar={onFechar}
         eyebrow="Meu perfil"
         titulo="Gerenciar acesso"
-        subtitulo="Gestores autorizados a acessar o Portal DP pelo e-mail corporativo"
+        subtitulo="Gestores autorizados a acessar o Portal Recursos Humanos pelo e-mail corporativo"
         largura="32rem"
       >
         <div className="flex flex-col gap-3">

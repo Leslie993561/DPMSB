@@ -7,7 +7,7 @@ const CAMINHOS_PUBLICOS = new Set(["/login"]);
 
 /**
  * Gate de autenticação e permissão de TODAS as páginas e rotas de API do
- * Portal DP. Só lê e valida a assinatura do cookie de sessão — nenhuma
+ * Portal Recursos Humanos. Só lê e valida a assinatura do cookie de sessão — nenhuma
  * consulta ao banco aqui (ver `lib/auth/token.ts` sobre o porquê).
  */
 export async function proxy(request: NextRequest) {

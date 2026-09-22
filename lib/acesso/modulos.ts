@@ -1,5 +1,5 @@
 /**
- * Árvore de módulos/submódulos do Portal DP usada no controle de acesso de
+ * Árvore de módulos/submódulos do Portal Recursos Humanos usada no controle de acesso de
  * gestores. As chaves espelham as rotas reais do Sidebar (`components/nav/Sidebar.tsx`)
  * — mudou uma lá, muda aqui também, senão a tela de permissões libera algo
  * que não existe mais ou esquece algo novo.

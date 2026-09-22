@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { ColaboradoresPageClient } from "@/components/modules/colaboradores/ColaboradoresPageClient";
 
-export const metadata = { title: "Colaboradores — Portal de DP" };
+export const metadata = { title: "Colaboradores — Portal Recursos Humanos" };
 
 export default function ColaboradoresPage() {
   return (

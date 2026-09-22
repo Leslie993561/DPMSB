@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { BeneficiosPageClient } from "@/components/modules/beneficios/BeneficiosPageClient";
 
-export const metadata = { title: "Benefícios — Portal de DP" };
+export const metadata = { title: "Benefícios — Portal Recursos Humanos" };
 
 export default function BeneficiosPage() {
   return (

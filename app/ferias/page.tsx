@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { FeriasPageClient } from "@/components/modules/ferias/FeriasPageClient";
 
-export const metadata = { title: "Férias — Portal de DP" };
+export const metadata = { title: "Férias — Portal Recursos Humanos" };
 
 export default function FeriasPage() {
   return (

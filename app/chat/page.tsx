@@ -1,7 +1,7 @@
 import { ChatWindow } from "@/components/chat/ChatWindow";
 import { PageHeader } from "@/components/shared/PageHeader";
 
-export const metadata = { title: "Chat — Portal de DP" };
+export const metadata = { title: "Chat — Portal Recursos Humanos" };
 
 export default function ChatPage() {
   return (

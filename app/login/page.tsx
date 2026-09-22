@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { LoginForm } from "./LoginForm";
 
-export const metadata = { title: "Entrar — Portal DP" };
+export const metadata = { title: "Entrar — Portal Recursos Humanos" };
 
 export default function LoginPage() {
   return (
@@ -13,7 +13,7 @@ export default function LoginPage() {
           <img src="/logo-msb.png" alt="MSB" width={104} height={32} className="block" />
           <div className="mt-4 flex items-center gap-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-brand-primary" />
-            <span className="text-[13.5px] font-bold tracking-tight text-foreground">Portal DP</span>
+            <span className="text-[13.5px] font-bold tracking-tight text-foreground">Portal Recursos Humanos</span>
           </div>
           <p className="mt-0.5 pl-3 text-[11px] text-brand-neutral">Departamento Pessoal</p>
         </div>

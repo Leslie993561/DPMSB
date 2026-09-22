@@ -1,7 +1,7 @@
 import { RescisaoForm } from "@/components/modules/rescisao/RescisaoForm";
 import { PageHeader } from "@/components/shared/PageHeader";
 
-export const metadata = { title: "Rescisão — Portal de DP" };
+export const metadata = { title: "Rescisão — Portal Recursos Humanos" };
 
 export default function RescisaoPage() {
   return (

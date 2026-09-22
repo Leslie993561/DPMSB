@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-export const metadata = { title: "Sem acesso — Portal DP" };
+export const metadata = { title: "Sem acesso — Portal Recursos Humanos" };
 
 export default function SemAcessoPage() {
   return (
@@ -8,7 +8,7 @@ export default function SemAcessoPage() {
       <span className="flex h-12 w-12 items-center justify-center rounded-full bg-status-danger/10 text-2xl">🔒</span>
       <h1 className="text-[16px] font-semibold text-foreground">Você não tem acesso a este módulo</h1>
       <p className="max-w-sm text-[12.5px] text-foreground-muted">
-        Fale com o administrador do Portal DP se achar que deveria ver esta página.
+        Fale com o administrador do Portal Recursos Humanos se achar que deveria ver esta página.
       </p>
       <Link
         href="/"

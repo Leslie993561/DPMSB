@@ -29,7 +29,7 @@ const poppins = Poppins({
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Portal Inteligente de Departamento Pessoal",
+  title: "Portal Recursos Humanos",
   description: "Assistente de DP com motor de cálculo determinístico e IA para interpretação e riscos.",
 };
 
