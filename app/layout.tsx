@@ -3,6 +3,7 @@ import { Poppins } from "next/font/google";
 import { Sidebar } from "@/components/nav/Sidebar";
 import { obterNavCounts } from "@/lib/db/navCounts";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
+import { escopoColaboradoresDoGestor } from "@/lib/acesso/equipeGestor";
 import "./globals.css";
 
 /**
@@ -49,7 +50,7 @@ export default async function RootLayout({
     );
   }
 
-  const counts = await obterNavCounts();
+  const counts = await obterNavCounts(await escopoColaboradoresDoGestor());
 
   return (
     <html lang="pt-BR" className={`${poppins.variable} h-full antialiased`}>
