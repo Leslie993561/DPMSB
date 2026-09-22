@@ -150,6 +150,99 @@ function Secao({ titulo }: { titulo: string }) {
   );
 }
 
+/**
+ * Gera um link de auto-cadastro: a própria pessoa preenche os dados pessoais
+ * dela (CPF, endereço, banco, cônjuge, dependentes) sem precisar de login no
+ * portal. O link expira em 2h e só funciona uma vez — ver
+ * app/api/convites/route.ts e app/convite/[token].
+ */
+function EnviarConviteBox({ colaboradorId }: { colaboradorId: number }) {
+  const [email, setEmail] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const [link, setLink] = useState<string | null>(null);
+  const [copiado, setCopiado] = useState(false);
+
+  async function gerar() {
+    setErro(null);
+    if (!email.trim()) {
+      setErro("Informe o e-mail da pessoa.");
+      return;
+    }
+    setEnviando(true);
+    try {
+      const res = await fetch("/api/convites", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ colaboradorId, email }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setErro(data.erro ?? "Não foi possível gerar o link.");
+        return;
+      }
+      setLink(data.link);
+      setCopiado(false);
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5 rounded border border-hairline bg-surface-page p-2 dark:border-brand-neutral/30">
+      <p className="text-[10.5px] font-semibold text-brand-primary-800 uppercase">
+        Link de auto-cadastro (dados pessoais)
+      </p>
+      {link ? (
+        <div className="flex flex-col gap-1">
+          <p className="text-[10.5px] text-foreground-muted">
+            Válido por 2h, uso único. Envie pra pessoa por onde preferir:
+          </p>
+          <div className="flex items-center gap-1.5">
+            <input readOnly value={link} className={`${INPUT_CLASS} truncate`} onFocus={(e) => e.target.select()} />
+            <button
+              type="button"
+              onClick={() => {
+                void navigator.clipboard.writeText(link);
+                setCopiado(true);
+              }}
+              className="shrink-0 rounded border border-hairline px-2 py-1 text-[11px] font-medium text-brand-primary-800 hover:bg-background"
+            >
+              {copiado ? "Copiado!" : "Copiar"}
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => setLink(null)}
+            className="self-start text-[10.5px] text-foreground-muted underline"
+          >
+            Gerar outro link
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-1.5">
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="e-mail da pessoa"
+            className={INPUT_CLASS}
+          />
+          <button
+            type="button"
+            disabled={enviando}
+            onClick={() => void gerar()}
+            className="shrink-0 rounded bg-brand-primary px-2.5 py-1 text-[11px] font-medium text-brand-white hover:bg-brand-primary-800 disabled:opacity-60"
+          >
+            {enviando ? "Gerando..." : "Gerar link"}
+          </button>
+        </div>
+      )}
+      {erro && <p className="text-[10.5px] text-status-danger">{erro}</p>}
+    </div>
+  );
+}
+
 interface Props {
   colaboradores: Colaborador[];
   /** Presente = edição de um colaborador existente; ausente = cadastro novo. */
@@ -601,6 +694,8 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
           </button>
         </div>
       )}
+
+      {editando && !desligado && <EnviarConviteBox colaboradorId={editando.id} />}
 
       {desligado && (
         <div className="flex flex-col gap-2 rounded border border-status-danger-border bg-status-danger-bg p-2">

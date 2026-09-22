@@ -294,6 +294,20 @@ CREATE TABLE IF NOT EXISTS gestor_permissoes (
   modulo TEXT NOT NULL,
   PRIMARY KEY (gestor_id, modulo)
 );
+
+-- Link de auto-cadastro: o colaborador preenche os PRÓPRIOS dados pessoais
+-- (endereço, banco, cônjuge, dependentes...) sem precisar de login no portal.
+-- O token vale sozinho como credencial (como um link de redefinir senha) —
+-- por isso expira rápido (2h) e só funciona uma vez (usado_em).
+CREATE TABLE IF NOT EXISTS convites_cadastro (
+  id SERIAL PRIMARY KEY,
+  colaborador_id INTEGER NOT NULL REFERENCES colaboradores(id),
+  email TEXT NOT NULL,
+  token TEXT NOT NULL UNIQUE,
+  criado_em TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS'),
+  expira_em TEXT NOT NULL,
+  usado_em TEXT
+);
 `;
 
 /**

@@ -14,7 +14,15 @@ export async function proxy(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
   const ehApi = pathname.startsWith("/api/");
 
-  if (CAMINHOS_PUBLICOS.has(pathname) || pathname.startsWith("/api/auth/")) {
+  // Link de auto-cadastro (/convite/[token] e sua API): quem preenche não
+  // tem login no portal — o token na URL já é a credencial, validado dentro
+  // da própria rota (ver app/api/convites/token/[token]/route.ts).
+  if (
+    CAMINHOS_PUBLICOS.has(pathname) ||
+    pathname.startsWith("/api/auth/") ||
+    pathname.startsWith("/convite/") ||
+    pathname.startsWith("/api/convites/token/")
+  ) {
     return NextResponse.next();
   }
 
