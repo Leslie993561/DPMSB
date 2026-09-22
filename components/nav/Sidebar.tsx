@@ -129,17 +129,16 @@ function montarGrupos(counts?: NavCounts): GrupoItem[] {
   ];
 }
 
-/** Frentes do portal, cada uma com seus próprios módulos — hoje só Departamento Pessoal tem conteúdo. */
+/** Frentes do portal. SST roda como aplicação separada, em outro domínio. */
 const FRENTES = [
-  { id: "dp", label: "Departamento Pessoal", href: "/" },
-  { id: "sst", label: "SST", href: "/sst" },
+  { id: "dp", label: "Departamento Pessoal", href: "/", externo: false },
+  { id: "sst", label: "SST", href: "https://portal-sst-xi.vercel.app", externo: true },
 ] as const;
 
 export function Sidebar({ counts, sessao }: { counts?: NavCounts; sessao: SessaoPayload }) {
   const pathname = usePathname();
   const ehAdmin = sessao.tipo === "administrador";
   const liberados = new Set(sessao.liberados);
-  const frenteAtual = pathname?.startsWith("/sst") ? "sst" : "dp";
   const [frenteMenuAberto, setFrenteMenuAberto] = useState(false);
 
   // Gestor comum só vê o que foi liberado pra ele; item sem permissão some da
@@ -165,7 +164,7 @@ export function Sidebar({ counts, sessao }: { counts?: NavCounts; sessao: Sessao
           onClick={() => setFrenteMenuAberto((v) => !v)}
           className="flex w-full items-center gap-1.5 rounded-md px-1 py-1 text-[10px] font-semibold tracking-[0.14em] text-foreground-muted uppercase transition-colors hover:bg-surface-page hover:text-brand-primary-800"
         >
-          <span className="flex-1 text-left">{FRENTES.find((f) => f.id === frenteAtual)?.label}</span>
+          <span className="flex-1 text-left">Departamento Pessoal</span>
           <span aria-hidden className="text-brand-primary">
             {frenteMenuAberto ? "▲" : "▼"}
           </span>
@@ -178,32 +177,40 @@ export function Sidebar({ counts, sessao }: { counts?: NavCounts; sessao: Sessao
               <p className="px-2 pt-1 pb-1.5 text-[9.5px] font-semibold tracking-wide text-foreground-muted uppercase">
                 Outras frentes
               </p>
-              {FRENTES.map((f) => (
-                <Link
-                  key={f.id}
-                  href={f.href}
-                  onClick={() => setFrenteMenuAberto(false)}
-                  className={cn(
-                    "block rounded px-2 py-1.5 text-[12.5px] font-medium transition-colors",
-                    f.id === frenteAtual
-                      ? "bg-brand-primary-100 text-brand-primary-800"
-                      : "text-foreground hover:bg-surface-page",
-                  )}
-                >
-                  {f.label}
-                </Link>
-              ))}
+              {FRENTES.map((f) => {
+                const classe = cn(
+                  "flex items-center gap-1.5 rounded px-2 py-1.5 text-[12.5px] font-medium transition-colors",
+                  f.externo
+                    ? "text-foreground hover:bg-surface-page"
+                    : "bg-brand-primary-100 text-brand-primary-800",
+                );
+                return f.externo ? (
+                  <a
+                    key={f.id}
+                    href={f.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setFrenteMenuAberto(false)}
+                    className={classe}
+                  >
+                    <span className="flex-1">{f.label}</span>
+                    <span aria-hidden className="text-[10px] text-foreground-muted">
+                      ↗
+                    </span>
+                  </a>
+                ) : (
+                  <Link key={f.id} href={f.href} onClick={() => setFrenteMenuAberto(false)} className={classe}>
+                    {f.label}
+                  </Link>
+                );
+              })}
             </div>
           </>
         )}
       </div>
 
       <nav className="flex flex-1 flex-col gap-1 px-3 pb-2">
-        {frenteAtual === "sst" && (
-          <p className="px-2 py-2 text-[11.5px] text-foreground-muted">Nenhum módulo de SST ainda.</p>
-        )}
-        {frenteAtual === "dp" &&
-        grupos.map((grupo) => {
+        {grupos.map((grupo) => {
           const grupoAtivo = pathname === grupo.base || pathname?.startsWith(`${grupo.base}/`);
           const expandido = aberto === grupo.id;
           return (
