@@ -23,3 +23,28 @@ const SIGLA_POR_SETOR: Record<string, string> = {
 export function siglaSetor(setor: string): string {
   return SIGLA_POR_SETOR[setor] ?? setor;
 }
+
+/**
+ * Lista fechada de setores pro cadastro de colaborador virar lista suspensa
+ * em vez de texto livre — era assim que "mantenção" virava um setor novo ao
+ * lado de "Manutenção" (ver lib/folha/parecidos.ts). Mesmos 16 nomes das
+ * abas de filtro do Quadro de Colaboradores, uma grafia só por sigla.
+ */
+export const SETORES: string[] = [
+  "Administrativo",
+  "Comercial",
+  "Controle da Qualidade",
+  "Contábil",
+  "Diretoria",
+  "Engenharia",
+  "Financeiro",
+  "Garantia da Qualidade",
+  "Industrial",
+  "Logística",
+  "Manutenção",
+  "Operações de Vendas",
+  "Planejamento",
+  "Produção",
+  "Recursos Humanos",
+  "Tecnologia da Informacao",
+];

@@ -6,6 +6,7 @@ import type { SexoDependente } from "@/lib/db/colaboradorDependentes";
 import { RiskCallout } from "@/components/shared/RiskCallout";
 import { cn } from "@/lib/cn";
 import { abreviarNome } from "@/lib/format";
+import { SETORES } from "@/lib/setores";
 
 const INPUT_CLASS =
   "w-full rounded border border-hairline bg-background px-2 py-1 text-[12px] font-light text-foreground placeholder:text-foreground-muted/60 disabled:cursor-not-allowed disabled:border-hairline/70 disabled:bg-surface-page disabled:text-foreground-muted dark:border-brand-neutral/30";
@@ -927,13 +928,22 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
       <div className="grid grid-cols-2 gap-2">
         <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
           Departamento
-          <input
+          <select
             value={departamento}
             onChange={(e) => setDepartamento(e.target.value)}
-            placeholder="ex.: Produção"
             disabled={bloqueado}
             className={INPUT_CLASS}
-          />
+          >
+            <option value="">—</option>
+            {/* Setor já cadastrado que não está na lista fechada (dado legado) continua
+                aparecendo, pra abrir o formulário não trocar o valor por engano. */}
+            {departamento && !SETORES.includes(departamento) && <option value={departamento}>{departamento}</option>}
+            {SETORES.map((setor) => (
+              <option key={setor} value={setor}>
+                {setor}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
           Vínculo
