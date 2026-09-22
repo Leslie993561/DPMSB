@@ -1,5 +1,5 @@
 import { buscarColaborador, contarVinculos, excluirColaborador } from "@/lib/db/colaboradores";
-import { dentroDoEscopo } from "@/lib/acesso/equipeGestor";
+import { obterSessaoAtual } from "@/lib/auth/sessao";
 
 export const runtime = "nodejs";
 
@@ -11,14 +11,16 @@ export const runtime = "nodejs";
  * desligamento, que preserva férias e folha já apuradas.
  */
 export async function POST(_request: Request, ctx: RouteContext<"/api/colaboradores/[id]/excluir">) {
+  const sessao = await obterSessaoAtual();
+  if (sessao?.tipo !== "administrador") {
+    return Response.json({ erro: "Só o RH pode excluir colaboradores." }, { status: 403 });
+  }
+
   const { id } = await ctx.params;
   const colaboradorId = Number(id);
 
   const colaborador = await buscarColaborador(colaboradorId);
   if (!colaborador) {
-    return Response.json({ erro: "Colaborador não encontrado." }, { status: 404 });
-  }
-  if (!(await dentroDoEscopo(colaboradorId))) {
     return Response.json({ erro: "Colaborador não encontrado." }, { status: 404 });
   }
 

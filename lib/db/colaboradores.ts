@@ -296,6 +296,70 @@ function paraColaborador(linha: LinhaColaborador): Colaborador {
   };
 }
 
+/**
+ * Some com todo campo PESSOAL (LGPD) antes de um gestor ver o colaborador —
+ * ele só liderou, não tem acesso a CPF, endereço, banco, cônjuge, documentos,
+ * salário nem benefícios de quem lidera, só ao que é dado profissional
+ * (cargo, setor, vínculo, CBO, admissão, e-mail corporativo). Mantém o
+ * mesmo formato `Colaborador` (com os campos pessoais zerados/nulos) de
+ * propósito — os componentes de tela não precisam de um tipo à parte pra
+ * saber renderizar "—" onde não veio dado.
+ */
+export function paraColaboradorProfissional(c: Colaborador): Colaborador {
+  return {
+    ...c,
+    cpf: null,
+    pis: null,
+    dataNascimento: null,
+    cidadeNascimento: null,
+    ufNascimento: null,
+    nomePai: null,
+    nomeMae: null,
+    telefone: null,
+    sexo: null,
+    emailPessoal: null,
+    banco: null,
+    agencia: null,
+    conta: null,
+    cep: null,
+    estado: null,
+    cidade: null,
+    bairro: null,
+    rua: null,
+    numero: null,
+    conjugeNome: null,
+    conjugeCpf: null,
+    conjugeNascimento: null,
+    conjugeSexo: null,
+    tituloEleitor: null,
+    tituloEleitorZona: null,
+    tituloEleitorSecao: null,
+    tituloEleitorEmissao: null,
+    cnhCategoria: null,
+    cnhValidade: null,
+    cnhEmissao: null,
+    reservistaSerie: null,
+    tamanhoCamisa: null,
+    tamanhoCalca: null,
+    tamanhoSapato: null,
+    dependentes: 0,
+    salarioBase: 0,
+    alimentacaoValor: null,
+    odontologicoValor: null,
+    auxilioEducacaoValor: null,
+    valorTransporteFixo: null,
+    valorTransporteDia: null,
+    periculosidadePercentual: null,
+    insalubridadePercentual: null,
+    adicionalFixo: null,
+    adicionalFixoDescricao: null,
+    valorRescisao: null,
+    valorFgts: null,
+    motivoDesligamento: null,
+    rateioD365: null,
+  };
+}
+
 export async function listarColaboradores(): Promise<Colaborador[]> {
   const db = await getDb();
   const resultado = await db.execute(

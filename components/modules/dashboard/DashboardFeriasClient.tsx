@@ -91,6 +91,17 @@ export function DashboardFeriasClient() {
   const [carregando, setCarregando] = useState(true);
   const [trimestreAberto, setTrimestreAberto] = useState<number | null>(null);
   const [menuProgramarAberto, setMenuProgramarAberto] = useState(false);
+  // Gestor só lança férias da própria equipe, um de cada vez — importação em
+  // lote e planejamento por trimestre mexem com a empresa inteira, ficam só com o RH.
+  const [tipoSessao, setTipoSessao] = useState<"administrador" | "gestor" | null>(null);
+  const somenteManual = tipoSessao === "gestor";
+
+  useEffect(() => {
+    fetch("/api/auth/sessao")
+      .then((r) => r.json())
+      .then((d) => setTipoSessao(d.tipo ?? null))
+      .catch(() => setTipoSessao(null));
+  }, []);
 
   async function recarregar() {
     try {
@@ -186,37 +197,43 @@ export function DashboardFeriasClient() {
                         </span>
                       </Link>
 
-                      <Link
-                        href="/ferias?aba=controle"
-                        onClick={() => setMenuProgramarAberto(false)}
-                        className="flex items-start gap-2.5 rounded px-2 py-2 text-left transition-colors hover:bg-surface-page"
-                      >
-                        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded bg-brand-primary-100 text-brand-primary-800">
-                          <IconeArquivo />
-                        </span>
-                        <span>
-                          <span className="block text-[12px] font-medium text-foreground">Importar planilha</span>
-                          <span className="block text-[10.5px] text-foreground-muted">
-                            PDF, XLS ou XLSX · em Controle de Férias → Importar arquivo
-                          </span>
-                        </span>
-                      </Link>
+                      {!somenteManual && (
+                        <>
+                          <Link
+                            href="/ferias?aba=controle"
+                            onClick={() => setMenuProgramarAberto(false)}
+                            className="flex items-start gap-2.5 rounded px-2 py-2 text-left transition-colors hover:bg-surface-page"
+                          >
+                            <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded bg-brand-primary-100 text-brand-primary-800">
+                              <IconeArquivo />
+                            </span>
+                            <span>
+                              <span className="block text-[12px] font-medium text-foreground">Importar planilha</span>
+                              <span className="block text-[10.5px] text-foreground-muted">
+                                PDF, XLS ou XLSX · em Controle de Férias → Importar arquivo
+                              </span>
+                            </span>
+                          </Link>
 
-                      <Link
-                        href="/ferias?aba=planejamento"
-                        onClick={() => setMenuProgramarAberto(false)}
-                        className="flex items-start gap-2.5 rounded px-2 py-2 text-left transition-colors hover:bg-surface-page"
-                      >
-                        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded bg-brand-primary-100 text-brand-primary-800">
-                          <IconeTrimestre />
-                        </span>
-                        <span>
-                          <span className="block text-[12px] font-medium text-foreground">
-                            Planejamento por trimestre
-                          </span>
-                          <span className="block text-[10.5px] text-foreground-muted">montar o ano inteiro por setor</span>
-                        </span>
-                      </Link>
+                          <Link
+                            href="/ferias?aba=planejamento"
+                            onClick={() => setMenuProgramarAberto(false)}
+                            className="flex items-start gap-2.5 rounded px-2 py-2 text-left transition-colors hover:bg-surface-page"
+                          >
+                            <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded bg-brand-primary-100 text-brand-primary-800">
+                              <IconeTrimestre />
+                            </span>
+                            <span>
+                              <span className="block text-[12px] font-medium text-foreground">
+                                Planejamento por trimestre
+                              </span>
+                              <span className="block text-[10.5px] text-foreground-muted">
+                                montar o ano inteiro por setor
+                              </span>
+                            </span>
+                          </Link>
+                        </>
+                      )}
                     </div>
 
                     <div className="mt-2 flex items-center justify-between border-t border-hairline pt-2 text-[11px]">

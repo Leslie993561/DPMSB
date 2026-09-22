@@ -7,6 +7,7 @@ import { FilterChip } from "@/components/shared/FilterChip";
 import { Drawer } from "@/components/shared/Drawer";
 import { BotaoPrimario } from "@/components/shared/PageHeader";
 import { ColaboradorForm } from "./ColaboradorForm";
+import { ColaboradorDetalheLeitura } from "./ColaboradorDetalheLeitura";
 import { ColaboradoresTable } from "./ColaboradoresTable";
 import { ImportarColaboradoresPanel } from "./ImportarColaboradoresPanel";
 import { OrganogramaTab } from "./OrganogramaTab";
@@ -24,17 +25,26 @@ export function ColaboradoresPageClient() {
   const [filtroPrincipal, setFiltroPrincipal] = useState("");
   const [drawer, setDrawer] = useState<"fechado" | "novo" | Colaborador>("fechado");
   const [importarAberto, setImportarAberto] = useState(false);
+  // Gestor só visualiza a própria equipe (dados profissionais, sem os
+  // pessoais — LGPD); quem cadastra, edita e importa/exporta é sempre o RH.
+  const [tipoSessao, setTipoSessao] = useState<"administrador" | "gestor" | null>(null);
+  const somenteLeitura = tipoSessao === "gestor";
+
+  useEffect(() => {
+    fetch("/api/auth/sessao")
+      .then((r) => r.json())
+      .then((d) => setTipoSessao(d.tipo ?? null))
+      .catch(() => setTipoSessao(null));
+  }, []);
 
   const verDesligados = filtroPrincipal === DESLIGADOS;
 
   async function recarregar() {
     try {
-      // `equipe=1`: só afeta quem loga como gestor (não administrador) — ver
-      // `escopoColaboradoresDoGestor`. Passa sempre daqui porque é essa a
-      // única tela que deve restringir a "minha equipe"; Férias e Folha
-      // chamam /api/colaboradores sem o parâmetro e continuam vendo todo
-      // mundo, como sempre viram.
-      const res = await fetch("/api/colaboradores?equipe=1");
+      // A própria API já restringe a "minha equipe" e some com os dados
+      // pessoais quando quem chama é gestor (ver escopoColaboradoresDoGestor
+      // e paraColaboradorProfissional) — nenhum parâmetro extra necessário.
+      const res = await fetch("/api/colaboradores");
       const data = await res.json();
       setColaboradores(data.colaboradores ?? []);
     } finally {
@@ -79,6 +89,7 @@ export function ColaboradoresPageClient() {
             importarAberto={importarAberto}
             onImportar={() => setImportarAberto((v) => !v)}
             onFecharImportar={() => setImportarAberto(false)}
+            somenteLeitura={somenteLeitura}
           >
             <ImportarColaboradoresPanel
               onImportado={() => {
@@ -98,6 +109,7 @@ export function ColaboradoresPageClient() {
             importarAberto={importarAberto}
             onImportar={() => setImportarAberto((v) => !v)}
             onFecharImportar={() => setImportarAberto(false)}
+            somenteLeitura={somenteLeitura}
           >
             <ImportarColaboradoresPanel
               onImportado={() => {
@@ -148,7 +160,12 @@ export function ColaboradoresPageClient() {
           <div className="rounded-md border border-hairline bg-background shadow-card">
             {/* Na visão de desligados o que interessa é outro conjunto de colunas:
                 a data de saída e o valor da rescisão, no lugar do aniversário. */}
-            <ColaboradoresTable colaboradores={filtrados} onEditar={setDrawer} desligados={verDesligados} />
+            <ColaboradoresTable
+              colaboradores={filtrados}
+              onEditar={setDrawer}
+              desligados={verDesligados}
+              somenteLeitura={somenteLeitura}
+            />
           </div>
         </>
       )}
@@ -161,22 +178,31 @@ export function ColaboradoresPageClient() {
             <path d="M7 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-5 7c0-2.76 2.24-5 5-5s5 2.24 5 5v1H2v-1Zm13-4h1.5v-2H15v-1.5h-1.5V10H12v1.5h-1.5v2H12V15h1.5v-2H15Z" />
           </svg>
         }
-        titulo={drawer !== "fechado" && drawer !== "novo" ? "Editar colaborador" : "Adicionar colaborador"}
+        titulo={
+          drawer !== "fechado" && drawer !== "novo"
+            ? somenteLeitura
+              ? "Dados do colaborador"
+              : "Editar colaborador"
+            : "Adicionar colaborador"
+        }
         subtitulo={
           drawer !== "fechado" && drawer !== "novo" ? `${drawer.nome} · ${drawer.cargo ?? "—"}` : undefined
         }
       >
-        {drawer !== "fechado" && (
-          <ColaboradorForm
-            colaboradores={colaboradores}
-            colaboradorEditando={drawer === "novo" ? undefined : drawer}
-            onCancelar={() => setDrawer("fechado")}
-            onSalvo={() => {
-              setDrawer("fechado");
-              void recarregar();
-            }}
-          />
-        )}
+        {drawer !== "fechado" &&
+          (somenteLeitura && drawer !== "novo" ? (
+            <ColaboradorDetalheLeitura colaborador={drawer} />
+          ) : (
+            <ColaboradorForm
+              colaboradores={colaboradores}
+              colaboradorEditando={drawer === "novo" ? undefined : drawer}
+              onCancelar={() => setDrawer("fechado")}
+              onSalvo={() => {
+                setDrawer("fechado");
+                void recarregar();
+              }}
+            />
+          ))}
       </Drawer>
     </div>
   );
@@ -189,6 +215,7 @@ function CabecalhoQuadro({
   importarAberto,
   onImportar,
   onFecharImportar,
+  somenteLeitura,
   children,
 }: {
   titulo: string;
@@ -197,6 +224,8 @@ function CabecalhoQuadro({
   importarAberto: boolean;
   onImportar: () => void;
   onFecharImportar: () => void;
+  /** Gestor: só visualiza — cadastrar, editar e importar/exportar (que carrega dado pessoal) é exclusivo do RH. */
+  somenteLeitura: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -206,28 +235,30 @@ function CabecalhoQuadro({
         <h1 className="text-[15px] font-semibold text-foreground">{titulo}</h1>
         <p className="text-[11.5px] font-light text-foreground-muted">{subtitulo}</p>
       </div>
-      <div className="flex items-center gap-2">
-        <div className="relative">
-          <button
-            type="button"
-            onClick={onImportar}
-            className="rounded border border-hairline px-3 py-2 text-[12.5px] font-medium text-foreground-muted transition-colors hover:bg-surface-page dark:border-brand-neutral/30"
-          >
-            Importar/Exportar
-          </button>
-          {importarAberto && (
-            <>
-              <div className="fixed inset-0 z-20" onClick={onFecharImportar} />
-              <div className="absolute top-full right-0 z-30 mt-1.5 w-[420px] rounded-md border border-hairline bg-background p-3 shadow-drawer">
-                {children}
-              </div>
-            </>
-          )}
+      {!somenteLeitura && (
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <button
+              type="button"
+              onClick={onImportar}
+              className="rounded border border-hairline px-3 py-2 text-[12.5px] font-medium text-foreground-muted transition-colors hover:bg-surface-page dark:border-brand-neutral/30"
+            >
+              Importar/Exportar
+            </button>
+            {importarAberto && (
+              <>
+                <div className="fixed inset-0 z-20" onClick={onFecharImportar} />
+                <div className="absolute top-full right-0 z-30 mt-1.5 w-[420px] rounded-md border border-hairline bg-background p-3 shadow-drawer">
+                  {children}
+                </div>
+              </>
+            )}
+          </div>
+          <BotaoPrimario onClick={onAdicionar} className="px-3 py-2 text-[12.5px]">
+            <span aria-hidden>+</span> Adicionar colaborador
+          </BotaoPrimario>
         </div>
-        <BotaoPrimario onClick={onAdicionar} className="px-3 py-2 text-[12.5px]">
-          <span aria-hidden>+</span> Adicionar colaborador
-        </BotaoPrimario>
-      </div>
+      )}
     </div>
   );
 }

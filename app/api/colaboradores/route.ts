@@ -1,7 +1,8 @@
 import { z } from "zod";
-import { atualizarColaborador, criarColaborador, listarColaboradores } from "@/lib/db/colaboradores";
+import { atualizarColaborador, criarColaborador, listarColaboradores, paraColaboradorProfissional } from "@/lib/db/colaboradores";
 import { substituirDependentes } from "@/lib/db/colaboradorDependentes";
 import { escopoColaboradoresDoGestor } from "@/lib/acesso/equipeGestor";
+import { obterSessaoAtual } from "@/lib/auth/sessao";
 
 export const runtime = "nodejs";
 
@@ -80,21 +81,28 @@ const schema = z.object({
   dependentesLista: z.array(schemaDependente).optional(),
 });
 
-export async function GET(request: Request) {
+export async function GET() {
   const colaboradores = await listarColaboradores();
 
-  // Só restringe quando quem chamou pediu explicitamente (tela de Quadro de
-  // Colaboradores) — Férias e Folha usam esta mesma rota pra outras coisas
-  // (nome/cargo/setor de todo mundo) e não devem ficar presas à equipe.
-  const restringirPorEquipe = new URL(request.url).searchParams.get("equipe") === "1";
-  const escopo = restringirPorEquipe ? await escopoColaboradoresDoGestor() : null;
+  // Gestor só vê a própria equipe (em QUALQUER tela — Colaboradores, Férias,
+  // Folha — não só no Quadro) e nunca os dados pessoais de quem lidera:
+  // CPF, endereço, banco, cônjuge, documentos e salário ficam de fora por
+  // LGPD, só o profissional (cargo, setor, vínculo, admissão) chega ao
+  // cliente. Administrador não tem nenhuma das duas restrições.
+  const sessao = await obterSessaoAtual();
+  const escopo = await escopoColaboradoresDoGestor();
+  const visiveis = escopo ? colaboradores.filter((c) => escopo.has(c.id)) : colaboradores;
+  const resultado = sessao?.tipo === "gestor" ? visiveis.map(paraColaboradorProfissional) : visiveis;
 
-  return Response.json({
-    colaboradores: escopo ? colaboradores.filter((c) => escopo.has(c.id)) : colaboradores,
-  });
+  return Response.json({ colaboradores: resultado });
 }
 
 export async function POST(request: Request) {
+  const sessao = await obterSessaoAtual();
+  if (sessao?.tipo !== "administrador") {
+    return Response.json({ erro: "Só o RH pode cadastrar colaboradores." }, { status: 403 });
+  }
+
   const body = await request.json();
   const parsed = schema.safeParse(body);
   if (!parsed.success) {

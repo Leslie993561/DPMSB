@@ -158,6 +158,8 @@ function feriasDoItem(item: ItemProgramacaoFerias): number {
 export async function obterDashboardFerias(
   ano: number = new Date().getFullYear(),
   setor?: string | null,
+  /** Gestor: `Set` com a própria equipe (dashboard vira "meu time", não a empresa). `null`/ausente = sem restrição (admin). */
+  escopoGestor?: Set<number> | null,
 ): Promise<DashboardFerias> {
   const hoje = new Date();
   const todosColaboradores = await listarColaboradores();
@@ -166,7 +168,11 @@ export async function obterDashboardFerias(
     new Set(ativos.map((c) => c.departamento).filter((d): d is string => Boolean(d))),
   ).sort();
   const colaboradoresFiltrados = setor ? ativos.filter((c) => c.departamento === setor) : ativos;
-  const idsFiltrados = new Set(colaboradoresFiltrados.map((c) => c.id));
+  const idsFiltrados = new Set(
+    escopoGestor
+      ? colaboradoresFiltrados.filter((c) => escopoGestor.has(c.id)).map((c) => c.id)
+      : colaboradoresFiltrados.map((c) => c.id),
+  );
   const colaboradoresPorId = new Map(todosColaboradores.map((c) => [c.id, c]));
 
   const [programacao, periodosTodos] = await Promise.all([listarProgramacaoFerias(), listarPeriodosAbertos()]);

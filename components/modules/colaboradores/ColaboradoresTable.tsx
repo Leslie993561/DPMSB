@@ -93,6 +93,7 @@ export function ColaboradoresTable({
   colaboradores,
   onEditar,
   desligados = false,
+  somenteLeitura = false,
 }: {
   colaboradores: Colaborador[];
   onEditar: (colaborador: Colaborador) => void;
@@ -102,6 +103,8 @@ export function ColaboradoresTable({
    * saiu não serve para nada, e a rescisão é justamente o que se procura ali.
    */
   desligados?: boolean;
+  /** Gestor vendo a equipe: sem coluna de aniversário (dado pessoal, vem nulo da API) nem rótulo de "editar". */
+  somenteLeitura?: boolean;
 }) {
   const porId = new Map(colaboradores.map((c) => [c.id, c]));
   const [filtros, setFiltros] = useState<FiltrosColuna>(FILTROS_VAZIOS);
@@ -153,6 +156,8 @@ export function ColaboradoresTable({
   }, [linhas, porAniversario]);
 
   const algumFiltroAtivo = Object.values(filtros).some(Boolean);
+  // Some a coluna de aniversário (dado pessoal) quando é gestor vendo a equipe.
+  const totalColunas = (desligados ? 9 : 7) - (!desligados && somenteLeitura ? 1 : 0);
 
   if (colaboradores.length === 0) {
     return <p className="p-5 text-[12.5px] text-foreground-muted">Nenhum colaborador encontrado.</p>;
@@ -289,8 +294,9 @@ export function ColaboradoresTable({
             {desligados && <th className="px-3 py-1 text-right">Valor do FGTS</th>}
 
             {/* ANI = aniversário. Clicar agrupa a lista por mês, com separador
-                de mês e a data de cada um; clicar de novo volta ao normal. */}
-            {!desligados && (
+                de mês e a data de cada um; clicar de novo volta ao normal.
+                Some pro gestor: é dado pessoal, e a API já devolve nulo. */}
+            {!desligados && !somenteLeitura && (
             <th className="px-3 py-1">
               <button
                 type="button"
@@ -318,7 +324,7 @@ export function ColaboradoresTable({
         <tbody>
           {algumFiltroAtivo && (
             <tr>
-              <td colSpan={desligados ? 9 : 7} className="border-b border-hairline bg-brand-primary-050 px-3 py-1 text-[10.5px] text-brand-primary-800">
+              <td colSpan={totalColunas} className="border-b border-hairline bg-brand-primary-050 px-3 py-1 text-[10.5px] text-brand-primary-800">
                 {linhas.length} de {colaboradores.length} colaborador(es) ·{" "}
                 <button type="button" onClick={() => setFiltros(FILTROS_VAZIOS)} className="font-semibold underline">
                   limpar filtros
@@ -328,7 +334,7 @@ export function ColaboradoresTable({
           )}
           {linhas.length === 0 ? (
             <tr>
-              <td colSpan={desligados ? 9 : 7} className="px-3 py-4 text-center text-foreground-muted">
+              <td colSpan={totalColunas} className="px-3 py-4 text-center text-foreground-muted">
                 Nenhum colaborador corresponde aos filtros.
               </td>
             </tr>
@@ -342,7 +348,7 @@ export function ColaboradoresTable({
                   {abreMes && (
                     <tr className="bg-brand-primary-050">
                       <td
-                        colSpan={desligados ? 9 : 7}
+                        colSpan={totalColunas}
                         className="px-3 py-1 text-[10px] font-bold tracking-wide text-brand-primary-800 uppercase"
                       >
                         {mes ?? "Sem data de nascimento"}
@@ -396,8 +402,9 @@ export function ColaboradoresTable({
                   </td>
                 )}
                 {/* Dia/mês e ano na mesma fonte: destacar só o dia/mês fazia a
-                    data parecer duas informações soltas em vez de uma só. */}
-                {!desligados && (
+                    data parecer duas informações soltas em vez de uma só.
+                    Some pro gestor: é dado pessoal, e a API já devolve nulo. */}
+                {!desligados && !somenteLeitura && (
                   <td className="px-3 py-1 text-foreground-muted">
                     {c.dataNascimento ? (
                       `${diaEMes(c.dataNascimento)}/${c.dataNascimento.slice(0, 4)}`
@@ -410,8 +417,8 @@ export function ColaboradoresTable({
                   <button
                     type="button"
                     onClick={() => onEditar(c)}
-                    aria-label={`Editar ${c.nome}`}
-                    title="Editar"
+                    aria-label={somenteLeitura ? `Ver ${c.nome}` : `Editar ${c.nome}`}
+                    title={somenteLeitura ? "Ver dados profissionais" : "Editar"}
                     className="rounded px-1.5 py-0.5 text-foreground-muted hover:bg-brand-surface hover:text-foreground"
                   >
                     ⋮
