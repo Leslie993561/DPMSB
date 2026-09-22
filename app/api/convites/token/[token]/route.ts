@@ -1,29 +1,38 @@
 import { z } from "zod";
 import { buscarColaborador, atualizarColaborador } from "@/lib/db/colaboradores";
 import { substituirDependentes } from "@/lib/db/colaboradorDependentes";
-import { buscarConvitePorToken, conviteValido, marcarConviteUsado } from "@/lib/db/convites";
+import {
+  buscarConvitePorToken,
+  convitePodeAbrir,
+  convitePodeSubmeter,
+  marcarConviteAberto,
+  marcarConviteUsado,
+} from "@/lib/db/convites";
 
 export const runtime = "nodejs";
+
+const ERRO_INVALIDO = { erro: "Link inválido, expirado ou já usado." };
 
 /**
  * Rota pública de propósito — quem preenche não tem login no portal, o token
  * na URL é a própria credencial (como um link de redefinir senha). Por isso
- * fica de fora do gate de sessão do Proxy (ver proxy.ts) e valida tudo aqui:
- * token existe, não expirou, não foi usado.
+ * fica de fora do gate de sessão do Proxy (ver proxy.ts).
+ *
+ * GET só é permitido a primeira vez (marca `aberto_em` na hora): recarregar a
+ * página ou reabrir o mesmo link depois já retorna inválido — é o que trava
+ * "só pode ser aberto uma vez, na segunda não permite".
  */
-async function resolverConvite(token: string) {
-  const convite = await buscarConvitePorToken(token);
-  if (!convite || !conviteValido(convite)) return null;
-  return convite;
-}
-
 export async function GET(_request: Request, ctx: RouteContext<"/api/convites/token/[token]">) {
   const { token } = await ctx.params;
-  const convite = await resolverConvite(token);
-  if (!convite) return Response.json({ erro: "Link inválido ou expirado." }, { status: 404 });
+  const convite = await buscarConvitePorToken(token);
+  if (!convite || !convitePodeAbrir(convite)) {
+    return Response.json(ERRO_INVALIDO, { status: 404 });
+  }
 
   const colaborador = await buscarColaborador(convite.colaboradorId);
-  if (!colaborador) return Response.json({ erro: "Link inválido ou expirado." }, { status: 404 });
+  if (!colaborador) return Response.json(ERRO_INVALIDO, { status: 404 });
+
+  await marcarConviteAberto(convite.id);
 
   return Response.json({
     nome: colaborador.nome,
@@ -100,8 +109,10 @@ const schema = z.object({
 
 export async function PATCH(request: Request, ctx: RouteContext<"/api/convites/token/[token]">) {
   const { token } = await ctx.params;
-  const convite = await resolverConvite(token);
-  if (!convite) return Response.json({ erro: "Link inválido ou expirado." }, { status: 404 });
+  const convite = await buscarConvitePorToken(token);
+  if (!convite || !convitePodeSubmeter(convite)) {
+    return Response.json(ERRO_INVALIDO, { status: 404 });
+  }
 
   const body = await request.json();
   const parsed = schema.safeParse(body);

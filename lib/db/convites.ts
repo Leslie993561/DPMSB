@@ -11,6 +11,7 @@ export interface ConviteCadastro {
   token: string;
   criadoEm: string;
   expiraEm: string;
+  abertoEm: string | null;
   usadoEm: string | null;
 }
 
@@ -21,6 +22,7 @@ interface LinhaConvite {
   token: string;
   criado_em: string;
   expira_em: string;
+  aberto_em: string | null;
   usado_em: string | null;
 }
 
@@ -32,6 +34,7 @@ function paraConvite(linha: LinhaConvite): ConviteCadastro {
     token: linha.token,
     criadoEm: linha.criado_em,
     expiraEm: linha.expira_em,
+    abertoEm: linha.aberto_em,
     usadoEm: linha.usado_em,
   };
 }
@@ -58,9 +61,22 @@ export async function buscarConvitePorToken(token: string): Promise<ConviteCadas
   return linha ? paraConvite(linha) : null;
 }
 
-/** Válido = não expirou e ainda não foi usado. */
-export function conviteValido(convite: ConviteCadastro): boolean {
+/** Pode ABRIR (primeira vez): não expirou, não foi aberto antes, não foi usado. */
+export function convitePodeAbrir(convite: ConviteCadastro): boolean {
+  return !convite.abertoEm && !convite.usadoEm && new Date(convite.expiraEm).getTime() > Date.now();
+}
+
+/** Pode SUBMETER: já foi aberto (pela própria abertura que trouxe o formulário), ainda não usado, não expirou. */
+export function convitePodeSubmeter(convite: ConviteCadastro): boolean {
   return !convite.usadoEm && new Date(convite.expiraEm).getTime() > Date.now();
+}
+
+export async function marcarConviteAberto(id: number): Promise<void> {
+  const db = await getDb();
+  await db.execute({
+    sql: "UPDATE convites_cadastro SET aberto_em = ? WHERE id = ?",
+    args: [new Date().toISOString(), id],
+  });
 }
 
 export async function marcarConviteUsado(id: number): Promise<void> {

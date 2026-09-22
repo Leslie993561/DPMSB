@@ -172,6 +172,9 @@ const MIGRACOES: { tabela: string; coluna: string; definicao: string }[] = [
   { tabela: "folha_extras", coluna: "solides_saude", definicao: "REAL" },
   // Plataforma nova do grupo "Plataformas" do Relatório detalhado.
   { tabela: "folha_extras", coluna: "total_pass", definicao: "REAL" },
+  // Marca a primeira vez que o link de auto-cadastro foi aberto — a segunda
+  // tentativa de abrir (recarregar, reenviar o link) já não é permitida.
+  { tabela: "convites_cadastro", coluna: "aberto_em", definicao: "TEXT" },
 ];
 
 /**
@@ -306,6 +309,9 @@ CREATE TABLE IF NOT EXISTS convites_cadastro (
   token TEXT NOT NULL UNIQUE,
   criado_em TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS'),
   expira_em TEXT NOT NULL,
+  -- Marcado assim que a página é aberta com sucesso pela primeira vez. Um
+  -- segundo GET (recarregar, abrir o link de novo) já não é permitido.
+  aberto_em TEXT,
   usado_em TEXT
 );
 `;
