@@ -101,6 +101,17 @@ const ROTULO_CAMPO: Record<string, string> = {
   conjugeCpf: "CPF do cônjuge",
   conjugeNascimento: "Nascimento do cônjuge",
   conjugeSexo: "Sexo do cônjuge",
+  tituloEleitor: "Título de eleitor",
+  tituloEleitorZona: "Zona do título",
+  tituloEleitorSecao: "Seção do título",
+  tituloEleitorEmissao: "Emissão do título",
+  cnhCategoria: "Categoria da CNH",
+  cnhValidade: "Validade da CNH",
+  cnhEmissao: "Emissão da CNH",
+  reservistaSerie: "Série do reservista",
+  tamanhoCamisa: "Tamanho de camisa",
+  tamanhoCalca: "Tamanho de calça",
+  tamanhoSapato: "Tamanho de sapato",
   valorRescisao: "Valor da rescisão",
   valorFgts: "Valor do FGTS",
   rateioD365: "Rateio D365",
@@ -267,6 +278,17 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
   const [telefone, setTelefone] = useState(editando?.telefone ?? "");
   const [sexo, setSexo] = useState<SexoColaborador | "">(editando?.sexo ?? "");
   const [emailPessoal, setEmailPessoal] = useState(editando?.emailPessoal ?? "");
+  const [tituloEleitor, setTituloEleitor] = useState(editando?.tituloEleitor ?? "");
+  const [tituloEleitorZona, setTituloEleitorZona] = useState(editando?.tituloEleitorZona ?? "");
+  const [tituloEleitorSecao, setTituloEleitorSecao] = useState(editando?.tituloEleitorSecao ?? "");
+  const [tituloEleitorEmissao, setTituloEleitorEmissao] = useState(editando?.tituloEleitorEmissao ?? "");
+  const [cnhCategoria, setCnhCategoria] = useState(editando?.cnhCategoria ?? "");
+  const [cnhValidade, setCnhValidade] = useState(editando?.cnhValidade ?? "");
+  const [cnhEmissao, setCnhEmissao] = useState(editando?.cnhEmissao ?? "");
+  const [reservistaSerie, setReservistaSerie] = useState(editando?.reservistaSerie ?? "");
+  const [tamanhoCamisa, setTamanhoCamisa] = useState(editando?.tamanhoCamisa ?? "");
+  const [tamanhoCalca, setTamanhoCalca] = useState(editando?.tamanhoCalca ?? "");
+  const [tamanhoSapato, setTamanhoSapato] = useState(editando?.tamanhoSapato ?? "");
 
   // Dados profissionais
   const [email, setEmail] = useState(editando?.email ?? "");
@@ -504,6 +526,17 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
         conjugeCpf: conjugeCpf || null,
         conjugeNascimento: conjugeNascimento || null,
         conjugeSexo: conjugeSexo || null,
+        tituloEleitor: tituloEleitor || null,
+        tituloEleitorZona: tituloEleitorZona || null,
+        tituloEleitorSecao: tituloEleitorSecao || null,
+        tituloEleitorEmissao: tituloEleitorEmissao || null,
+        cnhCategoria: cnhCategoria || null,
+        cnhValidade: cnhValidade || null,
+        cnhEmissao: cnhEmissao || null,
+        reservistaSerie: reservistaSerie || null,
+        tamanhoCamisa: tamanhoCamisa || null,
+        tamanhoCalca: tamanhoCalca || null,
+        tamanhoSapato: tamanhoSapato || null,
         rateioD365: rateioD365 || null,
         periculosidadePercentual: periculosidade ? Number(periculosidade) : null,
         insalubridadePercentual: insalubridade ? Number(insalubridade) : null,
@@ -882,6 +915,126 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
             value={emailPessoal}
             onChange={(e) => setEmailPessoal(e.target.value)}
             placeholder="pessoal@exemplo.com"
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Título de eleitor
+          <input
+            value={tituloEleitor}
+            onChange={(e) => setTituloEleitor(e.target.value)}
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Zona
+          <input
+            value={tituloEleitorZona}
+            onChange={(e) => setTituloEleitorZona(e.target.value)}
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Seção
+          <input
+            value={tituloEleitorSecao}
+            onChange={(e) => setTituloEleitorSecao(e.target.value)}
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Emissão do título
+          <input
+            type="date"
+            value={tituloEleitorEmissao}
+            onChange={(e) => setTituloEleitorEmissao(e.target.value)}
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          CNH · categoria
+          <input
+            value={cnhCategoria}
+            onChange={(e) => setCnhCategoria(e.target.value.toUpperCase())}
+            placeholder="ex.: AB"
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          CNH · validade
+          <input
+            type="date"
+            value={cnhValidade}
+            onChange={(e) => setCnhValidade(e.target.value)}
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          CNH · emissão
+          <input
+            type="date"
+            value={cnhEmissao}
+            onChange={(e) => setCnhEmissao(e.target.value)}
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Reservista · série
+          <input
+            value={reservistaSerie}
+            onChange={(e) => setReservistaSerie(e.target.value)}
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Tamanho de camisa
+          <input
+            value={tamanhoCamisa}
+            onChange={(e) => setTamanhoCamisa(e.target.value)}
+            placeholder="ex.: M"
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Tamanho de calça
+          <input
+            value={tamanhoCalca}
+            onChange={(e) => setTamanhoCalca(e.target.value)}
+            placeholder="ex.: 42"
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Tamanho de sapato
+          <input
+            value={tamanhoSapato}
+            onChange={(e) => setTamanhoSapato(e.target.value)}
+            placeholder="ex.: 40"
             disabled={bloqueado}
             className={INPUT_CLASS}
           />

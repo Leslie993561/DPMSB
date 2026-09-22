@@ -51,6 +51,17 @@ interface DadosPessoais {
   conjugeCpf: string | null;
   conjugeNascimento: string | null;
   conjugeSexo: "M" | "F" | null;
+  tituloEleitor: string | null;
+  tituloEleitorZona: string | null;
+  tituloEleitorSecao: string | null;
+  tituloEleitorEmissao: string | null;
+  cnhCategoria: string | null;
+  cnhValidade: string | null;
+  cnhEmissao: string | null;
+  reservistaSerie: string | null;
+  tamanhoCamisa: string | null;
+  tamanhoCalca: string | null;
+  tamanhoSapato: string | null;
 }
 
 function Secao({ titulo }: { titulo: string }) {
@@ -109,6 +120,17 @@ export function ConviteForm({ token }: { token: string }) {
   const [conjugeCpf, setConjugeCpf] = useState("");
   const [conjugeNascimento, setConjugeNascimento] = useState("");
   const [conjugeSexo, setConjugeSexo] = useState<"M" | "F" | "">("");
+  const [tituloEleitor, setTituloEleitor] = useState("");
+  const [tituloEleitorZona, setTituloEleitorZona] = useState("");
+  const [tituloEleitorSecao, setTituloEleitorSecao] = useState("");
+  const [tituloEleitorEmissao, setTituloEleitorEmissao] = useState("");
+  const [cnhCategoria, setCnhCategoria] = useState("");
+  const [cnhValidade, setCnhValidade] = useState("");
+  const [cnhEmissao, setCnhEmissao] = useState("");
+  const [reservistaSerie, setReservistaSerie] = useState("");
+  const [tamanhoCamisa, setTamanhoCamisa] = useState("");
+  const [tamanhoCalca, setTamanhoCalca] = useState("");
+  const [tamanhoSapato, setTamanhoSapato] = useState("");
   const [temDependente, setTemDependente] = useState(false);
   const [dependentes, setDependentes] = useState<DependenteForm[]>([]);
 
@@ -145,6 +167,17 @@ export function ConviteForm({ token }: { token: string }) {
         setConjugeCpf(d.conjugeCpf ?? "");
         setConjugeNascimento(d.conjugeNascimento ?? "");
         setConjugeSexo(d.conjugeSexo ?? "");
+        setTituloEleitor(d.tituloEleitor ?? "");
+        setTituloEleitorZona(d.tituloEleitorZona ?? "");
+        setTituloEleitorSecao(d.tituloEleitorSecao ?? "");
+        setTituloEleitorEmissao(d.tituloEleitorEmissao ?? "");
+        setCnhCategoria(d.cnhCategoria ?? "");
+        setCnhValidade(d.cnhValidade ?? "");
+        setCnhEmissao(d.cnhEmissao ?? "");
+        setReservistaSerie(d.reservistaSerie ?? "");
+        setTamanhoCamisa(d.tamanhoCamisa ?? "");
+        setTamanhoCalca(d.tamanhoCalca ?? "");
+        setTamanhoSapato(d.tamanhoSapato ?? "");
         setEstadoTela("formulario");
       })
       .catch(() => setEstadoTela("invalido"));
@@ -179,6 +212,17 @@ export function ConviteForm({ token }: { token: string }) {
         conjugeCpf: conjugeCpf || null,
         conjugeNascimento: conjugeNascimento || null,
         conjugeSexo: conjugeSexo || null,
+        tituloEleitor: tituloEleitor || null,
+        tituloEleitorZona: tituloEleitorZona || null,
+        tituloEleitorSecao: tituloEleitorSecao || null,
+        tituloEleitorEmissao: tituloEleitorEmissao || null,
+        cnhCategoria: cnhCategoria || null,
+        cnhValidade: cnhValidade || null,
+        cnhEmissao: cnhEmissao || null,
+        reservistaSerie: reservistaSerie || null,
+        tamanhoCamisa: tamanhoCamisa || null,
+        tamanhoCalca: tamanhoCalca || null,
+        tamanhoSapato: tamanhoSapato || null,
         dependentesLista: temDependente
           ? dependentes.map((d) => ({
               nome: d.nome,
@@ -264,6 +308,31 @@ export function ConviteForm({ token }: { token: string }) {
         <Campo label="Nome da mãe" value={nomeMae} onChange={setNomeMae} />
         <Campo label="Telefone" value={telefone} onChange={setTelefone} />
         <Campo label="E-mail pessoal" value={emailPessoal} onChange={setEmailPessoal} tipo="email" />
+      </div>
+
+      <Secao titulo="Documentos" />
+      <div className="grid grid-cols-3 gap-2.5">
+        <Campo label="Título de eleitor" value={tituloEleitor} onChange={setTituloEleitor} />
+        <Campo label="Zona" value={tituloEleitorZona} onChange={setTituloEleitorZona} />
+        <Campo label="Seção" value={tituloEleitorSecao} onChange={setTituloEleitorSecao} />
+      </div>
+      <div className="grid grid-cols-2 gap-2.5">
+        <Campo label="Emissão do título" value={tituloEleitorEmissao} onChange={setTituloEleitorEmissao} tipo="date" />
+      </div>
+      <div className="grid grid-cols-3 gap-2.5">
+        <Campo label="CNH · categoria" value={cnhCategoria} onChange={(v) => setCnhCategoria(v.toUpperCase())} />
+        <Campo label="CNH · validade" value={cnhValidade} onChange={setCnhValidade} tipo="date" />
+        <Campo label="CNH · emissão" value={cnhEmissao} onChange={setCnhEmissao} tipo="date" />
+      </div>
+      <div className="grid grid-cols-2 gap-2.5">
+        <Campo label="Reservista · série" value={reservistaSerie} onChange={setReservistaSerie} />
+      </div>
+
+      <Secao titulo="Uniforme" />
+      <div className="grid grid-cols-3 gap-2.5">
+        <Campo label="Tamanho de camisa" value={tamanhoCamisa} onChange={setTamanhoCamisa} />
+        <Campo label="Tamanho de calça" value={tamanhoCalca} onChange={setTamanhoCalca} />
+        <Campo label="Tamanho de sapato" value={tamanhoSapato} onChange={setTamanhoSapato} />
       </div>
 
       <Secao titulo="Dados bancários" />

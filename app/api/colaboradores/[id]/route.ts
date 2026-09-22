@@ -63,6 +63,17 @@ const schema = z.object({
   conjugeCpf: z.string().nullable().optional(),
   conjugeNascimento: z.iso.date().nullable().optional(),
   conjugeSexo: z.enum(["M", "F"]).nullable().optional(),
+  tituloEleitor: z.string().nullable().optional(),
+  tituloEleitorZona: z.string().nullable().optional(),
+  tituloEleitorSecao: z.string().nullable().optional(),
+  tituloEleitorEmissao: z.iso.date().nullable().optional(),
+  cnhCategoria: z.string().nullable().optional(),
+  cnhValidade: z.iso.date().nullable().optional(),
+  cnhEmissao: z.iso.date().nullable().optional(),
+  reservistaSerie: z.string().nullable().optional(),
+  tamanhoCamisa: z.string().nullable().optional(),
+  tamanhoCalca: z.string().nullable().optional(),
+  tamanhoSapato: z.string().nullable().optional(),
   rateioD365: z.enum(["ADM", "PRO"]).nullable().optional(),
   // Sem estes quatro o zod descartava o bloco "Adicionais" em silêncio e a
   // rota devolvia 200 sem gravar nada: o formulário existia, o campo aceitava

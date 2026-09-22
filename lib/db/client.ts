@@ -145,6 +145,18 @@ const MIGRACOES: { tabela: string; coluna: string; definicao: string }[] = [
   { tabela: "colaboradores", coluna: "conjuge_cpf", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "conjuge_nascimento", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "conjuge_sexo", definicao: "TEXT" },
+  // Documentos pessoais e uniforme — mesmo bloco "Dados pessoais" do cadastro.
+  { tabela: "colaboradores", coluna: "titulo_eleitor", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "titulo_eleitor_zona", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "titulo_eleitor_secao", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "titulo_eleitor_emissao", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "cnh_categoria", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "cnh_validade", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "cnh_emissao", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "reservista_serie", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "tamanho_camisa", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "tamanho_calca", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "tamanho_sapato", definicao: "TEXT" },
   // Adicionais de salário. Percentuais e não valores: periculosidade incide
   // sobre o salário base (Art. 193 §1º) e insalubridade sobre o salário mínimo
   // (Art. 192) — guardar o valor calculado congelaria um número que muda com

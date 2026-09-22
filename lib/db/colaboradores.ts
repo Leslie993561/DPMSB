@@ -71,6 +71,19 @@ export interface Colaborador {
   conjugeCpf: string | null;
   conjugeNascimento: string | null;
   conjugeSexo: SexoColaborador | null;
+  // Documentos pessoais
+  tituloEleitor: string | null;
+  tituloEleitorZona: string | null;
+  tituloEleitorSecao: string | null;
+  tituloEleitorEmissao: string | null;
+  cnhCategoria: string | null;
+  cnhValidade: string | null;
+  cnhEmissao: string | null;
+  reservistaSerie: string | null;
+  // Uniforme
+  tamanhoCamisa: string | null;
+  tamanhoCalca: string | null;
+  tamanhoSapato: string | null;
   /**
    * Adicionais guardados como PERCENTUAL, não como valor: periculosidade incide
    * sobre o salário base (Art. 193 §1º CLT) e insalubridade sobre o salário
@@ -132,6 +145,17 @@ export interface ColaboradorInput {
   conjugeCpf?: string | null;
   conjugeNascimento?: string | null;
   conjugeSexo?: SexoColaborador | null;
+  tituloEleitor?: string | null;
+  tituloEleitorZona?: string | null;
+  tituloEleitorSecao?: string | null;
+  tituloEleitorEmissao?: string | null;
+  cnhCategoria?: string | null;
+  cnhValidade?: string | null;
+  cnhEmissao?: string | null;
+  reservistaSerie?: string | null;
+  tamanhoCamisa?: string | null;
+  tamanhoCalca?: string | null;
+  tamanhoSapato?: string | null;
   periculosidadePercentual?: number | null;
   insalubridadePercentual?: number | null;
   adicionalFixo?: number | null;
@@ -191,6 +215,17 @@ interface LinhaColaborador {
   conjuge_cpf: string | null;
   conjuge_nascimento: string | null;
   conjuge_sexo: string | null;
+  titulo_eleitor: string | null;
+  titulo_eleitor_zona: string | null;
+  titulo_eleitor_secao: string | null;
+  titulo_eleitor_emissao: string | null;
+  cnh_categoria: string | null;
+  cnh_validade: string | null;
+  cnh_emissao: string | null;
+  reservista_serie: string | null;
+  tamanho_camisa: string | null;
+  tamanho_calca: string | null;
+  tamanho_sapato: string | null;
 }
 
 function paraColaborador(linha: LinhaColaborador): Colaborador {
@@ -243,6 +278,17 @@ function paraColaborador(linha: LinhaColaborador): Colaborador {
     conjugeCpf: linha.conjuge_cpf,
     conjugeNascimento: linha.conjuge_nascimento,
     conjugeSexo: linha.conjuge_sexo as SexoColaborador | null,
+    tituloEleitor: linha.titulo_eleitor,
+    tituloEleitorZona: linha.titulo_eleitor_zona,
+    tituloEleitorSecao: linha.titulo_eleitor_secao,
+    tituloEleitorEmissao: linha.titulo_eleitor_emissao,
+    cnhCategoria: linha.cnh_categoria,
+    cnhValidade: linha.cnh_validade,
+    cnhEmissao: linha.cnh_emissao,
+    reservistaSerie: linha.reservista_serie,
+    tamanhoCamisa: linha.tamanho_camisa,
+    tamanhoCalca: linha.tamanho_calca,
+    tamanhoSapato: linha.tamanho_sapato,
     periculosidadePercentual: linha.periculosidade_percentual,
     insalubridadePercentual: linha.insalubridade_percentual,
     adicionalFixo: linha.adicional_fixo,
@@ -298,8 +344,10 @@ export async function criarColaborador(input: ColaboradorInput): Promise<Colabor
           vinculo, alimentacao_valor, odontologico_valor, auxilio_educacao_valor, data_nascimento, cbo, agencia, conta, tipo_transporte, valor_transporte_fixo, valor_transporte_dia,
           lider_direto_nome, status, pis, cidade_nascimento, uf_nascimento, nome_pai, nome_mae, telefone, sexo,
           email_pessoal, horario, banco, cep, estado, bairro, rua, numero, conjuge_nome, conjuge_cpf, conjuge_nascimento, conjuge_sexo,
-          periculosidade_percentual, insalubridade_percentual, adicional_fixo, adicional_fixo_descricao, rateio_d365)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          periculosidade_percentual, insalubridade_percentual, adicional_fixo, adicional_fixo_descricao, rateio_d365,
+          titulo_eleitor, titulo_eleitor_zona, titulo_eleitor_secao, titulo_eleitor_emissao, cnh_categoria, cnh_validade, cnh_emissao,
+          reservista_serie, tamanho_camisa, tamanho_calca, tamanho_sapato)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       input.nome,
       input.dataAdmissao,
@@ -348,6 +396,17 @@ export async function criarColaborador(input: ColaboradorInput): Promise<Colabor
       input.adicionalFixo ?? null,
       input.adicionalFixoDescricao ?? null,
       input.rateioD365 ?? null,
+      input.tituloEleitor ?? null,
+      input.tituloEleitorZona ?? null,
+      input.tituloEleitorSecao ?? null,
+      input.tituloEleitorEmissao ?? null,
+      input.cnhCategoria ?? null,
+      input.cnhValidade ?? null,
+      input.cnhEmissao ?? null,
+      input.reservistaSerie ?? null,
+      input.tamanhoCamisa ?? null,
+      input.tamanhoCalca ?? null,
+      input.tamanhoSapato ?? null,
     ],
   });
   return (await buscarColaborador(Number(info.lastInsertRowid)))!;
@@ -409,6 +468,18 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
     conjugeCpf: input.conjugeCpf !== undefined ? input.conjugeCpf : atual.conjugeCpf,
     conjugeNascimento: input.conjugeNascimento !== undefined ? input.conjugeNascimento : atual.conjugeNascimento,
     conjugeSexo: input.conjugeSexo !== undefined ? input.conjugeSexo : atual.conjugeSexo,
+    tituloEleitor: input.tituloEleitor !== undefined ? input.tituloEleitor : atual.tituloEleitor,
+    tituloEleitorZona: input.tituloEleitorZona !== undefined ? input.tituloEleitorZona : atual.tituloEleitorZona,
+    tituloEleitorSecao: input.tituloEleitorSecao !== undefined ? input.tituloEleitorSecao : atual.tituloEleitorSecao,
+    tituloEleitorEmissao:
+      input.tituloEleitorEmissao !== undefined ? input.tituloEleitorEmissao : atual.tituloEleitorEmissao,
+    cnhCategoria: input.cnhCategoria !== undefined ? input.cnhCategoria : atual.cnhCategoria,
+    cnhValidade: input.cnhValidade !== undefined ? input.cnhValidade : atual.cnhValidade,
+    cnhEmissao: input.cnhEmissao !== undefined ? input.cnhEmissao : atual.cnhEmissao,
+    reservistaSerie: input.reservistaSerie !== undefined ? input.reservistaSerie : atual.reservistaSerie,
+    tamanhoCamisa: input.tamanhoCamisa !== undefined ? input.tamanhoCamisa : atual.tamanhoCamisa,
+    tamanhoCalca: input.tamanhoCalca !== undefined ? input.tamanhoCalca : atual.tamanhoCalca,
+    tamanhoSapato: input.tamanhoSapato !== undefined ? input.tamanhoSapato : atual.tamanhoSapato,
     periculosidadePercentual:
       input.periculosidadePercentual !== undefined ? input.periculosidadePercentual : atual.periculosidadePercentual,
     insalubridadePercentual:
@@ -428,6 +499,9 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
            pis = ?, cidade_nascimento = ?, uf_nascimento = ?, nome_pai = ?, nome_mae = ?, telefone = ?, sexo = ?,
            email_pessoal = ?, horario = ?, banco = ?, cep = ?, estado = ?, bairro = ?, rua = ?, numero = ?,
            conjuge_nome = ?, conjuge_cpf = ?, conjuge_nascimento = ?, conjuge_sexo = ?,
+           titulo_eleitor = ?, titulo_eleitor_zona = ?, titulo_eleitor_secao = ?, titulo_eleitor_emissao = ?,
+           cnh_categoria = ?, cnh_validade = ?, cnh_emissao = ?, reservista_serie = ?,
+           tamanho_camisa = ?, tamanho_calca = ?, tamanho_sapato = ?,
            periculosidade_percentual = ?, insalubridade_percentual = ?, adicional_fixo = ?,
            adicional_fixo_descricao = ?
        WHERE id = ?`,
@@ -479,6 +553,17 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
       mesclado.conjugeCpf ?? null,
       mesclado.conjugeNascimento ?? null,
       mesclado.conjugeSexo ?? null,
+      mesclado.tituloEleitor ?? null,
+      mesclado.tituloEleitorZona ?? null,
+      mesclado.tituloEleitorSecao ?? null,
+      mesclado.tituloEleitorEmissao ?? null,
+      mesclado.cnhCategoria ?? null,
+      mesclado.cnhValidade ?? null,
+      mesclado.cnhEmissao ?? null,
+      mesclado.reservistaSerie ?? null,
+      mesclado.tamanhoCamisa ?? null,
+      mesclado.tamanhoCalca ?? null,
+      mesclado.tamanhoSapato ?? null,
       mesclado.periculosidadePercentual ?? null,
       mesclado.insalubridadePercentual ?? null,
       mesclado.adicionalFixo ?? null,
