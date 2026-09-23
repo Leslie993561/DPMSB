@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
-import { listarColaboradoresParaEpi, MATRIZ_EPI, obterCustosEpi, obterCustosFardamento } from "@/lib/sst/epi";
+import { EPI_CATALOGO, listarColaboradoresParaEpi, obterMatrizEpi, obterCustosEpi, obterCustosFardamento } from "@/lib/sst/epi";
 import { obterResumoFichas } from "@/lib/sst/fichas";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { EpiPageClient, type AbaEpi } from "@/components/modules/sst/EpiPageClient";
@@ -26,8 +26,9 @@ export default async function SstEpiPage({
   const abaParam = (await searchParams).aba;
   const aba: AbaEpi = ABAS_VALIDAS.includes(abaParam as AbaEpi) ? (abaParam as AbaEpi) : "colaboradores";
 
-  const [colaboradores, custos, fardamento, resumoFichas] = await Promise.all([
+  const [colaboradores, matriz, custos, fardamento, resumoFichas] = await Promise.all([
     listarColaboradoresParaEpi(),
+    obterMatrizEpi(),
     obterCustosEpi(),
     obterCustosFardamento(),
     obterResumoFichas(),
@@ -36,7 +37,15 @@ export default async function SstEpiPage({
   return (
     <div className="space-y-4">
       <PageHeader eyebrow="SST" titulo="Gestão de EPI" subtitulo="Colaboradores, matriz por função e custos" />
-      <EpiPageClient aba={aba} colaboradores={colaboradores} matriz={MATRIZ_EPI} custos={custos} fardamento={fardamento} resumoFichas={resumoFichas} />
+      <EpiPageClient
+        aba={aba}
+        colaboradores={colaboradores}
+        matriz={matriz}
+        catalogoEpi={EPI_CATALOGO.map((c) => c.equip)}
+        custos={custos}
+        fardamento={fardamento}
+        resumoFichas={resumoFichas}
+      />
     </div>
   );
 }

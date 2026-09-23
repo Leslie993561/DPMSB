@@ -30,8 +30,13 @@ const TERMO_DECLARACOES = [
   "Que na não observância do seu uso, por negligência, os danos e/ou lesões resultantes de acidentes serão de minha inteira responsabilidade.",
 ];
 
-/** A ficha de entrega de EPI e, depois de assinada, o comprovante da assinatura eletrônica. */
-export function DocumentoFichaEpi({ documento }: { documento: DocumentoFicha }) {
+/**
+ * A ficha de entrega de EPI e, depois de assinada, o comprovante da assinatura
+ * eletrônica. `anexoHref` é a rota (admin ou pública, conforme quem chama)
+ * que baixa o PDF que o RH anexou ao registrar a entrega — o componente só
+ * mostra o botão se a ficha tiver anexo.
+ */
+export function DocumentoFichaEpi({ documento, anexoHref }: { documento: DocumentoFicha; anexoHref?: string }) {
   const a = documento.assinatura;
   return (
     <div className="flex flex-col gap-3 text-[12px] text-foreground">
@@ -42,6 +47,17 @@ export function DocumentoFichaEpi({ documento }: { documento: DocumentoFicha }) 
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo-msb.png" alt="MSB" width={80} height={25} className="shrink-0" />
       </div>
+
+      {documento.anexoUrl && anexoHref && (
+        <a
+          href={anexoHref}
+          target="_blank"
+          rel="noreferrer"
+          className="flex w-fit items-center gap-1.5 rounded-md border border-hairline bg-surface-page px-2.5 py-1.5 text-[11.5px] font-medium text-brand-primary-800 hover:bg-brand-primary-050"
+        >
+          📎 Baixar anexo{documento.anexoNome ? ` — ${documento.anexoNome}` : ""}
+        </a>
+      )}
 
       <div className="rounded-md border border-hairline px-3 py-2">
         <p>

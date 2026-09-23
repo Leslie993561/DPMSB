@@ -39,6 +39,8 @@ const schema = z
     fardamento: z
       .array(z.object({ tipo: z.string().trim().min(1), qtd: z.number().int().min(1).default(1), dataEntrega: dataIso }))
       .default([]),
+    anexoUrl: z.string().trim().min(1).nullable().optional(),
+    anexoNome: z.string().trim().min(1).nullable().optional(),
   })
   .refine((d) => d.itens.length + d.fardamento.length > 0, { message: "Selecione ao menos um EPI ou fardamento." });
 

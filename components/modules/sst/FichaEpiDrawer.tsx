@@ -10,6 +10,14 @@ import type { DocumentoFicha, FichaResumo } from "@/lib/sst/fichas";
 import { DocumentoFichaEpi } from "./DocumentoFichaEpi";
 import { RegistrarEntregaModal } from "./RegistrarEntregaModal";
 
+/** "DD/MM/AAAA" anterior a hoje; sem data de troca nunca vence. */
+function trocaVencida(dataBr: string): boolean {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dataBr.trim());
+  if (!m) return false;
+  const hoje = new Date();
+  return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1])) < new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+}
+
 export function FichaEpiDrawer({
   colaborador,
   catalogo,
@@ -25,6 +33,7 @@ export function FichaEpiDrawer({
   const router = useRouter();
   const [fichas, setFichas] = useState<FichaResumo[] | null>(null);
   const [episEntregues, setEpisEntregues] = useState<string[]>([]);
+  const [trocas, setTrocas] = useState<{ epi: string; dataTroca: string }[]>([]);
   const [erroCarga, setErroCarga] = useState<string | null>(null);
   const [registrando, setRegistrando] = useState(false);
   const [documento, setDocumento] = useState<DocumentoFicha | null>(null);
@@ -38,6 +47,7 @@ export function FichaEpiDrawer({
         if (!r.ok) throw new Error(d.erro ?? "Falha ao carregar o histórico.");
         setFichas(d.fichas);
         setEpisEntregues(d.episEntregues);
+        setTrocas(d.trocas);
       })
       .catch((e: Error) => setErroCarga(e.message));
   }, [colaborador]);
@@ -75,6 +85,7 @@ export function FichaEpiDrawer({
 
   const entregues = new Set(episEntregues);
   const semEntrega = colaborador.episObrigatorios.filter((epi) => !entregues.has(epi));
+  const vencidos = trocas.filter((t) => trocaVencida(t.dataTroca));
 
   return (
     <>
@@ -119,11 +130,24 @@ export function FichaEpiDrawer({
                   ))}
                 </ul>
               </div>
-            ) : (
+            ) : vencidos.length === 0 ? (
               <div className="rounded-md border border-status-success-border bg-status-success-bg px-3 py-2.5 text-[12px] text-status-success">
-                Todos os EPIs obrigatórios da função têm entrega registrada.
+                Todos os EPIs obrigatórios da função têm entrega registrada e estão dentro do prazo de troca.
               </div>
-            ))}
+            ) : null)}
+
+          {fichas !== null && vencidos.length > 0 && (
+            <div className="rounded-md border border-status-danger-border bg-status-danger-bg px-3 py-2.5 text-status-danger">
+              <p className="text-[12.5px] font-semibold">⚠ Troca necessária: {vencidos.length} EPI(s) com prazo de troca vencido</p>
+              <ul className="mt-1.5 list-disc pl-5 text-[12px]">
+                {vencidos.map((t) => (
+                  <li key={t.epi}>
+                    {t.epi} <span className="text-[11px] opacity-80">· venceu em {t.dataTroca}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <div>
             <p className="text-[13px] font-semibold text-foreground">Histórico de entregas ({fichas?.length ?? 0})</p>
@@ -208,7 +232,7 @@ export function FichaEpiDrawer({
           subtitulo={documento.colaborador.nome}
           largura="40rem"
         >
-          <DocumentoFichaEpi documento={documento} />
+          <DocumentoFichaEpi documento={documento} anexoHref={`/api/sst/epi/fichas/${documento.id}/anexo`} />
         </Modal>
       )}
     </>

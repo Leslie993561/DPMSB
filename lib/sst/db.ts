@@ -58,7 +58,14 @@ const ESQUEMA_EXTRA = `
   ALTER TABLE sst_fichas_epi ADD COLUMN IF NOT EXISTS expira_em timestamptz;
   ALTER TABLE sst_fichas_epi ADD COLUMN IF NOT EXISTS assinada_em timestamptz;
   ALTER TABLE sst_fichas_epi ADD COLUMN IF NOT EXISTS assinatura jsonb;
+  ALTER TABLE sst_fichas_epi ADD COLUMN IF NOT EXISTS anexo_url text;
+  ALTER TABLE sst_fichas_epi ADD COLUMN IF NOT EXISTS anexo_nome text;
   ALTER TABLE sst_fardamento_entregas ADD COLUMN IF NOT EXISTS ficha_id text;
+  CREATE TABLE IF NOT EXISTS sst_matriz_epi_extra (
+    funcao text PRIMARY KEY,
+    epis text[] NOT NULL DEFAULT '{}',
+    atualizado_em timestamptz NOT NULL DEFAULT now()
+  );
 `;
 
 let esquemaPronto: Promise<void> | null = null;

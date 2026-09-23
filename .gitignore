@@ -52,3 +52,5 @@ _dev.log
 
 # worktrees isolados de agentes do Claude Code — nunca fazem parte do repo
 /.claude/worktrees/
+
+.env*

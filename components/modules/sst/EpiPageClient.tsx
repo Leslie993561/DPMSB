@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { cn } from "@/lib/cn";
 import { Card } from "@/components/shared/Card";
 import { Badge } from "@/components/shared/Badge";
+import { Modal } from "@/components/shared/Modal";
 import { CabecalhoFiltravel, CampoTexto, COR_VINCULO } from "@/components/modules/colaboradores/ColaboradoresTable";
 import { FichaEpiDrawer } from "./FichaEpiDrawer";
 import { formatarMoeda } from "@/lib/format";
@@ -31,13 +32,16 @@ export function EpiPageClient({
   aba,
   colaboradores,
   matriz,
+  catalogoEpi,
   custos,
   fardamento,
   resumoFichas,
 }: {
   aba: AbaEpi;
   colaboradores: ColaboradorEpi[];
-  matriz: FuncaoEpi[];
+  matriz: (FuncaoEpi & { fixos: number })[];
+  /** Nomes de todos os EPIs do catálogo — sugestão ao adicionar EPI extra numa função. */
+  catalogoEpi: string[];
   custos: { trimestres: CustoTrimestre[]; linhas: LinhaCustoEpi[] };
   fardamento: LinhaCustoFardamento[];
   resumoFichas: { enviadas: number; assinadas: number };
@@ -98,7 +102,7 @@ export function EpiPageClient({
           itensFardamento={fardamento.map((f) => f.tipo)}
         />
       )}
-      {aba === "matriz" && <MatrizTab matriz={matriz} />}
+      {aba === "matriz" && <MatrizTab matriz={matriz} catalogoEpi={catalogoEpi} />}
       {aba === "custos" && <CustosTab custos={custos} fardamento={fardamento} />}
     </div>
   );
@@ -254,12 +258,24 @@ function ColaboradoresTab({
   );
 }
 
-function MatrizTab({ matriz }: { matriz: FuncaoEpi[] }) {
+function MatrizTab({ matriz, catalogoEpi }: { matriz: (FuncaoEpi & { fixos: number })[]; catalogoEpi: string[] }) {
+  const router = useRouter();
+  const [editando, setEditando] = useState<(FuncaoEpi & { fixos: number }) | null>(null);
+
   return (
     <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
       {matriz.map((f) => (
-        <Card key={f.funcao} className="px-3 py-2.5">
-          <div className="flex items-center gap-2">
+        <Card key={f.funcao} className="relative px-3 py-2.5">
+          <button
+            type="button"
+            onClick={() => setEditando(f)}
+            title="Adicionar EPI a esta função"
+            aria-label={`Adicionar EPI a ${f.funcao}`}
+            className="absolute top-2 right-2 rounded p-1 text-foreground-muted hover:bg-brand-surface hover:text-brand-primary"
+          >
+            ✏️
+          </button>
+          <div className="flex items-center gap-2 pr-6">
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-brand-primary-100 text-brand-primary-800">
               <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5" aria-hidden>
                 <path fillRule="evenodd" clipRule="evenodd" d="M10 2 3 5v5c0 4.42 2.98 8.1 7 9 4.02-.9 7-4.58 7-9V5l-7-3Zm-1.2 11.2L5.6 10l1.4-1.4 1.8 1.8L14 6.2l1.4 1.4-6.6 5.6Z" />
@@ -283,7 +299,164 @@ function MatrizTab({ matriz }: { matriz: FuncaoEpi[] }) {
           </div>
         </Card>
       ))}
+
+      {editando && (
+        <EditarMatrizModal
+          funcaoEpi={editando}
+          catalogoEpi={catalogoEpi}
+          onFechar={() => setEditando(null)}
+          onSalvo={() => {
+            setEditando(null);
+            router.refresh();
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+function EditarMatrizModal({
+  funcaoEpi,
+  catalogoEpi,
+  onFechar,
+  onSalvo,
+}: {
+  funcaoEpi: FuncaoEpi & { fixos: number };
+  catalogoEpi: string[];
+  onFechar: () => void;
+  onSalvo: () => void;
+}) {
+  const fixos = funcaoEpi.epis.slice(0, funcaoEpi.fixos);
+  const [extras, setExtras] = useState<string[]>(funcaoEpi.epis.slice(funcaoEpi.fixos));
+  const [novoEpi, setNovoEpi] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  function adicionar() {
+    const nome = novoEpi.trim();
+    if (!nome || fixos.includes(nome) || extras.includes(nome)) {
+      setNovoEpi("");
+      return;
+    }
+    setExtras((e) => [...e, nome]);
+    setNovoEpi("");
+  }
+
+  async function salvar() {
+    setSalvando(true);
+    setErro(null);
+    try {
+      const r = await fetch("/api/sst/epi/matriz", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ funcao: funcaoEpi.funcao, epis: extras }),
+      });
+      if (!r.ok) throw new Error((await r.json()).erro ?? "Falha ao salvar.");
+      onSalvo();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Falha ao salvar.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  const sugestoes = catalogoEpi.filter((e) => !fixos.includes(e) && !extras.includes(e));
+
+  return (
+    <Modal
+      aberto
+      onFechar={onFechar}
+      eyebrow="Matriz de EPI"
+      titulo={`EPIs de ${funcaoEpi.funcao}`}
+      largura="26rem"
+      rodape={
+        <div className="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onFechar}
+            className="rounded border border-hairline px-3 py-1.5 text-[12px] font-medium text-foreground hover:bg-surface-page"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={() => void salvar()}
+            disabled={salvando}
+            className="rounded bg-brand-primary px-3 py-1.5 text-[12px] font-medium text-brand-white hover:bg-brand-primary-hover disabled:opacity-50"
+          >
+            {salvando ? "Salvando..." : "Salvar"}
+          </button>
+        </div>
+      }
+    >
+      <div className="flex flex-col gap-2.5">
+        <div>
+          <p className="text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">Fixos da matriz</p>
+          <div className="mt-1 flex flex-wrap gap-1">
+            {fixos.map((epi) => (
+              <span
+                key={epi}
+                className="rounded-full border border-hairline bg-surface-page px-2 py-0.5 text-[10.5px] text-foreground-muted"
+              >
+                {epi}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <p className="text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">EPIs extras</p>
+          <div className="mt-1 flex flex-wrap gap-1">
+            {extras.length === 0 && <p className="text-[11px] text-foreground-muted">Nenhum EPI extra ainda.</p>}
+            {extras.map((epi) => (
+              <span
+                key={epi}
+                className="flex items-center gap-1 rounded-full border border-brand-primary/40 bg-brand-primary-050 px-2 py-0.5 text-[10.5px] text-brand-primary-800"
+              >
+                {epi}
+                <button
+                  type="button"
+                  onClick={() => setExtras((e) => e.filter((x) => x !== epi))}
+                  aria-label={`Remover ${epi}`}
+                  className="text-brand-primary-800 hover:text-status-danger"
+                >
+                  ✕
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <input
+            value={novoEpi}
+            onChange={(e) => setNovoEpi(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                adicionar();
+              }
+            }}
+            list="catalogo-epi-sugestoes"
+            placeholder="Nome do EPI"
+            className="min-w-0 flex-1 rounded border border-hairline bg-background px-2 py-1.5 text-[12px] text-foreground outline-none focus:border-brand-primary"
+          />
+          <datalist id="catalogo-epi-sugestoes">
+            {sugestoes.map((epi) => (
+              <option key={epi} value={epi} />
+            ))}
+          </datalist>
+          <button
+            type="button"
+            onClick={adicionar}
+            className="shrink-0 rounded border border-hairline px-2.5 py-1.5 text-[11.5px] font-medium text-brand-primary-800 hover:bg-brand-primary-050"
+          >
+            Adicionar
+          </button>
+        </div>
+        {erro && <p className="text-[11.5px] text-status-danger">{erro}</p>}
+      </div>
+    </Modal>
   );
 }
 

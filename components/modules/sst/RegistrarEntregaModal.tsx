@@ -49,6 +49,30 @@ export function RegistrarEntregaModal({
   const [link, setLink] = useState<string | null>(null);
   const [envio, setEnvio] = useState<{ para: string | null; erro: string | null }>({ para: null, erro: null });
   const [copiado, setCopiado] = useState(false);
+  const [anexo, setAnexo] = useState<{ url: string; nome: string } | null>(null);
+  const [enviandoAnexo, setEnviandoAnexo] = useState(false);
+  const [erroAnexo, setErroAnexo] = useState<string | null>(null);
+
+  async function anexarPdf(arquivo: File) {
+    setErroAnexo(null);
+    if (arquivo.type !== "application/pdf") {
+      setErroAnexo("Só é permitido anexar PDF.");
+      return;
+    }
+    setEnviandoAnexo(true);
+    try {
+      const form = new FormData();
+      form.append("arquivo", arquivo);
+      const r = await fetch("/api/sst/epi/anexo", { method: "POST", body: form });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.erro ?? "Falha ao anexar o PDF.");
+      setAnexo({ url: d.url, nome: d.nome });
+    } catch (e) {
+      setErroAnexo(e instanceof Error ? e.message : "Falha ao anexar o PDF.");
+    } finally {
+      setEnviandoAnexo(false);
+    }
+  }
 
   const marcados = opcoes.filter((epi) => selecao[epi].marcado);
   const todosMarcados = marcados.length === opcoes.length;
@@ -84,6 +108,8 @@ export function RegistrarEntregaModal({
             qtd: Math.max(1, Number(fardamento[tipo].qtd) || 1),
             dataEntrega: fardamento[tipo].dataEntrega,
           })),
+          anexoUrl: anexo?.url ?? null,
+          anexoNome: anexo?.nome ?? null,
         }),
       });
       const d = await r.json();
@@ -134,7 +160,7 @@ export function RegistrarEntregaModal({
             <button
               type="button"
               onClick={() => void enviar()}
-              disabled={totalItens === 0 || enviando || !colaborador.email}
+              disabled={totalItens === 0 || enviando || enviandoAnexo || !colaborador.email}
               className="rounded bg-brand-primary px-3 py-1.5 text-[12px] font-medium text-brand-white hover:bg-brand-primary-hover disabled:opacity-50"
             >
               {enviando ? "Gerando link..." : "Enviar link de assinatura"}
@@ -203,6 +229,37 @@ export function RegistrarEntregaModal({
             >
               {todosMarcados ? "Desmarcar todos" : "Selecionar todos"}
             </button>
+          </div>
+
+          <div className="flex items-center gap-2 text-[11px]">
+            <label className="cursor-pointer font-medium text-brand-primary hover:text-brand-primary-hover">
+              {enviandoAnexo ? "Anexando..." : anexo ? "Trocar PDF anexado" : "📎 Anexar PDF"}
+              <input
+                type="file"
+                accept="application/pdf"
+                className="hidden"
+                disabled={enviandoAnexo}
+                onChange={(e) => {
+                  const arquivo = e.target.files?.[0];
+                  if (arquivo) void anexarPdf(arquivo);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+            {anexo && (
+              <span className="flex items-center gap-1 truncate text-foreground-muted">
+                {anexo.nome}
+                <button
+                  type="button"
+                  onClick={() => setAnexo(null)}
+                  aria-label="Remover anexo"
+                  className="text-foreground-muted hover:text-status-danger"
+                >
+                  ✕
+                </button>
+              </span>
+            )}
+            {erroAnexo && <span className="text-status-danger">{erroAnexo}</span>}
           </div>
 
           <div className="flex flex-col divide-y divide-hairline/70 rounded-md border border-hairline">

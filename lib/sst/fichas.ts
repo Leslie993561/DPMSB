@@ -44,6 +44,9 @@ export interface DocumentoFicha {
   itens: ItemFicha[];
   /** Só depois de assinada — traz os dados pessoais do comprovante. */
   assinatura: AssinaturaFicha | null;
+  /** PDF anexado pelo RH ao registrar a entrega (ex.: ficha em papel já assinada antes) — opcional. */
+  anexoUrl: string | null;
+  anexoNome: string | null;
 }
 
 export interface FichaResumo {
@@ -89,6 +92,8 @@ interface LinhaFicha {
   gerada_em: string;
   expira_em: Date | null;
   assinatura: AssinaturaFicha | null;
+  anexo_url: string | null;
+  anexo_nome: string | null;
 }
 
 interface LinhaItem {
@@ -140,6 +145,9 @@ export interface NovaFicha {
   colaboradorId: number;
   itens: { epi: string; qtd: number; ca: string; dataEntrega: string; dataTroca: string | null }[];
   fardamento: { tipo: string; qtd: number; dataEntrega: string }[];
+  /** PDF opcional que o RH anexa ao registrar a entrega (já salvo no Blob antes de chamar criarFicha). */
+  anexoUrl?: string | null;
+  anexoNome?: string | null;
 }
 
 /**
@@ -169,9 +177,20 @@ export async function criarFicha(nova: NovaFicha, responsavel: string, origem: s
       "SELECT COALESCE(MAX(numero), 0) + 1 AS proximo FROM sst_fichas_epi",
     );
     await q(
-      `INSERT INTO sst_fichas_epi (id, numero, colab_id, entrega_ids, gerada_em, gerada_por, token, status, expira_em)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'aguardando', now() + ($8 || ' days')::interval)`,
-      [fichaId, proximo, colaborador.id, itens.map((i) => i.id), new Date().toISOString(), responsavel, token, String(VALIDADE_DIAS)],
+      `INSERT INTO sst_fichas_epi (id, numero, colab_id, entrega_ids, gerada_em, gerada_por, token, status, expira_em, anexo_url, anexo_nome)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'aguardando', now() + ($8 || ' days')::interval, $9, $10)`,
+      [
+        fichaId,
+        proximo,
+        colaborador.id,
+        itens.map((i) => i.id),
+        new Date().toISOString(),
+        responsavel,
+        token,
+        String(VALIDADE_DIAS),
+        nova.anexoUrl ?? null,
+        nova.anexoNome ?? null,
+      ],
     );
     for (const item of itens) {
       await q(
@@ -230,8 +249,10 @@ export async function listarFichasDoColaborador(colaboradorId: number, origem: s
     [colaboradorId],
   );
   const itens = await itensDasFichas(fichas.map((f) => f.id));
-  const entregues = await sstQuery<{ epi: string }>(
-    "SELECT DISTINCT epi FROM sst_entregas_epi WHERE colab_id = $1",
+  // Entrega mais recente de cada EPI (assinada ou aguardando) — uma nova entrega
+  // do mesmo EPI substitui a anterior: só a troca prevista dela vale.
+  const entregues = await sstQuery<{ epi: string; data_troca: string }>(
+    "SELECT DISTINCT ON (epi) epi, data_troca FROM sst_entregas_epi WHERE colab_id = $1 ORDER BY epi, to_date(NULLIF(data_entrega, ''), 'DD/MM/YYYY') DESC NULLS LAST, created_at DESC",
     [colaboradorId],
   );
 
@@ -244,7 +265,11 @@ export async function listarFichasDoColaborador(colaboradorId: number, origem: s
     expirada: expirou(f),
     link: f.status === "aguardando" ? linkAssinatura(origem, f.token) : null,
   }));
-  return { fichas: resumo, episEntregues: entregues.map((e) => e.epi) };
+  return {
+    fichas: resumo,
+    episEntregues: entregues.map((e) => e.epi),
+    trocas: entregues.map((e) => ({ epi: e.epi, dataTroca: e.data_troca })),
+  };
 }
 
 async function montarDocumento(f: LinhaFicha): Promise<DocumentoFicha> {
@@ -269,10 +294,12 @@ async function montarDocumento(f: LinhaFicha): Promise<DocumentoFicha> {
     },
     itens: itens.get(f.id) ?? [],
     assinatura: f.assinatura,
+    anexoUrl: f.anexo_url,
+    anexoNome: f.anexo_nome,
   };
 }
 
-const COLUNAS_FICHA = "id, numero, colab_id, status, token, gerada_em, expira_em, assinatura";
+const COLUNAS_FICHA = "id, numero, colab_id, status, token, gerada_em, expira_em, assinatura, anexo_url, anexo_nome";
 
 /** Documento completo para o RH (inclui o comprovante de assinatura). */
 export async function obterDocumentoFicha(fichaId: string): Promise<DocumentoFicha | null> {

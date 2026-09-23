@@ -55,19 +55,59 @@ export function funcaoDaMatriz(cargo: string | null, departamento: string | null
   return melhor?.funcao ?? null;
 }
 
+/** EPIs extras que o RH cadastrou por função, além dos fixos da matriz (sst_matriz_epi_extra). */
+async function obterExtrasMatriz(): Promise<Map<string, string[]>> {
+  const linhas = await sstQuery<{ funcao: string; epis: string[] }>("SELECT funcao, epis FROM sst_matriz_epi_extra");
+  return new Map(linhas.map((l) => [l.funcao, l.epis]));
+}
+
+/** Fixos da matriz + extras cadastrados pelo RH, sem repetir o que já é fixo. */
+function mesclarComExtras(fixos: string[], extras: string[] | undefined): string[] {
+  if (!extras || extras.length === 0) return fixos;
+  return [...fixos, ...extras.filter((e) => !fixos.includes(e))];
+}
+
+/**
+ * Matriz para exibir/editar: cada função com os EPIs fixos + extras do RH.
+ * `fixos` é a contagem dos primeiros itens de `epis` que vêm da matriz
+ * estática (não podem ser removidos por aqui) — o resto são extras editáveis.
+ */
+export async function obterMatrizEpi(): Promise<(FuncaoEpi & { fixos: number })[]> {
+  const extras = await obterExtrasMatriz();
+  return MATRIZ_EPI.map((f) => ({
+    funcao: f.funcao,
+    epis: mesclarComExtras(f.epis, extras.get(f.funcao)),
+    fixos: f.epis.length,
+  }));
+}
+
+/** RH adiciona EPI(s) extra(s) a uma função da matriz — os fixos continuam intocáveis. */
+export async function atualizarEpisExtrasDaFuncao(funcao: string, epis: string[]): Promise<void> {
+  const base = MATRIZ_EPI.find((f) => f.funcao === funcao);
+  if (!base) throw new Error("Função não encontrada na matriz de EPI.");
+  const extras = [...new Set(epis.map((e) => e.trim()).filter(Boolean))].filter((e) => !base.epis.includes(e));
+  await sstQuery(
+    `INSERT INTO sst_matriz_epi_extra (funcao, epis, atualizado_em) VALUES ($1, $2, now())
+       ON CONFLICT (funcao) DO UPDATE SET epis = EXCLUDED.epis, atualizado_em = now()`,
+    [funcao, extras],
+  );
+}
+
 /**
  * Usa o MESMO cadastro do Quadro de Colaboradores (banco principal do Portal
  * Recursos Humanos) — não o banco separado do SST, que não tem essa base
  * populada. É a lista de quem pode receber EPI, não uma base à parte.
  */
 export async function listarColaboradoresParaEpi(): Promise<ColaboradorEpi[]> {
-  const [todos, ultimasEntregas] = await Promise.all([
+  const [todos, ultimasEntregas, extras] = await Promise.all([
     listarColaboradores(),
-    // Só a entrega mais recente de cada EPI por colaborador vale para o vencimento.
+    // Só a entrega mais recente de cada EPI vale para o vencimento: uma nova entrega
+    // do mesmo EPI substitui a anterior (por data de entrega; empate, a última lançada).
     sstQuery<{ colab_id: string; epi: string; data_troca: string }>(
       `SELECT DISTINCT ON (colab_id, epi) colab_id, epi, data_troca
-         FROM sst_entregas_epi ORDER BY colab_id, epi, created_at DESC`,
+         FROM sst_entregas_epi ORDER BY colab_id, epi, to_date(NULLIF(data_entrega, ''), 'DD/MM/YYYY') DESC NULLS LAST, created_at DESC`,
     ),
+    obterExtrasMatriz(),
   ]);
   const trocaPorColaborador = new Map<number, Map<string, string>>();
   for (const e of ultimasEntregas) {
@@ -81,7 +121,7 @@ export async function listarColaboradoresParaEpi(): Promise<ColaboradorEpi[]> {
     .filter((c) => c.status !== "desligado")
     .map((c) => {
       const funcao = funcaoDaMatriz(c.cargo, c.departamento);
-      const episObrigatorios = funcao?.epis ?? [];
+      const episObrigatorios = funcao ? mesclarComExtras(funcao.epis, extras.get(funcao.funcao)) : [];
       return {
         id: c.id,
         nome: c.nome,
@@ -249,6 +289,7 @@ export const EPI_CATALOGO: { equip: string; valor: number; ca: string }[] = [
   { equip: "Abafador 3M Muffler", valor: 80, ca: "14.235" },
   { equip: "Protetor Auricular Interno", valor: 1, ca: "15.485" },
   { equip: "Máscara Semifacial", valor: 70, ca: "7072" },
+  { equip: "Cartucho Filtro RC203 para CG306", valor: 31, ca: "" },
   { equip: "Óculos de Proteção com UV", valor: 10, ca: "28.018" },
   { equip: "Óculos de Proteção Transparente", valor: 10, ca: "40.957" },
   { equip: "Bota-biqueira de PVC", valor: 120, ca: "" },
