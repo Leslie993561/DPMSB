@@ -88,6 +88,7 @@ export function EpiPageClient({
           busca={busca}
           onBusca={setBusca}
           resumoFichas={resumoFichas}
+          itensFardamento={fardamento.map((f) => f.tipo)}
         />
       )}
       {aba === "matriz" && <MatrizTab matriz={matriz} />}
@@ -102,12 +103,14 @@ function ColaboradoresTab({
   busca,
   onBusca,
   resumoFichas,
+  itensFardamento,
 }: {
   colaboradores: ColaboradorEpi[];
   precos: { epi: string; ca: string; valorUnitario: number }[];
   busca: string;
   onBusca: (v: string) => void;
   resumoFichas: { enviadas: number; assinadas: number };
+  itensFardamento: string[];
 }) {
   const [fichaAberta, setFichaAberta] = useState<ColaboradorEpi | null>(null);
   const [colunaAberta, setColunaAberta] = useState<"vinculo" | "texto" | null>(null);
@@ -215,7 +218,8 @@ function ColaboradoresTab({
           </tbody>
         </table>
       </div>
-      <FichaEpiDrawer colaborador={fichaAberta} catalogo={precos.map((p) => ({ epi: p.epi, ca: p.ca }))} onFechar={() => setFichaAberta(null)} />
+      <FichaEpiDrawer colaborador={fichaAberta} catalogo={precos.map((p) => ({ epi: p.epi, ca: p.ca }))}
+        itensFardamento={itensFardamento} onFechar={() => setFichaAberta(null)} />
     </Card>
   );
 }

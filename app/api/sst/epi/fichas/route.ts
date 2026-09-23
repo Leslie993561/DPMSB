@@ -22,20 +22,25 @@ export async function GET(request: Request) {
 
 const dataIso = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
-const schema = z.object({
-  colaboradorId: z.number().int().positive(),
-  itens: z
-    .array(
-      z.object({
-        epi: z.string().trim().min(1),
-        qtd: z.number().int().min(1).default(1),
-        ca: z.string().trim().default(""),
-        dataEntrega: dataIso,
-        dataTroca: dataIso.nullable(),
-      }),
-    )
-    .min(1, "Selecione ao menos um EPI."),
-});
+const schema = z
+  .object({
+    colaboradorId: z.number().int().positive(),
+    itens: z
+      .array(
+        z.object({
+          epi: z.string().trim().min(1),
+          qtd: z.number().int().min(1).default(1),
+          ca: z.string().trim().default(""),
+          dataEntrega: dataIso,
+          dataTroca: dataIso.nullable(),
+        }),
+      )
+      .default([]),
+    fardamento: z
+      .array(z.object({ tipo: z.string().trim().min(1), qtd: z.number().int().min(1).default(1), dataEntrega: dataIso }))
+      .default([]),
+  })
+  .refine((d) => d.itens.length + d.fardamento.length > 0, { message: "Selecione ao menos um EPI ou fardamento." });
 
 export async function POST(request: Request) {
   const sessao = await exigirAdmin();

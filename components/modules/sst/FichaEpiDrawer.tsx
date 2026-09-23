@@ -13,11 +13,13 @@ import { RegistrarEntregaModal } from "./RegistrarEntregaModal";
 export function FichaEpiDrawer({
   colaborador,
   catalogo,
+  itensFardamento,
   onFechar,
 }: {
   colaborador: ColaboradorEpi | null;
   /** Todos os EPIs do catálogo com o C.A. padrão. */
   catalogo: { epi: string; ca: string }[];
+  itensFardamento: string[];
   onFechar: () => void;
 }) {
   const router = useRouter();
@@ -98,7 +100,7 @@ export function FichaEpiDrawer({
             onClick={() => setRegistrando(true)}
             className="rounded-md bg-brand-primary px-3 py-2 text-[12.5px] font-semibold text-brand-white transition-colors hover:bg-brand-primary-hover"
           >
-            Registrar entrega de EPI
+            Registrar entrega de EPI e Fardamento
           </button>
 
           {fichas !== null &&
@@ -187,6 +189,7 @@ export function FichaEpiDrawer({
         <RegistrarEntregaModal
           colaborador={colaborador}
           catalogo={catalogo}
+          itensFardamento={itensFardamento}
           onFechar={() => setRegistrando(false)}
           onCriada={() => {
             carregar();

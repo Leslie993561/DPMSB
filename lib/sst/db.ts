@@ -58,6 +58,7 @@ const ESQUEMA_EXTRA = `
   ALTER TABLE sst_fichas_epi ADD COLUMN IF NOT EXISTS expira_em timestamptz;
   ALTER TABLE sst_fichas_epi ADD COLUMN IF NOT EXISTS assinada_em timestamptz;
   ALTER TABLE sst_fichas_epi ADD COLUMN IF NOT EXISTS assinatura jsonb;
+  ALTER TABLE sst_fardamento_entregas ADD COLUMN IF NOT EXISTS ficha_id text;
 `;
 
 let esquemaPronto: Promise<void> | null = null;

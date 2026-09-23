@@ -4,11 +4,7 @@ import { formatarMoeda } from "@/lib/format";
 import { Card } from "@/components/shared/Card";
 import { Badge, type CorBadge } from "@/components/shared/Badge";
 
-/**
- * Blocos do Dashboard SST reaproveitados em outras páginas (a Gestão de EPI
- * mostra o mesmo bloco de EPI no topo) — um lugar só para os dois não
- * divergirem.
- */
+/** Blocos do Dashboard SST. */
 
 /**
  * O Badge deste portal só tem 5 tons; o "roxo" do StatusBadge original do SST
@@ -175,15 +171,13 @@ export function TabelaRanking({ linhas, mostrarMedia }: { linhas: RankedRow[]; m
 export function BlocoGestaoEpi({
   fichasEpi,
   custoEpi,
-  comTitulo = true,
 }: {
   fichasEpi: DashboardSst["fichasEpi"];
   custoEpi: DashboardSst["custoEpi"];
-  comTitulo?: boolean;
 }) {
   return (
     <section className="space-y-2">
-      {comTitulo && <SectionTitle>Gestão de EPI</SectionTitle>}
+      <SectionTitle>Gestão de EPI</SectionTitle>
       <div className="grid gap-2 sm:grid-cols-3">
         <KpiTile titulo="Fichas assinadas" valor={fichasEpi.assinadas} tone="success" />
         <KpiTile titulo="Aguardando assinatura" valor={fichasEpi.aguardando} tone="warning" />

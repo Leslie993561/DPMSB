@@ -24,12 +24,15 @@ interface Selecao {
 export function RegistrarEntregaModal({
   colaborador,
   catalogo,
+  itensFardamento,
   onFechar,
   onCriada,
 }: {
   colaborador: ColaboradorEpi;
   /** Catálogo com C.A. padrão; a lista completa só aparece quando o cargo não tem função na matriz. */
   catalogo: { epi: string; ca: string }[];
+  /** Itens de fardamento do catálogo (Custo e Valores). */
+  itensFardamento: string[];
   onFechar: () => void;
   onCriada: () => void;
 }) {
@@ -37,6 +40,9 @@ export function RegistrarEntregaModal({
   const caPadrao = (epi: string) => catalogo.find((c) => c.epi === epi)?.ca ?? "";
   const [selecao, setSelecao] = useState<Record<string, Selecao>>(() =>
     Object.fromEntries(opcoes.map((epi) => [epi, { marcado: false, qtd: "1", ca: caPadrao(epi), editandoCa: false, dataEntrega: hojeIso(), dataTroca: "" }])),
+  );
+  const [fardamento, setFardamento] = useState<Record<string, { marcado: boolean; qtd: string; dataEntrega: string }>>(
+    () => Object.fromEntries(itensFardamento.map((t) => [t, { marcado: false, qtd: "1", dataEntrega: hojeIso() }])),
   );
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -46,6 +52,12 @@ export function RegistrarEntregaModal({
 
   const marcados = opcoes.filter((epi) => selecao[epi].marcado);
   const todosMarcados = marcados.length === opcoes.length;
+  const fardamentoMarcado = itensFardamento.filter((t) => fardamento[t].marcado);
+  const totalItens = marcados.length + fardamentoMarcado.length;
+
+  function alterarFardamento(tipo: string, parcial: Partial<{ marcado: boolean; qtd: string; dataEntrega: string }>) {
+    setFardamento((s) => ({ ...s, [tipo]: { ...s[tipo], ...parcial } }));
+  }
 
   function alterar(epi: string, parcial: Partial<Selecao>) {
     setSelecao((s) => ({ ...s, [epi]: { ...s[epi], ...parcial } }));
@@ -66,6 +78,11 @@ export function RegistrarEntregaModal({
             ca: selecao[epi].ca,
             dataEntrega: selecao[epi].dataEntrega,
             dataTroca: selecao[epi].dataTroca || null,
+          })),
+          fardamento: fardamentoMarcado.map((tipo) => ({
+            tipo,
+            qtd: Math.max(1, Number(fardamento[tipo].qtd) || 1),
+            dataEntrega: fardamento[tipo].dataEntrega,
           })),
         }),
       });
@@ -91,7 +108,7 @@ export function RegistrarEntregaModal({
       aberto
       onFechar={onFechar}
       eyebrow="Gestão de EPI"
-      titulo="Registrar entrega de EPI"
+      titulo="Registrar entrega de EPI e Fardamento"
       subtitulo={colaborador.nome}
       largura="44rem"
       rodape={
@@ -117,7 +134,7 @@ export function RegistrarEntregaModal({
             <button
               type="button"
               onClick={() => void enviar()}
-              disabled={marcados.length === 0 || enviando || !colaborador.email}
+              disabled={totalItens === 0 || enviando || !colaborador.email}
               className="rounded bg-brand-primary px-3 py-1.5 text-[12px] font-medium text-brand-white hover:bg-brand-primary-hover disabled:opacity-50"
             >
               {enviando ? "Gerando link..." : "Enviar link de assinatura"}
@@ -130,12 +147,12 @@ export function RegistrarEntregaModal({
         <div className="flex flex-col gap-3">
           {envio.para ? (
             <p className="rounded-md border border-status-success-border bg-status-success-bg px-3 py-2 text-[12.5px] text-status-success">
-              ✓ Ficha gerada com {marcados.length} EPI(s) e link de assinatura enviado para <strong>{envio.para}</strong>.
+              ✓ Ficha gerada com {totalItens} item(ns) e link de assinatura enviado para <strong>{envio.para}</strong>.
               O link vale por 7 dias.
             </p>
           ) : (
             <p className="rounded-md border border-status-warning-border bg-status-warning-bg px-3 py-2 text-[12.5px] text-status-warning">
-              Ficha gerada com {marcados.length} EPI(s), mas o e-mail não foi enviado: {envio.erro} Copie o link abaixo e
+              Ficha gerada com {totalItens} item(ns), mas o e-mail não foi enviado: {envio.erro} Copie o link abaixo e
               envie para {colaborador.nome.split(" ")[0]}.
             </p>
           )}
@@ -255,6 +272,49 @@ export function RegistrarEntregaModal({
                           type="date"
                           value={s.dataTroca}
                           onChange={(e) => alterar(epi, { dataTroca: e.target.value })}
+                          className={INPUT}
+                        />
+                      </label>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <p className="pt-2 text-[11px] font-semibold tracking-wide text-foreground uppercase">Fardamento</p>
+          <div className="flex flex-col divide-y divide-hairline/70 rounded-md border border-hairline">
+            {itensFardamento.map((tipo) => {
+              const f = fardamento[tipo];
+              return (
+                <div key={tipo} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-2.5 py-2">
+                  <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-[12.5px] text-foreground">
+                    <input
+                      type="checkbox"
+                      checked={f.marcado}
+                      onChange={(e) => alterarFardamento(tipo, { marcado: e.target.checked })}
+                      className="accent-brand-primary"
+                    />
+                    <span className="truncate">{tipo}</span>
+                  </label>
+                  {f.marcado && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <label className="flex flex-col text-[9.5px] text-foreground-muted">
+                        Quant.
+                        <input
+                          type="number"
+                          min={1}
+                          value={f.qtd}
+                          onChange={(e) => alterarFardamento(tipo, { qtd: e.target.value })}
+                          className={INPUT + " w-14"}
+                        />
+                      </label>
+                      <label className="flex flex-col text-[9.5px] text-foreground-muted">
+                        Entrega
+                        <input
+                          type="date"
+                          value={f.dataEntrega}
+                          onChange={(e) => alterarFardamento(tipo, { dataEntrega: e.target.value })}
                           className={INPUT}
                         />
                       </label>

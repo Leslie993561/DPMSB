@@ -2,12 +2,14 @@ import "server-only";
 import { randomBytes, randomUUID } from "node:crypto";
 import { buscarColaborador } from "@/lib/db/colaboradores";
 import { sstQuery, sstTransacao } from "./db";
-import { obterPrecosEpi } from "./epi";
+import { obterPrecosEpi, obterPrecosFardamento } from "./epi";
 
 /** Validade do link de assinatura. */
 const VALIDADE_DIAS = 7;
 
 export interface ItemFicha {
+  categoria: "epi" | "fardamento";
+  /** Nome do EPI ou do item de fardamento. */
   epi: string;
   qtd: number;
   /** Certificado de Aprovação do EPI. */
@@ -96,22 +98,40 @@ const expirou = (f: LinhaFicha) => f.status === "aguardando" && f.expira_em !== 
 async function itensDasFichas(ids: string[]): Promise<Map<string, ItemFicha[]>> {
   const porFicha = new Map<string, ItemFicha[]>();
   if (ids.length === 0) return porFicha;
-  const linhas = await sstQuery<LinhaItem>(
-    `SELECT ficha_id, epi, qtd, ca, valor_unit::float8 AS valor_unit, data_entrega, data_troca
-       FROM sst_entregas_epi WHERE ficha_id = ANY($1) ORDER BY created_at`,
-    [ids],
-  );
-  for (const l of linhas) {
+  const [epis, fardamento] = await Promise.all([
+    sstQuery<LinhaItem>(
+      `SELECT ficha_id, epi, qtd, ca, valor_unit::float8 AS valor_unit, data_entrega, data_troca
+         FROM sst_entregas_epi WHERE ficha_id = ANY($1) ORDER BY created_at`,
+      [ids],
+    ),
+    sstQuery<LinhaItem>(
+      `SELECT ficha_id, tipo AS epi, qtd, '' AS ca, valor_unit::float8 AS valor_unit, data_entrega, '' AS data_troca
+         FROM sst_fardamento_entregas WHERE ficha_id = ANY($1) ORDER BY created_at`,
+      [ids],
+    ),
+  ]);
+  const adicionar = (l: LinhaItem, categoria: ItemFicha["categoria"]) => {
     const lista = porFicha.get(l.ficha_id) ?? [];
-    lista.push({ epi: l.epi, qtd: l.qtd, ca: l.ca, valorUnit: l.valor_unit, dataEntrega: l.data_entrega, dataTroca: l.data_troca });
+    lista.push({
+      categoria,
+      epi: l.epi,
+      qtd: l.qtd,
+      ca: l.ca,
+      valorUnit: l.valor_unit,
+      dataEntrega: l.data_entrega,
+      dataTroca: l.data_troca,
+    });
     porFicha.set(l.ficha_id, lista);
-  }
+  };
+  epis.forEach((l) => adicionar(l, "epi"));
+  fardamento.forEach((l) => adicionar(l, "fardamento"));
   return porFicha;
 }
 
 export interface NovaFicha {
   colaboradorId: number;
   itens: { epi: string; qtd: number; ca: string; dataEntrega: string; dataTroca: string | null }[];
+  fardamento: { tipo: string; qtd: number; dataEntrega: string }[];
 }
 
 /**
@@ -123,7 +143,7 @@ export interface NovaFicha {
 export async function criarFicha(nova: NovaFicha, responsavel: string, origem: string) {
   const colaborador = await buscarColaborador(nova.colaboradorId);
   if (!colaborador) throw new Error("Colaborador não encontrado no Quadro.");
-  const precos = await obterPrecosEpi();
+  const [precos, precosFardamento] = await Promise.all([obterPrecosEpi(), obterPrecosFardamento()]);
 
   const fichaId = randomUUID();
   const token = randomBytes(24).toString("base64url");
@@ -159,6 +179,24 @@ export async function criarFicha(nova: NovaFicha, responsavel: string, origem: s
           precos.get(item.epi) ?? 0,
           isoParaBr(item.dataEntrega),
           item.dataTroca ? isoParaBr(item.dataTroca) : "",
+          responsavel,
+          fichaId,
+          new Date().toISOString(),
+        ],
+      );
+    }
+    for (const item of nova.fardamento) {
+      await q(
+        `INSERT INTO sst_fardamento_entregas (id, colab_id, cpf, tipo, qtd, valor_unit, data_entrega, responsavel, ficha_id, ts)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        [
+          randomUUID(),
+          colaborador.id,
+          colaborador.cpf ?? "",
+          item.tipo,
+          item.qtd,
+          precosFardamento.get(item.tipo) ?? 0,
+          isoParaBr(item.dataEntrega),
           responsavel,
           fichaId,
           new Date().toISOString(),
@@ -291,10 +329,11 @@ export async function obterResumoFichas(): Promise<{ enviadas: number; assinadas
   return r ?? { enviadas: 0, assinadas: 0 };
 }
 
-/** Exclui a ficha e as entregas dela (Custo e Valores deixa de contá-las). */
+/** Exclui a ficha e as entregas dela, de EPI e de fardamento (Custo e Valores deixa de contá-las). */
 export async function excluirFicha(fichaId: string): Promise<boolean> {
   return sstTransacao(async (q) => {
     await q("DELETE FROM sst_entregas_epi WHERE ficha_id = $1", [fichaId]);
+    await q("DELETE FROM sst_fardamento_entregas WHERE ficha_id = $1", [fichaId]);
     const apagadas = await q<{ id: string }>("DELETE FROM sst_fichas_epi WHERE id = $1 RETURNING id", [fichaId]);
     return apagadas.length > 0;
   });

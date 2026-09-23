@@ -305,7 +305,20 @@ export const FARDAMENTO_CATALOGO: { tipo: string; valor: number }[] = [
   { tipo: "Camisa Oxford", valor: 93 },
   { tipo: "Calça Helanca", valor: 72 },
   { tipo: "Calça Oxford", valor: 93 },
+  { tipo: "Jaleco Antiestático", valor: 50 },
+  { tipo: "Macacão Antiestático", valor: 100 },
 ];
+
+/** Preço vigente de cada item de fardamento: catálogo, sobrescrito por sst_fardamento_precos. */
+export async function obterPrecosFardamento(): Promise<Map<string, number>> {
+  const precos = await sstQuery<{ tipo: string; valor: number }>(
+    "SELECT tipo, valor::float8 AS valor FROM sst_fardamento_precos",
+  );
+  return new Map<string, number>([
+    ...FARDAMENTO_CATALOGO.map((c) => [c.tipo, c.valor] as const),
+    ...precos.map((p) => [p.tipo, p.valor] as const),
+  ]);
+}
 
 export interface LinhaCustoFardamento {
   tipo: string;
@@ -316,13 +329,9 @@ export interface LinhaCustoFardamento {
 
 /** Fardamento entregue (sst_fardamento_entregas) × preço vigente, no mesmo formato da planilha de EPI. */
 export async function obterCustosFardamento(): Promise<LinhaCustoFardamento[]> {
-  const [entregas, precos] = await Promise.all([
+  const [entregas, precoPorTipo] = await Promise.all([
     sstQuery<{ tipo: string; qtd: number }>("SELECT tipo, qtd FROM sst_fardamento_entregas"),
-    sstQuery<{ tipo: string; valor: number }>("SELECT tipo, valor::float8 AS valor FROM sst_fardamento_precos"),
-  ]);
-  const precoPorTipo = new Map<string, number>([
-    ...FARDAMENTO_CATALOGO.map((c) => [c.tipo, c.valor] as const),
-    ...precos.map((p) => [p.tipo, p.valor] as const),
+    obterPrecosFardamento(),
   ]);
   const qtdPorTipo = new Map<string, number>();
   for (const e of entregas) qtdPorTipo.set(e.tipo, (qtdPorTipo.get(e.tipo) ?? 0) + e.qtd);
