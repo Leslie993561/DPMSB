@@ -311,16 +311,22 @@ CREATE TABLE IF NOT EXISTS gestor_permissoes (
 );
 
 -- Documentos anexados ao cadastro (RG, CNH, comprovante...). Arquivo mora no
--- Vercel Blob (store PRIVADO — nunca público); aqui só a URL e o nome
--- original. Ver lib/blob.ts e lib/db/colaboradorDocumentos.ts.
+-- Supabase Storage (bucket PRIVADO — nunca público); aqui só o caminho e o
+-- nome original. "origem" separa a aba "Documentos DP" da aba "Documentos
+-- SST" no cadastro do colaborador — são anexos manuais; a lista de
+-- "Documentos SST" ainda mistura isto com as fichas de EPI/fardamento (essas
+-- vêm de sst_fichas_epi, não desta tabela). Ver lib/storage.ts e
+-- lib/db/colaboradorDocumentos.ts.
 CREATE TABLE IF NOT EXISTS colaborador_documentos (
   id SERIAL PRIMARY KEY,
   colaborador_id INTEGER NOT NULL REFERENCES colaboradores(id) ON DELETE CASCADE,
   nome TEXT NOT NULL,
   url TEXT NOT NULL,
   enviado_por TEXT NOT NULL,
+  origem TEXT NOT NULL DEFAULT 'dp' CHECK (origem IN ('dp', 'sst')),
   criado_em TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')
 );
+ALTER TABLE colaborador_documentos ADD COLUMN IF NOT EXISTS origem TEXT NOT NULL DEFAULT 'dp';
 
 -- Link de auto-cadastro: o colaborador preenche os PRÓPRIOS dados pessoais
 -- (endereço, banco, cônjuge, dependentes...) sem precisar de login no portal.

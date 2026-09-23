@@ -4,9 +4,13 @@ import { useEffect, useState } from "react";
 import type { Colaborador, RateioD365, SexoColaborador, TipoTransporte, Vinculo } from "@/lib/db/colaboradores";
 import type { SexoDependente } from "@/lib/db/colaboradorDependentes";
 import { RiskCallout } from "@/components/shared/RiskCallout";
+import { Modal } from "@/components/shared/Modal";
+import { DocumentoFichaEpi } from "@/components/modules/sst/DocumentoFichaEpi";
 import { cn } from "@/lib/cn";
 import { abreviarNome } from "@/lib/format";
 import { SETORES } from "@/lib/setores";
+import type { DocumentoFicha, FichaResumo } from "@/lib/sst/fichas";
+import type { OrigemDocumento } from "@/lib/db/colaboradorDocumentos";
 
 const INPUT_CLASS =
   "w-full rounded border border-hairline bg-background px-2 py-1 text-[12px] font-light text-foreground placeholder:text-foreground-muted/60 disabled:cursor-not-allowed disabled:border-hairline/70 disabled:bg-surface-page disabled:text-foreground-muted dark:border-brand-neutral/30";
@@ -53,23 +57,32 @@ interface DocumentoColaborador {
   nome: string;
   url: string;
   enviadoPor: string;
+  origem: OrigemDocumento;
   criadoEm: string;
 }
 
-/** Documentos anexados ao cadastro (RG, CNH, comprovante...) — guardados no Vercel Blob (store privado). */
-function DocumentosColaboradorPanel({ colaboradorId }: { colaboradorId: number }) {
+/** Lista + upload + exclusão de anexos manuais de uma aba (DP ou SST) — usado nas duas. */
+function ListaDocumentosManual({
+  colaboradorId,
+  origem,
+  vazio,
+}: {
+  colaboradorId: number;
+  origem: OrigemDocumento;
+  vazio: string;
+}) {
   const [documentos, setDocumentos] = useState<DocumentoColaborador[] | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
   function carregar() {
-    fetch(`/api/colaboradores/${colaboradorId}/documentos`)
+    fetch(`/api/colaboradores/${colaboradorId}/documentos?origem=${origem}`)
       .then((r) => r.json())
       .then((d) => setDocumentos(d.documentos ?? []))
       .catch(() => setErro("Não foi possível carregar os documentos."));
   }
 
-  useEffect(carregar, [colaboradorId]);
+  useEffect(carregar, [colaboradorId, origem]);
 
   async function anexar(arquivo: File) {
     setErro(null);
@@ -77,6 +90,7 @@ function DocumentosColaboradorPanel({ colaboradorId }: { colaboradorId: number }
     try {
       const form = new FormData();
       form.append("arquivo", arquivo);
+      form.append("origem", origem);
       const r = await fetch(`/api/colaboradores/${colaboradorId}/documentos`, { method: "POST", body: form });
       const d = await r.json();
       if (!r.ok) throw new Error(d.erro ?? "Falha ao anexar o documento.");
@@ -99,9 +113,9 @@ function DocumentosColaboradorPanel({ colaboradorId }: { colaboradorId: number }
   }
 
   return (
-    <div className="flex flex-col gap-1.5 rounded border border-hairline bg-surface-page p-2 dark:border-brand-neutral/30">
+    <div className="flex flex-col gap-1.5">
       <div className="flex items-center justify-between">
-        <p className="text-[10.5px] font-semibold text-brand-primary-800 uppercase">Documentos</p>
+        <p className="text-[10px] font-semibold text-foreground-muted uppercase">Documentos</p>
         <label className="cursor-pointer text-[10.5px] font-medium text-brand-primary hover:text-brand-primary-hover">
           {enviando ? "Enviando..." : "+ Anexar"}
           <input
@@ -121,7 +135,7 @@ function DocumentosColaboradorPanel({ colaboradorId }: { colaboradorId: number }
       {documentos === null ? (
         <p className="text-[10.5px] text-foreground-muted">Carregando...</p>
       ) : documentos.length === 0 ? (
-        <p className="text-[10.5px] text-foreground-muted">Nenhum documento anexado ainda.</p>
+        <p className="text-[10.5px] text-foreground-muted">{vazio}</p>
       ) : (
         <div className="flex flex-col divide-y divide-hairline/70">
           {documentos.map((doc) => (
@@ -147,6 +161,143 @@ function DocumentosColaboradorPanel({ colaboradorId }: { colaboradorId: number }
         </div>
       )}
       {erro && <p className="text-[10.5px] text-status-danger">{erro}</p>}
+    </div>
+  );
+}
+
+/** Fichas de EPI/fardamento do colaborador — contam como documento na aba SST, junto dos anexos manuais. */
+function FichasEpiDaAba({ colaboradorId }: { colaboradorId: number }) {
+  const [fichas, setFichas] = useState<FichaResumo[] | null>(null);
+  const [documento, setDocumento] = useState<DocumentoFicha | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+
+  function carregar() {
+    fetch(`/api/sst/epi/fichas?colaboradorId=${colaboradorId}`)
+      .then((r) => r.json())
+      .then((d) => setFichas(d.fichas ?? []))
+      .catch(() => setErro("Não foi possível carregar as fichas de EPI."));
+  }
+
+  useEffect(carregar, [colaboradorId]);
+
+  async function abrirDocumento(id: string) {
+    const r = await fetch(`/api/sst/epi/fichas/${id}`);
+    const d = await r.json();
+    if (r.ok) setDocumento(d.documento);
+  }
+
+  async function excluir(f: FichaResumo) {
+    if (!window.confirm(`Excluir a ficha de ${f.dataEntrega}? ${f.status === "assinada" ? "Já foi assinada." : "O link de assinatura deixa de funcionar."}`))
+      return;
+    const r = await fetch(`/api/sst/epi/fichas/${f.id}`, { method: "DELETE" });
+    if (!r.ok) {
+      window.alert((await r.json()).erro ?? "Não foi possível excluir.");
+      return;
+    }
+    carregar();
+  }
+
+  return (
+    <>
+      <div className="flex flex-col gap-1.5">
+        <p className="text-[10px] font-semibold text-foreground-muted uppercase">Fichas de EPI e fardamento</p>
+        {fichas === null ? (
+          <p className="text-[10.5px] text-foreground-muted">Carregando...</p>
+        ) : fichas.length === 0 ? (
+          <p className="text-[10.5px] text-foreground-muted">Nenhuma ficha registrada ainda.</p>
+        ) : (
+          <div className="flex flex-col divide-y divide-hairline/70">
+            {fichas.map((f) => (
+              <div key={f.id} className="flex items-center gap-2 py-1">
+                <span className="text-[11px] font-medium text-foreground">{f.dataEntrega || "—"}</span>
+                <span className="flex-1 truncate text-[10.5px] font-light text-foreground-muted/80">{f.conteudo}</span>
+                {f.status === "assinada" ? (
+                  <button
+                    type="button"
+                    onClick={() => void abrirDocumento(f.id)}
+                    className="rounded px-1 py-0.5 text-[13px] text-brand-primary hover:bg-brand-primary-100"
+                  >
+                    📎
+                  </button>
+                ) : f.expirada ? (
+                  <span className="text-[10.5px] text-status-danger">Expirada</span>
+                ) : (
+                  <span className="text-[10.5px] text-status-warning">Aguardando</span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => void excluir(f)}
+                  aria-label={`Excluir ficha de ${f.dataEntrega}`}
+                  className="shrink-0 rounded px-1 py-0.5 text-[11px] text-foreground-muted hover:bg-status-danger-bg hover:text-status-danger"
+                >
+                  🗑
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        {erro && <p className="text-[10.5px] text-status-danger">{erro}</p>}
+      </div>
+
+      {documento && (
+        <Modal
+          aberto
+          onFechar={() => setDocumento(null)}
+          eyebrow="Documento assinado"
+          titulo={`Ficha de entrega de EPI nº ${documento.numero}`}
+          subtitulo={documento.colaborador.nome}
+          largura="40rem"
+        >
+          <DocumentoFichaEpi documento={documento} anexoHref={`/api/sst/epi/fichas/${documento.id}/anexo`} />
+        </Modal>
+      )}
+    </>
+  );
+}
+
+/**
+ * Duas abas: "Documentos DP" (RG, CNH, comprovante... anexados manualmente) e
+ * "Documentos SST" (fichas de EPI/fardamento — que também são documentos — +
+ * outros anexos manuais do SST). Guardados no Supabase Storage (bucket privado).
+ */
+function DocumentosColaboradorPanel({ colaboradorId }: { colaboradorId: number }) {
+  const [aba, setAba] = useState<OrigemDocumento>("dp");
+
+  return (
+    <div className="flex flex-col gap-2 rounded border border-hairline bg-surface-page p-2 dark:border-brand-neutral/30">
+      <div className="flex gap-1">
+        {(
+          [
+            { id: "dp" as const, label: "Documentos DP" },
+            { id: "sst" as const, label: "Documentos SST" },
+          ]
+        ).map((a) => (
+          <button
+            key={a.id}
+            type="button"
+            onClick={() => setAba(a.id)}
+            className={cn(
+              "rounded-full px-2 py-0.5 text-[10.5px] font-medium transition-colors",
+              aba === a.id
+                ? "bg-brand-primary-100 text-brand-primary-800"
+                : "text-foreground-muted hover:bg-background hover:text-brand-primary",
+            )}
+          >
+            {a.label}
+          </button>
+        ))}
+      </div>
+
+      {aba === "dp" ? (
+        <ListaDocumentosManual colaboradorId={colaboradorId} origem="dp" vazio="Nenhum documento anexado ainda." />
+      ) : (
+        <>
+          <FichasEpiDaAba colaboradorId={colaboradorId} />
+          <div className="border-t border-hairline/70 pt-1.5">
+            <ListaDocumentosManual colaboradorId={colaboradorId} origem="sst" vazio="Nenhum outro documento do SST anexado ainda." />
+          </div>
+        </>
+      )}
     </div>
   );
 }

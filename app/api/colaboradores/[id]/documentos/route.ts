@@ -13,12 +13,14 @@ async function exigirAdmin() {
   return sessao?.tipo === "administrador" ? sessao : null;
 }
 
-/** Documentos do colaborador (RG, CNH, comprovante...) — anexos guardados no Vercel Blob. Admin-only. */
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+/** Documentos do colaborador (RG, CNH, comprovante...) — anexos guardados no Supabase Storage. Admin-only. */
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!(await exigirAdmin())) return Response.json({ erro: "Sem permissão." }, { status: 403 });
   const id = Number((await params).id);
   if (!Number.isInteger(id) || id <= 0) return Response.json({ erro: "Colaborador inválido." }, { status: 400 });
-  return Response.json({ documentos: await listarDocumentos(id) });
+  const origemParam = new URL(request.url).searchParams.get("origem");
+  const origem = origemParam === "dp" || origemParam === "sst" ? origemParam : undefined;
+  return Response.json({ documentos: await listarDocumentos(id, origem) });
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -41,8 +43,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return Response.json({ erro: "Só é permitido anexar PDF, JPG ou PNG." }, { status: 400 });
   }
   if (arquivo.size > TAMANHO_MAX) return Response.json({ erro: "O arquivo não pode passar de 10MB." }, { status: 400 });
+  const origem = form.get("origem");
+  if (origem !== "dp" && origem !== "sst") {
+    return Response.json({ erro: "Informe a aba (Documentos DP ou Documentos SST)." }, { status: 400 });
+  }
 
   const { url, nome } = await subirArquivoPrivado("colaboradores/documentos", arquivo.name || "documento", arquivo);
-  const documento = await adicionarDocumento(id, { nome, url }, sessao.email);
+  const documento = await adicionarDocumento(id, { nome, url, origem }, sessao.email);
   return Response.json({ documento }, { status: 201 });
 }
