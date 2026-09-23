@@ -49,3 +49,6 @@ _dev.log
 
 .vercel
 .env*
+
+# worktrees isolados de agentes do Claude Code — nunca fazem parte do repo
+/.claude/worktrees/

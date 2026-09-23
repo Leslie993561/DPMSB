@@ -193,7 +193,6 @@ export function Sidebar({ counts, sessao }: { counts?: NavCounts; sessao: Sessao
   const ehAdmin = sessao.tipo === "administrador";
   const liberados = new Set(sessao.liberados);
   const frenteAtual = pathname?.startsWith("/sst") ? "sst" : pathname?.startsWith("/dho") ? "dho" : "dp";
-  const frenteSelecionada = FRENTES.find((f) => f.id === frenteAtual) ?? FRENTES[0];
   const [frenteMenuAberto, setFrenteMenuAberto] = useState(false);
 
   // Gestor comum só vê o que foi liberado pra ele; item sem permissão some da
@@ -214,17 +213,21 @@ export function Sidebar({ counts, sessao }: { counts?: NavCounts; sessao: Sessao
       <Logo />
 
       <div className="relative px-3 pt-1 pb-1">
-        <button
-          type="button"
-          onClick={() => setFrenteMenuAberto((v) => !v)}
-          className="flex w-full items-center gap-2.5 rounded-lg bg-brand-primary-100 px-3 py-2 text-[13px] font-semibold text-brand-primary-800 transition-colors"
-        >
-          <span className="text-brand-primary">
-            <IconePortal />
-          </span>
-          <span className="flex-1 text-left">{frenteSelecionada.label}</span>
-          <span className="text-[10px] text-brand-primary">{frenteMenuAberto ? "▲" : "▼"}</span>
-        </button>
+        <div className="flex w-full items-center gap-2.5 rounded-lg bg-brand-primary-100 px-3 py-2 text-[13px] font-semibold text-brand-primary-800 transition-colors">
+          <Link href="/" className="flex flex-1 items-center gap-2.5">
+            <span className="text-brand-primary">
+              <IconePortal />
+            </span>
+            <span className="text-left">Portal Recursos Humanos</span>
+          </Link>
+          <button
+            type="button"
+            onClick={() => setFrenteMenuAberto((v) => !v)}
+            className="px-1 text-[10px] text-brand-primary"
+          >
+            {frenteMenuAberto ? "▲" : "▼"}
+          </button>
+        </div>
 
         {frenteMenuAberto && (
           <>

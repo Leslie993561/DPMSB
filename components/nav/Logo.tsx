@@ -12,10 +12,6 @@ export function Logo() {
     <div className="relative overflow-hidden px-4 py-5">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/logo-msb.png" alt="MSB" width={104} height={32} className="block" />
-      <div className="mt-4 flex items-center gap-1.5">
-        <span className="h-1.5 w-1.5 rounded-full bg-brand-primary" />
-        <span className="text-[13.5px] font-bold tracking-tight text-foreground">Portal Recursos Humanos</span>
-      </div>
       <svg
         viewBox="0 0 240 40"
         className="pointer-events-none absolute -right-10 -bottom-1.5 w-[150px] opacity-50"
