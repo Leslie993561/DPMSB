@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/cn";
 import { Card } from "@/components/shared/Card";
 import { Badge } from "@/components/shared/Badge";
@@ -30,9 +31,36 @@ export function EpiPageClient({
   matriz: FuncaoEpi[];
   custos: { trimestres: CustoTrimestre[]; linhas: LinhaCustoEpi[] };
 }) {
+  const router = useRouter();
+  // Busca fica aqui, fora da aba: continua valendo ao trocar de aba e voltar.
+  const [busca, setBusca] = useState("");
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <label className="flex w-60 items-center gap-1.5 rounded-full border border-hairline bg-background px-2.5 py-1 focus-within:border-brand-primary">
+          <span aria-hidden className="text-[11px] text-foreground-muted">🔍</span>
+          <input
+            value={busca}
+            onChange={(e) => {
+              setBusca(e.target.value);
+              if (aba !== "colaboradores") router.push("/sst/epi?aba=colaboradores");
+            }}
+            placeholder="Pesquisar colaborador"
+            aria-label="Pesquisar colaborador"
+            className="min-w-0 flex-1 bg-transparent text-[11.5px] text-foreground outline-none"
+          />
+          {busca && (
+            <button
+              type="button"
+              onClick={() => setBusca("")}
+              aria-label="Limpar pesquisa"
+              className="text-[11px] text-foreground-muted hover:text-foreground"
+            >
+              ✕
+            </button>
+          )}
+        </label>
         {ABAS.map((a) => (
           <Link
             key={a.id}
@@ -49,7 +77,9 @@ export function EpiPageClient({
         ))}
       </div>
 
-      {aba === "colaboradores" && <ColaboradoresTab colaboradores={colaboradores} precos={custos.linhas} />}
+      {aba === "colaboradores" && (
+        <ColaboradoresTab colaboradores={colaboradores} precos={custos.linhas} busca={busca} onBusca={setBusca} />
+      )}
       {aba === "matriz" && <MatrizTab matriz={matriz} />}
       {aba === "custos" && <CustosTab custos={custos} />}
     </div>
@@ -59,20 +89,23 @@ export function EpiPageClient({
 function ColaboradoresTab({
   colaboradores,
   precos,
+  busca,
+  onBusca,
 }: {
   colaboradores: ColaboradorEpi[];
   precos: { epi: string; ca: string; valorUnitario: number }[];
+  busca: string;
+  onBusca: (v: string) => void;
 }) {
   const [fichaAberta, setFichaAberta] = useState<ColaboradorEpi | null>(null);
   const [colunaAberta, setColunaAberta] = useState<"vinculo" | "texto" | null>(null);
   const [filtroVinculo, setFiltroVinculo] = useState<string>("");
-  const [filtroTexto, setFiltroTexto] = useState("");
 
   const vinculosDisponiveis = Array.from(
     new Set(colaboradores.map((c) => c.vinculo).filter((v): v is Vinculo => Boolean(v))),
   ).sort();
 
-  const termo = filtroTexto.trim().toLowerCase();
+  const termo = busca.trim().toLowerCase();
   const filtrados = colaboradores.filter((c) => {
     if (filtroVinculo && c.vinculo !== filtroVinculo) return false;
     if (termo && ![c.nome, c.cargo, c.departamento].some((v) => v?.toLowerCase().includes(termo))) return false;
@@ -111,11 +144,11 @@ function ColaboradoresTab({
               <CabecalhoFiltravel
                 label="Colaborador / Cargo · Setor"
                 aberta={colunaAberta === "texto"}
-                ativo={Boolean(filtroTexto)}
+                ativo={Boolean(busca)}
                 onToggle={() => setColunaAberta(colunaAberta === "texto" ? null : "texto")}
                 onFechar={() => setColunaAberta(null)}
               >
-                <CampoTexto valor={filtroTexto} onChange={setFiltroTexto} placeholder="Buscar nome, cargo ou setor" />
+                <CampoTexto valor={busca} onChange={onBusca} placeholder="Buscar nome, cargo ou setor" />
               </CabecalhoFiltravel>
               <th className="px-2 py-1" />
             </tr>
