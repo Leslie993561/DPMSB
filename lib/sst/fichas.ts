@@ -151,10 +151,9 @@ export interface NovaFicha {
 }
 
 /**
- * Registra as entregas e gera a ficha com o link de assinatura. A tabela de
- * entregas do SST tem chave estrangeira para a tabela de colaboradores DELE,
- * que não é o Quadro — o colaborador do Quadro é espelhado lá (mesmo id)
- * antes, na mesma transação.
+ * Registra as entregas e gera a ficha com o link de assinatura. As tabelas do
+ * SST vivem no mesmo banco do Quadro agora, então `colab_id` referencia a
+ * própria `colaboradores` real — sem espelho.
  */
 export async function criarFicha(nova: NovaFicha, responsavel: string, origem: string) {
   const colaborador = await buscarColaborador(nova.colaboradorId);
@@ -166,13 +165,6 @@ export async function criarFicha(nova: NovaFicha, responsavel: string, origem: s
   const itens = nova.itens.map((i) => ({ ...i, id: randomUUID() }));
 
   const numero = await sstTransacao(async (q) => {
-    await q(
-      `INSERT INTO colaboradores (id, cpf, nome, cargo, departamento, origem)
-       VALUES ($1, $2, $3, $4, $5, 'portal-rh')
-       ON CONFLICT (id) DO UPDATE SET cpf = excluded.cpf, nome = excluded.nome, cargo = excluded.cargo,
-         departamento = excluded.departamento, updated_at = now()`,
-      [colaborador.id, colaborador.cpf ?? "", colaborador.nome, colaborador.cargo ?? "", colaborador.departamento ?? ""],
-    );
     const [{ proximo }] = await q<{ proximo: number }>(
       "SELECT COALESCE(MAX(numero), 0) + 1 AS proximo FROM sst_fichas_epi",
     );

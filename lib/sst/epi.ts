@@ -94,9 +94,9 @@ export async function atualizarEpisExtrasDaFuncao(funcao: string, epis: string[]
 }
 
 /**
- * Usa o MESMO cadastro do Quadro de Colaboradores (banco principal do Portal
- * Recursos Humanos) — não o banco separado do SST, que não tem essa base
- * populada. É a lista de quem pode receber EPI, não uma base à parte.
+ * Usa o MESMO cadastro do Quadro de Colaboradores — não uma base à parte. As
+ * tabelas do SST (sst_entregas_epi etc.) vivem no mesmo banco hoje e
+ * referenciam `colaboradores` direto, sem espelho.
  */
 export async function listarColaboradoresParaEpi(): Promise<ColaboradorEpi[]> {
   const [todos, ultimasEntregas, extras] = await Promise.all([

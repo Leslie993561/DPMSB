@@ -275,9 +275,14 @@ export async function obterDashboardSst(): Promise<DashboardSst> {
     programasSaudeRows,
     desligamentosPendentesRows,
   ] = await Promise.all([
+    // sst_colaboradores_legado era a base própria de colaboradores + exames do
+    // antigo Portal SST (banco separado, hoje fora do ar) — não existe mais
+    // neste banco de propósito (o módulo recomeçou do zero, sem migrar aquele
+    // histórico); tolerante() trata a ausência como lista vazia, sem quebrar
+    // o Dashboard. Não confundir com a `colaboradores` real (Quadro).
     tolerante<ColaboradorRow>(
-      "colaboradores",
-      "SELECT id, cpf, nome, cargo, departamento, epis, exames, nascimento, desligado, data_desligamento, motivo_desligamento, desligado_by FROM colaboradores",
+      "sst_colaboradores_legado",
+      "SELECT id, cpf, nome, cargo, departamento, epis, exames, nascimento, desligado, data_desligamento, motivo_desligamento, desligado_by FROM sst_colaboradores_legado",
     ),
     tolerante<EntregaEpiRow>("sst_entregas_epi", "SELECT colab_id, valor_unit, qtd, data_entrega, ficha_id FROM sst_entregas_epi"),
     tolerante<CustoEpiMesRow>("sst_custos_epi_mes", "SELECT mes, orcado, realizado_base FROM sst_custos_epi_mes ORDER BY mes ASC"),
