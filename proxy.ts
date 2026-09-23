@@ -46,6 +46,15 @@ export async function proxy(request: NextRequest) {
     return NextResponse.json({ erro: "Só administradores gerenciam acesso." }, { status: 403 });
   }
 
+  // O SST tem login próprio (Supabase) e é restrito ao RH; nenhum gestor tem
+  // módulo liberado lá, então o portal já barra antes de servir o app.
+  if (pathname === "/sst" || pathname.startsWith("/sst/")) {
+    const destino = request.nextUrl.clone();
+    destino.pathname = "/sem-acesso";
+    destino.search = "";
+    return NextResponse.redirect(destino);
+  }
+
   const liberados = new Set(sessao.liberados);
 
   if (ehApi) {

@@ -129,17 +129,21 @@ function montarGrupos(counts?: NavCounts): GrupoItem[] {
   ];
 }
 
-/** Frentes do portal. SST roda como aplicação separada, em outro domínio. */
+/**
+ * Frentes do portal. O SST é outro app, servido sob /sst deste mesmo domínio
+ * (ver os rewrites em next.config.ts) — abre na mesma janela, como as demais.
+ */
 const FRENTES = [
-  { id: "dp", label: "Departamento Pessoal", href: "/", externo: false },
-  { id: "sst", label: "SST", href: "https://portal-sst-xi.vercel.app", externo: true },
+  { id: "dp", label: "Dashboard DP", href: "/dashboard" },
+  { id: "sst", label: "Dashboard SST", href: "/sst" },
+  { id: "dho", label: "Dashboard DHO", href: "/dho" },
 ] as const;
 
 export function Sidebar({ counts, sessao }: { counts?: NavCounts; sessao: SessaoPayload }) {
   const pathname = usePathname();
   const ehAdmin = sessao.tipo === "administrador";
   const liberados = new Set(sessao.liberados);
-  const [frenteMenuAberto, setFrenteMenuAberto] = useState(false);
+  const frenteAtual = pathname?.startsWith("/sst") ? "sst" : pathname?.startsWith("/dho") ? "dho" : "dp";
 
   // Gestor comum só vê o que foi liberado pra ele; item sem permissão some da
   // lista, e o grupo inteiro some junto se nenhum dos filhos sobrar.
@@ -158,55 +162,21 @@ export function Sidebar({ counts, sessao }: { counts?: NavCounts; sessao: Sessao
     <aside className="flex w-64 shrink-0 flex-col overflow-y-auto border-r border-hairline bg-background">
       <Logo />
 
-      <div className="relative px-3 pt-1 pb-2">
-        <button
-          type="button"
-          onClick={() => setFrenteMenuAberto((v) => !v)}
-          className="flex w-full items-center gap-1.5 rounded-md px-1 py-1 text-[10px] font-semibold tracking-[0.14em] text-foreground-muted uppercase transition-colors hover:bg-surface-page hover:text-brand-primary-800"
-        >
-          <span className="flex-1 text-left">Departamento Pessoal</span>
-          <span aria-hidden className="text-brand-primary">
-            {frenteMenuAberto ? "▲" : "▼"}
-          </span>
-        </button>
-
-        {frenteMenuAberto && (
-          <>
-            <div className="fixed inset-0 z-20" onClick={() => setFrenteMenuAberto(false)} />
-            <div className="absolute top-full left-3 z-30 mt-1 w-56 rounded-md border border-hairline bg-background p-1.5 shadow-drawer">
-              <p className="px-2 pt-1 pb-1.5 text-[9.5px] font-semibold tracking-wide text-foreground-muted uppercase">
-                Outras frentes
-              </p>
-              {FRENTES.map((f) => {
-                const classe = cn(
-                  "flex items-center gap-1.5 rounded px-2 py-1.5 text-[12.5px] font-medium transition-colors",
-                  f.externo
-                    ? "text-foreground hover:bg-surface-page"
-                    : "bg-brand-primary-100 text-brand-primary-800",
-                );
-                return f.externo ? (
-                  <a
-                    key={f.id}
-                    href={f.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => setFrenteMenuAberto(false)}
-                    className={classe}
-                  >
-                    <span className="flex-1">{f.label}</span>
-                    <span aria-hidden className="text-[10px] text-foreground-muted">
-                      ↗
-                    </span>
-                  </a>
-                ) : (
-                  <Link key={f.id} href={f.href} onClick={() => setFrenteMenuAberto(false)} className={classe}>
-                    {f.label}
-                  </Link>
-                );
-              })}
-            </div>
-          </>
-        )}
+      <div className="flex flex-col gap-0.5 px-3 pt-1 pb-2">
+        {FRENTES.map((f) => (
+          <Link
+            key={f.id}
+            href={f.href}
+            className={cn(
+              "block rounded-md px-2 py-1.5 text-[12.5px] font-semibold transition-colors",
+              f.id === frenteAtual
+                ? "bg-brand-primary-100 text-brand-primary-800"
+                : "text-foreground-muted hover:bg-surface-page hover:text-foreground",
+            )}
+          >
+            {f.label}
+          </Link>
+        ))}
       </div>
 
       <nav className="flex flex-1 flex-col gap-1 px-3 pb-2">
