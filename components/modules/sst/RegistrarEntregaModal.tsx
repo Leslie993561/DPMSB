@@ -282,7 +282,19 @@ export function RegistrarEntregaModal({
             })}
           </div>
 
-          <p className="pt-2 text-[11px] font-semibold tracking-wide text-foreground uppercase">Fardamento</p>
+          <div className="flex items-center justify-between pt-2">
+            <p className="text-[11px] font-semibold tracking-wide text-foreground uppercase">Fardamento</p>
+            <button
+              type="button"
+              onClick={() => {
+                const marcar = fardamentoMarcado.length !== itensFardamento.length;
+                itensFardamento.forEach((tipo) => alterarFardamento(tipo, { marcado: marcar }));
+              }}
+              className="text-[11px] font-medium text-brand-primary hover:text-brand-primary-hover"
+            >
+              {fardamentoMarcado.length === itensFardamento.length ? "Desmarcar todos" : "Selecionar todos"}
+            </button>
+          </div>
           <div className="flex flex-col divide-y divide-hairline/70 rounded-md border border-hairline">
             {itensFardamento.map((tipo) => {
               const f = fardamento[tipo];
