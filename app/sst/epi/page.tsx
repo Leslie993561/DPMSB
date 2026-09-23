@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
 import { listarColaboradoresParaEpi, MATRIZ_EPI, obterCustosEpi, obterCustosFardamento } from "@/lib/sst/epi";
 import { obterResumoFichas } from "@/lib/sst/fichas";
+import { obterDashboardSst } from "@/lib/sst/dashboard";
+import { BlocoGestaoEpi } from "@/components/modules/sst/BlocosSst";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { EpiPageClient, type AbaEpi } from "@/components/modules/sst/EpiPageClient";
 
@@ -26,16 +28,19 @@ export default async function SstEpiPage({
   const abaParam = (await searchParams).aba;
   const aba: AbaEpi = ABAS_VALIDAS.includes(abaParam as AbaEpi) ? (abaParam as AbaEpi) : "colaboradores";
 
-  const [colaboradores, custos, fardamento, resumoFichas] = await Promise.all([
+  const [colaboradores, custos, fardamento, resumoFichas, painel] = await Promise.all([
     listarColaboradoresParaEpi(),
     obterCustosEpi(),
     obterCustosFardamento(),
     obterResumoFichas(),
+    obterDashboardSst(),
   ]);
 
   return (
     <div className="space-y-4">
       <PageHeader eyebrow="SST" titulo="Gestão de EPI" subtitulo="Colaboradores, matriz por função e custos" />
+      {/* Mesmo bloco do Dashboard SST (components/modules/sst/BlocosSst.tsx). */}
+      <BlocoGestaoEpi fichasEpi={painel.fichasEpi} custoEpi={painel.custoEpi} comTitulo={false} />
       <EpiPageClient aba={aba} colaboradores={colaboradores} matriz={MATRIZ_EPI} custos={custos} fardamento={fardamento} resumoFichas={resumoFichas} />
     </div>
   );

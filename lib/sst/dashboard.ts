@@ -118,7 +118,11 @@ async function tolerante<T extends object>(nome: string, sql: string): Promise<T
   try {
     return await sstQuery<T>(sql);
   } catch (erro) {
-    console.error(`[sst/dashboard] Falha ao consultar ${nome}`, erro);
+    // 42P01 = tabela inexistente: esperado para peopleflow_desligamento_pendente,
+    // que é de outro app e não existe neste banco. Só erro de verdade vai pro log.
+    if ((erro as { code?: string }).code !== "42P01") {
+      console.error(`[sst/dashboard] Falha ao consultar ${nome}`, erro);
+    }
     return [];
   }
 }
