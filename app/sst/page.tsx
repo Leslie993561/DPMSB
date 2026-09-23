@@ -375,52 +375,6 @@ export default async function SstDashboardPage() {
       <section className="space-y-3">
         <SectionTitle
           aside={
-            <Link href="/sst/exames" className="text-[11px] font-medium text-brand-primary hover:text-brand-primary-hover">
-              Ver exames →
-            </Link>
-          }
-        >
-          Pendências que exigem ação
-        </SectionTitle>
-        <Card className="overflow-hidden">
-          {data.pendenciaRows.length === 0 ? (
-            <p className="p-4 text-[12px] text-foreground-muted">Nenhuma pendência no momento — base em conformidade.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-[10.5px]">
-                <thead>
-                  <tr className="border-b border-hairline bg-background text-left font-bold tracking-wide text-foreground-muted uppercase">
-                    <th className="px-3 py-1.5">Colaborador</th>
-                    <th className="px-3 py-1.5">Departamento</th>
-                    <th className="px-3 py-1.5">Exame</th>
-                    <th className="px-3 py-1.5">Próxima data</th>
-                    <th className="px-3 py-1.5 text-right">Dias em atraso</th>
-                    <th className="px-3 py-1.5">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.pendenciaRows.map((row, i) => (
-                    <tr key={i} className="border-t border-hairline/60">
-                      <td className="px-3 py-1.5 font-semibold text-foreground">{row.nome}</td>
-                      <td className="px-3 py-1.5 text-foreground-muted">{row.departamento}</td>
-                      <td className="px-3 py-1.5 text-foreground-muted">{row.item}</td>
-                      <td className="px-3 py-1.5 text-foreground-muted">{row.vencimento}</td>
-                      <td className="px-3 py-1.5 text-right text-foreground-muted">{row.diasAtraso ?? "—"}</td>
-                      <td className="px-3 py-1.5">
-                        <Badge cor={TOM_BADGE[row.tone]}>{row.status}</Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
-      </section>
-
-      <section className="space-y-3">
-        <SectionTitle
-          aside={
             <span className="text-[11px] text-foreground-muted/70">
               entregas {formatarMoeda(data.custoFardamento.entregasAno)} · reparos {formatarMoeda(data.custoFardamento.reparosAno)} ·
               orçado {formatarMoeda(data.custoFardamento.orcadoAno)}

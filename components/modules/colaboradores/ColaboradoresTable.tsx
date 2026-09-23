@@ -6,7 +6,7 @@ import { Badge, type CorBadge } from "@/components/shared/Badge";
 import { formatarDataBr, formatarMoeda } from "@/lib/format";
 import { cn } from "@/lib/cn";
 
-const COR_VINCULO: Record<Vinculo, CorBadge> = {
+export const COR_VINCULO: Record<Vinculo, CorBadge> = {
   CLT: "azul",
   "CLT-bio": "azul",
   PJ: "verde",
@@ -435,7 +435,7 @@ export function ColaboradoresTable({
   );
 }
 
-function CabecalhoFiltravel({
+export function CabecalhoFiltravel({
   label,
   aberta,
   ativo,
@@ -471,7 +471,7 @@ function CabecalhoFiltravel({
   );
 }
 
-function CampoTexto({
+export function CampoTexto({
   valor,
   onChange,
   placeholder,

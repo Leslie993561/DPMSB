@@ -4,7 +4,10 @@ import { useState } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { Card } from "@/components/shared/Card";
+import { Badge } from "@/components/shared/Badge";
+import { CabecalhoFiltravel, CampoTexto, COR_VINCULO } from "@/components/modules/colaboradores/ColaboradoresTable";
 import { formatarMoeda } from "@/lib/format";
+import type { Vinculo } from "@/lib/db/colaboradores";
 import type { ColaboradorEpi, CustoTrimestre, FuncaoEpi, LinhaCustoEpi } from "@/lib/sst/epi";
 
 export type AbaEpi = "colaboradores" | "matriz" | "custos";
@@ -80,35 +83,90 @@ function MenuFicha() {
 }
 
 function ColaboradoresTab({ colaboradores }: { colaboradores: ColaboradorEpi[] }) {
-  if (colaboradores.length === 0) {
-    return (
-      <Card className="p-6 text-center text-[12px] text-foreground-muted">Nenhum colaborador ativo cadastrado.</Card>
-    );
-  }
+  const [colunaAberta, setColunaAberta] = useState<"vinculo" | "texto" | null>(null);
+  const [filtroVinculo, setFiltroVinculo] = useState<string>("");
+  const [filtroTexto, setFiltroTexto] = useState("");
+
+  const vinculosDisponiveis = Array.from(
+    new Set(colaboradores.map((c) => c.vinculo).filter((v): v is Vinculo => Boolean(v))),
+  ).sort();
+
+  const termo = filtroTexto.trim().toLowerCase();
+  const filtrados = colaboradores.filter((c) => {
+    if (filtroVinculo && c.vinculo !== filtroVinculo) return false;
+    if (termo && ![c.nome, c.cargo, c.departamento].some((v) => v?.toLowerCase().includes(termo))) return false;
+    return true;
+  });
+
   return (
-    <Card className="overflow-x-auto p-0">
-      <table className="w-full text-[12px]">
-        <thead>
-          <tr className="border-b border-hairline bg-background text-left font-bold tracking-wide text-foreground-muted uppercase">
-            <th className="px-3 py-2 text-[10.5px]">Nome</th>
-            <th className="px-3 py-2 text-[10.5px]">Cargo</th>
-            <th className="px-3 py-2 text-[10.5px]">Departamento</th>
-            <th className="px-2 py-2" />
-          </tr>
-        </thead>
-        <tbody>
-          {colaboradores.map((c) => (
-            <tr key={c.id} className="border-t border-hairline/60">
-              <td className="px-3 py-1.5 font-semibold text-foreground">{c.nome}</td>
-              <td className="px-3 py-1.5 text-foreground-muted">{c.cargo ?? "—"}</td>
-              <td className="px-3 py-1.5 text-foreground-muted">{c.departamento ?? "—"}</td>
-              <td className="px-2 py-1.5 text-right">
-                <MenuFicha />
-              </td>
+    <Card className="overflow-hidden p-0">
+      <div className="max-h-[calc(100vh-260px)] overflow-x-auto overflow-y-auto">
+        <table className="w-full text-[11.5px]">
+          <thead className="sticky top-0 z-10">
+            <tr className="border-b border-hairline bg-surface-page text-left text-[9.5px] font-semibold tracking-wide text-foreground-muted uppercase">
+              <CabecalhoFiltravel
+                label="Vínculo"
+                aberta={colunaAberta === "vinculo"}
+                ativo={Boolean(filtroVinculo)}
+                onToggle={() => setColunaAberta(colunaAberta === "vinculo" ? null : "vinculo")}
+                onFechar={() => setColunaAberta(null)}
+              >
+                <div className="flex flex-col items-start gap-1">
+                  {["", ...vinculosDisponiveis].map((v) => (
+                    <button
+                      key={v || "todos"}
+                      type="button"
+                      onClick={() => {
+                        setFiltroVinculo(v);
+                        setColunaAberta(null);
+                      }}
+                      className={filtroVinculo === v ? "font-semibold text-brand-primary-800" : "text-foreground-muted"}
+                    >
+                      {v || "Todos"}
+                    </button>
+                  ))}
+                </div>
+              </CabecalhoFiltravel>
+              <CabecalhoFiltravel
+                label="Colaborador / Cargo · Setor"
+                aberta={colunaAberta === "texto"}
+                ativo={Boolean(filtroTexto)}
+                onToggle={() => setColunaAberta(colunaAberta === "texto" ? null : "texto")}
+                onFechar={() => setColunaAberta(null)}
+              >
+                <CampoTexto valor={filtroTexto} onChange={setFiltroTexto} placeholder="Buscar nome, cargo ou setor" />
+              </CabecalhoFiltravel>
+              <th className="px-2 py-1" />
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {filtrados.length === 0 ? (
+              <tr>
+                <td colSpan={3} className="px-3 py-4 text-center text-foreground-muted">
+                  Nenhum colaborador encontrado.
+                </td>
+              </tr>
+            ) : (
+              filtrados.map((c) => (
+                <tr key={c.id} className="border-b border-hairline/70 last:border-0 hover:bg-surface-page/60">
+                  <td className="w-20 px-3 py-1">
+                    {c.vinculo ? <Badge cor={COR_VINCULO[c.vinculo]}>{c.vinculo}</Badge> : "—"}
+                  </td>
+                  <td className="px-3 py-1">
+                    <div className="font-medium text-foreground uppercase">{c.nome}</div>
+                    <div className="text-[10px] text-foreground-muted">
+                      {c.cargo ?? "—"} · {c.departamento ?? "—"}
+                    </div>
+                  </td>
+                  <td className="px-2 py-1 text-right">
+                    <MenuFicha />
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </Card>
   );
 }

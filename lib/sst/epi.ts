@@ -1,5 +1,5 @@
 import "server-only";
-import { listarColaboradores } from "@/lib/db/colaboradores";
+import { listarColaboradores, type Vinculo } from "@/lib/db/colaboradores";
 import { sstQuery } from "./db";
 
 export interface ColaboradorEpi {
@@ -7,6 +7,7 @@ export interface ColaboradorEpi {
   nome: string;
   cargo: string | null;
   departamento: string | null;
+  vinculo: Vinculo | null;
 }
 
 /**
@@ -18,7 +19,7 @@ export async function listarColaboradoresParaEpi(): Promise<ColaboradorEpi[]> {
   const todos = await listarColaboradores();
   return todos
     .filter((c) => c.status !== "desligado")
-    .map((c) => ({ id: c.id, nome: c.nome, cargo: c.cargo, departamento: c.departamento }));
+    .map((c) => ({ id: c.id, nome: c.nome, cargo: c.cargo, departamento: c.departamento, vinculo: c.vinculo }));
 }
 
 export interface FuncaoEpi {
