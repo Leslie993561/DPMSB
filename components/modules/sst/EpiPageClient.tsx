@@ -271,9 +271,11 @@ function MatrizTab({ matriz, catalogoEpi }: { matriz: (FuncaoEpi & { fixos: numb
             onClick={() => setEditando(f)}
             title="Adicionar EPI a esta função"
             aria-label={`Adicionar EPI a ${f.funcao}`}
-            className="absolute top-2 right-2 rounded p-1 text-foreground-muted hover:bg-brand-surface hover:text-brand-primary"
+            className="absolute top-2 right-2 rounded p-1 text-foreground-muted/50 hover:bg-brand-surface hover:text-foreground"
           >
-            ✏️
+            <svg viewBox="0 0 20 20" fill="currentColor" className="h-2.5 w-2.5" aria-hidden>
+              <path d="M14.85 2.15a1.5 1.5 0 0 1 2.12 0l.88.88a1.5 1.5 0 0 1 0 2.12l-1.1 1.1-3-3 1.1-1.1Zm-2.16 2.16 3 3L6.94 16.06a1 1 0 0 1-.46.26l-3.1.83.83-3.1a1 1 0 0 1 .26-.46L12.7 4.3Z" />
+            </svg>
           </button>
           <div className="flex items-center gap-2 pr-6">
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-brand-primary-100 text-brand-primary-800">
