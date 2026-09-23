@@ -1,9 +1,9 @@
 import Link from "next/link";
 
 const FRENTES = [
-  { href: "/dashboard", titulo: "Dashboard DP", descricao: "Departamento Pessoal: férias, folha, colaboradores e rescisão." },
-  { href: "/sst", titulo: "Dashboard SST", descricao: "Segurança e Saúde no Trabalho: EPI, exames, fardamento e acessos." },
-  { href: "/dho", titulo: "Dashboard DHO", descricao: "Desenvolvimento Humano e Organizacional." },
+  { href: "/dashboard", titulo: "Portal DP", descricao: "Departamento Pessoal: férias, folha, colaboradores e rescisão." },
+  { href: "/sst", titulo: "Portal SST", descricao: "Segurança e Saúde no Trabalho: EPI, exames, fardamento e acessos." },
+  { href: "/dho", titulo: "Portal DHO", descricao: "Desenvolvimento Humano e Organizacional." },
 ];
 
 export default function Home() {

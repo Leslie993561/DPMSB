@@ -56,6 +56,46 @@ function IconeBeneficios() {
   );
 }
 
+function IconePortal() {
+  return (
+    <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+      <path d="M4 4a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4Zm7 0a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1V4ZM4 11a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-3Zm7 0a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1v-3Z" />
+    </svg>
+  );
+}
+
+function IconeEpi() {
+  return (
+    <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M10 2 3 5v5c0 4.42 2.98 8.1 7 9 4.02-.9 7-4.58 7-9V5l-7-3Zm-1.2 11.2L5.6 10l1.4-1.4 1.8 1.8L14 6.2l1.4 1.4-6.6 5.6Z"
+      />
+    </svg>
+  );
+}
+
+function IconeExames() {
+  return (
+    <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+      <path d="M8 2a1 1 0 0 0-1 1v1H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-1V3a1 1 0 1 0-2 0v1H9V3a1 1 0 0 0-1-1Zm-1 8h6v2H7v-2Zm0 3.5h4v2H7v-2Z" />
+    </svg>
+  );
+}
+
+function IconeProgramas() {
+  return (
+    <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M5 2a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.83a2 2 0 0 0-.59-1.42l-4.82-4.82A2 2 0 0 0 10.17 2H5Zm1 9h8v1.5H6V11Zm0 3.5h8V16H6v-1.5Z"
+      />
+    </svg>
+  );
+}
+
 function IconeSair() {
   return (
     <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
@@ -130,13 +170,22 @@ function montarGrupos(counts?: NavCounts): GrupoItem[] {
 }
 
 /**
- * Frentes do portal. O SST é outro app, servido sob /sst deste mesmo domínio
- * (ver os rewrites em next.config.ts) — abre na mesma janela, como as demais.
+ * Frentes do portal. Cada uma é servida por páginas DESTE MESMO app Next.js
+ * (mesma sidebar, mesmo layout) — nenhuma delas leva a outro site ou abre
+ * outra aba. O SST está em migração: por enquanto só o Dashboard é real, os
+ * demais módulos mostram "em construção" até serem portados.
  */
 const FRENTES = [
-  { id: "dp", label: "Dashboard DP", href: "/dashboard" },
-  { id: "sst", label: "Dashboard SST", href: "/sst" },
-  { id: "dho", label: "Dashboard DHO", href: "/dho" },
+  { id: "dp", label: "Portal DP", href: "/dashboard" },
+  { id: "sst", label: "Portal SST", href: "/sst" },
+  { id: "dho", label: "Portal DHO", href: "/dho" },
+] as const;
+
+const MODULOS_SST = [
+  { id: "sst-dashboard", label: "Dashboard", href: "/sst", Icone: IconeBreakdown },
+  { id: "sst-epi", label: "Gestão de EPI", href: "/sst/epi", Icone: IconeEpi },
+  { id: "sst-exames", label: "Exames Ocupacionais", href: "/sst/exames", Icone: IconeExames },
+  { id: "sst-programas", label: "Programas SST", href: "/sst/programas", Icone: IconeProgramas },
 ] as const;
 
 export function Sidebar({ counts, sessao }: { counts?: NavCounts; sessao: SessaoPayload }) {
@@ -144,6 +193,8 @@ export function Sidebar({ counts, sessao }: { counts?: NavCounts; sessao: Sessao
   const ehAdmin = sessao.tipo === "administrador";
   const liberados = new Set(sessao.liberados);
   const frenteAtual = pathname?.startsWith("/sst") ? "sst" : pathname?.startsWith("/dho") ? "dho" : "dp";
+  const frenteSelecionada = FRENTES.find((f) => f.id === frenteAtual) ?? FRENTES[0];
+  const [frenteMenuAberto, setFrenteMenuAberto] = useState(false);
 
   // Gestor comum só vê o que foi liberado pra ele; item sem permissão some da
   // lista, e o grupo inteiro some junto se nenhum dos filhos sobrar.
@@ -162,25 +213,76 @@ export function Sidebar({ counts, sessao }: { counts?: NavCounts; sessao: Sessao
     <aside className="flex w-64 shrink-0 flex-col overflow-y-auto border-r border-hairline bg-background">
       <Logo />
 
-      <div className="flex flex-col gap-0.5 px-3 pt-1 pb-2">
-        {FRENTES.map((f) => (
-          <Link
-            key={f.id}
-            href={f.href}
-            className={cn(
-              "block rounded-md px-2 py-1.5 text-[12.5px] font-semibold transition-colors",
-              f.id === frenteAtual
-                ? "bg-brand-primary-100 text-brand-primary-800"
-                : "text-foreground-muted hover:bg-surface-page hover:text-foreground",
-            )}
-          >
-            {f.label}
-          </Link>
-        ))}
+      <div className="relative px-3 pt-1 pb-1">
+        <button
+          type="button"
+          onClick={() => setFrenteMenuAberto((v) => !v)}
+          className="flex w-full items-center gap-2.5 rounded-lg bg-brand-primary-100 px-3 py-2 text-[13px] font-semibold text-brand-primary-800 transition-colors"
+        >
+          <span className="text-brand-primary">
+            <IconePortal />
+          </span>
+          <span className="flex-1 text-left">{frenteSelecionada.label}</span>
+          <span className="text-[10px] text-brand-primary">{frenteMenuAberto ? "▲" : "▼"}</span>
+        </button>
+
+        {frenteMenuAberto && (
+          <>
+            <div className="fixed inset-0 z-20" onClick={() => setFrenteMenuAberto(false)} />
+            <div className="relative z-30 mt-0.5 mb-1 ml-[21px] flex flex-col gap-0.5 border-l border-hairline pl-3">
+              {FRENTES.map((f) => (
+                <Link
+                  key={f.id}
+                  href={f.href}
+                  onClick={() => setFrenteMenuAberto(false)}
+                  className={cn(
+                    "flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[12.5px] font-normal transition-colors",
+                    f.id === frenteAtual
+                      ? "text-brand-primary-800"
+                      : "text-foreground-muted hover:bg-surface-page hover:text-foreground",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "h-[5px] w-[5px] shrink-0 rounded-full",
+                      f.id === frenteAtual ? "bg-brand-primary" : "bg-brand-surface",
+                    )}
+                  />
+                  <span>{f.label}</span>
+                </Link>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
       <nav className="flex flex-1 flex-col gap-1 px-3 pb-2">
-        {grupos.map((grupo) => {
+        {frenteAtual === "dho" && (
+          <p className="px-2 py-2 text-[11.5px] text-foreground-muted">Nenhum módulo de DHO cadastrado ainda.</p>
+        )}
+        {frenteAtual === "sst" &&
+          MODULOS_SST.map((m) => {
+            const ativo = pathname === m.href || pathname?.startsWith(`${m.href}/`);
+            return (
+              <Link
+                key={m.id}
+                href={m.href}
+                className={cn(
+                  "flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-semibold transition-colors",
+                  ativo
+                    ? "bg-brand-primary-100 text-brand-primary-800"
+                    : "text-foreground-muted hover:bg-surface-page hover:text-foreground",
+                )}
+              >
+                <span className={cn(ativo ? "text-brand-primary" : "text-brand-neutral")}>
+                  <m.Icone />
+                </span>
+                <span>{m.label}</span>
+              </Link>
+            );
+          })}
+        {frenteAtual === "dp" &&
+        grupos.map((grupo) => {
           const grupoAtivo = pathname === grupo.base || pathname?.startsWith(`${grupo.base}/`);
           const expandido = aberto === grupo.id;
           return (
