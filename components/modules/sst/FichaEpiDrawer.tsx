@@ -138,7 +138,8 @@ export function FichaEpiDrawer({
               <div className="mt-2 flex flex-col divide-y divide-hairline/70 rounded-md border border-hairline">
                 {fichas.map((f) => (
                   <div key={f.id} className="flex items-center gap-2 px-3 py-2">
-                    <span className="flex-1 text-[12.5px] font-medium text-foreground">{f.dataEntrega || "—"}</span>
+                    <span className="text-[12.5px] font-medium text-foreground">{f.dataEntrega || "—"}</span>
+                    <span className="flex-1 truncate text-center text-[10.5px] font-light whitespace-nowrap text-foreground-muted/80">{f.conteudo}</span>
                     {f.status === "assinada" ? (
                       <button
                         type="button"

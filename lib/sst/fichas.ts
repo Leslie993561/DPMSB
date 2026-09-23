@@ -51,6 +51,8 @@ export interface FichaResumo {
   numero: number;
   status: "aguardando" | "assinada";
   dataEntrega: string;
+  /** O que a ficha levou: "EPI", "Fardamento" ou "EPI e Fardamento". */
+  conteudo: string;
   expirada: boolean;
   /** Link para reenviar enquanto aguarda assinatura. */
   link: string | null;
@@ -66,6 +68,12 @@ function primeiraData(datas: string[]): string {
   const validas = datas.filter((d) => /^\d{2}\/\d{2}\/\d{4}$/.test(d));
   if (validas.length === 0) return "";
   return validas.sort((a, b) => a.split("/").reverse().join("").localeCompare(b.split("/").reverse().join("")))[0];
+}
+
+function conteudoDaFicha(itens: ItemFicha[]): string {
+  const temEpi = itens.some((i) => i.categoria === "epi");
+  const temFardamento = itens.some((i) => i.categoria === "fardamento");
+  return temEpi && temFardamento ? "EPI e Fardamento" : temFardamento ? "Fardamento" : "EPI";
 }
 
 export function linkAssinatura(origem: string, token: string): string {
@@ -232,6 +240,7 @@ export async function listarFichasDoColaborador(colaboradorId: number, origem: s
     numero: f.numero,
     status: f.status,
     dataEntrega: primeiraData((itens.get(f.id) ?? []).map((i) => i.dataEntrega)),
+    conteudo: conteudoDaFicha(itens.get(f.id) ?? []),
     expirada: expirou(f),
     link: f.status === "aguardando" ? linkAssinatura(origem, f.token) : null,
   }));
