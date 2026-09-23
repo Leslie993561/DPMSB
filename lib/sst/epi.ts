@@ -126,6 +126,21 @@ export const MATRIZ_EPI: FuncaoEpi[] = [
   },
 ];
 
+/**
+ * Preço base de cada EPI (catálogo do Portal SST original, `epiCatalogo.json`).
+ * Um preço cadastrado em sst_epi_precos, quando existir, prevalece sobre este.
+ */
+export const EPI_CATALOGO: { equip: string; valor: number }[] = [
+  { equip: "Calçado Antiderrapante", valor: 80 },
+  { equip: "Sandália", valor: 35 },
+  { equip: "Abafador 3M Muffler", valor: 80 },
+  { equip: "Protetor Auricular Interno", valor: 1 },
+  { equip: "Máscara Semifacial", valor: 70 },
+  { equip: "Óculos de Proteção com UV", valor: 10 },
+  { equip: "Óculos de Proteção Transparente", valor: 10 },
+  { equip: "Bota-biqueira de PVC", valor: 120 },
+];
+
 interface LinhaEntregaEpi {
   epi: string;
   qtd: number;
@@ -175,8 +190,11 @@ export async function obterCustosEpi(): Promise<DashboardCustosEpi> {
   const anoAtual = new Date().getFullYear();
 
   const [entregas, precos] = await Promise.all([
-    sstQuery<LinhaEntregaEpi>("SELECT epi, qtd, valor_unit, data_entrega FROM sst_entregas_epi"),
-    sstQuery<LinhaPrecoEpi>("SELECT equip, valor FROM sst_epi_precos"),
+    // ::float8 porque o pg devolve `numeric` como texto — somar texto concatenaria.
+    sstQuery<LinhaEntregaEpi>(
+      "SELECT epi, qtd, valor_unit::float8 AS valor_unit, data_entrega FROM sst_entregas_epi",
+    ),
+    sstQuery<LinhaPrecoEpi>("SELECT equip, valor::float8 AS valor FROM sst_epi_precos"),
   ]);
 
   const trimestres: CustoTrimestre[] = ROTULO_TRIMESTRE.map((label) => ({ label, quantidade: 0, valor: 0 }));
@@ -189,7 +207,11 @@ export async function obterCustosEpi(): Promise<DashboardCustosEpi> {
     trimestres[q].valor += e.qtd * e.valor_unit;
   }
 
-  const precoPorEpi = new Map(precos.map((p) => [p.equip, p.valor]));
+  const precoPorEpi = new Map<string, number>([
+    ...EPI_CATALOGO.map((c) => [c.equip, c.valor] as const),
+    ...precos.map((p) => [p.equip, p.valor] as const),
+  ]);
+  const ordemCatalogo = new Map(EPI_CATALOGO.map((c, i) => [c.equip, i]));
   const somaQtdPorEpi = new Map<string, number>();
   const somaValorPorEpi = new Map<string, number>();
   for (const e of entregas) {
@@ -205,7 +227,12 @@ export async function obterCustosEpi(): Promise<DashboardCustosEpi> {
       const valorUnitario = precoPorEpi.get(epi) ?? (quantidade > 0 ? somaValor / quantidade : 0);
       return { epi, quantidade, valorUnitario, valorTotal: quantidade * valorUnitario };
     })
-    .sort((a, b) => b.valorTotal - a.valorTotal || a.epi.localeCompare(b.epi, "pt-BR"));
+    .sort(
+      (a, b) =>
+        b.valorTotal - a.valorTotal ||
+        (ordemCatalogo.get(a.epi) ?? 99) - (ordemCatalogo.get(b.epi) ?? 99) ||
+        a.epi.localeCompare(b.epi, "pt-BR"),
+    );
 
   return { trimestres, linhas };
 }

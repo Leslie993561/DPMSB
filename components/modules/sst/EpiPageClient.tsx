@@ -72,9 +72,14 @@ function MenuFicha() {
           <div className="fixed inset-0 z-20" onClick={() => setAberto(false)} />
           <div className="absolute top-full right-0 z-30 mt-1 w-40 rounded-md border border-hairline bg-background p-1 shadow-drawer">
             {/* Sem ação ainda — a ficha de entrega depende de uma aba de fichas/histórico que ainda não existe. */}
-            <span className="block cursor-not-allowed rounded px-2 py-1.5 text-[12px] text-foreground-muted/50">
-              Enviar ficha
-            </span>
+            {["Ver ficha", "Enviar ficha"].map((opcao) => (
+              <span
+                key={opcao}
+                className="block cursor-not-allowed rounded px-2 py-1.5 text-[12px] text-foreground-muted/50"
+              >
+                {opcao}
+              </span>
+            ))}
           </div>
         </>
       )}
@@ -100,7 +105,7 @@ function ColaboradoresTab({ colaboradores }: { colaboradores: ColaboradorEpi[] }
 
   return (
     <Card className="overflow-hidden p-0">
-      <div className="max-h-[calc(100vh-260px)] overflow-x-auto overflow-y-auto">
+      <div className="max-h-[calc(100vh-180px)] overflow-x-auto overflow-y-auto">
         <table className="w-full text-[11.5px]">
           <thead className="sticky top-0 z-10">
             <tr className="border-b border-hairline bg-surface-page text-left text-[9.5px] font-semibold tracking-wide text-foreground-muted uppercase">

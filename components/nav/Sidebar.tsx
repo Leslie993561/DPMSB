@@ -291,7 +291,8 @@ export function Sidebar({ counts, sessao }: { counts?: NavCounts; sessao: Sessao
         )}
         {frenteAtual === "sst" &&
           MODULOS_SST.map((m) => {
-            const ativo = pathname === m.href || pathname?.startsWith(`${m.href}/`);
+            // O Dashboard é a raiz /sst: com startsWith ele acendia junto em /sst/epi etc.
+            const ativo = m.href === "/sst" ? pathname === "/sst" : pathname === m.href || pathname?.startsWith(`${m.href}/`);
             return (
               <Link
                 key={m.id}
