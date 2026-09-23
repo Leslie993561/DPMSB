@@ -12,13 +12,13 @@ function Toggle({ ligado, onClick, titulo }: { ligado: boolean; onClick: () => v
       onClick={onClick}
       title={titulo}
       aria-pressed={ligado}
-      className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${
+      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
         ligado ? "bg-brand-primary" : "bg-brand-surface"
       }`}
     >
       <span
-        className={`absolute top-0.5 h-4 w-4 rounded-full bg-brand-white shadow-sm transition-transform ${
-          ligado ? "translate-x-4" : "translate-x-0.5"
+        className={`absolute top-0.5 h-5 w-5 rounded-full bg-brand-white shadow-sm transition-transform ${
+          ligado ? "translate-x-5" : "translate-x-0.5"
         }`}
       />
     </button>
@@ -93,20 +93,20 @@ export function PermissoesGestorModal({
       eyebrow="Controle de acesso"
       titulo={gestor ? `Permissões de ${gestor.nome}` : ""}
       subtitulo={gestor?.email}
-      largura="34rem"
+      largura="42rem"
     >
       {carregando ? (
-        <p className="py-6 text-center text-[12.5px] text-foreground-muted">Carregando…</p>
+        <p className="py-6 text-center text-[13px] text-foreground-muted">Carregando…</p>
       ) : (
-        <div className="flex flex-col gap-3">
-          <p className="text-[11.5px] text-foreground-muted">
+        <div className="flex flex-col gap-4">
+          <p className="text-[12.5px] text-foreground-muted">
             Marque os módulos e submódulos que {gestor?.nome} pode ver no portal. Tudo começa bloqueado.
           </p>
-          <p className="rounded-md bg-brand-primary-050 px-3 py-2 text-[11px] text-brand-primary-800">
+          <p className="rounded-md bg-brand-primary-050 px-3.5 py-2.5 text-[12px] text-brand-primary-800">
             A mudança vale a partir do próximo login — se {gestor?.nome} já estiver com o portal aberto, precisa
             sair e entrar de novo pra ver o efeito.
           </p>
-          {erro && <p className="rounded-md bg-status-danger/10 px-3 py-2 text-[11.5px] text-status-danger">{erro}</p>}
+          {erro && <p className="rounded-md bg-status-danger/10 px-3.5 py-2.5 text-[12.5px] text-status-danger">{erro}</p>}
 
           <div className="flex flex-col divide-y divide-hairline rounded-md border border-hairline">
             {MODULOS_PORTAL.map((modulo) => {
@@ -115,13 +115,13 @@ export function PermissoesGestorModal({
               const algumLigado = filhos.some((f) => liberados.has(f.chave));
 
               return (
-                <div key={modulo.chave} className="px-3 py-2">
-                  <div className="flex items-center gap-2.5">
-                    <span className="min-w-0 flex-1 text-[12.5px] font-semibold text-foreground">{modulo.label}</span>
+                <div key={modulo.chave} className="px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <span className="min-w-0 flex-1 text-[14px] font-semibold text-foreground">{modulo.label}</span>
                     {filhos.length > 0 ? (
                       <>
                         {algumLigado && !todosLigados && (
-                          <span className="text-[10px] text-foreground-muted">parcial</span>
+                          <span className="text-[11px] text-foreground-muted">parcial</span>
                         )}
                         <Toggle
                           ligado={todosLigados}
@@ -139,10 +139,10 @@ export function PermissoesGestorModal({
                   </div>
 
                   {filhos.length > 0 && (
-                    <div className="mt-1.5 ml-1 flex flex-col gap-1.5 border-l border-hairline pl-3">
+                    <div className="mt-2.5 ml-1 flex flex-col gap-2.5 border-l border-hairline pl-4">
                       {filhos.map((filho) => (
-                        <div key={filho.chave} className="flex items-center gap-2.5">
-                          <span className="min-w-0 flex-1 text-[12px] text-foreground-muted">{filho.label}</span>
+                        <div key={filho.chave} className="flex items-center gap-3">
+                          <span className="min-w-0 flex-1 text-[13px] text-foreground-muted">{filho.label}</span>
                           <Toggle
                             ligado={liberados.has(filho.chave)}
                             onClick={() => alternarFolha(filho.chave)}
@@ -157,7 +157,7 @@ export function PermissoesGestorModal({
             })}
           </div>
 
-          <p className="text-[10.5px] text-foreground-muted">{salvando ? "Salvando…" : "Alterações salvas automaticamente."}</p>
+          <p className="text-[11.5px] text-foreground-muted">{salvando ? "Salvando…" : "Alterações salvas automaticamente."}</p>
         </div>
       )}
     </Modal>
