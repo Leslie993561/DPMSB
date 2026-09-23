@@ -8,6 +8,50 @@ export interface ColaboradorEpi {
   cargo: string | null;
   departamento: string | null;
   vinculo: Vinculo | null;
+  /** E-mail profissional — é com ele que o colaborador confirma a identidade ao assinar a ficha. */
+  email: string | null;
+  /** Função da matriz de EPI que corresponde ao cargo/setor — null se nenhuma bate. */
+  funcaoMatriz: string | null;
+  episObrigatorios: string[];
+}
+
+const PALAVRAS_IGNORADAS = new Set(["de", "da", "do", "das", "dos", "em", "e", "a", "i", "ii", "iii"]);
+
+/** "Líder De Manutenção" → {lider, manut}: sem acento, sem conectivos, 5 letras (logística ≈ logístico). */
+function radicais(texto: string | null): string[] {
+  return (texto ?? "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z\s]/g, " ")
+    .split(/\s+/)
+    .filter((p) => p && !PALAVRAS_IGNORADAS.has(p))
+    .map((p) => p.slice(0, 5));
+}
+
+/**
+ * O Quadro guarda cargo e setor separados ("Auxiliar" · "Produção"); a matriz
+ * usa o nome da função inteiro ("Auxiliar De Produção"). Casa quando TODO o
+ * cargo está no nome da função e a maior parte da função é coberta por
+ * cargo + setor — "Auxiliar" · "Administrativo" não vira Auxiliar de Produção.
+ */
+export function funcaoDaMatriz(cargo: string | null, departamento: string | null): FuncaoEpi | null {
+  const doCargo = radicais(cargo);
+  if (doCargo.length === 0) return null;
+  const doColaborador = new Set([...doCargo, ...radicais(departamento)]);
+
+  let melhor: { funcao: FuncaoEpi; cobertura: number; tamanho: number } | null = null;
+  for (const funcao of MATRIZ_EPI) {
+    const daFuncao = radicais(funcao.funcao);
+    if (!doCargo.every((r) => daFuncao.includes(r))) continue;
+    const cobertura = daFuncao.filter((r) => doColaborador.has(r)).length / daFuncao.length;
+    if (cobertura < 0.6) continue;
+    // Empate (ex.: Auxiliar de Produção e Auxiliar de Produção I, mesmos EPIs): fica o nome mais curto.
+    if (!melhor || cobertura > melhor.cobertura || (cobertura === melhor.cobertura && funcao.funcao.length < melhor.tamanho)) {
+      melhor = { funcao, cobertura, tamanho: funcao.funcao.length };
+    }
+  }
+  return melhor?.funcao ?? null;
 }
 
 /**
@@ -19,7 +63,19 @@ export async function listarColaboradoresParaEpi(): Promise<ColaboradorEpi[]> {
   const todos = await listarColaboradores();
   return todos
     .filter((c) => c.status !== "desligado")
-    .map((c) => ({ id: c.id, nome: c.nome, cargo: c.cargo, departamento: c.departamento, vinculo: c.vinculo }));
+    .map((c) => {
+      const funcao = funcaoDaMatriz(c.cargo, c.departamento);
+      return {
+        id: c.id,
+        nome: c.nome,
+        cargo: c.cargo,
+        departamento: c.departamento,
+        vinculo: c.vinculo,
+        email: c.email,
+        funcaoMatriz: funcao?.funcao ?? null,
+        episObrigatorios: funcao?.epis ?? [],
+      };
+    });
 }
 
 export interface FuncaoEpi {
@@ -148,9 +204,16 @@ interface LinhaEntregaEpi {
   data_entrega: string;
 }
 
-interface LinhaPrecoEpi {
-  equip: string;
-  valor: number;
+/** Preço vigente de cada EPI: catálogo base, sobrescrito pelo que estiver em sst_epi_precos. */
+export async function obterPrecosEpi(): Promise<Map<string, number>> {
+  // ::float8 porque o pg devolve `numeric` como texto — somar texto concatenaria.
+  const precos = await sstQuery<{ equip: string; valor: number }>(
+    "SELECT equip, valor::float8 AS valor FROM sst_epi_precos",
+  );
+  return new Map<string, number>([
+    ...EPI_CATALOGO.map((c) => [c.equip, c.valor] as const),
+    ...precos.map((p) => [p.equip, p.valor] as const),
+  ]);
 }
 
 export interface CustoTrimestre {
@@ -189,12 +252,11 @@ function mesEAnoBr(dataBr: string): { mes: number; ano: number } | null {
 export async function obterCustosEpi(): Promise<DashboardCustosEpi> {
   const anoAtual = new Date().getFullYear();
 
-  const [entregas, precos] = await Promise.all([
-    // ::float8 porque o pg devolve `numeric` como texto — somar texto concatenaria.
+  const [entregas, precoPorEpi] = await Promise.all([
     sstQuery<LinhaEntregaEpi>(
       "SELECT epi, qtd, valor_unit::float8 AS valor_unit, data_entrega FROM sst_entregas_epi",
     ),
-    sstQuery<LinhaPrecoEpi>("SELECT equip, valor::float8 AS valor FROM sst_epi_precos"),
+    obterPrecosEpi(),
   ]);
 
   const trimestres: CustoTrimestre[] = ROTULO_TRIMESTRE.map((label) => ({ label, quantidade: 0, valor: 0 }));
@@ -207,10 +269,6 @@ export async function obterCustosEpi(): Promise<DashboardCustosEpi> {
     trimestres[q].valor += e.qtd * e.valor_unit;
   }
 
-  const precoPorEpi = new Map<string, number>([
-    ...EPI_CATALOGO.map((c) => [c.equip, c.valor] as const),
-    ...precos.map((p) => [p.equip, p.valor] as const),
-  ]);
   const ordemCatalogo = new Map(EPI_CATALOGO.map((c, i) => [c.equip, i]));
   const somaQtdPorEpi = new Map<string, number>();
   const somaValorPorEpi = new Map<string, number>();

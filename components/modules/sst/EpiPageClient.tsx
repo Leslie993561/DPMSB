@@ -6,6 +6,7 @@ import { cn } from "@/lib/cn";
 import { Card } from "@/components/shared/Card";
 import { Badge } from "@/components/shared/Badge";
 import { CabecalhoFiltravel, CampoTexto, COR_VINCULO } from "@/components/modules/colaboradores/ColaboradoresTable";
+import { FichaEpiDrawer } from "./FichaEpiDrawer";
 import { formatarMoeda } from "@/lib/format";
 import type { Vinculo } from "@/lib/db/colaboradores";
 import type { ColaboradorEpi, CustoTrimestre, FuncaoEpi, LinhaCustoEpi } from "@/lib/sst/epi";
@@ -48,46 +49,21 @@ export function EpiPageClient({
         ))}
       </div>
 
-      {aba === "colaboradores" && <ColaboradoresTab colaboradores={colaboradores} />}
+      {aba === "colaboradores" && <ColaboradoresTab colaboradores={colaboradores} precos={custos.linhas} />}
       {aba === "matriz" && <MatrizTab matriz={matriz} />}
       {aba === "custos" && <CustosTab custos={custos} />}
     </div>
   );
 }
 
-function MenuFicha() {
-  const [aberto, setAberto] = useState(false);
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setAberto((v) => !v)}
-        aria-label="Mais opções"
-        className="rounded px-1.5 py-0.5 text-foreground-muted hover:bg-brand-surface hover:text-foreground"
-      >
-        ⋮
-      </button>
-      {aberto && (
-        <>
-          <div className="fixed inset-0 z-20" onClick={() => setAberto(false)} />
-          <div className="absolute top-full right-0 z-30 mt-1 w-40 rounded-md border border-hairline bg-background p-1 shadow-drawer">
-            {/* Sem ação ainda — a ficha de entrega depende de uma aba de fichas/histórico que ainda não existe. */}
-            {["Ver ficha", "Enviar ficha"].map((opcao) => (
-              <span
-                key={opcao}
-                className="block cursor-not-allowed rounded px-2 py-1.5 text-[12px] text-foreground-muted/50"
-              >
-                {opcao}
-              </span>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-function ColaboradoresTab({ colaboradores }: { colaboradores: ColaboradorEpi[] }) {
+function ColaboradoresTab({
+  colaboradores,
+  precos,
+}: {
+  colaboradores: ColaboradorEpi[];
+  precos: { epi: string; valorUnitario: number }[];
+}) {
+  const [fichaAberta, setFichaAberta] = useState<ColaboradorEpi | null>(null);
   const [colunaAberta, setColunaAberta] = useState<"vinculo" | "texto" | null>(null);
   const [filtroVinculo, setFiltroVinculo] = useState<string>("");
   const [filtroTexto, setFiltroTexto] = useState("");
@@ -164,7 +140,15 @@ function ColaboradoresTab({ colaboradores }: { colaboradores: ColaboradorEpi[] }
                     </div>
                   </td>
                   <td className="px-2 py-1 text-right">
-                    <MenuFicha />
+                    <button
+                      type="button"
+                      onClick={() => setFichaAberta(c)}
+                      aria-label={`Ficha de ${c.nome}`}
+                      title="Ficha do colaborador"
+                      className="rounded px-1.5 py-0.5 text-foreground-muted hover:bg-brand-surface hover:text-foreground"
+                    >
+                      ⋮
+                    </button>
                   </td>
                 </tr>
               ))
@@ -172,68 +156,40 @@ function ColaboradoresTab({ colaboradores }: { colaboradores: ColaboradorEpi[] }
           </tbody>
         </table>
       </div>
+      <FichaEpiDrawer colaborador={fichaAberta} todosEpis={precos.map((p) => p.epi)} onFechar={() => setFichaAberta(null)} />
     </Card>
   );
 }
 
 function MatrizTab({ matriz }: { matriz: FuncaoEpi[] }) {
-  const [selecionada, setSelecionada] = useState<string | null>(null);
-
   return (
-    <div className="grid gap-4 sm:grid-cols-[260px_1fr]">
-      <Card className="flex flex-col gap-0.5 p-2">
-        {matriz.map((f) => {
-          const ativa = f.funcao === selecionada;
-          return (
-            <button
-              key={f.funcao}
-              type="button"
-              onClick={() => setSelecionada(ativa ? null : f.funcao)}
-              className={
-                "flex items-center justify-between rounded-md px-2.5 py-2 text-left text-[12.5px] font-medium transition-colors " +
-                (ativa
-                  ? "bg-brand-primary-100 text-brand-primary-800"
-                  : "text-foreground hover:bg-surface-page")
-              }
-            >
-              <span>{f.funcao}</span>
-              <span className="text-[10.5px] text-foreground-muted">{f.epis.length}</span>
-            </button>
-          );
-        })}
-      </Card>
-
-      <Card className="p-4">
-        {!selecionada ? (
-          <p className="text-[12px] text-foreground-muted">
-            Selecione uma função à esquerda para ver os EPIs obrigatórios.
-          </p>
-        ) : (
-          (() => {
-            const entrada = matriz.find((f) => f.funcao === selecionada);
-            if (!entrada) return null;
-            return (
-              <div className="space-y-3">
-                <div>
-                  <h3 className="text-[13px] font-semibold text-foreground">{entrada.funcao}</h3>
-                  <p className="text-[11px] text-foreground-muted">{entrada.epis.length} EPI(s) obrigatório(s)</p>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {entrada.epis.map((epi) => (
-                    <span
-                      key={epi}
-                      className="flex items-center gap-1.5 rounded-full border border-hairline bg-background px-2.5 py-1 text-[11px] text-foreground"
-                    >
-                      <span className="h-1.5 w-1.5 rounded-full bg-brand-primary" />
-                      {epi}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            );
-          })()
-        )}
-      </Card>
+    <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+      {matriz.map((f) => (
+        <Card key={f.funcao} className="px-3 py-2.5">
+          <div className="flex items-center gap-2">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-brand-primary-100 text-brand-primary-800">
+              <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5" aria-hidden>
+                <path fillRule="evenodd" clipRule="evenodd" d="M10 2 3 5v5c0 4.42 2.98 8.1 7 9 4.02-.9 7-4.58 7-9V5l-7-3Zm-1.2 11.2L5.6 10l1.4-1.4 1.8 1.8L14 6.2l1.4 1.4-6.6 5.6Z" />
+              </svg>
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-[12.5px] font-semibold text-foreground">{f.funcao}</p>
+              <p className="text-[10.5px] text-foreground-muted">{f.epis.length} EPIs</p>
+            </div>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1">
+            {f.epis.map((epi) => (
+              <span
+                key={epi}
+                className="flex items-center gap-1 rounded-full border border-hairline bg-surface-page px-2 py-0.5 text-[10.5px] text-foreground"
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-brand-primary" />
+                {epi}
+              </span>
+            ))}
+          </div>
+        </Card>
+      ))}
     </div>
   );
 }

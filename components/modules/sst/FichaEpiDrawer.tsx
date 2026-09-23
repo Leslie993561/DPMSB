@@ -1,0 +1,187 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Drawer } from "@/components/shared/Drawer";
+import { Modal } from "@/components/shared/Modal";
+import { iniciais } from "@/lib/format";
+import type { ColaboradorEpi } from "@/lib/sst/epi";
+import type { DocumentoFicha, FichaResumo } from "@/lib/sst/fichas";
+import { DocumentoFichaEpi } from "./DocumentoFichaEpi";
+import { RegistrarEntregaModal } from "./RegistrarEntregaModal";
+
+export function FichaEpiDrawer({
+  colaborador,
+  todosEpis,
+  onFechar,
+}: {
+  colaborador: ColaboradorEpi | null;
+  todosEpis: string[];
+  onFechar: () => void;
+}) {
+  const router = useRouter();
+  const [fichas, setFichas] = useState<FichaResumo[] | null>(null);
+  const [episEntregues, setEpisEntregues] = useState<string[]>([]);
+  const [erroCarga, setErroCarga] = useState<string | null>(null);
+  const [registrando, setRegistrando] = useState(false);
+  const [documento, setDocumento] = useState<DocumentoFicha | null>(null);
+  const [copiada, setCopiada] = useState<string | null>(null);
+
+  const carregar = useCallback(() => {
+    if (!colaborador) return;
+    fetch(`/api/sst/epi/fichas?colaboradorId=${colaborador.id}`)
+      .then(async (r) => {
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.erro ?? "Falha ao carregar o histórico.");
+        setFichas(d.fichas);
+        setEpisEntregues(d.episEntregues);
+      })
+      .catch((e: Error) => setErroCarga(e.message));
+  }, [colaborador]);
+
+  useEffect(() => {
+    setFichas(null);
+    setErroCarga(null);
+    setRegistrando(false);
+    setDocumento(null);
+    carregar();
+  }, [carregar]);
+
+  async function abrirDocumento(id: string) {
+    const r = await fetch(`/api/sst/epi/fichas/${id}`);
+    const d = await r.json();
+    if (r.ok) setDocumento(d.documento);
+  }
+
+  if (!colaborador) return null;
+
+  const entregues = new Set(episEntregues);
+  const semEntrega = colaborador.episObrigatorios.filter((epi) => !entregues.has(epi));
+
+  return (
+    <>
+      <Drawer aberto onFechar={onFechar} titulo="Ficha do colaborador" subtitulo={colaborador.nome} largura="30rem">
+        <div className="flex flex-col gap-4 p-4">
+          <div className="flex items-center gap-3">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand-primary text-[15px] font-bold text-brand-white">
+              {iniciais(colaborador.nome)}
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-[15px] font-semibold text-foreground">{colaborador.nome}</p>
+              <p className="text-[12px] text-foreground-muted">
+                {colaborador.cargo ?? "—"} · {colaborador.departamento ?? "—"}
+              </p>
+              <p className="text-[10.5px] text-foreground-muted/80">
+                Matriz de EPI: {colaborador.funcaoMatriz ?? "função não encontrada"}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setRegistrando(true)}
+            className="rounded-md bg-brand-primary px-3 py-2 text-[12.5px] font-semibold text-brand-white transition-colors hover:bg-brand-primary-hover"
+          >
+            Registrar entrega de EPI
+          </button>
+
+          {fichas !== null &&
+            (colaborador.funcaoMatriz === null ? (
+              <div className="rounded-md border border-hairline bg-surface-page px-3 py-2.5 text-[12px] text-foreground-muted">
+                O cargo deste colaborador não tem função correspondente na matriz de EPI.
+              </div>
+            ) : semEntrega.length > 0 ? (
+              <div className="rounded-md border border-status-danger-border bg-status-danger-bg px-3 py-2.5 text-status-danger">
+                <p className="text-[12.5px] font-semibold">
+                  ⚠ Divergência: {semEntrega.length} EPI(s) obrigatório(s) sem entrega registrada
+                </p>
+                <ul className="mt-1.5 list-disc pl-5 text-[12px]">
+                  {semEntrega.map((epi) => (
+                    <li key={epi}>{epi}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <div className="rounded-md border border-status-success-border bg-status-success-bg px-3 py-2.5 text-[12px] text-status-success">
+                Todos os EPIs obrigatórios da função têm entrega registrada.
+              </div>
+            ))}
+
+          <div>
+            <p className="text-[13px] font-semibold text-foreground">Histórico de entregas ({fichas?.length ?? 0})</p>
+
+            {erroCarga ? (
+              <p className="mt-3 text-[12px] text-status-danger">{erroCarga}</p>
+            ) : fichas === null ? (
+              <p className="mt-3 text-[12px] text-foreground-muted">Carregando...</p>
+            ) : fichas.length === 0 ? (
+              <p className="mt-3 text-[12px] text-foreground-muted">Nenhuma entrega registrada para este colaborador ainda.</p>
+            ) : (
+              <div className="mt-2 flex flex-col divide-y divide-hairline/70 rounded-md border border-hairline">
+                {fichas.map((f) => (
+                  <div key={f.id} className="flex items-center justify-between gap-2 px-3 py-2">
+                    <span className="text-[12.5px] font-medium text-foreground">{f.dataEntrega || "—"}</span>
+                    {f.status === "assinada" ? (
+                      <button
+                        type="button"
+                        onClick={() => void abrirDocumento(f.id)}
+                        title="Ver documento assinado"
+                        aria-label={`Ver documento assinado da entrega de ${f.dataEntrega}`}
+                        className="rounded px-1.5 py-0.5 text-[15px] text-brand-primary hover:bg-brand-primary-100"
+                      >
+                        📎
+                      </button>
+                    ) : f.expirada ? (
+                      <span className="text-[11px] text-status-danger">Link expirado · sem assinatura</span>
+                    ) : (
+                      <span className="flex items-center gap-2 text-[11px] text-status-warning">
+                        Aguardando assinatura
+                        {f.link && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void navigator.clipboard.writeText(f.link!);
+                              setCopiada(f.id);
+                            }}
+                            className="font-medium text-brand-primary hover:text-brand-primary-hover"
+                          >
+                            {copiada === f.id ? "copiado ✓" : "copiar link"}
+                          </button>
+                        )}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </Drawer>
+
+      {registrando && (
+        <RegistrarEntregaModal
+          colaborador={colaborador}
+          todosEpis={todosEpis}
+          onFechar={() => setRegistrando(false)}
+          onCriada={() => {
+            carregar();
+            router.refresh();
+          }}
+        />
+      )}
+
+      {documento && (
+        <Modal
+          aberto
+          onFechar={() => setDocumento(null)}
+          eyebrow="Documento assinado"
+          titulo={`Ficha de entrega de EPI nº ${documento.numero}`}
+          subtitulo={documento.colaborador.nome}
+          largura="40rem"
+        >
+          <DocumentoFichaEpi documento={documento} />
+        </Modal>
+      )}
+    </>
+  );
+}

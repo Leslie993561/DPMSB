@@ -46,12 +46,60 @@ function getSstPool(): Pool {
   return cache.pool;
 }
 
+/**
+ * Colunas que o Portal RH acrescenta às tabelas do SST. A sst_fichas_epi foi
+ * feita para anexar um PDF assinado à mão; a assinatura eletrônica precisa de
+ * token do link, situação, validade e o registro de quem assinou. Aditivo e
+ * idempotente — roda uma vez por processo.
+ */
+const ESQUEMA_EXTRA = `
+  ALTER TABLE sst_fichas_epi ADD COLUMN IF NOT EXISTS token text UNIQUE;
+  ALTER TABLE sst_fichas_epi ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'aguardando';
+  ALTER TABLE sst_fichas_epi ADD COLUMN IF NOT EXISTS expira_em timestamptz;
+  ALTER TABLE sst_fichas_epi ADD COLUMN IF NOT EXISTS assinada_em timestamptz;
+  ALTER TABLE sst_fichas_epi ADD COLUMN IF NOT EXISTS assinatura jsonb;
+`;
+
+let esquemaPronto: Promise<void> | null = null;
+
+async function garantirEsquema(pool: Pool): Promise<void> {
+  esquemaPronto ??= pool
+    .query(ESQUEMA_EXTRA)
+    .then(() => undefined)
+    .catch((erro) => {
+      esquemaPronto = null;
+      throw erro;
+    });
+  return esquemaPronto;
+}
+
 /** Executa uma consulta contra o Postgres do Portal SST e devolve as linhas já tipadas. */
 export async function sstQuery<T extends object = Record<string, unknown>>(
   sql: string,
   params: unknown[] = [],
 ): Promise<T[]> {
   const pool = getSstPool();
+  await garantirEsquema(pool);
   const resultado = await pool.query(sql, params);
   return resultado.rows as T[];
+}
+
+/** Várias escritas que só fazem sentido juntas (ficha + entregas): tudo ou nada. */
+export async function sstTransacao<T>(fn: (query: typeof sstQuery) => Promise<T>): Promise<T> {
+  const pool = getSstPool();
+  await garantirEsquema(pool);
+  const conexao = await pool.connect();
+  try {
+    await conexao.query("BEGIN");
+    const query = (async (sql: string, params: unknown[] = []) =>
+      (await conexao.query(sql, params)).rows) as typeof sstQuery;
+    const resultado = await fn(query);
+    await conexao.query("COMMIT");
+    return resultado;
+  } catch (erro) {
+    await conexao.query("ROLLBACK").catch(() => {});
+    throw erro;
+  } finally {
+    conexao.release();
+  }
 }

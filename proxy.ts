@@ -21,7 +21,11 @@ export async function proxy(request: NextRequest) {
     CAMINHOS_PUBLICOS.has(pathname) ||
     pathname.startsWith("/api/auth/") ||
     pathname.startsWith("/convite/") ||
-    pathname.startsWith("/api/convites/token/")
+    pathname.startsWith("/api/convites/token/") ||
+    // Ficha de EPI para o colaborador assinar: mesma lógica do convite (token
+    // na URL + e-mail profissional conferido dentro da rota).
+    pathname.startsWith("/assinatura-epi/") ||
+    pathname.startsWith("/api/assinatura-epi/")
   ) {
     return NextResponse.next();
   }
