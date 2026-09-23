@@ -161,6 +161,7 @@ export type CampoColaborador =
   | "tipoTransporte"
   | "valorTransporteDia"
   | "valorTransporteFixo"
+  | "valorTransporte"
   | "rateioD365"
   | "periculosidadePercentual"
   | "insalubridadePercentual"
@@ -188,7 +189,20 @@ export type CampoColaborador =
   | "numero"
   | "conjugeNome"
   | "conjugeCpf"
-  | "conjugeNascimento";
+  | "conjugeNascimento"
+  | "tituloEleitor"
+  | "tituloEleitorZona"
+  | "tituloEleitorSecao"
+  | "tituloEleitorEmissao"
+  | "cnhCategoria"
+  | "cnhValidade"
+  | "cnhEmissao"
+  | "reservistaSerie"
+  | "tamanhoCamisa"
+  | "tamanhoCalca"
+  | "tamanhoSapato"
+  | "odontologicoValor"
+  | "auxilioEducacaoValor";
 
 /**
  * Os sinônimos de campos que disputam o mesmo termo (dois e-mails, duas
@@ -219,6 +233,9 @@ const SINONIMOS_COLABORADOR: Record<CampoColaborador, string[]> = {
   tipoTransporte: ["vale", "tipo de transporte", "tipo transporte", "transporte", "beneficio transporte"],
   valorTransporteDia: ["valor por dia util", "valor por dia", "valor dia", "vt dia", "vt por dia"],
   valorTransporteFixo: ["valor fixo", "vm", "vale mobilidade", "transporte fixo", "valor mensal transporte"],
+  // A exportação tem UMA coluna de valor, porque cada pessoa recebe um tipo só.
+  // Na volta, ela é atribuída ao VT ou ao VM conforme o tipo da mesma linha.
+  valorTransporte: ["valor do transporte", "valor transporte"],
   rateioD365: ["rateio d365", "rateio", "d365", "centro de custo", "centro de rateio"],
   periculosidadePercentual: ["periculosidade", "periculosidade %", "adicional de periculosidade"],
   insalubridadePercentual: ["insalubridade", "insalubridade %", "adicional de insalubridade"],
@@ -249,6 +266,19 @@ const SINONIMOS_COLABORADOR: Record<CampoColaborador, string[]> = {
   conjugeNome: ["conjuge nome", "nome do conjuge", "conjuge", "conjunge nome", "conjunge"],
   conjugeCpf: ["conjuge cpf", "cpf do conjuge", "conjunge cpf"],
   conjugeNascimento: ["conjuge nascimento", "nascimento do conjuge", "conjunge nascimento"],
+  tituloEleitor: ["titulo de eleitor", "titulo eleitor", "titulo do eleitor", "inscricao eleitoral"],
+  tituloEleitorZona: ["titulo zona", "zona do titulo", "zona eleitoral", "zona"],
+  tituloEleitorSecao: ["titulo secao", "secao do titulo", "secao eleitoral", "secao"],
+  tituloEleitorEmissao: ["titulo emissao", "emissao do titulo", "data de emissao do titulo"],
+  cnhCategoria: ["cnh categoria", "categoria da cnh", "categoria cnh"],
+  cnhValidade: ["cnh validade", "validade da cnh", "validade cnh"],
+  cnhEmissao: ["cnh emissao", "emissao da cnh", "emissao cnh"],
+  reservistaSerie: ["reservista serie", "serie do reservista", "certificado de reservista", "reservista"],
+  tamanhoCamisa: ["tamanho de camisa", "tamanho camisa", "camisa"],
+  tamanhoCalca: ["tamanho de calca", "tamanho calca", "calca"],
+  tamanhoSapato: ["tamanho de sapato", "tamanho sapato", "sapato", "calcado"],
+  odontologicoValor: ["odontologico", "plano odontologico", "odonto"],
+  auxilioEducacaoValor: ["auxilio educacao", "auxilio educacional", "educacao"],
 };
 
 const OBRIGATORIOS_COLABORADOR: Record<CampoColaborador, boolean> = {
@@ -267,6 +297,7 @@ const OBRIGATORIOS_COLABORADOR: Record<CampoColaborador, boolean> = {
   tipoTransporte: false,
   valorTransporteDia: false,
   valorTransporteFixo: false,
+  valorTransporte: false,
   rateioD365: false,
   periculosidadePercentual: false,
   insalubridadePercentual: false,
@@ -295,6 +326,19 @@ const OBRIGATORIOS_COLABORADOR: Record<CampoColaborador, boolean> = {
   conjugeNome: false,
   conjugeCpf: false,
   conjugeNascimento: false,
+  tituloEleitor: false,
+  tituloEleitorZona: false,
+  tituloEleitorSecao: false,
+  tituloEleitorEmissao: false,
+  cnhCategoria: false,
+  cnhValidade: false,
+  cnhEmissao: false,
+  reservistaSerie: false,
+  tamanhoCamisa: false,
+  tamanhoCalca: false,
+  tamanhoSapato: false,
+  odontologicoValor: false,
+  auxilioEducacaoValor: false,
 };
 
 /**
@@ -365,6 +409,19 @@ export interface ColaboradorImportado {
   conjugeNome: string | null;
   conjugeCpf: string | null;
   conjugeNascimento: string | null;
+  tituloEleitor: string | null;
+  tituloEleitorZona: string | null;
+  tituloEleitorSecao: string | null;
+  tituloEleitorEmissao: string | null;
+  cnhCategoria: string | null;
+  cnhValidade: string | null;
+  cnhEmissao: string | null;
+  reservistaSerie: string | null;
+  tamanhoCamisa: string | null;
+  tamanhoCalca: string | null;
+  tamanhoSapato: string | null;
+  odontologicoValor: number | null;
+  auxilioEducacaoValor: number | null;
   /** Lidos das colunas "Dependente N — Nome/Nascimento/CPF" (padrão do modelo/exportação), não do mapeamento manual. */
   dependentesLista: DependenteImportado[];
 }
@@ -467,6 +524,11 @@ export function converterParaColaboradoresCadastro(
         ? null
         : Number(typeof alimentacaoBruta === "number" ? alimentacaoBruta : String(alimentacaoBruta).replace(",", "."));
 
+    const data = (campo: CampoColaborador): string | null => {
+      const coluna = mapeamento[campo];
+      return coluna ? parseDataAdmissao(linha[coluna]) : null;
+    };
+
     const numero = (campo: CampoColaborador): number | null => {
       const coluna = mapeamento[campo];
       if (!coluna) return null;
@@ -521,8 +583,10 @@ export function converterParaColaboradoresCadastro(
       liderDiretoNome: opcional("liderDireto"),
       alimentacaoValor: alimentacaoValor !== null && Number.isFinite(alimentacaoValor) ? alimentacaoValor : null,
       tipoTransporte,
-      valorTransporteDia: numero("valorTransporteDia"),
-      valorTransporteFixo: numero("valorTransporteFixo"),
+      valorTransporteDia:
+        numero("valorTransporteDia") ?? (tipoTransporte === "vt_diario" ? numero("valorTransporte") : null),
+      valorTransporteFixo:
+        numero("valorTransporteFixo") ?? (tipoTransporte === "vm_fixo" ? numero("valorTransporte") : null),
       rateioD365,
       periculosidadePercentual: numero("periculosidadePercentual"),
       insalubridadePercentual: numero("insalubridadePercentual"),
@@ -553,6 +617,19 @@ export function converterParaColaboradoresCadastro(
       conjugeNascimento: mapeamento.conjugeNascimento
         ? parseDataAdmissao(linha[mapeamento.conjugeNascimento])
         : null,
+      tituloEleitor: opcional("tituloEleitor"),
+      tituloEleitorZona: opcional("tituloEleitorZona"),
+      tituloEleitorSecao: opcional("tituloEleitorSecao"),
+      tituloEleitorEmissao: data("tituloEleitorEmissao"),
+      cnhCategoria: opcional("cnhCategoria"),
+      cnhValidade: data("cnhValidade"),
+      cnhEmissao: data("cnhEmissao"),
+      reservistaSerie: opcional("reservistaSerie"),
+      tamanhoCamisa: opcional("tamanhoCamisa"),
+      tamanhoCalca: opcional("tamanhoCalca"),
+      tamanhoSapato: opcional("tamanhoSapato"),
+      odontologicoValor: numero("odontologicoValor"),
+      auxilioEducacaoValor: numero("auxilioEducacaoValor"),
       dependentesLista,
     });
   });

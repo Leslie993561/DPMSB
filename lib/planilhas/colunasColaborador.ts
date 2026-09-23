@@ -16,11 +16,22 @@ export const COLUNAS_COLABORADOR = [
   { header: "Nascimento", key: "dataNascimento", width: 14 },
   { header: "Cidade de nascimento", key: "cidadeNascimento", width: 20 },
   { header: "UF de nascimento", key: "ufNascimento", width: 10 },
+  { header: "Sexo", key: "sexo", width: 12 },
   { header: "Nome do pai", key: "nomePai", width: 28 },
   { header: "Nome da mãe", key: "nomeMae", width: 28 },
   { header: "Telefone", key: "telefone", width: 16 },
-  { header: "Sexo", key: "sexo", width: 12 },
   { header: "E-mail pessoal", key: "emailPessoal", width: 28 },
+  { header: "Título de eleitor", key: "tituloEleitor", width: 20 },
+  { header: "Título — zona", key: "tituloEleitorZona", width: 14 },
+  { header: "Título — seção", key: "tituloEleitorSecao", width: 14 },
+  { header: "Título — emissão", key: "tituloEleitorEmissao", width: 16 },
+  { header: "CNH — categoria", key: "cnhCategoria", width: 16 },
+  { header: "CNH — validade", key: "cnhValidade", width: 16 },
+  { header: "CNH — emissão", key: "cnhEmissao", width: 16 },
+  { header: "Reservista — série", key: "reservistaSerie", width: 18 },
+  { header: "Tamanho de camisa", key: "tamanhoCamisa", width: 18 },
+  { header: "Tamanho de calça", key: "tamanhoCalca", width: 18 },
+  { header: "Tamanho de sapato", key: "tamanhoSapato", width: 18 },
   // Dados profissionais
   // Calculado a partir do "Nome completo" — primeiro nome + último sobrenome.
   // Vem preenchido só na exportação; no modelo de importação a coluna aparece
@@ -47,6 +58,8 @@ export const COLUNAS_COLABORADOR = [
   { header: "Conta", key: "conta", width: 14 },
   // Benefícios
   { header: "Alimentação", key: "alimentacaoValor", width: 14 },
+  { header: "Odontológico", key: "odontologicoValor", width: 14 },
+  { header: "Auxílio educação", key: "auxilioEducacaoValor", width: 18 },
   { header: "Tipo de transporte", key: "tipoTransporte", width: 18 },
   { header: "Valor do transporte", key: "valorTransporte", width: 18 },
   // Adicionais
