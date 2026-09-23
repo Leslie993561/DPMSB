@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { buscarColaborador, atualizarColaborador } from "@/lib/db/colaboradores";
+import { buscarColaborador, atualizarColaborador, criarColaborador } from "@/lib/db/colaboradores";
 import { substituirDependentes } from "@/lib/db/colaboradorDependentes";
 import {
   buscarConvitePorToken,
@@ -7,11 +7,50 @@ import {
   convitePodeSubmeter,
   marcarConviteAberto,
   marcarConviteUsado,
+  vincularConviteAoColaborador,
 } from "@/lib/db/convites";
 
 export const runtime = "nodejs";
 
 const ERRO_INVALIDO = { erro: "Link inválido, expirado ou já usado." };
+
+/** Formulário em branco para o convite de pré-cadastro (colaborador ainda não existe). */
+const DADOS_VAZIOS = {
+  cpf: null,
+  pis: null,
+  dataNascimento: null,
+  cidadeNascimento: null,
+  ufNascimento: null,
+  nomePai: null,
+  nomeMae: null,
+  telefone: null,
+  sexo: null,
+  emailPessoal: null,
+  banco: null,
+  agencia: null,
+  conta: null,
+  cep: null,
+  estado: null,
+  cidade: null,
+  bairro: null,
+  rua: null,
+  numero: null,
+  conjugeNome: null,
+  conjugeCpf: null,
+  conjugeNascimento: null,
+  conjugeSexo: null,
+  tituloEleitor: null,
+  tituloEleitorZona: null,
+  tituloEleitorSecao: null,
+  tituloEleitorEmissao: null,
+  cnhCategoria: null,
+  cnhValidade: null,
+  cnhEmissao: null,
+  reservistaSerie: null,
+  tamanhoCamisa: null,
+  tamanhoCalca: null,
+  tamanhoSapato: null,
+};
 
 /**
  * Rota pública de propósito — quem preenche não tem login no portal, o token
@@ -29,6 +68,12 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/convites/to
     return Response.json(ERRO_INVALIDO, { status: 404 });
   }
 
+  // Pré-cadastro: ainda não existe colaborador — devolve um formulário em branco (a pessoa preenche tudo, inclusive o nome).
+  if (convite.colaboradorId === null) {
+    await marcarConviteAberto(convite.id);
+    return Response.json({ nome: "", novo: true, expiraEm: convite.expiraEm, dados: DADOS_VAZIOS });
+  }
+
   const colaborador = await buscarColaborador(convite.colaboradorId);
   if (!colaborador) return Response.json(ERRO_INVALIDO, { status: 404 });
 
@@ -36,6 +81,7 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/convites/to
 
   return Response.json({
     nome: colaborador.nome,
+    novo: false,
     expiraEm: convite.expiraEm,
     dados: {
       cpf: colaborador.cpf,
@@ -92,6 +138,8 @@ const schemaDependente = z.object({
  * gestor aqui: quem preenche o próprio cadastro nunca decide isso.
  */
 const schema = z.object({
+  // Só obrigatório (e só usado) quando o convite é de pré-cadastro (colaboradorId null).
+  nome: z.string().trim().min(1).optional(),
   cpf: z.string().nullable().optional(),
   pis: z.string().nullable().optional(),
   dataNascimento: z.iso.date().nullable().optional(),
@@ -142,11 +190,34 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/convites/t
     return Response.json({ erro: "Dados inválidos", detalhes: parsed.error.issues }, { status: 400 });
   }
 
-  const { dependentesLista, ...dadosPessoais } = parsed.data;
-  await atualizarColaborador(convite.colaboradorId, dadosPessoais);
+  const { dependentesLista, nome, ...dadosPessoais } = parsed.data;
+
+  let colaboradorId = convite.colaboradorId;
+  if (colaboradorId === null) {
+    // Pré-cadastro: ninguém existia ainda — cria o colaborador com o que a
+    // própria pessoa preencheu. Cargo, salário, admissão e gestor ficam de
+    // fora de propósito (mesma regra do resto deste arquivo): quem se
+    // autocadastra nunca decide isso, o RH completa depois no Quadro.
+    if (!nome) {
+      return Response.json({ erro: "Informe seu nome completo." }, { status: 400 });
+    }
+    const hoje = new Date().toISOString().slice(0, 10);
+    const novo = await criarColaborador({
+      nome,
+      dataAdmissao: hoje,
+      salarioBase: 0,
+      emailPessoal: dadosPessoais.emailPessoal ?? convite.email,
+      ...dadosPessoais,
+    });
+    colaboradorId = novo.id;
+    await vincularConviteAoColaborador(convite.id, novo.id);
+  } else {
+    await atualizarColaborador(colaboradorId, dadosPessoais);
+  }
+
   if (dependentesLista) {
-    await substituirDependentes(convite.colaboradorId, dependentesLista);
-    await atualizarColaborador(convite.colaboradorId, { dependentes: dependentesLista.length });
+    await substituirDependentes(colaboradorId, dependentesLista);
+    await atualizarColaborador(colaboradorId, { dependentes: dependentesLista.length });
   }
   await marcarConviteUsado(convite.id);
 

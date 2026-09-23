@@ -6,7 +6,8 @@ const DURACAO_HORAS = 2;
 
 export interface ConviteCadastro {
   id: number;
-  colaboradorId: number;
+  /** null = convite de pré-cadastro: a pessoa ainda não existe no Quadro, ela cria o próprio registro ao submeter. */
+  colaboradorId: number | null;
   email: string;
   token: string;
   criadoEm: string;
@@ -17,7 +18,7 @@ export interface ConviteCadastro {
 
 interface LinhaConvite {
   id: number;
-  colaborador_id: number;
+  colaborador_id: number | null;
   email: string;
   token: string;
   criado_em: string;
@@ -39,7 +40,8 @@ function paraConvite(linha: LinhaConvite): ConviteCadastro {
   };
 }
 
-export async function criarConvite(colaboradorId: number, email: string): Promise<ConviteCadastro> {
+/** `colaboradorId: null` gera um convite de PRÉ-CADASTRO — sem ninguém existente pra vincular ainda. */
+export async function criarConvite(colaboradorId: number | null, email: string): Promise<ConviteCadastro> {
   const token = randomBytes(24).toString("hex");
   const expiraEm = new Date(Date.now() + DURACAO_HORAS * 60 * 60 * 1000).toISOString();
 
@@ -49,6 +51,12 @@ export async function criarConvite(colaboradorId: number, email: string): Promis
     args: [colaboradorId, email.trim().toLowerCase(), token, expiraEm],
   });
   return paraConvite(resultado.rows[0] as unknown as LinhaConvite);
+}
+
+/** Depois que o pré-cadastro cria o colaborador, vincula o convite a ele (auditoria/histórico). */
+export async function vincularConviteAoColaborador(id: number, colaboradorId: number): Promise<void> {
+  const db = await getDb();
+  await db.execute({ sql: "UPDATE convites_cadastro SET colaborador_id = ? WHERE id = ?", args: [colaboradorId, id] });
 }
 
 export async function buscarConvitePorToken(token: string): Promise<ConviteCadastro | null> {

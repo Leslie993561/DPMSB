@@ -310,13 +310,29 @@ CREATE TABLE IF NOT EXISTS gestor_permissoes (
   PRIMARY KEY (gestor_id, modulo)
 );
 
+-- Documentos anexados ao cadastro (RG, CNH, comprovante...). Arquivo mora no
+-- Vercel Blob (store PRIVADO — nunca público); aqui só a URL e o nome
+-- original. Ver lib/blob.ts e lib/db/colaboradorDocumentos.ts.
+CREATE TABLE IF NOT EXISTS colaborador_documentos (
+  id SERIAL PRIMARY KEY,
+  colaborador_id INTEGER NOT NULL REFERENCES colaboradores(id) ON DELETE CASCADE,
+  nome TEXT NOT NULL,
+  url TEXT NOT NULL,
+  enviado_por TEXT NOT NULL,
+  criado_em TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')
+);
+
 -- Link de auto-cadastro: o colaborador preenche os PRÓPRIOS dados pessoais
 -- (endereço, banco, cônjuge, dependentes...) sem precisar de login no portal.
 -- O token vale sozinho como credencial (como um link de redefinir senha) —
 -- por isso expira rápido (2h) e só funciona uma vez (usado_em).
+-- colaborador_id é opcional: quando o RH ainda nem cadastrou a pessoa, o
+-- convite nasce sem colaborador — a própria pessoa preenche tudo do zero
+-- (inclusive o nome) e o cadastro é CRIADO ao submeter (ver
+-- app/api/convites/token/[token]/route.ts).
 CREATE TABLE IF NOT EXISTS convites_cadastro (
   id SERIAL PRIMARY KEY,
-  colaborador_id INTEGER NOT NULL REFERENCES colaboradores(id),
+  colaborador_id INTEGER REFERENCES colaboradores(id) ON DELETE CASCADE,
   email TEXT NOT NULL,
   token TEXT NOT NULL UNIQUE,
   criado_em TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS'),
@@ -326,6 +342,19 @@ CREATE TABLE IF NOT EXISTS convites_cadastro (
   aberto_em TEXT,
   usado_em TEXT
 );
+
+-- Banco já existente pode ter colaborador_id NOT NULL da versão anterior —
+-- idempotente (repetir num banco já sem a restrição não dá erro).
+ALTER TABLE convites_cadastro ALTER COLUMN colaborador_id DROP NOT NULL;
+
+-- Idem para ON DELETE CASCADE: sem isso, excluir um colaborador (a opção "só
+-- para registro criado por engano") falhava com violação de FK sempre que
+-- ele já tinha recebido QUALQUER link de auto-cadastro — inclusive o próprio
+-- link de pré-cadastro que o criou. Convite é histórico do link, não do
+-- vínculo empregatício: pode sumir junto do colaborador.
+ALTER TABLE convites_cadastro DROP CONSTRAINT IF EXISTS convites_cadastro_colaborador_id_fkey;
+ALTER TABLE convites_cadastro ADD CONSTRAINT convites_cadastro_colaborador_id_fkey
+  FOREIGN KEY (colaborador_id) REFERENCES colaboradores(id) ON DELETE CASCADE;
 `;
 
 /**

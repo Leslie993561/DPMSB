@@ -48,6 +48,109 @@ function IconeLapis() {
   );
 }
 
+interface DocumentoColaborador {
+  id: number;
+  nome: string;
+  url: string;
+  enviadoPor: string;
+  criadoEm: string;
+}
+
+/** Documentos anexados ao cadastro (RG, CNH, comprovante...) — guardados no Vercel Blob (store privado). */
+function DocumentosColaboradorPanel({ colaboradorId }: { colaboradorId: number }) {
+  const [documentos, setDocumentos] = useState<DocumentoColaborador[] | null>(null);
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  function carregar() {
+    fetch(`/api/colaboradores/${colaboradorId}/documentos`)
+      .then((r) => r.json())
+      .then((d) => setDocumentos(d.documentos ?? []))
+      .catch(() => setErro("Não foi possível carregar os documentos."));
+  }
+
+  useEffect(carregar, [colaboradorId]);
+
+  async function anexar(arquivo: File) {
+    setErro(null);
+    setEnviando(true);
+    try {
+      const form = new FormData();
+      form.append("arquivo", arquivo);
+      const r = await fetch(`/api/colaboradores/${colaboradorId}/documentos`, { method: "POST", body: form });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.erro ?? "Falha ao anexar o documento.");
+      carregar();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Falha ao anexar o documento.");
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  async function excluir(doc: DocumentoColaborador) {
+    if (!window.confirm(`Excluir "${doc.nome}"?`)) return;
+    const r = await fetch(`/api/colaboradores/${colaboradorId}/documentos/${doc.id}`, { method: "DELETE" });
+    if (!r.ok) {
+      window.alert((await r.json()).erro ?? "Não foi possível excluir.");
+      return;
+    }
+    carregar();
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5 rounded border border-hairline bg-surface-page p-2 dark:border-brand-neutral/30">
+      <div className="flex items-center justify-between">
+        <p className="text-[10.5px] font-semibold text-brand-primary-800 uppercase">Documentos</p>
+        <label className="cursor-pointer text-[10.5px] font-medium text-brand-primary hover:text-brand-primary-hover">
+          {enviando ? "Enviando..." : "+ Anexar"}
+          <input
+            type="file"
+            accept="application/pdf,image/jpeg,image/png"
+            className="hidden"
+            disabled={enviando}
+            onChange={(e) => {
+              const arquivo = e.target.files?.[0];
+              if (arquivo) void anexar(arquivo);
+              e.target.value = "";
+            }}
+          />
+        </label>
+      </div>
+
+      {documentos === null ? (
+        <p className="text-[10.5px] text-foreground-muted">Carregando...</p>
+      ) : documentos.length === 0 ? (
+        <p className="text-[10.5px] text-foreground-muted">Nenhum documento anexado ainda.</p>
+      ) : (
+        <div className="flex flex-col divide-y divide-hairline/70">
+          {documentos.map((doc) => (
+            <div key={doc.id} className="flex items-center gap-2 py-1">
+              <a
+                href={`/api/colaboradores/${colaboradorId}/documentos/${doc.id}`}
+                target="_blank"
+                rel="noreferrer"
+                className="min-w-0 flex-1 truncate text-[11px] font-medium text-brand-primary-800 hover:underline"
+              >
+                📎 {doc.nome}
+              </a>
+              <button
+                type="button"
+                onClick={() => void excluir(doc)}
+                aria-label={`Excluir ${doc.nome}`}
+                className="shrink-0 rounded px-1 py-0.5 text-[11px] text-foreground-muted hover:bg-status-danger-bg hover:text-status-danger"
+              >
+                🗑
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {erro && <p className="text-[10.5px] text-status-danger">{erro}</p>}
+    </div>
+  );
+}
+
 /** Divisor com rótulo em versalete, usado para separar o formulário em blocos temáticos. */
 /**
  * Nome de cada campo como ele aparece na tela.
@@ -163,12 +266,16 @@ function Secao({ titulo }: { titulo: string }) {
 }
 
 /**
- * Gera um link de auto-cadastro: a própria pessoa preenche os dados pessoais
- * dela (CPF, endereço, banco, cônjuge, dependentes) sem precisar de login no
- * portal. O link expira em 2h e só funciona uma vez — ver
- * app/api/convites/route.ts e app/convite/[token].
+ * Gera um link de auto-cadastro. Com colaborador já salvo (`colaboradorId`
+ * número), a pessoa só completa os dados pessoais dela (CPF, endereço, banco,
+ * cônjuge, dependentes). Sem colaborador ainda (`colaboradorId: null`), a
+ * pessoa preenche TUDO do zero, inclusive o nome — o cadastro é criado no
+ * Quadro só quando ela envia (cargo, salário e admissão ficam pendentes pro
+ * RH completar depois, de propósito: quem se autocadastra não decide isso).
+ * O link expira em 2h e só funciona uma vez — ver app/api/convites/route.ts
+ * e app/convite/[token].
  */
-function EnviarConviteBox({ colaboradorId }: { colaboradorId: number }) {
+function EnviarConviteBox({ colaboradorId }: { colaboradorId: number | null }) {
   const [email, setEmail] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -203,8 +310,14 @@ function EnviarConviteBox({ colaboradorId }: { colaboradorId: number }) {
   return (
     <div className="flex flex-col gap-1.5 rounded border border-hairline bg-surface-page p-2 dark:border-brand-neutral/30">
       <p className="text-[10.5px] font-semibold text-brand-primary-800 uppercase">
-        Link de auto-cadastro (dados pessoais)
+        {colaboradorId === null ? "Link de auto-cadastro (colaborador novo)" : "Link de auto-cadastro (dados pessoais)"}
       </p>
+      {colaboradorId === null && (
+        <p className="text-[10.5px] text-foreground-muted">
+          Sem preencher nada aqui: informe o e-mail pessoal e a pessoa preenche tudo pelo link, inclusive o nome. O
+          cadastro é criado no Quadro assim que ela enviar.
+        </p>
+      )}
       {link ? (
         <div className="flex flex-col gap-1">
           <p className="text-[10.5px] text-foreground-muted">
@@ -411,6 +524,7 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
   /** Colaborador existente abre travado — só fica editável depois de clicar no lápis. Cadastro novo já nasce editável. */
   const [modoEdicao, setModoEdicao] = useState(false);
   const bloqueado = Boolean(editando) && !modoEdicao;
+  const [mostrarDocumentos, setMostrarDocumentos] = useState(false);
 
   useEffect(() => {
     if (!editando) return;
@@ -709,16 +823,25 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-2">
       {editando && (
-        <div className="flex items-center justify-between rounded border border-hairline bg-surface-page px-2 py-1 dark:border-brand-neutral/30">
-          <p className="text-[10.5px] font-normal text-foreground-muted">
-            {modoEdicao ? "Edição habilitada" : "Dados bloqueados — clique no lápis para editar"}
-          </p>
+        <div className="flex items-stretch divide-x divide-hairline overflow-hidden rounded border border-hairline bg-surface-page dark:divide-brand-neutral/30 dark:border-brand-neutral/30">
+          <button
+            type="button"
+            onClick={() => setMostrarDocumentos((v) => !v)}
+            className={cn(
+              "flex-1 px-2 py-1 text-left text-[10.5px] font-medium transition-colors",
+              mostrarDocumentos
+                ? "bg-brand-primary-100 text-brand-primary-800"
+                : "text-foreground-muted hover:bg-background hover:text-brand-primary",
+            )}
+          >
+            📄 Documentos
+          </button>
           <button
             type="button"
             onClick={() => setModoEdicao((v) => !v)}
             title={modoEdicao ? "Bloquear edição" : "Habilitar edição"}
             className={cn(
-              "flex h-6 w-6 items-center justify-center rounded transition-colors",
+              "flex w-9 shrink-0 items-center justify-center transition-colors",
               modoEdicao
                 ? "bg-brand-primary-100 text-brand-primary-800"
                 : "text-foreground-muted hover:bg-background hover:text-brand-primary",
@@ -729,7 +852,9 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
         </div>
       )}
 
-      {editando && !desligado && <EnviarConviteBox colaboradorId={editando.id} />}
+      {editando && mostrarDocumentos && <DocumentosColaboradorPanel colaboradorId={editando.id} />}
+
+      {!desligado && <EnviarConviteBox colaboradorId={editando ? editando.id : null} />}
 
       {desligado && (
         <div className="flex flex-col gap-2 rounded border border-status-danger-border bg-status-danger-bg p-2">

@@ -94,6 +94,9 @@ function Campo({
 export function ConviteForm({ token }: { token: string }) {
   const [estado, setEstadoTela] = useState<"carregando" | "invalido" | "formulario" | "enviado">("carregando");
   const [nomeColaborador, setNomeColaborador] = useState("");
+  /** true = pré-cadastro: a pessoa ainda não existe no Quadro, ela preenche até o próprio nome. */
+  const [novo, setNovo] = useState(false);
+  const [nome, setNome] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -141,8 +144,9 @@ export function ConviteForm({ token }: { token: string }) {
           setEstadoTela("invalido");
           return;
         }
-        const data: { nome: string; dados: DadosPessoais } = await res.json();
+        const data: { nome: string; novo: boolean; dados: DadosPessoais } = await res.json();
         setNomeColaborador(data.nome);
+        setNovo(data.novo);
         const d = data.dados;
         setCpf(d.cpf ?? "");
         setPis(d.pis ?? "");
@@ -186,9 +190,14 @@ export function ConviteForm({ token }: { token: string }) {
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
     setErro(null);
+    if (novo && !nome.trim()) {
+      setErro("Informe seu nome completo.");
+      return;
+    }
     setSalvando(true);
     try {
       const payload = {
+        nome: novo ? nome.trim() : undefined,
         cpf: cpf || null,
         pis: pis || null,
         dataNascimento: dataNascimento || null,
@@ -277,7 +286,8 @@ export function ConviteForm({ token }: { token: string }) {
         <span className="text-2xl">✅</span>
         <p className="text-[14px] font-semibold text-foreground">Dados enviados</p>
         <p className="max-w-sm text-[12.5px] text-foreground-muted">
-          Obrigado, {nomeColaborador}. Seus dados foram recebidos pelo RH. Pode fechar esta página.
+          Obrigado, {novo ? nome.trim().split(/\s+/)[0] : nomeColaborador}. Seus dados foram recebidos pelo RH. Pode
+          fechar esta página.
         </p>
       </div>
     );
@@ -286,11 +296,28 @@ export function ConviteForm({ token }: { token: string }) {
   return (
     <form onSubmit={enviar} className="flex flex-col gap-3">
       <p className="text-[12.5px] text-foreground-muted">
-        Olá, <strong className="text-foreground">{nomeColaborador}</strong>. Preencha seus dados pessoais abaixo.
+        {novo ? (
+          "Olá! Você foi convidado a se cadastrar no Portal Recursos Humanos. Preencha seus dados abaixo — o RH completa o restante (cargo, admissão) depois."
+        ) : (
+          <>
+            Olá, <strong className="text-foreground">{nomeColaborador}</strong>. Preencha seus dados pessoais abaixo.
+          </>
+        )}
       </p>
 
       <Secao titulo="Dados pessoais" />
       <div className="grid grid-cols-2 gap-2.5">
+        {novo && (
+          <label className="col-span-2 flex flex-col gap-1">
+            <span className="text-[10.5px] font-medium text-foreground-muted">Nome completo</span>
+            <input
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              required
+              className={INPUT_CLASS}
+            />
+          </label>
+        )}
         <Campo label="CPF" value={cpf} onChange={setCpf} />
         <Campo label="PIS" value={pis} onChange={setPis} />
         <Campo label="Data de nascimento" value={dataNascimento} onChange={setDataNascimento} tipo="date" />
