@@ -1,5 +1,5 @@
 import { obterSessaoAtual } from "@/lib/auth/sessao";
-import { blobConfigurado, subirArquivoPrivado } from "@/lib/blob";
+import { blobConfigurado, subirArquivoPrivado } from "@/lib/storage";
 import { adicionarDocumento, listarDocumentos } from "@/lib/db/colaboradorDocumentos";
 import { buscarColaborador } from "@/lib/db/colaboradores";
 

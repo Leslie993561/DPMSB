@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -47,10 +48,6 @@ popular-banco-*.sql
 next-env.d.ts
 _dev.log
 
-.vercel
-.env*
 
 # worktrees isolados de agentes do Claude Code — nunca fazem parte do repo
 /.claude/worktrees/
-
-.env*

@@ -1,5 +1,5 @@
 import { obterSessaoAtual } from "@/lib/auth/sessao";
-import { blobConfigurado, subirArquivoPrivado } from "@/lib/blob";
+import { blobConfigurado, subirArquivoPrivado } from "@/lib/storage";
 
 export const runtime = "nodejs";
 

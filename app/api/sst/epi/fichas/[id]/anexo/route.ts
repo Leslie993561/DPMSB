@@ -1,5 +1,5 @@
 import { obterSessaoAtual } from "@/lib/auth/sessao";
-import { baixarArquivoPrivado } from "@/lib/blob";
+import { baixarArquivoPrivado } from "@/lib/storage";
 import { obterDocumentoFicha } from "@/lib/sst/fichas";
 
 export const runtime = "nodejs";

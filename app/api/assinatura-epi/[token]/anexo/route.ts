@@ -1,4 +1,4 @@
-import { baixarArquivoPrivado } from "@/lib/blob";
+import { baixarArquivoPrivado } from "@/lib/storage";
 import { obterFichaPublica } from "@/lib/sst/fichas";
 
 export const runtime = "nodejs";
