@@ -9,6 +9,14 @@ export const runtime = "nodejs";
 export async function GET(_request: Request, { params }: { params: Promise<{ token: string }> }) {
   const documento = await obterFichaPublica((await params).token);
   if (!documento) return Response.json({ erro: "Link inválido." }, { status: 404 });
+  // Link de uso único: depois de assinado (ou vencido) não devolve mais nada
+  // da ficha — o documento assinado fica só com o RH.
+  if (documento.status === "assinada") {
+    return Response.json({ erro: "Esta ficha já foi assinada. Este link não está mais disponível." }, { status: 410 });
+  }
+  if (documento.expirada) {
+    return Response.json({ erro: "Este link expirou. Peça ao RH um novo link de assinatura." }, { status: 410 });
+  }
   return Response.json({ documento });
 }
 

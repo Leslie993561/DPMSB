@@ -43,25 +43,18 @@ export function AssinaturaEpiForm({ token }: { token: string }) {
     }
   }
 
-  if (erroCarga) return <p className="text-[13px] text-status-danger">{erroCarga}</p>;
+  if (erroCarga) return <p className="text-[13px] text-foreground">{erroCarga}</p>;
   if (!documento) return <p className="text-[13px] text-foreground-muted">Carregando...</p>;
 
   if (assinadoAgora) {
     return (
       <div className="flex flex-col gap-4">
         <p className="rounded-md bg-status-success-bg px-3 py-2 text-[13px] font-medium text-status-success">
-          Ficha assinada com sucesso. O documento assinado fica guardado no seu histórico com o RH.
+          Ficha assinada com sucesso. O documento assinado fica guardado com o RH, e este link deixa de funcionar.
         </p>
         <DocumentoFichaEpi documento={documento} />
       </div>
     );
-  }
-
-  if (documento.status === "assinada") {
-    return <p className="text-[13px] text-foreground">Esta ficha já foi assinada. Obrigado!</p>;
-  }
-  if (documento.expirada) {
-    return <p className="text-[13px] text-status-danger">Este link expirou. Peça ao RH um novo link de assinatura.</p>;
   }
 
   return (
