@@ -13,6 +13,7 @@ export interface ColaboradorEpi {
   /** Função da matriz de EPI que corresponde ao cargo/setor — null se nenhuma bate. */
   funcaoMatriz: string | null;
   episObrigatorios: string[];
+  situacaoEpi: SituacaoEpi;
 }
 
 const PALAVRAS_IGNORADAS = new Set(["de", "da", "do", "das", "dos", "em", "e", "a", "i", "ii", "iii"]);
@@ -60,11 +61,27 @@ export function funcaoDaMatriz(cargo: string | null, departamento: string | null
  * populada. É a lista de quem pode receber EPI, não uma base à parte.
  */
 export async function listarColaboradoresParaEpi(): Promise<ColaboradorEpi[]> {
-  const todos = await listarColaboradores();
+  const [todos, ultimasEntregas] = await Promise.all([
+    listarColaboradores(),
+    // Só a entrega mais recente de cada EPI por colaborador vale para o vencimento.
+    sstQuery<{ colab_id: string; epi: string; data_troca: string }>(
+      `SELECT DISTINCT ON (colab_id, epi) colab_id, epi, data_troca
+         FROM sst_entregas_epi ORDER BY colab_id, epi, created_at DESC`,
+    ),
+  ]);
+  const trocaPorColaborador = new Map<number, Map<string, string>>();
+  for (const e of ultimasEntregas) {
+    const id = Number(e.colab_id);
+    const mapa = trocaPorColaborador.get(id) ?? new Map<string, string>();
+    mapa.set(e.epi, e.data_troca);
+    trocaPorColaborador.set(id, mapa);
+  }
+
   return todos
     .filter((c) => c.status !== "desligado")
     .map((c) => {
       const funcao = funcaoDaMatriz(c.cargo, c.departamento);
+      const episObrigatorios = funcao?.epis ?? [];
       return {
         id: c.id,
         nome: c.nome,
@@ -73,9 +90,48 @@ export async function listarColaboradoresParaEpi(): Promise<ColaboradorEpi[]> {
         vinculo: c.vinculo,
         email: c.email,
         funcaoMatriz: funcao?.funcao ?? null,
-        episObrigatorios: funcao?.epis ?? [],
+        episObrigatorios,
+        situacaoEpi: situacaoDosEpis(episObrigatorios, trocaPorColaborador.get(c.id) ?? new Map()),
       };
     });
+}
+
+export interface SituacaoEpi {
+  vencidos: number;
+  vencendo: number;
+  emDia: number;
+  /** Base das frações: EPIs obrigatórios da função (ou os entregues, se a função não tem). */
+  total: number;
+}
+
+const DIAS_ALERTA_VENCIMENTO = 30;
+
+/** "DD/MM/AAAA" → dias até a data (negativo = já passou); null se vazio/ inválido. */
+function diasAte(dataBr: string, hoje: Date): number | null {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dataBr.trim());
+  if (!m) return null;
+  const alvo = Date.UTC(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+  const base = Date.UTC(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+  return Math.round((alvo - base) / 86_400_000);
+}
+
+/**
+ * Pela troca prevista da última entrega de cada EPI: vencido (troca já passou),
+ * vencendo (até 30 dias) ou em dia (mais longe ou sem data de troca). EPI
+ * obrigatório nunca entregue não entra em nenhuma — é divergência, na ficha.
+ */
+function situacaoDosEpis(obrigatorios: string[], trocaPorEpi: Map<string, string>): SituacaoEpi {
+  const base = obrigatorios.length > 0 ? obrigatorios : [...trocaPorEpi.keys()];
+  const hoje = new Date();
+  const situacao: SituacaoEpi = { vencidos: 0, vencendo: 0, emDia: 0, total: base.length };
+  for (const epi of base) {
+    if (!trocaPorEpi.has(epi)) continue;
+    const dias = diasAte(trocaPorEpi.get(epi) ?? "", hoje);
+    if (dias !== null && dias < 0) situacao.vencidos++;
+    else if (dias !== null && dias <= DIAS_ALERTA_VENCIMENTO) situacao.vencendo++;
+    else situacao.emDia++;
+  }
+  return situacao;
 }
 
 export interface FuncaoEpi {

@@ -10,7 +10,14 @@ import { CabecalhoFiltravel, CampoTexto, COR_VINCULO } from "@/components/module
 import { FichaEpiDrawer } from "./FichaEpiDrawer";
 import { formatarMoeda } from "@/lib/format";
 import type { Vinculo } from "@/lib/db/colaboradores";
-import type { ColaboradorEpi, CustoTrimestre, FuncaoEpi, LinhaCustoEpi, LinhaCustoFardamento } from "@/lib/sst/epi";
+import type {
+  ColaboradorEpi,
+  CustoTrimestre,
+  FuncaoEpi,
+  LinhaCustoEpi,
+  LinhaCustoFardamento,
+  SituacaoEpi,
+} from "@/lib/sst/epi";
 
 export type AbaEpi = "colaboradores" | "matriz" | "custos";
 
@@ -97,6 +104,25 @@ export function EpiPageClient({
   );
 }
 
+/** Vencidos (vermelho), vencendo em até 30 dias (laranja) e em dia (verde), sobre os EPIs obrigatórios. */
+function SituacaoEpiChips({ situacao }: { situacao: SituacaoEpi }) {
+  const chips = [
+    { rotulo: "Vencidos", n: situacao.vencidos, cor: "border-status-danger-border bg-status-danger-bg text-status-danger" },
+    { rotulo: "Vencendo", n: situacao.vencendo, cor: "border-orange-200 bg-orange-50 text-orange-700" },
+    { rotulo: "Ativo", n: situacao.emDia, cor: "border-status-success-border bg-status-success-bg text-status-success" },
+  ].filter((c) => c.n > 0);
+  if (chips.length === 0) return null;
+  return (
+    <div className="flex flex-wrap justify-end gap-1">
+      {chips.map((c) => (
+        <span key={c.rotulo} className={`whitespace-nowrap rounded-full border px-1.5 py-px text-[10px] font-semibold ${c.cor}`}>
+          {c.rotulo} {c.n}/{situacao.total}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function ColaboradoresTab({
   colaboradores,
   precos,
@@ -165,6 +191,7 @@ function ColaboradoresTab({
               >
                 <CampoTexto valor={busca} onChange={onBusca} placeholder="Buscar nome, cargo ou setor" />
               </CabecalhoFiltravel>
+              <th className="px-2 py-1" />
               <th className="px-2 py-1 text-right">
                 {resumoFichas.enviadas > 0 && (
                   <span
@@ -185,7 +212,7 @@ function ColaboradoresTab({
           <tbody>
             {filtrados.length === 0 ? (
               <tr>
-                <td colSpan={3} className="px-3 py-4 text-center text-foreground-muted">
+                <td colSpan={4} className="px-3 py-4 text-center text-foreground-muted">
                   Nenhum colaborador encontrado.
                 </td>
               </tr>
@@ -200,6 +227,9 @@ function ColaboradoresTab({
                     <div className="text-[10px] text-foreground-muted">
                       {c.cargo ?? "—"} · {c.departamento ?? "—"}
                     </div>
+                  </td>
+                  <td className="px-2 py-1">
+                    <SituacaoEpiChips situacao={c.situacaoEpi} />
                   </td>
                   <td className="px-2 py-1 text-right">
                     <button
