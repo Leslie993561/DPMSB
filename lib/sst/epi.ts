@@ -8,7 +8,7 @@ export interface ColaboradorEpi {
   cargo: string | null;
   departamento: string | null;
   vinculo: Vinculo | null;
-  /** E-mail profissional — é com ele que o colaborador confirma a identidade ao assinar a ficha. */
+  /** E-mail profissional — para onde vai o link de assinatura da ficha. */
   email: string | null;
   /** Função da matriz de EPI que corresponde ao cargo/setor — null se nenhuma bate. */
   funcaoMatriz: string | null;
@@ -297,4 +297,42 @@ export async function obterCustosEpi(): Promise<DashboardCustosEpi> {
     );
 
   return { trimestres, linhas };
+}
+
+/** Itens de fardamento e preço base; um preço em sst_fardamento_precos prevalece. */
+export const FARDAMENTO_CATALOGO: { tipo: string; valor: number }[] = [
+  { tipo: "Camisa Helanca", valor: 72 },
+  { tipo: "Camisa Oxford", valor: 93 },
+  { tipo: "Calça Helanca", valor: 72 },
+  { tipo: "Calça Oxford", valor: 93 },
+];
+
+export interface LinhaCustoFardamento {
+  tipo: string;
+  quantidade: number;
+  valorUnitario: number;
+  valorTotal: number;
+}
+
+/** Fardamento entregue (sst_fardamento_entregas) × preço vigente, no mesmo formato da planilha de EPI. */
+export async function obterCustosFardamento(): Promise<LinhaCustoFardamento[]> {
+  const [entregas, precos] = await Promise.all([
+    sstQuery<{ tipo: string; qtd: number }>("SELECT tipo, qtd FROM sst_fardamento_entregas"),
+    sstQuery<{ tipo: string; valor: number }>("SELECT tipo, valor::float8 AS valor FROM sst_fardamento_precos"),
+  ]);
+  const precoPorTipo = new Map<string, number>([
+    ...FARDAMENTO_CATALOGO.map((c) => [c.tipo, c.valor] as const),
+    ...precos.map((p) => [p.tipo, p.valor] as const),
+  ]);
+  const qtdPorTipo = new Map<string, number>();
+  for (const e of entregas) qtdPorTipo.set(e.tipo, (qtdPorTipo.get(e.tipo) ?? 0) + e.qtd);
+
+  const ordem = new Map(FARDAMENTO_CATALOGO.map((c, i) => [c.tipo, i]));
+  return [...new Set([...precoPorTipo.keys(), ...qtdPorTipo.keys()])]
+    .map((tipo) => {
+      const quantidade = qtdPorTipo.get(tipo) ?? 0;
+      const valorUnitario = precoPorTipo.get(tipo) ?? 0;
+      return { tipo, quantidade, valorUnitario, valorTotal: quantidade * valorUnitario };
+    })
+    .sort((a, b) => (ordem.get(a.tipo) ?? 99) - (ordem.get(b.tipo) ?? 99) || a.tipo.localeCompare(b.tipo, "pt-BR"));
 }

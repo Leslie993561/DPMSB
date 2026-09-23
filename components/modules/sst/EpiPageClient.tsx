@@ -10,7 +10,7 @@ import { CabecalhoFiltravel, CampoTexto, COR_VINCULO } from "@/components/module
 import { FichaEpiDrawer } from "./FichaEpiDrawer";
 import { formatarMoeda } from "@/lib/format";
 import type { Vinculo } from "@/lib/db/colaboradores";
-import type { ColaboradorEpi, CustoTrimestre, FuncaoEpi, LinhaCustoEpi } from "@/lib/sst/epi";
+import type { ColaboradorEpi, CustoTrimestre, FuncaoEpi, LinhaCustoEpi, LinhaCustoFardamento } from "@/lib/sst/epi";
 
 export type AbaEpi = "colaboradores" | "matriz" | "custos";
 
@@ -25,11 +25,13 @@ export function EpiPageClient({
   colaboradores,
   matriz,
   custos,
+  fardamento,
 }: {
   aba: AbaEpi;
   colaboradores: ColaboradorEpi[];
   matriz: FuncaoEpi[];
   custos: { trimestres: CustoTrimestre[]; linhas: LinhaCustoEpi[] };
+  fardamento: LinhaCustoFardamento[];
 }) {
   const router = useRouter();
   // Busca fica aqui, fora da aba: continua valendo ao trocar de aba e voltar.
@@ -81,7 +83,7 @@ export function EpiPageClient({
         <ColaboradoresTab colaboradores={colaboradores} precos={custos.linhas} busca={busca} onBusca={setBusca} />
       )}
       {aba === "matriz" && <MatrizTab matriz={matriz} />}
-      {aba === "custos" && <CustosTab custos={custos} />}
+      {aba === "custos" && <CustosTab custos={custos} fardamento={fardamento} />}
     </div>
   );
 }
@@ -227,7 +229,14 @@ function MatrizTab({ matriz }: { matriz: FuncaoEpi[] }) {
   );
 }
 
-function CustosTab({ custos }: { custos: { trimestres: CustoTrimestre[]; linhas: LinhaCustoEpi[] } }) {
+function CustosTab({
+  custos,
+  fardamento,
+}: {
+  custos: { trimestres: CustoTrimestre[]; linhas: LinhaCustoEpi[] };
+  fardamento: LinhaCustoFardamento[];
+}) {
+  const totalFardamento = fardamento.reduce((acc, l) => acc + l.valorTotal, 0);
   const totalGeral = custos.linhas.reduce((acc, l) => acc + l.valorTotal, 0);
 
   return (
@@ -284,6 +293,40 @@ function CustosTab({ custos }: { custos: { trimestres: CustoTrimestre[]; linhas:
           )}
         </table>
       </Card>
+
+      <div className="space-y-2">
+        <h2 className="text-[10px] font-bold tracking-[0.16em] text-foreground-muted uppercase">Fardamento</h2>
+        <Card className="overflow-x-auto p-0">
+          <table className="w-full text-[12px]">
+            <thead>
+              <tr className="border-b border-hairline bg-background text-left font-bold tracking-wide text-foreground-muted uppercase">
+                <th className="px-3 py-2 text-[10.5px]">Item</th>
+                <th className="px-3 py-2 text-right text-[10.5px]">Quantidade</th>
+                <th className="px-3 py-2 text-right text-[10.5px]">Valor unitário</th>
+                <th className="px-3 py-2 text-right text-[10.5px]">Valor total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {fardamento.map((l) => (
+                <tr key={l.tipo} className="border-t border-hairline/60">
+                  <td className="px-3 py-1.5 font-semibold text-foreground">{l.tipo}</td>
+                  <td className="px-3 py-1.5 text-right text-foreground">{l.quantidade}</td>
+                  <td className="px-3 py-1.5 text-right text-foreground-muted">{formatarMoeda(l.valorUnitario)}</td>
+                  <td className="px-3 py-1.5 text-right font-semibold text-brand-primary-800">{formatarMoeda(l.valorTotal)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t border-hairline bg-background font-semibold">
+                <td className="px-3 py-2 text-foreground" colSpan={3}>
+                  Total geral
+                </td>
+                <td className="px-3 py-2 text-right text-brand-primary-800">{formatarMoeda(totalFardamento)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </Card>
+      </div>
     </div>
   );
 }
