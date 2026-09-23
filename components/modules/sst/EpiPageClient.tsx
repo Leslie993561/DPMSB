@@ -61,7 +61,7 @@ function ColaboradoresTab({
   precos,
 }: {
   colaboradores: ColaboradorEpi[];
-  precos: { epi: string; valorUnitario: number }[];
+  precos: { epi: string; ca: string; valorUnitario: number }[];
 }) {
   const [fichaAberta, setFichaAberta] = useState<ColaboradorEpi | null>(null);
   const [colunaAberta, setColunaAberta] = useState<"vinculo" | "texto" | null>(null);
@@ -156,7 +156,7 @@ function ColaboradoresTab({
           </tbody>
         </table>
       </div>
-      <FichaEpiDrawer colaborador={fichaAberta} todosEpis={precos.map((p) => p.epi)} onFechar={() => setFichaAberta(null)} />
+      <FichaEpiDrawer colaborador={fichaAberta} catalogo={precos.map((p) => ({ epi: p.epi, ca: p.ca }))} onFechar={() => setFichaAberta(null)} />
     </Card>
   );
 }

@@ -183,18 +183,19 @@ export const MATRIZ_EPI: FuncaoEpi[] = [
 ];
 
 /**
- * Preço base de cada EPI (catálogo do Portal SST original, `epiCatalogo.json`).
- * Um preço cadastrado em sst_epi_precos, quando existir, prevalece sobre este.
+ * Catálogo de EPI: preço base (do Portal SST original, `epiCatalogo.json`) e
+ * C.A. padrão, que vem preenchido na entrega e pode ser editado ali. Um preço
+ * cadastrado em sst_epi_precos, quando existir, prevalece sobre este.
  */
-export const EPI_CATALOGO: { equip: string; valor: number }[] = [
-  { equip: "Calçado Antiderrapante", valor: 80 },
-  { equip: "Sandália", valor: 35 },
-  { equip: "Abafador 3M Muffler", valor: 80 },
-  { equip: "Protetor Auricular Interno", valor: 1 },
-  { equip: "Máscara Semifacial", valor: 70 },
-  { equip: "Óculos de Proteção com UV", valor: 10 },
-  { equip: "Óculos de Proteção Transparente", valor: 10 },
-  { equip: "Bota-biqueira de PVC", valor: 120 },
+export const EPI_CATALOGO: { equip: string; valor: number; ca: string }[] = [
+  { equip: "Calçado Antiderrapante", valor: 80, ca: "27.921" },
+  { equip: "Sandália", valor: 35, ca: "" },
+  { equip: "Abafador 3M Muffler", valor: 80, ca: "14.235" },
+  { equip: "Protetor Auricular Interno", valor: 1, ca: "15.485" },
+  { equip: "Máscara Semifacial", valor: 70, ca: "7072" },
+  { equip: "Óculos de Proteção com UV", valor: 10, ca: "28.018" },
+  { equip: "Óculos de Proteção Transparente", valor: 10, ca: "40.957" },
+  { equip: "Bota-biqueira de PVC", valor: 120, ca: "" },
 ];
 
 interface LinhaEntregaEpi {
@@ -224,6 +225,8 @@ export interface CustoTrimestre {
 
 export interface LinhaCustoEpi {
   epi: string;
+  /** C.A. padrão do catálogo (vazio quando o EPI não tem). */
+  ca: string;
   quantidade: number;
   valorUnitario: number;
   valorTotal: number;
@@ -283,7 +286,8 @@ export async function obterCustosEpi(): Promise<DashboardCustosEpi> {
       const quantidade = somaQtdPorEpi.get(epi) ?? 0;
       const somaValor = somaValorPorEpi.get(epi) ?? 0;
       const valorUnitario = precoPorEpi.get(epi) ?? (quantidade > 0 ? somaValor / quantidade : 0);
-      return { epi, quantidade, valorUnitario, valorTotal: quantidade * valorUnitario };
+      const ca = EPI_CATALOGO.find((c) => c.equip === epi)?.ca ?? "";
+      return { epi, ca, quantidade, valorUnitario, valorTotal: quantidade * valorUnitario };
     })
     .sort(
       (a, b) =>

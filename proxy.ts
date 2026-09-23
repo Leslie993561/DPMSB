@@ -84,5 +84,7 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  // Imagens de /public (logo) ficam fora: sem isso o logo quebrava nas telas
+  // públicas — link de assinatura, convite e login — para quem não tem sessão.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|svg|gif|webp|ico)$).*)"],
 };

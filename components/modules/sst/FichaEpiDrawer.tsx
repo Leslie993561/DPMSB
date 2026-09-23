@@ -12,11 +12,12 @@ import { RegistrarEntregaModal } from "./RegistrarEntregaModal";
 
 export function FichaEpiDrawer({
   colaborador,
-  todosEpis,
+  catalogo,
   onFechar,
 }: {
   colaborador: ColaboradorEpi | null;
-  todosEpis: string[];
+  /** Todos os EPIs do catálogo com o C.A. padrão. */
+  catalogo: { epi: string; ca: string }[];
   onFechar: () => void;
 }) {
   const router = useRouter();
@@ -46,6 +47,21 @@ export function FichaEpiDrawer({
     setDocumento(null);
     carregar();
   }, [carregar]);
+
+  async function excluir(f: FichaResumo) {
+    const aviso =
+      f.status === "assinada"
+        ? `A entrega de ${f.dataEntrega} já foi assinada. Excluir apaga o documento assinado e as entregas dessa ficha. Continuar?`
+        : `Excluir a entrega de ${f.dataEntrega}? O link de assinatura deixa de funcionar.`;
+    if (!window.confirm(aviso)) return;
+    const r = await fetch(`/api/sst/epi/fichas/${f.id}`, { method: "DELETE" });
+    if (!r.ok) {
+      window.alert((await r.json()).erro ?? "Não foi possível excluir.");
+      return;
+    }
+    carregar();
+    router.refresh();
+  }
 
   async function abrirDocumento(id: string) {
     const r = await fetch(`/api/sst/epi/fichas/${id}`);
@@ -119,8 +135,8 @@ export function FichaEpiDrawer({
             ) : (
               <div className="mt-2 flex flex-col divide-y divide-hairline/70 rounded-md border border-hairline">
                 {fichas.map((f) => (
-                  <div key={f.id} className="flex items-center justify-between gap-2 px-3 py-2">
-                    <span className="text-[12.5px] font-medium text-foreground">{f.dataEntrega || "—"}</span>
+                  <div key={f.id} className="flex items-center gap-2 px-3 py-2">
+                    <span className="flex-1 text-[12.5px] font-medium text-foreground">{f.dataEntrega || "—"}</span>
                     {f.status === "assinada" ? (
                       <button
                         type="button"
@@ -150,6 +166,15 @@ export function FichaEpiDrawer({
                         )}
                       </span>
                     )}
+                    <button
+                      type="button"
+                      onClick={() => void excluir(f)}
+                      title="Excluir entrega"
+                      aria-label={`Excluir entrega de ${f.dataEntrega}`}
+                      className="rounded px-1.5 py-0.5 text-[13px] text-foreground-muted hover:bg-status-danger-bg hover:text-status-danger"
+                    >
+                      🗑
+                    </button>
                   </div>
                 ))}
               </div>
@@ -161,7 +186,7 @@ export function FichaEpiDrawer({
       {registrando && (
         <RegistrarEntregaModal
           colaborador={colaborador}
-          todosEpis={todosEpis}
+          catalogo={catalogo}
           onFechar={() => setRegistrando(false)}
           onCriada={() => {
             carregar();

@@ -4,7 +4,7 @@ import { assinarFicha, linkAssinatura, obterFichaPublica } from "@/lib/sst/ficha
 export const runtime = "nodejs";
 
 // Rota pública (liberada em proxy.ts): quem assina não tem login no portal. O
-// token do link é a credencial, e o e-mail profissional confirma a pessoa.
+// token do link — enviado ao e-mail profissional do colaborador — é a credencial.
 
 export async function GET(_request: Request, { params }: { params: Promise<{ token: string }> }) {
   const documento = await obterFichaPublica((await params).token);
@@ -13,9 +13,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
 }
 
 const schema = z.object({
-  email: z.string().trim().email("Informe um e-mail válido."),
-  rg: z.string().trim().min(3, "Informe o seu RG."),
-  concordo: z.literal(true, { message: "É preciso concordar com a declaração." }),
+  concordo: z.literal(true, { message: "É preciso marcar que leu e concorda com a declaração." }),
 });
 
 export async function POST(request: Request, { params }: { params: Promise<{ token: string }> }) {
@@ -26,7 +24,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
   }
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "—";
   try {
-    const documento = await assinarFicha(token, parsed.data, {
+    const documento = await assinarFicha(token, {
       ip,
       link: linkAssinatura(new URL(request.url).origin, token),
     });

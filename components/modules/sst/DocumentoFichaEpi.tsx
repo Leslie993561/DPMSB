@@ -1,20 +1,21 @@
 import type { DocumentoFicha } from "@/lib/sst/fichas";
 
-function dataHora(iso: string): string {
-  return new Date(iso).toLocaleString("pt-BR", {
-    timeZone: "America/Sao_Paulo",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+const FUSO = "America/Sao_Paulo";
+
+function data(iso: string): string {
+  return new Date(iso).toLocaleDateString("pt-BR", { timeZone: FUSO });
 }
 
-function dataIsoParaBr(iso: string | null): string {
-  if (!iso || iso.length < 10) return "—";
-  return `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
+function hora(iso: string): string {
+  return new Date(iso).toLocaleTimeString("pt-BR", { timeZone: FUSO, hour: "2-digit", minute: "2-digit" });
 }
+
+/** A frase que o colaborador marca para assinar — repetida no comprovante. */
+export const CONCORDANCIA = "Li a ficha acima, confirmo o recebimento dos EPIs e concordo com a declaração.";
+
+export const AVISO_LGPD =
+  "Em conformidade com a LGPD (Lei nº 13.709/2018), os dados pessoais desta ficha são usados pela MSB apenas para " +
+  "o registro da entrega de EPI e não serão compartilhados com terceiros.";
 
 /** Texto do termo de recebimento de EPI adotado pelo RH da MSB. */
 const TERMO_ABERTURA = [
@@ -101,20 +102,16 @@ export function DocumentoFichaEpi({ documento }: { documento: DocumentoFicha }) 
 
       {a ? (
         <div className="rounded-md border border-status-success-border bg-status-success-bg p-3">
-          <p className="text-[12px] font-semibold text-status-success">
-            ✓ Assinatura do colaborador — assinado eletronicamente em {dataHora(a.assinadaEm)}
-          </p>
+          <p className="text-[12px] font-semibold text-status-success">✓ Confirmação de assinatura eletrônica</p>
           <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 text-[11.5px]">
             {[
               ["Nome", a.nome],
-              ["CPF", a.cpf || "—"],
-              ["RG", a.rg],
-              ["E-mail", a.email],
               ["Cargo", a.cargo ?? "—"],
-              ["Departamento", a.departamento ?? "—"],
-              ["Data de admissão", dataIsoParaBr(a.dataAdmissao)],
-              ["Data da assinatura", dataHora(a.assinadaEm)],
-              ["IP", a.ip],
+              ["Setor", a.departamento ?? "—"],
+              ["CPF", a.cpf || "—"],
+              ["E-mail", a.email ?? "—"],
+              ["Data da assinatura", data(a.assinadaEm)],
+              ["Horário da assinatura", hora(a.assinadaEm)],
             ].map(([rotulo, valor]) => (
               <div key={rotulo}>
                 <dt className="text-[9.5px] font-semibold tracking-wide text-foreground-muted uppercase">{rotulo}</dt>
@@ -122,10 +119,14 @@ export function DocumentoFichaEpi({ documento }: { documento: DocumentoFicha }) 
               </div>
             ))}
             <div className="col-span-2">
-              <dt className="text-[9.5px] font-semibold tracking-wide text-foreground-muted uppercase">Link</dt>
+              <dt className="text-[9.5px] font-semibold tracking-wide text-foreground-muted uppercase">
+                Link pelo qual foi acessado
+              </dt>
               <dd className="break-all text-[11px]">{a.link}</dd>
             </div>
           </dl>
+          <p className="mt-2 text-[11.5px]">☑ {CONCORDANCIA}</p>
+          <p className="mt-1 text-[10.5px] text-foreground-muted">{AVISO_LGPD}</p>
         </div>
       ) : (
         <div className="mt-2 flex flex-col items-center gap-1">

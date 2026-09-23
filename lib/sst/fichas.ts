@@ -21,14 +21,14 @@ export interface ItemFicha {
 
 export interface AssinaturaFicha {
   assinadaEm: string;
+  /** Link pelo qual a ficha foi acessada e assinada. */
   link: string;
   nome: string;
   cpf: string;
-  email: string;
-  rg: string;
-  dataAdmissao: string | null;
+  email: string | null;
   cargo: string | null;
   departamento: string | null;
+  /** Guardado como evidência, não aparece no documento. */
   ip: string;
 }
 
@@ -168,7 +168,12 @@ export async function criarFicha(nova: NovaFicha, responsavel: string, origem: s
     return proximo;
   });
 
-  return { fichaId, numero, link: linkAssinatura(origem, token) };
+  return {
+    fichaId,
+    numero,
+    link: linkAssinatura(origem, token),
+    colaborador: { nome: colaborador.nome, email: colaborador.email },
+  };
 }
 
 /** Histórico do colaborador (uma linha por ficha) + quais EPIs já têm entrega registrada. */
@@ -240,11 +245,11 @@ export async function obterFichaPublica(token: string): Promise<DocumentoFicha |
   return { ...doc, assinatura: null };
 }
 
-export async function assinarFicha(
-  token: string,
-  dados: { email: string; rg: string },
-  evidencia: { ip: string; link: string },
-): Promise<DocumentoFicha> {
+/**
+ * A identidade vem do próprio link: ele é enviado ao e-mail profissional do
+ * colaborador no Quadro, e só assina uma vez.
+ */
+export async function assinarFicha(token: string, evidencia: { ip: string; link: string }): Promise<DocumentoFicha> {
   const [f] = await sstQuery<LinhaFicha>(`SELECT ${COLUNAS_FICHA} FROM sst_fichas_epi WHERE token = $1`, [token]);
   if (!f) throw new Error("Link inválido.");
   if (f.status === "assinada") throw new Error("Esta ficha já foi assinada.");
@@ -252,10 +257,6 @@ export async function assinarFicha(
 
   const colaborador = await buscarColaborador(Number(f.colab_id));
   if (!colaborador) throw new Error("Colaborador não encontrado.");
-  if (!colaborador.email) throw new Error("Seu cadastro não tem e-mail profissional. Procure o RH.");
-  if (colaborador.email.trim().toLowerCase() !== dados.email.trim().toLowerCase()) {
-    throw new Error("E-mail não confere com o e-mail profissional cadastrado para esta ficha.");
-  }
 
   const assinatura: AssinaturaFicha = {
     assinadaEm: new Date().toISOString(),
@@ -263,8 +264,6 @@ export async function assinarFicha(
     nome: colaborador.nome,
     cpf: colaborador.cpf ?? "",
     email: colaborador.email,
-    rg: dados.rg.trim(),
-    dataAdmissao: colaborador.dataAdmissao ?? null,
     cargo: colaborador.cargo,
     departamento: colaborador.departamento,
     ip: evidencia.ip,
@@ -280,4 +279,13 @@ export async function assinarFicha(
   await sstQuery("UPDATE sst_entregas_epi SET assinatura = 'eletronica' WHERE ficha_id = $1", [f.id]);
 
   return montarDocumento({ ...f, status: "assinada", assinatura });
+}
+
+/** Exclui a ficha e as entregas dela (Custo e Valores deixa de contá-las). */
+export async function excluirFicha(fichaId: string): Promise<boolean> {
+  return sstTransacao(async (q) => {
+    await q("DELETE FROM sst_entregas_epi WHERE ficha_id = $1", [fichaId]);
+    const apagadas = await q<{ id: string }>("DELETE FROM sst_fichas_epi WHERE id = $1 RETURNING id", [fichaId]);
+    return apagadas.length > 0;
+  });
 }
