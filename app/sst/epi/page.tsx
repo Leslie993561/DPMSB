@@ -1,18 +1,36 @@
+import { redirect } from "next/navigation";
+import { obterSessaoAtual } from "@/lib/auth/sessao";
+import { listarColaboradoresParaEpi, MATRIZ_EPI, obterCustosEpi } from "@/lib/sst/epi";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { Card } from "@/components/shared/Card";
+import { EpiPageClient, type AbaEpi } from "@/components/modules/sst/EpiPageClient";
 
 export const metadata = { title: "Gestão de EPI — Portal Recursos Humanos" };
 
-export default function SstEpiPage() {
+const ABAS_VALIDAS: AbaEpi[] = ["colaboradores", "matriz", "custos"];
+
+export default async function SstEpiPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  // proxy.ts já bloqueia /sst/* pra quem não é administrador; checagem extra
+  // aqui só por segurança (mesmo padrão do Dashboard SST).
+  const sessao = await obterSessaoAtual();
+  if (!sessao || sessao.tipo !== "administrador") {
+    redirect("/sem-acesso");
+  }
+
+  // Aba lida no servidor e passada como prop: com useSearchParams + Suspense o
+  // conteúdo chegava pronto mas ficava escondido atrás do "Carregando...".
+  const abaParam = (await searchParams).aba;
+  const aba: AbaEpi = ABAS_VALIDAS.includes(abaParam as AbaEpi) ? (abaParam as AbaEpi) : "colaboradores";
+
+  const [colaboradores, custos] = await Promise.all([listarColaboradoresParaEpi(), obterCustosEpi()]);
+
   return (
     <div className="space-y-4">
-      <PageHeader eyebrow="SST" titulo="Gestão de EPI" subtitulo="Entregas, fardamento, custos e matriz de EPI" />
-      <Card className="flex flex-col items-center gap-2 px-6 py-14 text-center">
-        <p className="text-[13px] font-semibold text-foreground">Módulo em migração</p>
-        <p className="max-w-sm text-[12px] text-foreground-muted">
-          Ainda está no Portal SST antigo — está sendo trazido para cá em etapas.
-        </p>
-      </Card>
+      <PageHeader eyebrow="SST" titulo="Gestão de EPI" subtitulo="Colaboradores, matriz por função e custos" />
+      <EpiPageClient aba={aba} colaboradores={colaboradores} matriz={MATRIZ_EPI} custos={custos} />
     </div>
   );
 }

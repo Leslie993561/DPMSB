@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
@@ -190,6 +190,10 @@ const MODULOS_SST = [
 
 export function Sidebar({ counts, sessao }: { counts?: NavCounts; sessao: SessaoPayload }) {
   const pathname = usePathname();
+  const [abertoMobile, setAbertoMobile] = useState(false);
+  // Troca de página fecha a gaveta no celular — sem isso o menu ficava aberto
+  // por cima do conteúdo depois de tocar num link.
+  useEffect(() => setAbertoMobile(false), [pathname]);
   const ehAdmin = sessao.tipo === "administrador";
   const liberados = new Set(sessao.liberados);
   const frenteAtual = pathname?.startsWith("/sst") ? "sst" : pathname?.startsWith("/dho") ? "dho" : "dp";
@@ -210,7 +214,32 @@ export function Sidebar({ counts, sessao }: { counts?: NavCounts; sessao: Sessao
   );
 
   return (
-    <aside className="flex w-64 shrink-0 flex-col overflow-y-auto border-r border-hairline bg-background">
+    <>
+      <button
+        type="button"
+        onClick={() => setAbertoMobile(true)}
+        aria-label="Abrir menu"
+        className="fixed top-3 left-3 z-30 flex h-9 w-9 items-center justify-center rounded-lg border border-hairline bg-background text-foreground shadow-card md:hidden"
+      >
+        <svg viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">
+          <path
+            fillRule="evenodd"
+            clipRule="evenodd"
+            d="M3 5.5A1 1 0 0 1 4 4.5h12a1 1 0 1 1 0 2H4a1 1 0 0 1-1-1Zm0 5A1 1 0 0 1 4 9.5h12a1 1 0 1 1 0 2H4a1 1 0 0 1-1-1Zm1 4a1 1 0 1 0 0 2h12a1 1 0 1 0 0-2H4Z"
+          />
+        </svg>
+      </button>
+
+      {abertoMobile && (
+        <div className="fixed inset-0 z-30 bg-black/30 md:hidden" onClick={() => setAbertoMobile(false)} />
+      )}
+
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 -translate-x-full flex-col overflow-y-auto border-r border-hairline bg-background transition-transform duration-200 md:static md:z-auto md:translate-x-0",
+          abertoMobile && "translate-x-0",
+        )}
+      >
       <Logo />
 
       <div className="relative px-3 pt-1 pb-1">
@@ -344,7 +373,8 @@ export function Sidebar({ counts, sessao }: { counts?: NavCounts; sessao: Sessao
       </nav>
 
       <UserCard sessao={sessao} />
-    </aside>
+      </aside>
+    </>
   );
 }
 

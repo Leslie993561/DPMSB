@@ -50,9 +50,9 @@ function KpiTile({
   const corValor =
     tone === "success" ? "text-status-success" : tone === "warning" ? "text-status-warning" : tone === "danger" ? "text-status-danger" : "text-brand-primary-800";
   return (
-    <Card className={destaque ? "border-status-danger-border bg-status-danger-bg p-4" : "p-4"}>
+    <Card className={destaque ? "border-status-danger-border bg-status-danger-bg px-3 py-2.5" : "px-3 py-2.5"}>
       <p className="text-[10px] font-bold tracking-wide text-foreground-muted uppercase">{titulo}</p>
-      <p className={`mt-1 text-2xl font-bold tracking-tight ${corValor}`}>{valor}</p>
+      <p className={`text-xl font-bold tracking-tight ${corValor}`}>{valor}</p>
     </Card>
   );
 }
@@ -73,8 +73,8 @@ function DonutStatus({
   let acumulado = 0;
 
   return (
-    <div className="relative flex h-32 w-32 shrink-0 items-center justify-center">
-      <svg viewBox="0 0 100 100" className="h-32 w-32 -rotate-90">
+    <div className="relative flex h-24 w-24 shrink-0 items-center justify-center">
+      <svg viewBox="0 0 100 100" className="h-24 w-24 -rotate-90">
         <circle cx="50" cy="50" r={raio} fill="none" stroke="var(--hairline)" strokeWidth="14" />
         {total > 0 &&
           segmentos.map((s, i) => {
@@ -116,7 +116,7 @@ function BarrasOrcadoRealizado({ dados }: { dados: { mesLabel: string; orcado: n
     <div className="flex items-end gap-3 overflow-x-auto pb-1">
       {dados.map((d) => (
         <div key={d.mesLabel} className="flex min-w-[44px] flex-1 flex-col items-center gap-1">
-          <div className="flex h-28 w-full items-end justify-center gap-1">
+          <div className="flex h-20 w-full items-end justify-center gap-1">
             <div
               className="w-3 rounded-t bg-brand-surface"
               style={{ height: `${Math.max(2, Math.round((d.orcado / max) * 100))}%` }}
@@ -274,38 +274,101 @@ export default async function SstDashboardPage() {
         </Card>
       )}
 
-      <section className="space-y-3">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <KpiTile titulo="Colaboradores na base" valor={data.kpi.colaboradores} />
-          <KpiTile titulo="Com matriz de EPI" valor={data.kpi.classificados} />
-          <KpiTile titulo="Exames em dia" valor={data.kpi.asoEmDia} tone="success" />
-          <KpiTile titulo="A vencer (60 dias)" valor={data.kpi.aVencer} tone="warning" />
-          <KpiTile titulo="Vencidos + revisão" valor={data.kpi.pendencias} tone="danger" destaque />
-        </div>
-      </section>
-
-      <section className="space-y-3">
-        <SectionTitle>Conformidade de ASO</SectionTitle>
-        <Card className="flex flex-wrap items-center gap-6 p-4">
-          <DonutStatus segmentos={data.donutLegend} pctEmDia={data.pctEmDia} />
-          <div className="flex flex-col gap-1.5">
-            {data.donutLegend.map((item) => (
-              <div key={item.label} className="flex items-center gap-2 text-[12px] text-foreground">
-                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: item.color }} />
-                {item.label} · <strong>{item.count}</strong>
-              </div>
-            ))}
+      <section className="space-y-2">
+        <SectionTitle>Gestão de EPI</SectionTitle>
+        <div className="grid gap-2 lg:grid-cols-[auto_1fr]">
+          <Card className="flex flex-wrap items-center gap-4 px-3 py-2.5">
+            <DonutStatus segmentos={data.donutLegend} pctEmDia={data.pctEmDia} />
+            <div className="flex flex-col gap-1.5">
+              {data.donutLegend.map((item) => (
+                <div key={item.label} className="flex items-center gap-2 text-[12px] text-foreground">
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: item.color }} />
+                  {item.label} · <strong>{item.count}</strong>
+                </div>
+              ))}
+            </div>
+          </Card>
+          <div className="flex flex-col gap-2">
+            <div className="grid gap-2 sm:grid-cols-3">
+              <KpiTile titulo="Exames em dia" valor={data.kpi.asoEmDia} tone="success" />
+              <KpiTile titulo="A vencer (60 dias)" valor={data.kpi.aVencer} tone="warning" />
+              <KpiTile titulo="Vencidos + revisão" valor={data.kpi.pendencias} tone="danger" destaque />
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <KpiTile titulo="Fichas geradas" valor={data.fichasEpi.total} />
+              <KpiTile titulo="Fichas assinadas" valor={data.fichasEpi.assinadas} tone="success" />
+              <KpiTile titulo="Aguardando assinatura" valor={data.fichasEpi.aguardando} tone="warning" />
+              <KpiTile titulo="Entregas sem ficha ainda" valor={data.fichasEpi.semFicha} tone="danger" />
+            </div>
           </div>
-        </Card>
-      </section>
+        </div>
 
-      <section className="space-y-3">
-        <SectionTitle>Fichas de EPI pendentes de assinatura</SectionTitle>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <KpiTile titulo="Fichas geradas" valor={data.fichasEpi.total} />
-          <KpiTile titulo="Fichas assinadas" valor={data.fichasEpi.assinadas} tone="success" />
-          <KpiTile titulo="Aguardando assinatura" valor={data.fichasEpi.aguardando} tone="warning" />
-          <KpiTile titulo="Entregas sem ficha ainda" valor={data.fichasEpi.semFicha} tone="danger" />
+        <p className="pt-1 text-[11px] text-foreground-muted">
+          <span className="font-semibold text-foreground">Custos de EPI</span> · orçado{" "}
+          {formatarMoeda(data.custoEpi.orcadoAno)} · realizado {formatarMoeda(data.custoEpi.realizadoAno)} ·{" "}
+          {data.custoEpi.pctAno}% consumido
+        </p>
+        <div className="grid gap-2 lg:grid-cols-2">
+          <Card className="px-3 py-2.5">
+            <BarrasOrcadoRealizado dados={data.custoEpi.meses} />
+            <div className="mt-2 flex items-center gap-4 text-[10.5px] text-foreground-muted">
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-sm bg-brand-surface" /> Orçado
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-sm bg-brand-primary" /> Realizado
+              </span>
+            </div>
+          </Card>
+          <Card className="overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-[10.5px]">
+                <thead>
+                  <tr className="border-b border-hairline bg-background text-left font-bold tracking-wide text-foreground-muted uppercase">
+                    <th className="px-3 py-1.5">Mês</th>
+                    <th className="px-3 py-1.5 text-right">Orçado</th>
+                    <th className="px-3 py-1.5 text-right">Realizado</th>
+                    <th className="px-3 py-1.5 text-right">Diferença</th>
+                    <th className="px-3 py-1.5">% consumo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.custoEpi.meses.map((m) => (
+                    <tr key={m.mes} className="border-t border-hairline/60">
+                      <td className="px-3 py-1.5 font-semibold text-foreground">{m.mesLabel}</td>
+                      <td className="px-3 py-1.5 text-right text-foreground-muted">{formatarMoeda(m.orcado)}</td>
+                      <td className="px-3 py-1.5 text-right font-semibold text-foreground">{formatarMoeda(m.realizado)}</td>
+                      <td
+                        className={`px-3 py-1.5 text-right font-semibold ${m.dif > 0 ? "text-status-danger" : "text-status-success"}`}
+                      >
+                        {m.dif >= 0 ? "+" : "−"} {formatarMoeda(Math.abs(m.dif))}
+                      </td>
+                      <td className="px-3 py-1.5">
+                        <Badge cor={TOM_BADGE[m.pctTone]}>{m.pctConsumo}%</Badge>
+                      </td>
+                    </tr>
+                  ))}
+                  {data.custoEpi.meses.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="px-3 py-3 text-foreground-muted">
+                        Nenhum orçamento mensal cadastrado ainda.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
+        <div className="grid gap-2 lg:grid-cols-2">
+          <Card className="overflow-hidden">
+            <p className="border-b border-hairline px-3 py-1.5 text-[11px] font-semibold text-foreground">Por departamento</p>
+            <TabelaRanking linhas={data.custoEpi.porDepartamento} mostrarMedia />
+          </Card>
+          <Card className="overflow-hidden">
+            <p className="border-b border-hairline px-3 py-1.5 text-[11px] font-semibold text-foreground">Por colaborador</p>
+            <TabelaRanking linhas={data.custoEpi.porColaborador} />
+          </Card>
         </div>
       </section>
 
@@ -353,79 +416,6 @@ export default async function SstDashboardPage() {
             </div>
           )}
         </Card>
-      </section>
-
-      <section className="space-y-3">
-        <SectionTitle
-          aside={
-            <span className="text-[11px] text-foreground-muted/70">
-              orçado {formatarMoeda(data.custoEpi.orcadoAno)} · realizado {formatarMoeda(data.custoEpi.realizadoAno)} ·{" "}
-              {data.custoEpi.pctAno}% consumido
-            </span>
-          }
-        >
-          Custos de EPI · realizado × orçado
-        </SectionTitle>
-        <Card className="p-4">
-          <BarrasOrcadoRealizado dados={data.custoEpi.meses} />
-          <div className="mt-3 flex items-center gap-4 text-[10.5px] text-foreground-muted">
-            <span className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-sm bg-brand-surface" /> Orçado
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-sm bg-brand-primary" /> Realizado
-            </span>
-          </div>
-        </Card>
-
-        <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-[10.5px]">
-              <thead>
-                <tr className="border-b border-hairline bg-background text-left font-bold tracking-wide text-foreground-muted uppercase">
-                  <th className="px-3 py-1.5">Mês</th>
-                  <th className="px-3 py-1.5 text-right">Orçado</th>
-                  <th className="px-3 py-1.5 text-right">Realizado</th>
-                  <th className="px-3 py-1.5 text-right">Diferença</th>
-                  <th className="px-3 py-1.5">% consumo</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.custoEpi.meses.map((m) => (
-                  <tr key={m.mes} className="border-t border-hairline/60">
-                    <td className="px-3 py-1.5 font-semibold text-foreground">{m.mesLabel}</td>
-                    <td className="px-3 py-1.5 text-right text-foreground-muted">{formatarMoeda(m.orcado)}</td>
-                    <td className="px-3 py-1.5 text-right font-semibold text-foreground">{formatarMoeda(m.realizado)}</td>
-                    <td className={`px-3 py-1.5 text-right font-semibold ${m.dif > 0 ? "text-status-danger" : "text-status-success"}`}>
-                      {m.dif >= 0 ? "+" : "−"} {formatarMoeda(Math.abs(m.dif))}
-                    </td>
-                    <td className="px-3 py-1.5">
-                      <Badge cor={TOM_BADGE[m.pctTone]}>{m.pctConsumo}%</Badge>
-                    </td>
-                  </tr>
-                ))}
-                {data.custoEpi.meses.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="px-3 py-3 text-foreground-muted">
-                      Nenhum orçamento mensal cadastrado ainda.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-
-        <div className="grid gap-3 lg:grid-cols-2">
-          <Card className="overflow-hidden">
-            <p className="border-b border-hairline px-3 py-2 text-[11px] font-semibold text-foreground">Por departamento</p>
-            <TabelaRanking linhas={data.custoEpi.porDepartamento} mostrarMedia />
-          </Card>
-          <Card className="overflow-hidden">
-            <p className="border-b border-hairline px-3 py-2 text-[11px] font-semibold text-foreground">Por colaborador</p>
-            <TabelaRanking linhas={data.custoEpi.porColaborador} />
-          </Card>
-        </div>
       </section>
 
       <section className="space-y-3">
