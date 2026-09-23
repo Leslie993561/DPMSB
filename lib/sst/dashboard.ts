@@ -1,5 +1,6 @@
 import "server-only";
 import { sstQuery } from "./db";
+import { listarColaboradoresParaEpi } from "./epi";
 import {
   CATALOGO_EXAMES_OCUPACIONAIS,
   computeProgramaStatus,
@@ -84,6 +85,7 @@ interface FichaEpiRow {
   id: string;
   colab_id: number;
   assinatura_storage_path: string | null;
+  status: string | null;
 }
 
 interface AsoDemissionalPendenteRow {
@@ -286,7 +288,7 @@ export async function obterDashboardSst(): Promise<DashboardSst> {
     ),
     tolerante<ExamePrecoRow>("sst_exame_precos", "SELECT codigo, valor FROM sst_exame_precos"),
     tolerante<AnexoExameRow>("sst_anexos_exames", "SELECT valor FROM sst_anexos_exames"),
-    tolerante<FichaEpiRow>("sst_fichas_epi", "SELECT id, colab_id, assinatura_storage_path FROM sst_fichas_epi"),
+    tolerante<FichaEpiRow>("sst_fichas_epi", "SELECT id, colab_id, assinatura_storage_path, status FROM sst_fichas_epi"),
     tolerante<AsoDemissionalPendenteRow>(
       "sst_aso_demissional_pendentes",
       "SELECT colab_id, desligado_em, motivo, solicitado_por, ts FROM sst_aso_demissional_pendentes ORDER BY ts ASC",
@@ -492,9 +494,18 @@ export async function obterDashboardSst(): Promise<DashboardSst> {
   // ---------- fichas de EPI pendentes de assinatura ----------
 
   const totalFichasEpi = fichasEpiRows.length;
-  const fichasAssinadas = fichasEpiRows.filter((f) => statusFichaEpi(f.assinatura_storage_path) === "assinada").length;
+  // Assinada = assinatura eletrônica pelo link (status) ou PDF assinado anexado
+  // (modelo antigo do Portal SST). O resto foi entregue e ainda não assinado.
+  const fichasAssinadas = fichasEpiRows.filter(
+    (f) => f.status === "assinada" || statusFichaEpi(f.assinatura_storage_path) === "assinada",
+  ).length;
   const fichasAguardando = totalFichasEpi - fichasAssinadas;
-  const entregasSemFicha = entregasEpiRows.filter((e) => !e.ficha_id).length;
+  // Quem tem EPI obrigatório pela função (cadastro do Quadro × matriz) e ainda
+  // não recebeu nenhuma ficha para assinar.
+  const comFicha = new Set(fichasEpiRows.map((f) => Number(f.colab_id)));
+  const entregasSemFicha = (await listarColaboradoresParaEpi()).filter(
+    (c) => c.episObrigatorios.length > 0 && !comFicha.has(c.id),
+  ).length;
 
   // ---------- desligamentos pendentes (Portal PeopleFlow) ----------
 

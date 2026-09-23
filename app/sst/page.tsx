@@ -294,8 +294,7 @@ export default async function SstDashboardPage() {
               <KpiTile titulo="A vencer (60 dias)" valor={data.kpi.aVencer} tone="warning" />
               <KpiTile titulo="Vencidos + revisão" valor={data.kpi.pendencias} tone="danger" destaque />
             </div>
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              <KpiTile titulo="Fichas geradas" valor={data.fichasEpi.total} />
+            <div className="grid gap-2 sm:grid-cols-3">
               <KpiTile titulo="Fichas assinadas" valor={data.fichasEpi.assinadas} tone="success" />
               <KpiTile titulo="Aguardando assinatura" valor={data.fichasEpi.aguardando} tone="warning" />
               <KpiTile titulo="Entregas sem ficha ainda" valor={data.fichasEpi.semFicha} tone="danger" />

@@ -26,12 +26,14 @@ export function EpiPageClient({
   matriz,
   custos,
   fardamento,
+  resumoFichas,
 }: {
   aba: AbaEpi;
   colaboradores: ColaboradorEpi[];
   matriz: FuncaoEpi[];
   custos: { trimestres: CustoTrimestre[]; linhas: LinhaCustoEpi[] };
   fardamento: LinhaCustoFardamento[];
+  resumoFichas: { enviadas: number; assinadas: number };
 }) {
   const router = useRouter();
   // Busca fica aqui, fora da aba: continua valendo ao trocar de aba e voltar.
@@ -80,7 +82,13 @@ export function EpiPageClient({
       </div>
 
       {aba === "colaboradores" && (
-        <ColaboradoresTab colaboradores={colaboradores} precos={custos.linhas} busca={busca} onBusca={setBusca} />
+        <ColaboradoresTab
+          colaboradores={colaboradores}
+          precos={custos.linhas}
+          busca={busca}
+          onBusca={setBusca}
+          resumoFichas={resumoFichas}
+        />
       )}
       {aba === "matriz" && <MatrizTab matriz={matriz} />}
       {aba === "custos" && <CustosTab custos={custos} fardamento={fardamento} />}
@@ -93,11 +101,13 @@ function ColaboradoresTab({
   precos,
   busca,
   onBusca,
+  resumoFichas,
 }: {
   colaboradores: ColaboradorEpi[];
   precos: { epi: string; ca: string; valorUnitario: number }[];
   busca: string;
   onBusca: (v: string) => void;
+  resumoFichas: { enviadas: number; assinadas: number };
 }) {
   const [fichaAberta, setFichaAberta] = useState<ColaboradorEpi | null>(null);
   const [colunaAberta, setColunaAberta] = useState<"vinculo" | "texto" | null>(null);
@@ -152,7 +162,21 @@ function ColaboradoresTab({
               >
                 <CampoTexto valor={busca} onChange={onBusca} placeholder="Buscar nome, cargo ou setor" />
               </CabecalhoFiltravel>
-              <th className="px-2 py-1" />
+              <th className="px-2 py-1 text-right">
+                {resumoFichas.enviadas > 0 && (
+                  <span
+                    title={`De ${resumoFichas.enviadas} ficha(s) enviada(s), ${resumoFichas.assinadas} assinada(s)`}
+                    className={
+                      "rounded-full px-1.5 py-px text-[10px] font-bold tracking-normal normal-case " +
+                      (resumoFichas.assinadas < resumoFichas.enviadas
+                        ? "bg-status-warning-bg text-status-warning"
+                        : "bg-status-success-bg text-status-success")
+                    }
+                  >
+                    {resumoFichas.assinadas}/{resumoFichas.enviadas}
+                  </span>
+                )}
+              </th>
             </tr>
           </thead>
           <tbody>

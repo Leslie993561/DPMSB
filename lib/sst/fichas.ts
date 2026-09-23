@@ -281,6 +281,16 @@ export async function assinarFicha(token: string, evidencia: { ip: string; link:
   return montarDocumento({ ...f, status: "assinada", assinatura });
 }
 
+/** Quantas fichas foram enviadas e quantas já têm assinatura (eletrônica ou PDF anexado do modelo antigo). */
+export async function obterResumoFichas(): Promise<{ enviadas: number; assinadas: number }> {
+  const [r] = await sstQuery<{ enviadas: number; assinadas: number }>(
+    `SELECT count(*)::int AS enviadas,
+            count(*) FILTER (WHERE status = 'assinada' OR assinatura_storage_path IS NOT NULL)::int AS assinadas
+       FROM sst_fichas_epi`,
+  );
+  return r ?? { enviadas: 0, assinadas: 0 };
+}
+
 /** Exclui a ficha e as entregas dela (Custo e Valores deixa de contá-las). */
 export async function excluirFicha(fichaId: string): Promise<boolean> {
   return sstTransacao(async (q) => {
