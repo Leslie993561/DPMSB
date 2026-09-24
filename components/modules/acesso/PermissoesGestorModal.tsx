@@ -93,7 +93,7 @@ export function PermissoesGestorModal({
       eyebrow="Controle de acesso"
       titulo={gestor ? `Permissões de ${gestor.nome}` : ""}
       subtitulo={gestor?.email}
-      largura="42rem"
+      largura="56rem"
     >
       {carregando ? (
         <p className="py-6 text-center text-[13px] text-foreground-muted">Carregando…</p>
@@ -108,16 +108,16 @@ export function PermissoesGestorModal({
           </p>
           {erro && <p className="rounded-md bg-status-danger/10 px-3.5 py-2.5 text-[12.5px] text-status-danger">{erro}</p>}
 
-          <div className="flex flex-col divide-y divide-hairline rounded-md border border-hairline">
+          <div className="grid gap-3 md:grid-cols-2">
             {MODULOS_PORTAL.map((modulo) => {
               const filhos = modulo.filhos ?? [];
               const todosLigados = filhos.length > 0 && filhos.every((f) => liberados.has(f.chave));
               const algumLigado = filhos.some((f) => liberados.has(f.chave));
 
               return (
-                <div key={modulo.chave} className="px-4 py-3">
+                <div key={modulo.chave} className="rounded-md border border-hairline px-4 py-3.5">
                   <div className="flex items-center gap-3">
-                    <span className="min-w-0 flex-1 text-[14px] font-semibold text-foreground">{modulo.label}</span>
+                    <span className="min-w-0 flex-1 text-[14.5px] font-semibold text-foreground">{modulo.label}</span>
                     {filhos.length > 0 ? (
                       <>
                         {algumLigado && !todosLigados && (
@@ -139,10 +139,10 @@ export function PermissoesGestorModal({
                   </div>
 
                   {filhos.length > 0 && (
-                    <div className="mt-2.5 ml-1 flex flex-col gap-2.5 border-l border-hairline pl-4">
+                    <div className="mt-3 ml-1 flex flex-col gap-3 border-l border-hairline pl-4">
                       {filhos.map((filho) => (
                         <div key={filho.chave} className="flex items-center gap-3">
-                          <span className="min-w-0 flex-1 text-[13px] text-foreground-muted">{filho.label}</span>
+                          <span className="min-w-0 flex-1 text-[13.5px] text-foreground-muted">{filho.label}</span>
                           <Toggle
                             ligado={liberados.has(filho.chave)}
                             onClick={() => alternarFolha(filho.chave)}
