@@ -586,22 +586,65 @@ function AnexarExameModal({
 function MatrizExamesTab({ matriz, catalogoExames }: { matriz: FuncaoExames[]; catalogoExames: string[] }) {
   const router = useRouter();
   const [editando, setEditando] = useState<FuncaoExames | null>(null);
+  const [adicionando, setAdicionando] = useState(false);
+  const [removendo, setRemovendo] = useState<string | null>(null);
+
+  async function remover(funcao: string) {
+    if (!window.confirm(`Remover "${funcao}" da Matriz por Função?`)) return;
+    setRemovendo(funcao);
+    try {
+      const r = await fetch("/api/sst/exames/matriz", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ funcao }),
+      });
+      if (!r.ok) {
+        window.alert((await r.json()).erro ?? "Não foi possível remover.");
+        return;
+      }
+      router.refresh();
+    } finally {
+      setRemovendo(null);
+    }
+  }
 
   return (
     <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+      <button
+        type="button"
+        onClick={() => setAdicionando(true)}
+        className="flex min-h-[5.5rem] items-center justify-center gap-1.5 rounded-md border border-dashed border-hairline px-3 py-2.5 text-[12.5px] font-medium text-foreground-muted hover:border-brand-primary hover:text-brand-primary-800"
+      >
+        + Adicionar cargo
+      </button>
+
       {matriz.map((f) => (
         <Card key={f.funcao} className="relative px-3 py-2.5">
-          <button
-            type="button"
-            onClick={() => setEditando(f)}
-            title="Adicionar exame a esta função"
-            aria-label={`Adicionar exame a ${f.funcao}`}
-            className="absolute top-2 right-2 rounded p-1 text-foreground-muted/50 hover:bg-brand-surface hover:text-foreground"
-          >
-            <svg viewBox="0 0 20 20" fill="currentColor" className="h-2.5 w-2.5" aria-hidden>
-              <path d="M14.85 2.15a1.5 1.5 0 0 1 2.12 0l.88.88a1.5 1.5 0 0 1 0 2.12l-1.1 1.1-3-3 1.1-1.1Zm-2.16 2.16 3 3L6.94 16.06a1 1 0 0 1-.46.26l-3.1.83.83-3.1a1 1 0 0 1 .26-.46L12.7 4.3Z" />
-            </svg>
-          </button>
+          <div className="absolute top-2 right-2 flex items-center gap-0.5">
+            <button
+              type="button"
+              onClick={() => setEditando(f)}
+              title="Editar exames desta função"
+              aria-label={`Editar exames de ${f.funcao}`}
+              className="rounded p-1 text-foreground-muted/50 hover:bg-brand-surface hover:text-foreground"
+            >
+              <svg viewBox="0 0 20 20" fill="currentColor" className="h-2.5 w-2.5" aria-hidden>
+                <path d="M14.85 2.15a1.5 1.5 0 0 1 2.12 0l.88.88a1.5 1.5 0 0 1 0 2.12l-1.1 1.1-3-3 1.1-1.1Zm-2.16 2.16 3 3L6.94 16.06a1 1 0 0 1-.46.26l-3.1.83.83-3.1a1 1 0 0 1 .26-.46L12.7 4.3Z" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={() => void remover(f.funcao)}
+              disabled={removendo === f.funcao}
+              title="Remover este cargo da matriz"
+              aria-label={`Remover ${f.funcao}`}
+              className="rounded p-1 text-foreground-muted/50 hover:bg-status-danger-bg hover:text-status-danger disabled:opacity-50"
+            >
+              <svg viewBox="0 0 20 20" fill="currentColor" className="h-2.5 w-2.5" aria-hidden>
+                <path d="M8 2a1 1 0 0 0-1 1v1H4v1.5h12V4h-3V3a1 1 0 0 0-1-1H8ZM5 7l.7 9.1a1.5 1.5 0 0 0 1.5 1.4h5.6a1.5 1.5 0 0 0 1.5-1.4L15 7H5Z" />
+              </svg>
+            </button>
+          </div>
           <div className="flex items-center gap-2 pr-6">
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-brand-primary-100 text-brand-primary-800">
               <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5" aria-hidden>
@@ -642,7 +685,94 @@ function MatrizExamesTab({ matriz, catalogoExames }: { matriz: FuncaoExames[]; c
           }}
         />
       )}
+
+      {adicionando && (
+        <AdicionarCargoModal
+          onFechar={() => setAdicionando(false)}
+          onCriado={(funcao) => {
+            setAdicionando(false);
+            router.refresh();
+            setEditando({ funcao, exames: [] });
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+function AdicionarCargoModal({ onFechar, onCriado }: { onFechar: () => void; onCriado: (funcao: string) => void }) {
+  const [nome, setNome] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  async function criar() {
+    const funcao = nome.trim();
+    if (!funcao) {
+      setErro("Informe o nome do cargo/função.");
+      return;
+    }
+    setSalvando(true);
+    setErro(null);
+    try {
+      const r = await fetch("/api/sst/exames/matriz", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ funcao, exames: [] }),
+      });
+      if (!r.ok) throw new Error((await r.json()).erro ?? "Falha ao criar.");
+      onCriado(funcao);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Falha ao criar.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <Modal
+      aberto
+      onFechar={onFechar}
+      eyebrow="Matriz por Função"
+      titulo="Adicionar cargo"
+      largura="22rem"
+      rodape={
+        <div className="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onFechar}
+            className="rounded border border-hairline px-3 py-1.5 text-[12px] font-medium text-foreground hover:bg-surface-page"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={() => void criar()}
+            disabled={salvando}
+            className="rounded bg-brand-primary px-3 py-1.5 text-[12px] font-medium text-brand-white hover:bg-brand-primary-hover disabled:opacity-50"
+          >
+            {salvando ? "Criando..." : "Criar e adicionar exames"}
+          </button>
+        </div>
+      }
+    >
+      <label className="block text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">
+        Nome do cargo/função
+        <input
+          value={nome}
+          onChange={(e) => setNome(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              void criar();
+            }
+          }}
+          autoFocus
+          placeholder="Ex.: Analista de Marketing"
+          className="mt-1 w-full rounded border border-hairline bg-background px-2.5 py-1.5 text-[12px] font-normal normal-case text-foreground outline-none focus:border-brand-primary"
+        />
+      </label>
+      {erro && <p className="mt-2 text-[11.5px] text-status-danger">{erro}</p>}
+    </Modal>
   );
 }
 

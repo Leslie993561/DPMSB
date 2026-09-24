@@ -153,6 +153,13 @@ const ESQUEMA_EXTRA = `
     atualizado_em timestamptz NOT NULL DEFAULT now()
   );
 
+  -- Cargos/funções fixas (FUNCOES_MATRIZ_EXAMES, no código) que a RH removeu
+  -- pela tela — não apaga a constante, só marca pra sumir da listagem.
+  CREATE TABLE IF NOT EXISTS sst_matriz_exames_removidas (
+    funcao text PRIMARY KEY,
+    removido_em timestamptz NOT NULL DEFAULT now()
+  );
+
   -- Matriz Ocupacional antiga, por função — substituída pela Matriz
   -- Ocupacional por CARGO/setor (sst_cargos_ocupacionais) assim que a Leslie
   -- repassou a planilha real; fica só a tabela (vazia, sem uso) pra não

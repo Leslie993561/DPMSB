@@ -88,18 +88,42 @@ async function obterExamesPorFuncao(): Promise<Map<string, string[]>> {
   return new Map(linhas.map((l) => [l.funcao, l.exames]));
 }
 
-export async function obterMatrizExames(): Promise<FuncaoExames[]> {
-  const mapa = await obterExamesPorFuncao();
-  return FUNCOES_MATRIZ_EXAMES.map((funcao) => ({ funcao, exames: mapa.get(funcao) ?? [] }));
+/** Funções fixas (FUNCOES_MATRIZ_EXAMES) que a RH removeu da tela — não dá pra apagar a constante do código, só "esconder". */
+async function obterFuncoesRemovidas(): Promise<Set<string>> {
+  const linhas = await sstQuery<{ funcao: string }>("SELECT funcao FROM sst_matriz_exames_removidas");
+  return new Set(linhas.map((l) => l.funcao));
 }
 
+/**
+ * Fixas (FUNCOES_MATRIZ_EXAMES) + as que a RH cadastrou na tela, menos as
+ * que ela removeu. RH pode adicionar cargo/função novo e remover qualquer
+ * um, fixo ou não — igual à Matriz de EPI.
+ */
+export async function obterMatrizExames(): Promise<FuncaoExames[]> {
+  const [mapa, removidas] = await Promise.all([obterExamesPorFuncao(), obterFuncoesRemovidas()]);
+  const funcoes = [...new Set([...FUNCOES_MATRIZ_EXAMES, ...mapa.keys()])].filter((f) => !removidas.has(f));
+  return funcoes.sort((a, b) => a.localeCompare(b, "pt-BR")).map((funcao) => ({ funcao, exames: mapa.get(funcao) ?? [] }));
+}
+
+/** RH adiciona/edita os exames de uma função — nova ou já existente. */
 export async function atualizarExamesDaFuncao(funcao: string, exames: string[]): Promise<void> {
-  if (!FUNCOES_MATRIZ_EXAMES.includes(funcao)) throw new Error("Função não encontrada na matriz.");
+  const nome = funcao.trim();
+  if (!nome) throw new Error("Informe o nome do cargo/função.");
   const limpos = [...new Set(exames.map((e) => e.trim()).filter(Boolean))];
   await sstQuery(
     `INSERT INTO sst_matriz_exames_funcao (funcao, exames, atualizado_em) VALUES ($1, $2, now())
        ON CONFLICT (funcao) DO UPDATE SET exames = EXCLUDED.exames, atualizado_em = now()`,
-    [funcao, limpos],
+    [nome, limpos],
+  );
+  await sstQuery("DELETE FROM sst_matriz_exames_removidas WHERE funcao = $1", [nome]);
+}
+
+/** RH remove um cargo/função inteiro da matriz — fixo (só some da tela) ou cadastrado por ela (some de vez). */
+export async function removerFuncaoDaMatriz(funcao: string): Promise<void> {
+  await sstQuery("DELETE FROM sst_matriz_exames_funcao WHERE funcao = $1", [funcao]);
+  await sstQuery(
+    `INSERT INTO sst_matriz_exames_removidas (funcao) VALUES ($1) ON CONFLICT (funcao) DO NOTHING`,
+    [funcao],
   );
 }
 
