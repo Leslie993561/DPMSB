@@ -102,9 +102,16 @@ export async function listarColaboradoresParaEpi(): Promise<ColaboradorEpi[]> {
     listarColaboradores(),
     // Só a entrega mais recente de cada EPI vale para o vencimento: uma nova entrega
     // do mesmo EPI substitui a anterior (por data de entrega; empate, a última lançada).
+    // Só conta entrega CONFIRMADA (ficha assinada, PDF do modelo antigo anexado, ou
+    // sem ficha — registro legado de antes de existir esse controle): enquanto a
+    // ficha só está "aguardando assinatura", o colaborador ainda não confirmou que
+    // recebeu, então não pode contar como EPI em dia.
     sstQuery<{ colab_id: string; epi: string; data_troca: string }>(
-      `SELECT DISTINCT ON (colab_id, epi) colab_id, epi, data_troca
-         FROM sst_entregas_epi ORDER BY colab_id, epi, to_date(NULLIF(data_entrega, ''), 'DD/MM/YYYY') DESC NULLS LAST, created_at DESC`,
+      `SELECT DISTINCT ON (e.colab_id, e.epi) e.colab_id, e.epi, e.data_troca
+         FROM sst_entregas_epi e
+         LEFT JOIN sst_fichas_epi f ON f.id = e.ficha_id
+         WHERE e.ficha_id IS NULL OR f.status = 'assinada' OR f.assinatura_storage_path IS NOT NULL
+         ORDER BY e.colab_id, e.epi, to_date(NULLIF(e.data_entrega, ''), 'DD/MM/YYYY') DESC NULLS LAST, e.created_at DESC`,
     ),
     obterListaEditadaMatriz(),
     sstQuery<{ colab_id: string }>(

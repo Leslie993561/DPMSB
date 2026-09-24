@@ -367,11 +367,16 @@ export async function listarFichasDoColaborador(colaboradorId: number, origem: s
     [colaboradorId],
   );
   const itens = await itensDasFichas(fichas.map((f) => f.id));
-  // Entrega mais recente de cada EPI (assinada ou aguardando) — uma nova entrega
-  // do mesmo EPI substitui a anterior: só a troca prevista dela vale.
+  // Entrega mais recente de cada EPI — só conta CONFIRMADA (ficha assinada, PDF
+  // do modelo antigo, ou sem ficha/registro legado): enquanto a ficha só está
+  // aguardando assinatura, o colaborador ainda não confirmou o recebimento.
   const [entregues, dispensadas] = await Promise.all([
     sstQuery<{ epi: string; data_troca: string }>(
-      "SELECT DISTINCT ON (epi) epi, data_troca FROM sst_entregas_epi WHERE colab_id = $1 ORDER BY epi, to_date(NULLIF(data_entrega, ''), 'DD/MM/YYYY') DESC NULLS LAST, created_at DESC",
+      `SELECT DISTINCT ON (e.epi) e.epi, e.data_troca
+         FROM sst_entregas_epi e
+         LEFT JOIN sst_fichas_epi f ON f.id = e.ficha_id
+         WHERE e.colab_id = $1 AND (e.ficha_id IS NULL OR f.status = 'assinada' OR f.assinatura_storage_path IS NOT NULL)
+         ORDER BY e.epi, to_date(NULLIF(e.data_entrega, ''), 'DD/MM/YYYY') DESC NULLS LAST, e.created_at DESC`,
       [colaboradorId],
     ),
     sstQuery<{ epi: string; data_troca: string }>(
