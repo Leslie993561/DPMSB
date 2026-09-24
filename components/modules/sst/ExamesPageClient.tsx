@@ -8,10 +8,11 @@ import { Card } from "@/components/shared/Card";
 import { Badge } from "@/components/shared/Badge";
 import { Modal } from "@/components/shared/Modal";
 import { Drawer } from "@/components/shared/Drawer";
+import { DocumentoFichaExame } from "@/components/modules/sst/DocumentoFichaExame";
 import { CabecalhoFiltravel, CampoTexto, COR_VINCULO } from "@/components/modules/colaboradores/ColaboradoresTable";
 import { formatarMoeda, iniciais } from "@/lib/format";
 import type { Vinculo } from "@/lib/db/colaboradores";
-import type { CargoOcupacional, ColaboradorExame, FuncaoExames, LinhaCustoExame, SetorOcupacional } from "@/lib/sst/exames";
+import type { CargoOcupacional, ColaboradorExame, ExameVencido, FuncaoExames, LinhaCustoExame, SetorOcupacional } from "@/lib/sst/exames";
 
 const TIPOS_ASO = [
   { valor: "admissional", label: "Admissional" },
@@ -26,6 +27,7 @@ interface FichaExameResumo {
   tipoAso: string;
   dataRealizacao: string;
   exames: string[];
+  itens: { exame: string; codigo: string; dataRealizacao: string; dataVencimento: string | null }[];
   anexoUrl: string | null;
   anexoNome: string | null;
 }
@@ -236,7 +238,7 @@ function ColaboradoresTab({
 function ExameColaboradorDrawer({ colaborador, onFechar }: { colaborador: ColaboradorExame; onFechar: () => void }) {
   const router = useRouter();
   const [fichas, setFichas] = useState<FichaExameResumo[] | null>(null);
-  const [vencidos, setVencidos] = useState<string[]>([]);
+  const [vencidos, setVencidos] = useState<ExameVencido[]>([]);
   const [erroCarga, setErroCarga] = useState<string | null>(null);
   const [anexando, setAnexando] = useState(false);
   const [documento, setDocumento] = useState<{ ficha: FichaExameResumo } | null>(null);
@@ -305,8 +307,11 @@ function ExameColaboradorDrawer({ colaborador, onFechar }: { colaborador: Colabo
             <div className="rounded-md border border-status-danger-border bg-status-danger-bg px-3 py-2.5 text-status-danger">
               <p className="text-[12.5px] font-semibold">⚠ {vencidos.length} exame(s) vencido(s)</p>
               <ul className="mt-1.5 list-inside list-disc text-[12px]">
-                {vencidos.map((exame) => (
-                  <li key={exame}>{exame}</li>
+                {vencidos.map((v) => (
+                  <li key={v.exame}>
+                    {v.exame}
+                    <span className="text-status-danger/80"> — {v.dataVencimento ? `venceu em ${v.dataVencimento}` : "nunca realizado"}</span>
+                  </li>
                 ))}
               </ul>
             </div>
@@ -332,17 +337,15 @@ function ExameColaboradorDrawer({ colaborador, onFechar }: { colaborador: Colabo
                     <span className="flex-1 truncate text-center text-[10.5px] font-light whitespace-nowrap text-foreground-muted/80">
                       {LABEL_TIPO_ASO.get(f.tipoAso) ?? f.tipoAso}
                     </span>
-                    {f.anexoUrl && (
-                      <button
-                        type="button"
-                        onClick={() => setDocumento({ ficha: f })}
-                        title="Ver documento anexado"
-                        aria-label={`Ver documento de ${f.dataRealizacao}`}
-                        className="rounded px-1.5 py-0.5 text-[15px] text-brand-primary hover:bg-brand-primary-100"
-                      >
-                        📎
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => setDocumento({ ficha: f })}
+                      title="Ver exames realizados"
+                      aria-label={`Ver exames do registro de ${f.dataRealizacao}`}
+                      className="rounded px-1.5 py-0.5 text-[15px] text-brand-primary hover:bg-brand-primary-100"
+                    >
+                      📎
+                    </button>
                     <button
                       type="button"
                       onClick={() => void excluir(f)}
@@ -373,19 +376,19 @@ function ExameColaboradorDrawer({ colaborador, onFechar }: { colaborador: Colabo
         />
       )}
 
-      {documento?.ficha.anexoUrl && (
+      {documento && (
         <Modal
           aberto
           onFechar={() => setDocumento(null)}
-          eyebrow="Documento anexado"
+          eyebrow="Ficha de exame ocupacional"
           titulo={LABEL_TIPO_ASO.get(documento.ficha.tipoAso) ?? documento.ficha.tipoAso}
           subtitulo={colaborador.nome}
-          largura="40rem"
+          largura="34rem"
         >
-          <iframe
-            src={`/api/sst/exames/fichas/${documento.ficha.id}/anexo`}
-            title="Documento anexado"
-            className="h-[70vh] w-full rounded-md border border-hairline"
+          <DocumentoFichaExame
+            ficha={documento.ficha}
+            colaborador={colaborador}
+            anexoHref={`/api/sst/exames/fichas/${documento.ficha.id}/anexo`}
           />
         </Modal>
       )}
@@ -400,13 +403,13 @@ function AnexarExameModal({
   onCriado,
 }: {
   colaborador: ColaboradorExame;
-  vencidos: string[];
+  vencidos: ExameVencido[];
   onFechar: () => void;
   onCriado: () => void;
 }) {
   const [tipoAso, setTipoAso] = useState("periodico");
   const [dataRealizacao, setDataRealizacao] = useState(() => new Date().toISOString().slice(0, 10));
-  const [marcados, setMarcados] = useState<Set<string>>(new Set(vencidos));
+  const [marcados, setMarcados] = useState<Set<string>>(new Set(vencidos.map((v) => v.exame)));
   const [anexo, setAnexo] = useState<{ url: string; nome: string } | null>(null);
   const [enviandoAnexo, setEnviandoAnexo] = useState(false);
   const [enviando, setEnviando] = useState(false);
@@ -555,7 +558,7 @@ function AnexarExameModal({
             </p>
           ) : null}
           <div className="mt-1.5 flex flex-col divide-y divide-hairline/70 rounded-md border border-hairline">
-            {(vencidos.length > 0 ? vencidos : colaborador.examesObrigatorios).map((exame) => (
+            {(vencidos.length > 0 ? vencidos.map((v) => v.exame) : colaborador.examesObrigatorios).map((exame) => (
               <label key={exame} className="flex items-center gap-2 px-2.5 py-1.5 text-[12px] text-foreground">
                 <input type="checkbox" checked={marcados.has(exame)} onChange={() => alternar(exame)} className="accent-brand-primary" />
                 {exame}

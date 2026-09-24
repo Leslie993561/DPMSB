@@ -6,6 +6,8 @@ import type { SexoDependente } from "@/lib/db/colaboradorDependentes";
 import { RiskCallout } from "@/components/shared/RiskCallout";
 import { Modal } from "@/components/shared/Modal";
 import { DocumentoFichaEpi } from "@/components/modules/sst/DocumentoFichaEpi";
+import { DocumentoFichaExame } from "@/components/modules/sst/DocumentoFichaExame";
+import type { FichaExameResumo } from "@/lib/sst/exames";
 import { cn } from "@/lib/cn";
 import { abreviarNome } from "@/lib/format";
 import { SETORES } from "@/lib/setores";
@@ -274,11 +276,20 @@ const LABEL_TIPO_ASO: Record<string, string> = {
  * é lá na Gestão de Exames Ocupacionais (SST), pra não duplicar o mesmo
  * upload em dois lugares.
  */
-function FichasExameDaAba({ colaboradorId }: { colaboradorId: number }) {
-  const [fichas, setFichas] = useState<
-    { id: string; tipoAso: string; dataRealizacao: string; exames: string[]; anexoUrl: string | null }[] | null
-  >(null);
+function FichasExameDaAba({
+  colaboradorId,
+  nome,
+  cargo,
+  departamento,
+}: {
+  colaboradorId: number;
+  nome: string;
+  cargo: string | null;
+  departamento: string | null;
+}) {
+  const [fichas, setFichas] = useState<FichaExameResumo[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  const [documento, setDocumento] = useState<FichaExameResumo | null>(null);
 
   function carregar() {
     fetch(`/api/sst/exames/fichas?colaboradorId=${colaboradorId}`)
@@ -314,16 +325,15 @@ function FichasExameDaAba({ colaboradorId }: { colaboradorId: number }) {
               <span className="flex-1 truncate text-[10.5px] font-light text-foreground-muted/80">
                 {LABEL_TIPO_ASO[f.tipoAso] ?? f.tipoAso}
               </span>
-              {f.anexoUrl && (
-                <a
-                  href={`/api/sst/exames/fichas/${f.id}/anexo`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="rounded px-1 py-0.5 text-[13px] text-brand-primary hover:bg-brand-primary-100"
-                >
-                  📎
-                </a>
-              )}
+              <button
+                type="button"
+                onClick={() => setDocumento(f)}
+                title="Ver exames realizados"
+                aria-label={`Ver exames do registro de ${f.dataRealizacao}`}
+                className="rounded px-1 py-0.5 text-[13px] text-brand-primary hover:bg-brand-primary-100"
+              >
+                📎
+              </button>
               <button
                 type="button"
                 onClick={() => void excluir(f)}
@@ -337,6 +347,23 @@ function FichasExameDaAba({ colaboradorId }: { colaboradorId: number }) {
         </div>
       )}
       {erro && <p className="text-[10.5px] text-status-danger">{erro}</p>}
+
+      {documento && (
+        <Modal
+          aberto
+          onFechar={() => setDocumento(null)}
+          eyebrow="Ficha de exame ocupacional"
+          titulo={LABEL_TIPO_ASO[documento.tipoAso] ?? documento.tipoAso}
+          subtitulo={nome}
+          largura="34rem"
+        >
+          <DocumentoFichaExame
+            ficha={documento}
+            colaborador={{ nome, cargo, departamento }}
+            anexoHref={`/api/sst/exames/fichas/${documento.id}/anexo`}
+          />
+        </Modal>
+      )}
     </div>
   );
 }
@@ -347,7 +374,17 @@ function FichasExameDaAba({ colaboradorId }: { colaboradorId: number }) {
  * são documentos — só leitura, o anexo fica lá no SST). Guardados no
  * Supabase Storage (bucket privado).
  */
-function DocumentosColaboradorPanel({ colaboradorId }: { colaboradorId: number }) {
+function DocumentosColaboradorPanel({
+  colaboradorId,
+  nome,
+  cargo,
+  departamento,
+}: {
+  colaboradorId: number;
+  nome: string;
+  cargo: string | null;
+  departamento: string | null;
+}) {
   const [aba, setAba] = useState<OrigemDocumento>("dp");
 
   return (
@@ -381,7 +418,7 @@ function DocumentosColaboradorPanel({ colaboradorId }: { colaboradorId: number }
         <>
           <FichasEpiDaAba colaboradorId={colaboradorId} />
           <div className="border-t border-hairline/70 pt-1.5">
-            <FichasExameDaAba colaboradorId={colaboradorId} />
+            <FichasExameDaAba colaboradorId={colaboradorId} nome={nome} cargo={cargo} departamento={departamento} />
           </div>
         </>
       )}
@@ -1090,7 +1127,14 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
         </div>
       )}
 
-      {editando && mostrarDocumentos && <DocumentosColaboradorPanel colaboradorId={editando.id} />}
+      {editando && mostrarDocumentos && (
+        <DocumentosColaboradorPanel
+          colaboradorId={editando.id}
+          nome={editando.nome}
+          cargo={editando.cargo}
+          departamento={editando.departamento}
+        />
+      )}
 
       {!desligado && <EnviarConviteBox colaboradorId={editando ? editando.id : null} />}
 

@@ -245,12 +245,24 @@ async function obterUltimasRealizacoes(colaboradorId: number): Promise<Map<strin
   return new Map(linhas.map((l) => [l.exame, { dataRealizacao: l.data_realizacao, dataPrevista: l.data_prevista }]));
 }
 
+export interface ExameVencido {
+  exame: string;
+  /** Data em que a periodicidade estourou — null se o exame nunca foi realizado. */
+  dataVencimento: string | null;
+}
+
 /** Exames obrigatórios da função que estão vencidos (nunca feitos ou fora da periodicidade) — o que entra no checklist de "Anexar exame". */
-function calcularVencidos(examesObrigatorios: string[], realizados: Map<string, { dataPrevista: string | null }>, hoje = new Date()): string[] {
-  return examesObrigatorios.filter((exame) => {
-    const info = realizados.get(exame);
-    return exameVencido(info?.dataPrevista, Boolean(info), hoje);
-  });
+function calcularVencidos(
+  examesObrigatorios: string[],
+  realizados: Map<string, { dataPrevista: string | null }>,
+  hoje = new Date(),
+): ExameVencido[] {
+  return examesObrigatorios
+    .filter((exame) => {
+      const info = realizados.get(exame);
+      return exameVencido(info?.dataPrevista, Boolean(info), hoje);
+    })
+    .map((exame) => ({ exame, dataVencimento: realizados.get(exame)?.dataPrevista ?? null }));
 }
 
 // ---------- Colaboradores (mesmo cadastro do Quadro, igual Gestão de EPI) ----------
@@ -329,11 +341,20 @@ export interface NovaFichaExame {
   anexoNome?: string | null;
 }
 
+export interface ItemFichaExame {
+  exame: string;
+  codigo: string;
+  dataRealizacao: string;
+  /** Próxima data prevista pela periodicidade — null se o exame não repete ("Sem periódico"). */
+  dataVencimento: string | null;
+}
+
 export interface FichaExameResumo {
   id: string;
   tipoAso: string;
   dataRealizacao: string;
   exames: string[];
+  itens: ItemFichaExame[];
   anexoUrl: string | null;
   anexoNome: string | null;
 }
@@ -370,6 +391,8 @@ interface LinhaFichaExame {
   anexo_nome: string | null;
 }
 
+const CODIGO_POR_EXAME = new Map(CATALOGO_EXAMES_OCUPACIONAIS.map((c) => [c.nome, c.codigo]));
+
 /** Histórico de fichas do colaborador (uma linha por atendimento) — pro drawer da Gestão de Exames e a aba Documentos ASO do Quadro. */
 export async function listarFichasExameDoColaborador(colaboradorId: number): Promise<FichaExameResumo[]> {
   const [fichas, itens] = await Promise.all([
@@ -377,15 +400,20 @@ export async function listarFichasExameDoColaborador(colaboradorId: number): Pro
       "SELECT id, tipo_aso, anexo_url, anexo_nome FROM sst_fichas_exame WHERE colab_id = $1 ORDER BY created_at DESC",
       [colaboradorId],
     ),
-    sstQuery<{ ficha_id: string; exame: string; data_realizacao: string }>(
-      "SELECT ficha_id, exame, data_realizacao FROM sst_exames_realizados WHERE colab_id = $1 ORDER BY created_at",
+    sstQuery<{ ficha_id: string; exame: string; data_realizacao: string; data_prevista: string | null }>(
+      "SELECT ficha_id, exame, data_realizacao, data_prevista FROM sst_exames_realizados WHERE colab_id = $1 ORDER BY created_at",
       [colaboradorId],
     ),
   ]);
-  const itensPorFicha = new Map<string, { exame: string; dataRealizacao: string }[]>();
+  const itensPorFicha = new Map<string, ItemFichaExame[]>();
   for (const i of itens) {
     const lista = itensPorFicha.get(i.ficha_id) ?? [];
-    lista.push({ exame: i.exame, dataRealizacao: i.data_realizacao });
+    lista.push({
+      exame: i.exame,
+      codigo: CODIGO_POR_EXAME.get(i.exame) ?? "—",
+      dataRealizacao: i.data_realizacao,
+      dataVencimento: i.data_prevista,
+    });
     itensPorFicha.set(i.ficha_id, lista);
   }
   return fichas.map((f) => {
@@ -395,6 +423,7 @@ export async function listarFichasExameDoColaborador(colaboradorId: number): Pro
       tipoAso: f.tipo_aso,
       dataRealizacao: itensDaFicha[0]?.dataRealizacao ?? "",
       exames: itensDaFicha.map((i) => i.exame),
+      itens: itensDaFicha,
       anexoUrl: f.anexo_url,
       anexoNome: f.anexo_nome,
     };
@@ -402,7 +431,7 @@ export async function listarFichasExameDoColaborador(colaboradorId: number): Pro
 }
 
 /** Exames obrigatórios da função que ainda estão vencidos — é o checklist de "Anexar exame ocupacional" (só o que falta, não a lista toda). */
-export async function obterExamesVencidosDoColaborador(colaboradorId: number, examesObrigatorios: string[]): Promise<string[]> {
+export async function obterExamesVencidosDoColaborador(colaboradorId: number, examesObrigatorios: string[]): Promise<ExameVencido[]> {
   const realizados = await obterUltimasRealizacoes(colaboradorId);
   return calcularVencidos(examesObrigatorios, realizados);
 }
