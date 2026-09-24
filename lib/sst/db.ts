@@ -147,8 +147,10 @@ const ESQUEMA_EXTRA = `
     atualizado_em timestamptz NOT NULL DEFAULT now()
   );
 
-  -- Matriz Ocupacional: função → riscos (agentes físico/químico/biológico/
-  -- ergonômico) que justificam os exames — tela separada da matriz de exames.
+  -- Matriz Ocupacional antiga, por função — substituída pela Matriz
+  -- Ocupacional por CARGO/setor (sst_cargos_ocupacionais) assim que a Leslie
+  -- repassou a planilha real; fica só a tabela (vazia, sem uso) pra não
+  -- perder histórico de uma versão que já rodou em produção.
   CREATE TABLE IF NOT EXISTS sst_matriz_riscos_funcao (
     funcao text PRIMARY KEY,
     riscos jsonb NOT NULL DEFAULT '[]',
@@ -158,6 +160,47 @@ const ESQUEMA_EXTRA = `
   CREATE TABLE IF NOT EXISTS sst_exame_precos (
     codigo text PRIMARY KEY,
     valor numeric NOT NULL
+  );
+
+  -- Matriz Ocupacional por CARGO (não por função): setor → cargos → riscos
+  -- (agente + frequência), EPIs aplicáveis e exames obrigatórios. Dado real
+  -- da empresa, repassado pela Leslie (planilha do Portal SST antigo) — ver
+  -- scripts/seed-cargos-ocupacionais.js.
+  CREATE TABLE IF NOT EXISTS sst_cargos_ocupacionais (
+    cargo text PRIMARY KEY,
+    cbo text NOT NULL DEFAULT '',
+    setor text NOT NULL,
+    riscos jsonb NOT NULL DEFAULT '[]',
+    epis text[] NOT NULL DEFAULT '{}',
+    exames text[] NOT NULL DEFAULT '{}',
+    atualizado_em timestamptz NOT NULL DEFAULT now()
+  );
+
+  -- Ficha de exame ocupacional (ASO): RH anexa o comprovante e marca quais
+  -- exames vencidos foram feitos naquele atendimento — mesmo espírito da
+  -- ficha de EPI, sem link de assinatura (é um registro do RH, não algo que
+  -- o colaborador assina).
+  CREATE TABLE IF NOT EXISTS sst_fichas_exame (
+    id text PRIMARY KEY,
+    colab_id integer NOT NULL REFERENCES colaboradores(id),
+    tipo_aso text NOT NULL,
+    anexo_url text,
+    anexo_nome text,
+    responsavel text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+  );
+
+  -- Um exame feito, dentro de uma ficha. data_prevista já vem calculada
+  -- (data_realizacao + periodicidade do catálogo, domain.ts) — não é campo
+  -- que o RH preenche na tela.
+  CREATE TABLE IF NOT EXISTS sst_exames_realizados (
+    id text PRIMARY KEY,
+    ficha_id text NOT NULL REFERENCES sst_fichas_exame(id) ON DELETE CASCADE,
+    colab_id integer NOT NULL REFERENCES colaboradores(id),
+    exame text NOT NULL,
+    data_realizacao text NOT NULL DEFAULT '',
+    data_prevista text,
+    created_at timestamptz NOT NULL DEFAULT now()
   );
 `;
 

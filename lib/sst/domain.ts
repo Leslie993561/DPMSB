@@ -111,6 +111,10 @@ export interface CatalogoExameOcupacional {
   cargos: number;
   obs: string[];
   valor: number;
+  /** Cada quanto tempo repete no periódico — "12 meses", "24 meses", "Sem periódico" etc. */
+  periodicidade: string;
+  /** Em quais situações o exame é pedido: admissional, periódico, retorno ao trabalho, mudança de risco, demissional. */
+  situacoes: string[];
 }
 
 export interface ContextoIdadeExame {
@@ -242,37 +246,43 @@ export function versoesMaisRecentes<T extends ProgramaSaudeVersao>(programas: T[
  * PCMSO). O restante da matriz (cargos, riscos, EPIs) não é lido aqui;
  * o original também mantém isso como JSON estático (não vem do Supabase).
  */
+const SITUACOES_PADRAO = ["Adm.", "Periódico", "Retorno", "Mud. risco", "Demiss."];
+
 export const CATALOGO_EXAMES_OCUPACIONAIS: CatalogoExameOcupacional[] = [
-  { codigo: "0295", nome: "AVALIAÇÃO CLINICA OCUPACIONAL", valor: 20, cargos: 55, obs: [] },
-  { codigo: "0673", nome: "GRUPO SANGUÍNEO / FATOR RH", valor: 14.8, cargos: 55, obs: [] },
+  { codigo: "0295", nome: "AVALIAÇÃO CLINICA OCUPACIONAL", valor: 20, cargos: 55, periodicidade: "12 meses", situacoes: SITUACOES_PADRAO, obs: [] },
+  { codigo: "0673", nome: "GRUPO SANGUÍNEO / FATOR RH", valor: 14.8, cargos: 55, periodicidade: "Sem periódico", situacoes: ["Adm.", "Mud. risco"], obs: [] },
   {
     codigo: "0530",
     nome: "ECG",
     valor: 30,
     cargos: 55,
+    periodicidade: "12 meses",
+    situacoes: SITUACOES_PADRAO,
     obs: [
       "Somente para colaboradores a partir de 40 anos (ambos os sexos). A cada 12 meses",
       "Recomendamos que só deverão fazer o Eletrocardiograma (ECG) os colaboradores que tiverem à",
     ],
   },
-  { codigo: "1410", nome: "RAIO X - COLUNA LOMBAR", valor: 42, cargos: 17, obs: [] },
-  { codigo: "0693", nome: "HEMOGRAMA COMPLETO", valor: 15, cargos: 13, obs: [] },
-  { codigo: "0296", nome: "ACUIDADE VISUAL", valor: 22.5, cargos: 13, obs: [] },
-  { codigo: "1057", nome: "ESPIROMETRIA", valor: 28, cargos: 13, obs: [] },
-  { codigo: "1086", nome: "RETICULOCITOS", valor: 7, cargos: 13, obs: [] },
+  { codigo: "1410", nome: "RAIO X - COLUNA LOMBAR", valor: 42, cargos: 17, periodicidade: "24 meses", situacoes: SITUACOES_PADRAO, obs: [] },
+  { codigo: "0693", nome: "HEMOGRAMA COMPLETO", valor: 15, cargos: 13, periodicidade: "12 meses", situacoes: SITUACOES_PADRAO, obs: [] },
+  { codigo: "0296", nome: "ACUIDADE VISUAL", valor: 22.5, cargos: 13, periodicidade: "12 meses", situacoes: SITUACOES_PADRAO, obs: [] },
+  { codigo: "1057", nome: "ESPIROMETRIA", valor: 28, cargos: 13, periodicidade: "12 meses", situacoes: SITUACOES_PADRAO, obs: [] },
+  { codigo: "1086", nome: "RETICULOCITOS", valor: 7, cargos: 13, periodicidade: "12 meses", situacoes: SITUACOES_PADRAO, obs: [] },
   {
     codigo: "0281",
     nome: "AUDIOMETRIA TONAL",
     valor: 25,
     cargos: 12,
+    periodicidade: "6 meses",
+    situacoes: SITUACOES_PADRAO,
     obs: [
       "A AUDIOMETRIA deve ser realizada na admissão, no 6º mês após a admissão e, no periódico, a cada 6 meses — APENAS para cargos expostos a ruído.",
     ],
   },
-  { codigo: "0658", nome: "GLICEMIA", valor: 0, cargos: 2, obs: [] },
-  { codigo: "0300", nome: "AVALIAÇÃO PSICOSSOCIAL", valor: 0, cargos: 2, obs: [] },
-  { codigo: "0536", nome: "EEG", valor: 0, cargos: 2, obs: [] },
+  { codigo: "0658", nome: "GLICEMIA", valor: 10.8, cargos: 2, periodicidade: "12 meses", situacoes: SITUACOES_PADRAO, obs: [] },
+  { codigo: "0300", nome: "AVALIAÇÃO PSICOSSOCIAL", valor: 30, cargos: 2, periodicidade: "12 meses", situacoes: ["Adm.", "Periódico", "Retorno", "Mud. risco"], obs: [] },
+  { codigo: "0536", nome: "EEG", valor: 40, cargos: 2, periodicidade: "12 meses", situacoes: SITUACOES_PADRAO, obs: [] },
   // Sem código numérico na planilha original da Matriz Ocupacional — só entra
   // pra Líder de Manutenção e Técnico em Manutenção Geral.
-  { codigo: "", nome: "TESTE DE ROMBERG", valor: 0, cargos: 2, obs: [] },
+  { codigo: "", nome: "TESTE DE ROMBERG", valor: 0, cargos: 2, periodicidade: "", situacoes: [], obs: [] },
 ];

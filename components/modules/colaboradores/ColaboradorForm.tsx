@@ -255,10 +255,90 @@ function FichasEpiDaAba({ colaboradorId }: { colaboradorId: number }) {
   );
 }
 
+const LABEL_TIPO_ASO: Record<string, string> = {
+  admissional: "Admissional",
+  periodico: "Periódico",
+  retorno: "Retorno ao Trabalho",
+  demissional: "Demissional",
+};
+
+/**
+ * Fichas de exame ocupacional (ASO) do colaborador — só leitura aqui: anexar
+ * é lá na Gestão de Exames Ocupacionais (SST), pra não duplicar o mesmo
+ * upload em dois lugares.
+ */
+function FichasExameDaAba({ colaboradorId }: { colaboradorId: number }) {
+  const [fichas, setFichas] = useState<
+    { id: string; tipoAso: string; dataRealizacao: string; exames: string[]; anexoUrl: string | null }[] | null
+  >(null);
+  const [erro, setErro] = useState<string | null>(null);
+
+  function carregar() {
+    fetch(`/api/sst/exames/fichas?colaboradorId=${colaboradorId}`)
+      .then((r) => r.json())
+      .then((d) => setFichas(d.fichas ?? []))
+      .catch(() => setErro("Não foi possível carregar as fichas de exame."));
+  }
+
+  useEffect(carregar, [colaboradorId]);
+
+  async function excluir(f: { id: string; dataRealizacao: string }) {
+    if (!window.confirm(`Excluir o registro de ${f.dataRealizacao}?`)) return;
+    const r = await fetch(`/api/sst/exames/fichas/${f.id}`, { method: "DELETE" });
+    if (!r.ok) {
+      window.alert((await r.json()).erro ?? "Não foi possível excluir.");
+      return;
+    }
+    carregar();
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <p className="text-[10px] font-semibold text-foreground-muted uppercase">Documentos ASO</p>
+      {fichas === null ? (
+        <p className="text-[10.5px] text-foreground-muted">Carregando...</p>
+      ) : fichas.length === 0 ? (
+        <p className="text-[10.5px] text-foreground-muted">Nenhum documento ASO anexado ainda.</p>
+      ) : (
+        <div className="flex flex-col divide-y divide-hairline/70">
+          {fichas.map((f) => (
+            <div key={f.id} className="flex items-center gap-2 py-1">
+              <span className="text-[11px] font-medium text-foreground">{f.dataRealizacao || "—"}</span>
+              <span className="flex-1 truncate text-[10.5px] font-light text-foreground-muted/80">
+                {LABEL_TIPO_ASO[f.tipoAso] ?? f.tipoAso}
+              </span>
+              {f.anexoUrl && (
+                <a
+                  href={`/api/sst/exames/fichas/${f.id}/anexo`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded px-1 py-0.5 text-[13px] text-brand-primary hover:bg-brand-primary-100"
+                >
+                  📎
+                </a>
+              )}
+              <button
+                type="button"
+                onClick={() => void excluir(f)}
+                aria-label={`Excluir registro de ${f.dataRealizacao}`}
+                className="shrink-0 rounded px-1 py-0.5 text-[11px] text-foreground-muted hover:bg-status-danger-bg hover:text-status-danger"
+              >
+                🗑
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {erro && <p className="text-[10.5px] text-status-danger">{erro}</p>}
+    </div>
+  );
+}
+
 /**
  * Duas abas: "Documentos DP" (RG, CNH, comprovante... anexados manualmente) e
- * "Documentos SST" (fichas de EPI/fardamento — que também são documentos — +
- * outros anexos manuais do SST). Guardados no Supabase Storage (bucket privado).
+ * "Documentos SST" (fichas de EPI/fardamento + documentos ASO — que também
+ * são documentos — só leitura, o anexo fica lá no SST). Guardados no
+ * Supabase Storage (bucket privado).
  */
 function DocumentosColaboradorPanel({ colaboradorId }: { colaboradorId: number }) {
   const [aba, setAba] = useState<OrigemDocumento>("dp");
@@ -294,7 +374,7 @@ function DocumentosColaboradorPanel({ colaboradorId }: { colaboradorId: number }
         <>
           <FichasEpiDaAba colaboradorId={colaboradorId} />
           <div className="border-t border-hairline/70 pt-1.5">
-            <ListaDocumentosManual colaboradorId={colaboradorId} origem="sst" vazio="Nenhum outro documento do SST anexado ainda." />
+            <FichasExameDaAba colaboradorId={colaboradorId} />
           </div>
         </>
       )}

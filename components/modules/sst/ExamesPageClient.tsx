@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/cn";
@@ -9,18 +9,26 @@ import { Badge } from "@/components/shared/Badge";
 import { Modal } from "@/components/shared/Modal";
 import { Drawer } from "@/components/shared/Drawer";
 import { CabecalhoFiltravel, CampoTexto, COR_VINCULO } from "@/components/modules/colaboradores/ColaboradoresTable";
-import { formatarMoeda } from "@/lib/format";
+import { formatarMoeda, iniciais } from "@/lib/format";
 import type { Vinculo } from "@/lib/db/colaboradores";
-import type { ColaboradorExame, FuncaoExames, FuncaoRiscos, LinhaCustoExame, RiscoOcupacional, TipoRisco } from "@/lib/sst/exames";
+import type { CargoOcupacional, ColaboradorExame, FuncaoExames, LinhaCustoExame, SetorOcupacional } from "@/lib/sst/exames";
 
-// Duplicado do rótulo de lib/sst/exames.ts (server-only) — cliente não pode
-// importar valor de lá, só tipo.
-const ROTULO_TIPO_RISCO: Record<TipoRisco, string> = {
-  fisico: "Físico",
-  quimico: "Químico",
-  biologico: "Biológico",
-  ergonomico: "Ergonômico",
-};
+const TIPOS_ASO = [
+  { valor: "admissional", label: "Admissional" },
+  { valor: "periodico", label: "Periódico" },
+  { valor: "retorno", label: "Retorno ao Trabalho" },
+  { valor: "demissional", label: "Demissional" },
+];
+const LABEL_TIPO_ASO = new Map(TIPOS_ASO.map((t) => [t.valor, t.label]));
+
+interface FichaExameResumo {
+  id: string;
+  tipoAso: string;
+  dataRealizacao: string;
+  exames: string[];
+  anexoUrl: string | null;
+  anexoNome: string | null;
+}
 
 export type AbaExames = "colaboradores" | "matriz" | "ocupacional" | "custos";
 
@@ -31,27 +39,30 @@ const ABAS: { id: AbaExames; label: string }[] = [
   { id: "custos", label: "Custo e Valores" },
 ];
 
-const COR_RISCO: Record<TipoRisco, string> = {
-  fisico: "border-status-warning-border bg-status-warning-bg text-status-warning",
-  quimico: "border-status-danger-border bg-status-danger-bg text-status-danger",
-  biologico: "border-status-success-border bg-status-success-bg text-status-success",
-  ergonomico: "border-brand-primary/40 bg-brand-primary-050 text-brand-primary-800",
-};
+/** Cor por grupo de risco — os nomes vêm crus da planilha (domain.ts não tem enum pra isto). */
+function corRisco(tipo: string): string {
+  const t = tipo.toUpperCase();
+  if (t.includes("QUÍMIC")) return "border-status-danger-border bg-status-danger-bg text-status-danger";
+  if (t.includes("BIOLÓGIC")) return "border-status-success-border bg-status-success-bg text-status-success";
+  if (t.includes("ERGON")) return "border-brand-primary/40 bg-brand-primary-050 text-brand-primary-800";
+  if (t.includes("FÍSIC")) return "border-status-warning-border bg-status-warning-bg text-status-warning";
+  return "border-hairline bg-surface-page text-foreground-muted";
+}
 
 export function ExamesPageClient({
   aba,
   colaboradores,
   matrizExames,
-  matrizRiscos,
+  setoresOcupacionais,
   catalogoExames,
   custos,
 }: {
   aba: AbaExames;
   colaboradores: ColaboradorExame[];
   matrizExames: FuncaoExames[];
-  matrizRiscos: FuncaoRiscos[];
-  /** Nomes dos exames do catálogo — sugestão ao adicionar exame numa função. */
-  catalogoExames: string[];
+  setoresOcupacionais: SetorOcupacional[];
+  /** Nomes + periodicidade dos exames do catálogo. */
+  catalogoExames: { nome: string; periodicidade: string }[];
   custos: LinhaCustoExame[];
 }) {
   const router = useRouter();
@@ -100,8 +111,8 @@ export function ExamesPageClient({
       </div>
 
       {aba === "colaboradores" && <ColaboradoresTab colaboradores={colaboradores} busca={busca} onBusca={setBusca} />}
-      {aba === "matriz" && <MatrizExamesTab matriz={matrizExames} catalogoExames={catalogoExames} />}
-      {aba === "ocupacional" && <MatrizOcupacionalTab matriz={matrizRiscos} />}
+      {aba === "matriz" && <MatrizExamesTab matriz={matrizExames} catalogoExames={catalogoExames.map((c) => c.nome)} />}
+      {aba === "ocupacional" && <MatrizOcupacionalTab setores={setoresOcupacionais} catalogoExames={catalogoExames} />}
       {aba === "custos" && <CustosTab custos={custos} />}
     </div>
   );
@@ -193,9 +204,9 @@ function ColaboradoresTab({
                     </div>
                   </td>
                   <td className="px-2 py-1 text-right">
-                    {c.examesObrigatorios.length > 0 && (
-                      <span className="whitespace-nowrap rounded-full border border-status-warning-border bg-status-warning-bg px-1.5 py-px text-[10px] font-semibold text-status-warning">
-                        Pendente {c.examesObrigatorios.length}
+                    {c.examesVencidos > 0 && (
+                      <span className="whitespace-nowrap rounded-full border border-status-danger-border bg-status-danger-bg px-1.5 py-px text-[10px] font-semibold text-status-danger">
+                        Vencido {c.examesVencidos}/{c.examesObrigatorios.length}
                       </span>
                     )}
                   </td>
@@ -217,43 +228,355 @@ function ColaboradoresTab({
         </table>
       </div>
 
-      {colaboradorAberto && (
-        <Drawer aberto onFechar={() => setColaboradorAberto(null)} titulo="Exames do colaborador" subtitulo={colaboradorAberto.nome} largura="26rem">
-          <div className="flex flex-col gap-3 p-4">
-            <p className="text-[10.5px] text-foreground-muted">
-              Matriz Ocupacional: {colaboradorAberto.funcaoMatriz ?? "função não encontrada"}
-            </p>
-            {colaboradorAberto.funcaoMatriz === null ? (
-              <div className="rounded-md border border-hairline bg-surface-page px-3 py-2.5 text-[12px] text-foreground-muted">
-                O cargo deste colaborador não tem função correspondente na Matriz por Função.
-              </div>
-            ) : colaboradorAberto.examesObrigatorios.length === 0 ? (
-              <div className="rounded-md border border-hairline bg-surface-page px-3 py-2.5 text-[12px] text-foreground-muted">
-                Esta função ainda não tem exames cadastrados na Matriz por Função.
-              </div>
+      {colaboradorAberto && <ExameColaboradorDrawer colaborador={colaboradorAberto} onFechar={() => setColaboradorAberto(null)} />}
+    </Card>
+  );
+}
+
+function ExameColaboradorDrawer({ colaborador, onFechar }: { colaborador: ColaboradorExame; onFechar: () => void }) {
+  const router = useRouter();
+  const [fichas, setFichas] = useState<FichaExameResumo[] | null>(null);
+  const [vencidos, setVencidos] = useState<string[]>([]);
+  const [erroCarga, setErroCarga] = useState<string | null>(null);
+  const [anexando, setAnexando] = useState(false);
+  const [documento, setDocumento] = useState<{ ficha: FichaExameResumo } | null>(null);
+
+  const carregar = useCallback(() => {
+    const qs = new URLSearchParams({ colaboradorId: String(colaborador.id) });
+    colaborador.examesObrigatorios.forEach((e) => qs.append("exame", e));
+    fetch(`/api/sst/exames/fichas?${qs}`)
+      .then(async (r) => {
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.erro ?? "Falha ao carregar o histórico.");
+        setFichas(d.fichas);
+        setVencidos(d.vencidos ?? []);
+      })
+      .catch((e: Error) => setErroCarga(e.message));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [colaborador.id]);
+
+  useEffect(() => {
+    carregar();
+  }, [carregar]);
+
+  async function excluir(f: FichaExameResumo) {
+    if (!window.confirm(`Excluir o registro de ${f.dataRealizacao}?`)) return;
+    const r = await fetch(`/api/sst/exames/fichas/${f.id}`, { method: "DELETE" });
+    if (!r.ok) {
+      window.alert((await r.json()).erro ?? "Não foi possível excluir.");
+      return;
+    }
+    carregar();
+    router.refresh();
+  }
+
+  return (
+    <>
+      <Drawer aberto onFechar={onFechar} titulo="Ficha de exame ocupacional" subtitulo={colaborador.nome} largura="30rem">
+        <div className="flex flex-col gap-4 p-4">
+          <div className="flex items-center gap-3">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand-primary text-[15px] font-bold text-brand-white">
+              {iniciais(colaborador.nome)}
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-[15px] font-semibold text-foreground">{colaborador.nome}</p>
+              <p className="text-[12px] text-foreground-muted">
+                {colaborador.cargo ?? "—"} · {colaborador.departamento ?? "—"}
+              </p>
+              <p className="text-[10.5px] text-foreground-muted/80">
+                Matriz Ocupacional: {colaborador.funcaoMatriz ?? "função não encontrada"}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setAnexando(true)}
+            className="rounded-md bg-brand-primary px-3 py-2 text-[12.5px] font-semibold text-brand-white transition-colors hover:bg-brand-primary-hover"
+          >
+            Anexar exame ocupacional
+          </button>
+
+          {colaborador.funcaoMatriz === null ? (
+            <div className="rounded-md border border-hairline bg-surface-page px-3 py-2.5 text-[12px] text-foreground-muted">
+              O cargo deste colaborador não tem função correspondente na Matriz por Função.
+            </div>
+          ) : fichas !== null && vencidos.length > 0 ? (
+            <div className="rounded-md border border-status-danger-border bg-status-danger-bg px-3 py-2.5 text-status-danger">
+              <p className="text-[12.5px] font-semibold">⚠ {vencidos.length} exame(s) vencido(s)</p>
+              <ul className="mt-1.5 list-inside list-disc text-[12px]">
+                {vencidos.map((exame) => (
+                  <li key={exame}>{exame}</li>
+                ))}
+              </ul>
+            </div>
+          ) : fichas !== null && colaborador.examesObrigatorios.length > 0 ? (
+            <div className="rounded-md border border-status-success-border bg-status-success-bg px-3 py-2.5 text-[12px] text-status-success">
+              Todos os exames obrigatórios da função estão em dia.
+            </div>
+          ) : null}
+
+          <div>
+            <p className="text-[13px] font-semibold text-foreground">Histórico de registros ({fichas?.length ?? 0})</p>
+            {erroCarga ? (
+              <p className="mt-3 text-[12px] text-status-danger">{erroCarga}</p>
+            ) : fichas === null ? (
+              <p className="mt-3 text-[12px] text-foreground-muted">Carregando...</p>
+            ) : fichas.length === 0 ? (
+              <p className="mt-3 text-[12px] text-foreground-muted">Nenhum registro de exame ainda.</p>
             ) : (
-              <div>
-                <p className="text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">Exames obrigatórios</p>
-                <div className="mt-1.5 flex flex-wrap gap-1">
-                  {colaboradorAberto.examesObrigatorios.map((exame) => (
-                    <span
-                      key={exame}
-                      className="rounded-full border border-hairline bg-surface-page px-2 py-0.5 text-[10.5px] text-foreground"
-                    >
-                      {exame}
+              <div className="mt-2 flex flex-col divide-y divide-hairline/70 rounded-md border border-hairline">
+                {fichas.map((f) => (
+                  <div key={f.id} className="flex items-center gap-2 px-3 py-2">
+                    <span className="text-[12.5px] font-medium text-foreground">{f.dataRealizacao || "—"}</span>
+                    <span className="flex-1 truncate text-center text-[10.5px] font-light whitespace-nowrap text-foreground-muted/80">
+                      {LABEL_TIPO_ASO.get(f.tipoAso) ?? f.tipoAso}
                     </span>
-                  ))}
-                </div>
+                    {f.anexoUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setDocumento({ ficha: f })}
+                        title="Ver documento anexado"
+                        aria-label={`Ver documento de ${f.dataRealizacao}`}
+                        className="rounded px-1.5 py-0.5 text-[15px] text-brand-primary hover:bg-brand-primary-100"
+                      >
+                        📎
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => void excluir(f)}
+                      title="Excluir registro"
+                      aria-label={`Excluir registro de ${f.dataRealizacao}`}
+                      className="rounded px-1.5 py-0.5 text-[13px] text-foreground-muted hover:bg-status-danger-bg hover:text-status-danger"
+                    >
+                      🗑
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
-            <p className="text-[10.5px] text-foreground-muted">
-              O registro de exame realizado (ficha, data, vencimento) ainda não existe neste módulo — por enquanto
-              esta lista mostra só o que a função exige.
-            </p>
           </div>
-        </Drawer>
+        </div>
+      </Drawer>
+
+      {anexando && (
+        <AnexarExameModal
+          colaborador={colaborador}
+          vencidos={vencidos}
+          onFechar={() => setAnexando(false)}
+          onCriado={() => {
+            setAnexando(false);
+            carregar();
+            router.refresh();
+          }}
+        />
       )}
-    </Card>
+
+      {documento?.ficha.anexoUrl && (
+        <Modal
+          aberto
+          onFechar={() => setDocumento(null)}
+          eyebrow="Documento anexado"
+          titulo={LABEL_TIPO_ASO.get(documento.ficha.tipoAso) ?? documento.ficha.tipoAso}
+          subtitulo={colaborador.nome}
+          largura="40rem"
+        >
+          <iframe
+            src={`/api/sst/exames/fichas/${documento.ficha.id}/anexo`}
+            title="Documento anexado"
+            className="h-[70vh] w-full rounded-md border border-hairline"
+          />
+        </Modal>
+      )}
+    </>
+  );
+}
+
+function AnexarExameModal({
+  colaborador,
+  vencidos,
+  onFechar,
+  onCriado,
+}: {
+  colaborador: ColaboradorExame;
+  vencidos: string[];
+  onFechar: () => void;
+  onCriado: () => void;
+}) {
+  const [tipoAso, setTipoAso] = useState("periodico");
+  const [dataRealizacao, setDataRealizacao] = useState(() => new Date().toISOString().slice(0, 10));
+  const [marcados, setMarcados] = useState<Set<string>>(new Set(vencidos));
+  const [anexo, setAnexo] = useState<{ url: string; nome: string } | null>(null);
+  const [enviandoAnexo, setEnviandoAnexo] = useState(false);
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  function alternar(exame: string) {
+    setMarcados((s) => {
+      const novo = new Set(s);
+      if (novo.has(exame)) novo.delete(exame);
+      else novo.add(exame);
+      return novo;
+    });
+  }
+
+  async function anexarPdf(arquivo: File) {
+    setErro(null);
+    if (arquivo.type !== "application/pdf") {
+      setErro("Só é permitido anexar PDF.");
+      return;
+    }
+    setEnviandoAnexo(true);
+    try {
+      const form = new FormData();
+      form.append("arquivo", arquivo);
+      const r = await fetch("/api/sst/exames/anexo", { method: "POST", body: form });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.erro ?? "Falha ao anexar o PDF.");
+      setAnexo({ url: d.url, nome: d.nome });
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Falha ao anexar o PDF.");
+    } finally {
+      setEnviandoAnexo(false);
+    }
+  }
+
+  async function salvar() {
+    if (marcados.size === 0) {
+      setErro("Selecione ao menos um exame.");
+      return;
+    }
+    setEnviando(true);
+    setErro(null);
+    try {
+      const r = await fetch("/api/sst/exames/fichas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          colaboradorId: colaborador.id,
+          tipoAso,
+          exames: [...marcados].map((exame) => ({ exame, dataRealizacao })),
+          anexoUrl: anexo?.url ?? null,
+          anexoNome: anexo?.nome ?? null,
+        }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.erro ?? "Falha ao registrar o exame.");
+      onCriado();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Falha ao registrar o exame.");
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <Modal
+      aberto
+      onFechar={onFechar}
+      eyebrow="Exames Ocupacionais"
+      titulo="Anexar exame ocupacional"
+      subtitulo={colaborador.nome}
+      largura="34rem"
+      rodape={
+        <div className="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onFechar}
+            className="rounded border border-hairline px-3 py-1.5 text-[12px] font-medium text-foreground hover:bg-surface-page"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={() => void salvar()}
+            disabled={enviando || enviandoAnexo}
+            className="rounded bg-brand-primary px-3 py-1.5 text-[12px] font-medium text-brand-white hover:bg-brand-primary-hover disabled:opacity-50"
+          >
+            {enviando ? "Salvando..." : "Salvar"}
+          </button>
+        </div>
+      }
+    >
+      <div className="flex flex-col gap-3">
+        <div>
+          <p className="text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">Colaborador</p>
+          <p className="text-[12.5px] text-foreground">
+            {colaborador.nome} · {colaborador.funcaoMatriz ?? colaborador.cargo ?? "—"}
+          </p>
+        </div>
+
+        <label className="block text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">
+          Tipo de ASO
+          <select
+            value={tipoAso}
+            onChange={(e) => setTipoAso(e.target.value)}
+            className="mt-1 w-full rounded border border-hairline bg-background px-2.5 py-1.5 text-[12px] font-normal normal-case text-foreground outline-none focus:border-brand-primary"
+          >
+            {TIPOS_ASO.map((t) => (
+              <option key={t.valor} value={t.valor}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <div className="flex items-center gap-2 text-[11px]">
+          <label className="cursor-pointer font-medium text-brand-primary hover:text-brand-primary-hover">
+            {enviandoAnexo ? "Anexando..." : anexo ? "Trocar PDF anexado" : "📎 Anexar comprovante (opcional)"}
+            <input
+              type="file"
+              accept="application/pdf"
+              className="hidden"
+              disabled={enviandoAnexo}
+              onChange={(e) => {
+                const arquivo = e.target.files?.[0];
+                if (arquivo) void anexarPdf(arquivo);
+                e.target.value = "";
+              }}
+            />
+          </label>
+          {anexo && (
+            <span className="flex items-center gap-1 truncate text-foreground-muted">
+              {anexo.nome}
+              <button type="button" onClick={() => setAnexo(null)} aria-label="Remover anexo" className="text-foreground-muted hover:text-status-danger">
+                ✕
+              </button>
+            </span>
+          )}
+        </div>
+
+        <div>
+          <p className="text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">Exames vencidos</p>
+          {vencidos.length === 0 ? (
+            <p className="mt-1 text-[11.5px] text-foreground-muted">
+              Nenhum exame vencido pra esta função no momento — marque abaixo se quiser registrar mesmo assim.
+            </p>
+          ) : null}
+          <div className="mt-1.5 flex flex-col divide-y divide-hairline/70 rounded-md border border-hairline">
+            {(vencidos.length > 0 ? vencidos : colaborador.examesObrigatorios).map((exame) => (
+              <label key={exame} className="flex items-center gap-2 px-2.5 py-1.5 text-[12px] text-foreground">
+                <input type="checkbox" checked={marcados.has(exame)} onChange={() => alternar(exame)} className="accent-brand-primary" />
+                {exame}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <label className="block text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">
+          Data de realização
+          <input
+            type="date"
+            value={dataRealizacao}
+            onChange={(e) => setDataRealizacao(e.target.value)}
+            className="mt-1 w-full rounded border border-hairline bg-background px-2.5 py-1.5 text-[12px] font-normal normal-case text-foreground outline-none focus:border-brand-primary"
+          />
+        </label>
+
+        {erro && <p className="text-[11.5px] text-status-danger">{erro}</p>}
+      </div>
+    </Modal>
   );
 }
 
@@ -450,203 +773,146 @@ function EditarExamesModal({
   );
 }
 
-function MatrizOcupacionalTab({ matriz }: { matriz: FuncaoRiscos[] }) {
-  const router = useRouter();
-  const [editando, setEditando] = useState<FuncaoRiscos | null>(null);
+/**
+ * Setor → cargo → detalhe (riscos, EPIs, exames com periodicidade). Dado real
+ * da empresa, repassado pela Leslie — por enquanto só visualização (sem
+ * lápis): é o que foi pedido, "separar em listas e clicar no cargo".
+ */
+function MatrizOcupacionalTab({
+  setores,
+  catalogoExames,
+}: {
+  setores: SetorOcupacional[];
+  catalogoExames: { nome: string; periodicidade: string }[];
+}) {
+  const [setorAberto, setSetorAberto] = useState<string | null>(setores[0]?.setor ?? null);
+  const [cargoAberto, setCargoAberto] = useState<CargoOcupacional | null>(null);
+  const periodicidadePorExame = new Map(catalogoExames.map((c) => [c.nome, c.periodicidade]));
 
   return (
-    <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-      {matriz.map((f) => (
-        <Card key={f.funcao} className="relative px-3 py-2.5">
+    <div className="grid gap-3 lg:grid-cols-[18rem_1fr]">
+      <Card className="flex flex-col divide-y divide-hairline overflow-hidden p-0">
+        {setores.map((s) => (
           <button
+            key={s.setor}
             type="button"
-            onClick={() => setEditando(f)}
-            title="Adicionar risco a esta função"
-            aria-label={`Adicionar risco a ${f.funcao}`}
-            className="absolute top-2 right-2 rounded p-1 text-foreground-muted/50 hover:bg-brand-surface hover:text-foreground"
+            onClick={() => setSetorAberto(setorAberto === s.setor ? null : s.setor)}
+            className={cn(
+              "flex items-center justify-between px-3 py-2.5 text-left transition-colors",
+              setorAberto === s.setor ? "bg-brand-primary-050" : "hover:bg-surface-page",
+            )}
           >
-            <svg viewBox="0 0 20 20" fill="currentColor" className="h-2.5 w-2.5" aria-hidden>
-              <path d="M14.85 2.15a1.5 1.5 0 0 1 2.12 0l.88.88a1.5 1.5 0 0 1 0 2.12l-1.1 1.1-3-3 1.1-1.1Zm-2.16 2.16 3 3L6.94 16.06a1 1 0 0 1-.46.26l-3.1.83.83-3.1a1 1 0 0 1 .26-.46L12.7 4.3Z" />
-            </svg>
-          </button>
-          <div className="flex items-center gap-2 pr-6">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-status-warning-bg text-status-warning">
-              <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5" aria-hidden>
-                <path d="M10.9 2.5a1 1 0 0 0-1.8 0l-8 15A1 1 0 0 0 2 19h16a1 1 0 0 0 .9-1.5l-8-15ZM10 8a1 1 0 0 1 1 1v3a1 1 0 1 1-2 0V9a1 1 0 0 1 1-1Zm0 7a1.1 1.1 0 1 1 0 2.2A1.1 1.1 0 0 1 10 15Z" />
-              </svg>
+            <span className="text-[12.5px] font-semibold text-foreground">{s.setor}</span>
+            <span className="shrink-0 rounded-full bg-brand-primary-100 px-2 py-0.5 text-[10px] font-bold text-brand-primary-800">
+              {s.cargos.length} cargo(s)
             </span>
-            <div className="min-w-0">
-              <p className="truncate text-[12.5px] font-semibold text-foreground">{f.funcao}</p>
-              <p className="text-[10.5px] text-foreground-muted">{f.riscos.length} risco(s)</p>
+          </button>
+        ))}
+      </Card>
+
+      <Card className="overflow-hidden p-0">
+        {!setorAberto ? (
+          <p className="p-6 text-center text-[12px] text-foreground-muted">Selecione um setor à esquerda.</p>
+        ) : (
+          <div className="flex flex-col divide-y divide-hairline">
+            {setores
+              .find((s) => s.setor === setorAberto)
+              ?.cargos.map((c) => (
+                <button
+                  key={c.cargo}
+                  type="button"
+                  onClick={() => setCargoAberto(c)}
+                  className="flex items-center justify-between px-3 py-2 text-left hover:bg-surface-page"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate text-[12px] font-medium text-foreground">{c.cargo}</span>
+                    <span className="text-[10px] text-foreground-muted">CBO {c.cbo || "—"}</span>
+                  </span>
+                  <span aria-hidden className="shrink-0 text-foreground-muted">
+                    ›
+                  </span>
+                </button>
+              ))}
+          </div>
+        )}
+      </Card>
+
+      {cargoAberto && (
+        <Modal
+          aberto
+          onFechar={() => setCargoAberto(null)}
+          eyebrow={cargoAberto.setor}
+          titulo={cargoAberto.cargo}
+          subtitulo={`CBO ${cargoAberto.cbo || "—"}`}
+          largura="32rem"
+        >
+          <div className="flex flex-col gap-4">
+            <div>
+              <p className="text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">Riscos ocupacionais</p>
+              {cargoAberto.riscos.length === 0 ? (
+                <p className="mt-1 text-[12px] text-foreground-muted">Sem risco inventariado.</p>
+              ) : (
+                <div className="mt-1.5 flex flex-col gap-1.5">
+                  {cargoAberto.riscos.map((r, i) => (
+                    <div key={i} className="flex items-start gap-1.5">
+                      <span className={`mt-0.5 shrink-0 rounded-full border px-1.5 py-px text-[9.5px] font-semibold whitespace-nowrap ${corRisco(r.tipo)}`}>
+                        {r.tipo}
+                      </span>
+                      <span className="text-[12px] text-foreground">
+                        {r.descricao} <span className="text-foreground-muted">· {r.frequencia}</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <p className="text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">EPIs aplicáveis</p>
+              {cargoAberto.epis.length === 0 ? (
+                <p className="mt-1 text-[12px] text-foreground-muted">Não aplicável a este cargo.</p>
+              ) : (
+                <div className="mt-1.5 flex flex-wrap gap-1">
+                  {cargoAberto.epis.map((epi) => (
+                    <span key={epi} className="rounded-full border border-hairline bg-surface-page px-2 py-0.5 text-[10.5px] text-foreground">
+                      {epi}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <p className="text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">Exames obrigatórios</p>
+              <div className="mt-1.5 overflow-hidden rounded-md border border-hairline">
+                <table className="w-full text-[11.5px]">
+                  <thead>
+                    <tr className="border-b border-hairline bg-surface-page text-left text-[9.5px] font-semibold tracking-wide text-foreground-muted uppercase">
+                      <th className="px-2.5 py-1.5">Exame</th>
+                      <th className="px-2.5 py-1.5 text-right">Periodicidade</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cargoAberto.exames.map((exame) => (
+                      <tr key={exame} className="border-t border-hairline/70">
+                        <td className="px-2.5 py-1.5 text-foreground">{exame}</td>
+                        <td className="px-2.5 py-1.5 text-right text-foreground-muted">{periodicidadePorExame.get(exame) || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
-          <div className="mt-2 flex flex-col gap-1">
-            {f.riscos.length === 0 ? (
-              <p className="text-[10.5px] text-foreground-muted">Nenhum risco cadastrado ainda.</p>
-            ) : (
-              f.riscos.map((r, i) => (
-                <div key={i} className="flex items-start gap-1.5">
-                  <span
-                    className={`shrink-0 rounded-full border px-1.5 py-px text-[9.5px] font-semibold whitespace-nowrap ${COR_RISCO[r.tipo]}`}
-                  >
-                    {ROTULO_TIPO_RISCO[r.tipo]}
-                  </span>
-                  <span className="text-[10.5px] text-foreground">{r.descricao}</span>
-                </div>
-              ))
-            )}
-          </div>
-        </Card>
-      ))}
-
-      {editando && (
-        <EditarRiscosModal
-          funcaoRiscos={editando}
-          onFechar={() => setEditando(null)}
-          onSalvo={() => {
-            setEditando(null);
-            router.refresh();
-          }}
-        />
+        </Modal>
       )}
     </div>
   );
 }
 
-function EditarRiscosModal({
-  funcaoRiscos,
-  onFechar,
-  onSalvo,
-}: {
-  funcaoRiscos: FuncaoRiscos;
-  onFechar: () => void;
-  onSalvo: () => void;
-}) {
-  const [riscos, setRiscos] = useState<RiscoOcupacional[]>(funcaoRiscos.riscos);
-  const [tipo, setTipo] = useState<TipoRisco>("fisico");
-  const [descricao, setDescricao] = useState("");
-  const [salvando, setSalvando] = useState(false);
-  const [erro, setErro] = useState<string | null>(null);
-
-  function adicionar() {
-    const texto = descricao.trim();
-    if (!texto) return;
-    setRiscos((r) => [...r, { tipo, descricao: texto }]);
-    setDescricao("");
-  }
-
-  async function salvar() {
-    setSalvando(true);
-    setErro(null);
-    try {
-      const r = await fetch("/api/sst/exames/riscos", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ funcao: funcaoRiscos.funcao, riscos }),
-      });
-      if (!r.ok) throw new Error((await r.json()).erro ?? "Falha ao salvar.");
-      onSalvo();
-    } catch (e) {
-      setErro(e instanceof Error ? e.message : "Falha ao salvar.");
-    } finally {
-      setSalvando(false);
-    }
-  }
-
-  return (
-    <Modal
-      aberto
-      onFechar={onFechar}
-      eyebrow="Matriz Ocupacional"
-      titulo={`Riscos de ${funcaoRiscos.funcao}`}
-      largura="28rem"
-      rodape={
-        <div className="flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={onFechar}
-            className="rounded border border-hairline px-3 py-1.5 text-[12px] font-medium text-foreground hover:bg-surface-page"
-          >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            onClick={() => void salvar()}
-            disabled={salvando}
-            className="rounded bg-brand-primary px-3 py-1.5 text-[12px] font-medium text-brand-white hover:bg-brand-primary-hover disabled:opacity-50"
-          >
-            {salvando ? "Salvando..." : "Salvar"}
-          </button>
-        </div>
-      }
-    >
-      <div className="flex flex-col gap-2.5">
-        <div>
-          <p className="text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">Riscos desta função</p>
-          {riscos.length === 0 ? (
-            <p className="mt-1 text-[11px] text-foreground-muted">Nenhum risco ainda.</p>
-          ) : (
-            <div className="mt-1 flex flex-col gap-1.5">
-              {riscos.map((r, i) => (
-                <div key={i} className="flex items-center gap-1.5 rounded border border-hairline bg-surface-page px-2 py-1">
-                  <span className={`shrink-0 rounded-full border px-1.5 py-px text-[9.5px] font-semibold whitespace-nowrap ${COR_RISCO[r.tipo]}`}>
-                    {ROTULO_TIPO_RISCO[r.tipo]}
-                  </span>
-                  <span className="min-w-0 flex-1 text-[11.5px] text-foreground">{r.descricao}</span>
-                  <button
-                    type="button"
-                    onClick={() => setRiscos((rs) => rs.filter((_, idx) => idx !== i))}
-                    aria-label={`Remover risco ${r.descricao}`}
-                    className="shrink-0 text-foreground-muted hover:text-status-danger"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center gap-1.5">
-          <select
-            value={tipo}
-            onChange={(e) => setTipo(e.target.value as TipoRisco)}
-            className="shrink-0 rounded border border-hairline bg-background px-2 py-1.5 text-[12px] text-foreground outline-none focus:border-brand-primary"
-          >
-            {Object.entries(ROTULO_TIPO_RISCO).map(([valor, rotulo]) => (
-              <option key={valor} value={valor}>
-                {rotulo}
-              </option>
-            ))}
-          </select>
-          <input
-            value={descricao}
-            onChange={(e) => setDescricao(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                adicionar();
-              }
-            }}
-            placeholder="Descrição do risco (ex.: ruído acima do limite de tolerância)"
-            className="min-w-0 flex-1 rounded border border-hairline bg-background px-2 py-1.5 text-[12px] text-foreground outline-none focus:border-brand-primary"
-          />
-          <button
-            type="button"
-            onClick={adicionar}
-            className="shrink-0 rounded border border-hairline px-2.5 py-1.5 text-[11.5px] font-medium text-brand-primary-800 hover:bg-brand-primary-050"
-          >
-            Adicionar
-          </button>
-        </div>
-        {erro && <p className="text-[11.5px] text-status-danger">{erro}</p>}
-      </div>
-    </Modal>
-  );
-}
-
 function CustosTab({ custos }: { custos: LinhaCustoExame[] }) {
-  const totalGeral = custos.reduce((acc, l) => acc + l.valorTotal, 0);
+  const totalEstimado = custos.reduce((acc, l) => acc + l.valorEstimado, 0);
+  const totalRealizado = custos.reduce((acc, l) => acc + l.valorRealizado, 0);
 
   return (
     <div className="space-y-4">
@@ -659,12 +925,13 @@ function CustosTab({ custos }: { custos: LinhaCustoExame[] }) {
               <th className="px-3 py-2 text-right text-[10.5px]">Cargos</th>
               <th className="px-3 py-2 text-right text-[10.5px]">Valor unitário</th>
               <th className="px-3 py-2 text-right text-[10.5px]">Valor estimado</th>
+              <th className="px-3 py-2 text-right text-[10.5px]">Valor realizado</th>
             </tr>
           </thead>
           <tbody>
             {custos.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-3 py-4 text-center text-foreground-muted">
+                <td colSpan={6} className="px-3 py-4 text-center text-foreground-muted">
                   Nenhum exame cadastrado no catálogo de preços ainda.
                 </td>
               </tr>
@@ -675,7 +942,8 @@ function CustosTab({ custos }: { custos: LinhaCustoExame[] }) {
                   <td className="px-3 py-1.5 font-semibold text-foreground">{l.nome}</td>
                   <td className="px-3 py-1.5 text-right text-foreground">{l.cargos}</td>
                   <td className="px-3 py-1.5 text-right text-foreground-muted">{formatarMoeda(l.valorUnitario)}</td>
-                  <td className="px-3 py-1.5 text-right font-semibold text-brand-primary-800">{formatarMoeda(l.valorTotal)}</td>
+                  <td className="px-3 py-1.5 text-right font-semibold text-brand-primary-800">{formatarMoeda(l.valorEstimado)}</td>
+                  <td className="px-3 py-1.5 text-right font-semibold text-status-success">{formatarMoeda(l.valorRealizado)}</td>
                 </tr>
               ))
             )}
@@ -684,17 +952,19 @@ function CustosTab({ custos }: { custos: LinhaCustoExame[] }) {
             <tfoot>
               <tr className="border-t border-hairline bg-background font-semibold">
                 <td className="px-3 py-2 text-foreground" colSpan={4}>
-                  Total estimado
+                  Total
                 </td>
-                <td className="px-3 py-2 text-right text-brand-primary-800">{formatarMoeda(totalGeral)}</td>
+                <td className="px-3 py-2 text-right text-brand-primary-800">{formatarMoeda(totalEstimado)}</td>
+                <td className="px-3 py-2 text-right text-status-success">{formatarMoeda(totalRealizado)}</td>
               </tr>
             </tfoot>
           )}
         </table>
       </Card>
       <p className="text-[10.5px] text-foreground-muted">
-        Valor estimado = valor do exame × quantos cargos precisam dele na Matriz Ocupacional original (não é o
-        realizado — ainda não existe registro de exame feito neste módulo).
+        Valor estimado = previsão para aplicação no ano corrente (até 31/12) — valor do exame × quantos cargos
+        precisam dele na Matriz Ocupacional. Valor realizado = o que já foi de fato gasto (exames com registro de
+        realização) — ainda 0 em todo lugar até existir esse registro no módulo.
       </p>
     </div>
   );

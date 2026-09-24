@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
 import { CATALOGO_EXAMES_OCUPACIONAIS } from "@/lib/sst/domain";
-import { listarColaboradoresParaExames, obterCustosExames, obterMatrizExames, obterMatrizRiscos } from "@/lib/sst/exames";
+import { listarColaboradoresParaExames, obterCargosOcupacionais, obterCustosExames, obterMatrizExames } from "@/lib/sst/exames";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { ExamesPageClient, type AbaExames } from "@/components/modules/sst/ExamesPageClient";
 
@@ -24,10 +24,10 @@ export default async function SstExamesPage({
   const abaParam = (await searchParams).aba;
   const aba: AbaExames = ABAS_VALIDAS.includes(abaParam as AbaExames) ? (abaParam as AbaExames) : "colaboradores";
 
-  const [colaboradores, matrizExames, matrizRiscos, custos] = await Promise.all([
+  const [colaboradores, matrizExames, setoresOcupacionais, custos] = await Promise.all([
     listarColaboradoresParaExames(),
     obterMatrizExames(),
-    obterMatrizRiscos(),
+    obterCargosOcupacionais(),
     obterCustosExames(),
   ]);
 
@@ -38,8 +38,8 @@ export default async function SstExamesPage({
         aba={aba}
         colaboradores={colaboradores}
         matrizExames={matrizExames}
-        matrizRiscos={matrizRiscos}
-        catalogoExames={CATALOGO_EXAMES_OCUPACIONAIS.map((c) => c.nome)}
+        setoresOcupacionais={setoresOcupacionais}
+        catalogoExames={CATALOGO_EXAMES_OCUPACIONAIS.map((c) => ({ nome: c.nome, periodicidade: c.periodicidade }))}
         custos={custos}
       />
     </div>

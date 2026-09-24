@@ -1,6 +1,7 @@
 import "server-only";
-import { listarColaboradores, type Vinculo } from "@/lib/db/colaboradores";
-import { sstQuery } from "./db";
+import { randomUUID } from "node:crypto";
+import { buscarColaborador, listarColaboradores, type Vinculo } from "@/lib/db/colaboradores";
+import { sstQuery, sstTransacao } from "./db";
 import { CATALOGO_EXAMES_OCUPACIONAIS } from "./domain";
 
 /**
@@ -102,45 +103,110 @@ export async function atualizarExamesDaFuncao(funcao: string, exames: string[]):
   );
 }
 
-// ---------- Matriz Ocupacional (função → riscos) ----------
+// ---------- Matriz Ocupacional (setor → cargo → riscos/EPIs/exames) ----------
 
-export type TipoRisco = "fisico" | "quimico" | "biologico" | "ergonomico";
-
-export const ROTULO_TIPO_RISCO: Record<TipoRisco, string> = {
-  fisico: "Físico",
-  quimico: "Químico",
-  biologico: "Biológico",
-  ergonomico: "Ergonômico",
-};
-
-export interface RiscoOcupacional {
-  tipo: TipoRisco;
+/** Uma linha de risco do PGR: agente (ex.: "Ruído continuo ou intermitente") e frequência de exposição. */
+export interface RiscoCargo {
+  /** Grupo do agente: "ACIDENTES / MECÂNICOS", "ERGONÔMICOS", "FÍSICOS", "QUÍMICOS", "BIOLÓGICOS". */
+  tipo: string;
   descricao: string;
+  frequencia: string;
 }
 
-export interface FuncaoRiscos {
-  funcao: string;
-  riscos: RiscoOcupacional[];
+export interface CargoOcupacional {
+  cargo: string;
+  cbo: string;
+  setor: string;
+  riscos: RiscoCargo[];
+  epis: string[];
+  /** Nomes dos exames — mesmo catálogo de domain.ts; periodicidade vem de lá, não é repetida aqui. */
+  exames: string[];
 }
 
-async function obterRiscosPorFuncao(): Promise<Map<string, RiscoOcupacional[]>> {
-  const linhas = await sstQuery<{ funcao: string; riscos: RiscoOcupacional[] }>("SELECT funcao, riscos FROM sst_matriz_riscos_funcao");
-  return new Map(linhas.map((l) => [l.funcao, l.riscos]));
+export interface SetorOcupacional {
+  setor: string;
+  cargos: CargoOcupacional[];
 }
 
-export async function obterMatrizRiscos(): Promise<FuncaoRiscos[]> {
-  const mapa = await obterRiscosPorFuncao();
-  return FUNCOES_MATRIZ_EXAMES.map((funcao) => ({ funcao, riscos: mapa.get(funcao) ?? [] }));
-}
-
-export async function atualizarRiscosDaFuncao(funcao: string, riscos: RiscoOcupacional[]): Promise<void> {
-  if (!FUNCOES_MATRIZ_EXAMES.includes(funcao)) throw new Error("Função não encontrada na matriz.");
-  const limpos = riscos.map((r) => ({ tipo: r.tipo, descricao: r.descricao.trim() })).filter((r) => r.descricao);
-  await sstQuery(
-    `INSERT INTO sst_matriz_riscos_funcao (funcao, riscos, atualizado_em) VALUES ($1, $2::jsonb, now())
-       ON CONFLICT (funcao) DO UPDATE SET riscos = EXCLUDED.riscos, atualizado_em = now()`,
-    [funcao, JSON.stringify(limpos)],
+/**
+ * Dado real da empresa (planilha do Portal SST antigo, repassada pela
+ * Leslie) — ver scripts/seed-cargos-ocupacionais.js. Diferente da Matriz por
+ * Função (que é por FUNÇÃO, mais genérica e editável pela tela): aqui é por
+ * CARGO/setor, com risco+frequência e EPI por cargo — ainda sem edição pela
+ * tela, só visualização (é o que foi pedido: separar em listas e navegar).
+ */
+export async function obterCargosOcupacionais(): Promise<SetorOcupacional[]> {
+  const linhas = await sstQuery<{ cargo: string; cbo: string; setor: string; riscos: RiscoCargo[]; epis: string[]; exames: string[] }>(
+    "SELECT cargo, cbo, setor, riscos, epis, exames FROM sst_cargos_ocupacionais ORDER BY setor, cargo",
   );
+  const porSetor = new Map<string, CargoOcupacional[]>();
+  for (const l of linhas) {
+    const lista = porSetor.get(l.setor) ?? [];
+    lista.push({ cargo: l.cargo, cbo: l.cbo, setor: l.setor, riscos: l.riscos, epis: l.epis, exames: l.exames });
+    porSetor.set(l.setor, lista);
+  }
+  return [...porSetor.entries()].map(([setor, cargos]) => ({ setor, cargos }));
+}
+
+// ---------- Vencimento (periodicidade do catálogo × última realização) ----------
+
+const PERIODICIDADE_POR_EXAME = new Map(CATALOGO_EXAMES_OCUPACIONAIS.map((c) => [c.nome, c.periodicidade]));
+
+/** "12 meses" → 12; "Sem periódico"/vazio → null (feito uma vez, nunca vence de novo). */
+function mesesDaPeriodicidade(exame: string): number | null {
+  const m = /^(\d+)\s*mes/i.exec((PERIODICIDADE_POR_EXAME.get(exame) ?? "").trim());
+  return m ? Number(m[1]) : null;
+}
+
+/** "DD/MM/AAAA" + N meses → "DD/MM/AAAA". */
+function somarMeses(dataBr: string, meses: number): string | null {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dataBr.trim());
+  if (!m) return null;
+  const d = new Date(Number(m[3]), Number(m[2]) - 1 + meses, Number(m[1]));
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+}
+
+/** Próxima data prevista pra um exame, a partir de quando foi feito — null se o exame não repete ("Sem periódico"). */
+function calcularDataPrevista(exame: string, dataRealizacaoBr: string): string | null {
+  const meses = mesesDaPeriodicidade(exame);
+  return meses ? somarMeses(dataRealizacaoBr, meses) : null;
+}
+
+/** "DD/MM/AAAA" já passou da data de hoje? */
+function dataPassou(dataBr: string, hoje: Date): boolean {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dataBr.trim());
+  if (!m) return false;
+  const alvo = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+  return alvo < new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+}
+
+/**
+ * Vencido = nunca foi feito, OU foi feito mas a data prevista (periodicidade)
+ * já passou. Exame sem periodicidade ("Sem periódico") feito uma vez nunca
+ * vence de novo.
+ */
+function exameVencido(dataPrevista: string | null | undefined, feito: boolean, hoje: Date): boolean {
+  if (!feito) return true;
+  if (!dataPrevista) return false;
+  return dataPassou(dataPrevista, hoje);
+}
+
+/** Última realização de cada exame do colaborador (uma nova realização substitui a anterior). */
+async function obterUltimasRealizacoes(colaboradorId: number): Promise<Map<string, { dataRealizacao: string; dataPrevista: string | null }>> {
+  const linhas = await sstQuery<{ exame: string; data_realizacao: string; data_prevista: string | null }>(
+    `SELECT DISTINCT ON (exame) exame, data_realizacao, data_prevista FROM sst_exames_realizados
+       WHERE colab_id = $1 ORDER BY exame, to_date(NULLIF(data_realizacao, ''), 'DD/MM/YYYY') DESC NULLS LAST, created_at DESC`,
+    [colaboradorId],
+  );
+  return new Map(linhas.map((l) => [l.exame, { dataRealizacao: l.data_realizacao, dataPrevista: l.data_prevista }]));
+}
+
+/** Exames obrigatórios da função que estão vencidos (nunca feitos ou fora da periodicidade) — o que entra no checklist de "Anexar exame". */
+function calcularVencidos(examesObrigatorios: string[], realizados: Map<string, { dataPrevista: string | null }>, hoje = new Date()): string[] {
+  return examesObrigatorios.filter((exame) => {
+    const info = realizados.get(exame);
+    return exameVencido(info?.dataPrevista, Boolean(info), hoje);
+  });
 }
 
 // ---------- Colaboradores (mesmo cadastro do Quadro, igual Gestão de EPI) ----------
@@ -154,20 +220,39 @@ export interface ColaboradorExame {
   email: string | null;
   funcaoMatriz: string | null;
   examesObrigatorios: string[];
+  /** Quantos dos obrigatórios estão vencidos (nunca feitos ou fora da periodicidade) — mostrado como chip na lista. */
+  examesVencidos: number;
 }
 
 /**
  * Usa o MESMO cadastro do Quadro de Colaboradores — não uma base à parte.
- * Ainda não existe um registro de exame REALIZADO por colaborador (esse é o
- * próximo passo, quando a "ficha" de exame for construída, no molde da ficha
- * de EPI); por enquanto isto só mostra quantos exames a função exige.
+ * "Vencidos" já considera o histórico real de sst_exames_realizados (ficha de
+ * exame, ver mais abaixo) — igual à situação de EPI.
  */
 export async function listarColaboradoresParaExames(): Promise<ColaboradorExame[]> {
-  const [todos, mapaExames] = await Promise.all([listarColaboradores(), obterExamesPorFuncao()]);
+  const [todos, mapaExames, ultimasRealizacoes] = await Promise.all([
+    listarColaboradores(),
+    obterExamesPorFuncao(),
+    sstQuery<{ colab_id: string; exame: string; data_prevista: string | null }>(
+      `SELECT DISTINCT ON (colab_id, exame) colab_id, exame, data_prevista FROM sst_exames_realizados
+         ORDER BY colab_id, exame, to_date(NULLIF(data_realizacao, ''), 'DD/MM/YYYY') DESC NULLS LAST, created_at DESC`,
+    ),
+  ]);
+  const realizadosPorColaborador = new Map<number, Map<string, { dataPrevista: string | null }>>();
+  for (const r of ultimasRealizacoes) {
+    const id = Number(r.colab_id);
+    const mapa = realizadosPorColaborador.get(id) ?? new Map<string, { dataPrevista: string | null }>();
+    mapa.set(r.exame, { dataPrevista: r.data_prevista });
+    realizadosPorColaborador.set(id, mapa);
+  }
+
+  const hoje = new Date();
   return todos
     .filter((c) => c.status !== "desligado")
     .map((c) => {
       const funcao = funcaoCorrespondente(c.cargo, c.departamento, FUNCOES_MATRIZ_EXAMES);
+      const examesObrigatorios = funcao ? (mapaExames.get(funcao) ?? []) : [];
+      const vencidos = calcularVencidos(examesObrigatorios, realizadosPorColaborador.get(c.id) ?? new Map(), hoje);
       return {
         id: c.id,
         nome: c.nome,
@@ -176,9 +261,120 @@ export async function listarColaboradoresParaExames(): Promise<ColaboradorExame[
         vinculo: c.vinculo,
         email: c.email,
         funcaoMatriz: funcao,
-        examesObrigatorios: funcao ? (mapaExames.get(funcao) ?? []) : [],
+        examesObrigatorios,
+        examesVencidos: vencidos.length,
       };
     });
+}
+
+// ---------- Ficha de exame ocupacional (ASO) ----------
+
+export const TIPOS_ASO = [
+  { valor: "admissional", label: "Admissional" },
+  { valor: "periodico", label: "Periódico" },
+  { valor: "retorno", label: "Retorno ao Trabalho" },
+  { valor: "demissional", label: "Demissional" },
+];
+
+export interface NovaFichaExame {
+  colaboradorId: number;
+  tipoAso: string;
+  /** Um item por exame marcado — todos com a MESMA data de realização (mesmo atendimento). */
+  exames: { exame: string; dataRealizacao: string }[];
+  anexoUrl?: string | null;
+  anexoNome?: string | null;
+}
+
+export interface FichaExameResumo {
+  id: string;
+  tipoAso: string;
+  dataRealizacao: string;
+  exames: string[];
+  anexoUrl: string | null;
+  anexoNome: string | null;
+}
+
+/** Registra a ficha (comprovante) e os exames feitos naquele atendimento — data prevista calculada aqui, não vem da tela. */
+export async function criarFichaExame(nova: NovaFichaExame, responsavel: string): Promise<{ fichaId: string }> {
+  const colaborador = await buscarColaborador(nova.colaboradorId);
+  if (!colaborador) throw new Error("Colaborador não encontrado no Quadro.");
+  if (nova.exames.length === 0) throw new Error("Selecione ao menos um exame.");
+
+  const fichaId = randomUUID();
+  await sstTransacao(async (q) => {
+    await q(
+      `INSERT INTO sst_fichas_exame (id, colab_id, tipo_aso, anexo_url, anexo_nome, responsavel)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [fichaId, colaborador.id, nova.tipoAso, nova.anexoUrl ?? null, nova.anexoNome ?? null, responsavel],
+    );
+    for (const item of nova.exames) {
+      const dataPrevista = calcularDataPrevista(item.exame, item.dataRealizacao);
+      await q(
+        `INSERT INTO sst_exames_realizados (id, ficha_id, colab_id, exame, data_realizacao, data_prevista)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [randomUUID(), fichaId, colaborador.id, item.exame, item.dataRealizacao, dataPrevista],
+      );
+    }
+  });
+  return { fichaId };
+}
+
+interface LinhaFichaExame {
+  id: string;
+  tipo_aso: string;
+  anexo_url: string | null;
+  anexo_nome: string | null;
+}
+
+/** Histórico de fichas do colaborador (uma linha por atendimento) — pro drawer da Gestão de Exames e a aba Documentos ASO do Quadro. */
+export async function listarFichasExameDoColaborador(colaboradorId: number): Promise<FichaExameResumo[]> {
+  const [fichas, itens] = await Promise.all([
+    sstQuery<LinhaFichaExame>(
+      "SELECT id, tipo_aso, anexo_url, anexo_nome FROM sst_fichas_exame WHERE colab_id = $1 ORDER BY created_at DESC",
+      [colaboradorId],
+    ),
+    sstQuery<{ ficha_id: string; exame: string; data_realizacao: string }>(
+      "SELECT ficha_id, exame, data_realizacao FROM sst_exames_realizados WHERE colab_id = $1 ORDER BY created_at",
+      [colaboradorId],
+    ),
+  ]);
+  const itensPorFicha = new Map<string, { exame: string; dataRealizacao: string }[]>();
+  for (const i of itens) {
+    const lista = itensPorFicha.get(i.ficha_id) ?? [];
+    lista.push({ exame: i.exame, dataRealizacao: i.data_realizacao });
+    itensPorFicha.set(i.ficha_id, lista);
+  }
+  return fichas.map((f) => {
+    const itensDaFicha = itensPorFicha.get(f.id) ?? [];
+    return {
+      id: f.id,
+      tipoAso: f.tipo_aso,
+      dataRealizacao: itensDaFicha[0]?.dataRealizacao ?? "",
+      exames: itensDaFicha.map((i) => i.exame),
+      anexoUrl: f.anexo_url,
+      anexoNome: f.anexo_nome,
+    };
+  });
+}
+
+/** Exames obrigatórios da função que ainda estão vencidos — é o checklist de "Anexar exame ocupacional" (só o que falta, não a lista toda). */
+export async function obterExamesVencidosDoColaborador(colaboradorId: number, examesObrigatorios: string[]): Promise<string[]> {
+  const realizados = await obterUltimasRealizacoes(colaboradorId);
+  return calcularVencidos(examesObrigatorios, realizados);
+}
+
+export async function obterAnexoFichaExame(fichaId: string): Promise<{ url: string; nome: string | null } | null> {
+  const [f] = await sstQuery<{ anexo_url: string | null; anexo_nome: string | null }>(
+    "SELECT anexo_url, anexo_nome FROM sst_fichas_exame WHERE id = $1",
+    [fichaId],
+  );
+  if (!f?.anexo_url) return null;
+  return { url: f.anexo_url, nome: f.anexo_nome };
+}
+
+export async function excluirFichaExame(fichaId: string): Promise<boolean> {
+  const apagadas = await sstQuery<{ id: string }>("DELETE FROM sst_fichas_exame WHERE id = $1 RETURNING id", [fichaId]);
+  return apagadas.length > 0;
 }
 
 // ---------- Custo e Valores (catálogo de exames) ----------
@@ -188,7 +384,10 @@ export interface LinhaCustoExame {
   nome: string;
   cargos: number;
   valorUnitario: number;
-  valorTotal: number;
+  /** Previsto p/ o ano corrente (até 31/12): preço × quantos cargos precisam dele — 1 exame por cargo no ano. */
+  valorEstimado: number;
+  /** Já gasto de fato — sempre 0 por enquanto: não existe registro de exame REALIZADO neste módulo ainda. */
+  valorRealizado: number;
 }
 
 /** Preço vigente de cada exame: catálogo estático (domain.ts), sobrescrito pelo que estiver em sst_exame_precos. */
@@ -200,11 +399,30 @@ export async function obterPrecosExames(): Promise<Map<string, number>> {
   ]);
 }
 
-/** Valor estimado (não realizado — ainda não existe registro de exame feito): preço × quantos cargos precisam dele. */
+/** Estimativa pro ano corrente (até 31/12): preço × quantos cargos precisam dele. Realizado = exames de fato registrados este ano (sst_exames_realizados), no preço vigente. */
 export async function obterCustosExames(): Promise<LinhaCustoExame[]> {
-  const precos = await obterPrecosExames();
+  const anoAtual = new Date().getFullYear();
+  const [precos, realizados] = await Promise.all([
+    obterPrecosExames(),
+    sstQuery<{ exame: string; data_realizacao: string }>("SELECT exame, data_realizacao FROM sst_exames_realizados"),
+  ]);
+  const qtdRealizadaPorExame = new Map<string, number>();
+  for (const r of realizados) {
+    const ano = Number(r.data_realizacao.slice(6, 10));
+    if (ano !== anoAtual) continue;
+    qtdRealizadaPorExame.set(r.exame, (qtdRealizadaPorExame.get(r.exame) ?? 0) + 1);
+  }
+
   return CATALOGO_EXAMES_OCUPACIONAIS.map((c) => {
     const valorUnitario = precos.get(c.codigo) ?? c.valor;
-    return { codigo: c.codigo, nome: c.nome, cargos: c.cargos, valorUnitario, valorTotal: valorUnitario * c.cargos };
-  }).sort((a, b) => b.valorTotal - a.valorTotal);
+    const qtdRealizada = qtdRealizadaPorExame.get(c.nome) ?? 0;
+    return {
+      codigo: c.codigo,
+      nome: c.nome,
+      cargos: c.cargos,
+      valorUnitario,
+      valorEstimado: valorUnitario * c.cargos,
+      valorRealizado: valorUnitario * qtdRealizada,
+    };
+  }).sort((a, b) => b.valorEstimado - a.valorEstimado);
 }
