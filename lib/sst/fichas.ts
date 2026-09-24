@@ -1,6 +1,7 @@
 import "server-only";
 import { randomBytes, randomUUID } from "node:crypto";
 import { buscarColaborador } from "@/lib/db/colaboradores";
+import { emailConfigurado, enviarEmail } from "@/lib/email";
 import { sstQuery, sstTransacao } from "./db";
 import { obterPrecosEpi, obterPrecosFardamento } from "./epi";
 
@@ -81,6 +82,56 @@ function conteudoDaFicha(itens: ItemFicha[]): string {
 
 export function linkAssinatura(origem: string, token: string): string {
   return `${origem}/assinatura-epi/${token}`;
+}
+
+function escaparHtml(texto: string): string {
+  return texto.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+}
+
+function emailFicha(para: string, nome: string, link: string) {
+  const primeiroNome = nome.trim().split(/\s+/)[0] ?? "";
+  return {
+    para,
+    assunto: "Ficha de entrega de EPI para assinatura",
+    texto: `Olá, ${primeiroNome}!\n\nO RH registrou a entrega dos seus EPIs. Confira a ficha e assine pelo link abaixo, entrando com o seu e-mail profissional:\n${link}\n\nO link vale por 7 dias.\n\nRH · MSB`,
+    html: `<div style="font-family:Arial,sans-serif;font-size:14px;color:#1f2d3d;max-width:520px">
+  <p>Olá, ${escaparHtml(primeiroNome)}!</p>
+  <p>O RH registrou a entrega dos seus EPIs. Confira a ficha e assine pelo botão abaixo, entrando com o seu e-mail profissional.</p>
+  <p style="margin:24px 0"><a href="${escaparHtml(link)}" style="background:#4a9fb5;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:bold">Conferir e assinar a ficha</a></p>
+  <p style="font-size:12px;color:#6b7c8f">O link vale por 7 dias. Se o botão não abrir, copie este endereço no navegador:<br>${escaparHtml(link)}</p>
+  <p>RH · MSB</p>
+</div>`,
+  };
+}
+
+/**
+ * Envia (ou reenvia) o e-mail da ficha — chamado quando o RH clica em
+ * "Concluir" na tela de registro, não mais na hora de gerar a ficha, pra dar
+ * chance de conferir o link antes de mandar pro colaborador.
+ */
+export async function enviarEmailDaFicha(
+  fichaId: string,
+  origem: string,
+): Promise<{ emailEnviadoPara: string | null; erroEmail: string | null }> {
+  const linhas = await sstQuery<{ colab_id: number; token: string | null }>(
+    "SELECT colab_id, token FROM sst_fichas_epi WHERE id = $1",
+    [fichaId],
+  );
+  const ficha = linhas[0];
+  if (!ficha || !ficha.token) return { emailEnviadoPara: null, erroEmail: "Ficha não encontrada." };
+  const colaborador = await buscarColaborador(ficha.colab_id);
+  if (!colaborador) return { emailEnviadoPara: null, erroEmail: "Colaborador não encontrado." };
+
+  if (!colaborador.email) return { emailEnviadoPara: null, erroEmail: "Colaborador sem e-mail profissional no Quadro." };
+  if (!emailConfigurado()) return { emailEnviadoPara: null, erroEmail: "Envio automático de e-mail ainda não configurado no portal." };
+
+  const link = linkAssinatura(origem, ficha.token);
+  try {
+    await enviarEmail(emailFicha(colaborador.email, colaborador.nome, link));
+    return { emailEnviadoPara: colaborador.email, erroEmail: null };
+  } catch (erro) {
+    return { emailEnviadoPara: null, erroEmail: `Não foi possível enviar o e-mail (${erro instanceof Error ? erro.message : "erro desconhecido"}).` };
+  }
 }
 
 interface LinhaFicha {

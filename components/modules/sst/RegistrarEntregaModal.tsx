@@ -46,8 +46,10 @@ export function RegistrarEntregaModal({
   );
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [fichaId, setFichaId] = useState<string | null>(null);
   const [link, setLink] = useState<string | null>(null);
-  const [envio, setEnvio] = useState<{ para: string | null; erro: string | null }>({ para: null, erro: null });
+  const [concluindo, setConcluindo] = useState(false);
+  const [envio, setEnvio] = useState<{ para: string | null; erro: string | null } | null>(null);
   const [copiado, setCopiado] = useState(false);
   const [anexo, setAnexo] = useState<{ url: string; nome: string } | null>(null);
   const [enviandoAnexo, setEnviandoAnexo] = useState(false);
@@ -114,13 +116,34 @@ export function RegistrarEntregaModal({
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.erro ?? "Falha ao gerar o link.");
+      setFichaId(d.fichaId);
       setLink(d.link);
-      setEnvio({ para: d.emailEnviadoPara, erro: d.erroEmail });
       onCriada();
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Falha ao gerar o link.");
     } finally {
       setEnviando(false);
+    }
+  }
+
+  /** "Concluir" é quem dispara o e-mail de fato — dá chance de conferir o link antes de mandar pro colaborador. */
+  async function concluir() {
+    if (!fichaId || !colaborador.email) {
+      onFechar();
+      return;
+    }
+    setConcluindo(true);
+    try {
+      const r = await fetch(`/api/sst/epi/fichas/${fichaId}/enviar-email`, { method: "POST" });
+      const d = await r.json();
+      setEnvio({ para: d.emailEnviadoPara ?? null, erro: d.erroEmail ?? null });
+      if (d.emailEnviadoPara) {
+        onFechar();
+      }
+    } catch {
+      setEnvio({ para: null, erro: "Não foi possível enviar o e-mail agora." });
+    } finally {
+      setConcluindo(false);
     }
   }
 
@@ -142,10 +165,11 @@ export function RegistrarEntregaModal({
           <div className="flex justify-end">
             <button
               type="button"
-              onClick={onFechar}
-              className="rounded bg-brand-primary px-3 py-1.5 text-[12px] font-medium text-brand-white hover:bg-brand-primary-hover"
+              onClick={() => void concluir()}
+              disabled={concluindo}
+              className="rounded bg-brand-primary px-3 py-1.5 text-[12px] font-medium text-brand-white hover:bg-brand-primary-hover disabled:opacity-50"
             >
-              Concluir
+              {concluindo ? "Enviando..." : envio?.erro ? "Tentar enviar de novo" : "Concluir"}
             </button>
           </div>
         ) : (
@@ -160,10 +184,10 @@ export function RegistrarEntregaModal({
             <button
               type="button"
               onClick={() => void enviar()}
-              disabled={totalItens === 0 || enviando || enviandoAnexo || !colaborador.email}
+              disabled={totalItens === 0 || enviando || enviandoAnexo}
               className="rounded bg-brand-primary px-3 py-1.5 text-[12px] font-medium text-brand-white hover:bg-brand-primary-hover disabled:opacity-50"
             >
-              {enviando ? "Gerando link..." : "Enviar link de assinatura"}
+              {enviando ? "Gerando link..." : "Gerar link de assinatura"}
             </button>
           </div>
         )
@@ -171,15 +195,25 @@ export function RegistrarEntregaModal({
     >
       {link ? (
         <div className="flex flex-col gap-3">
-          {envio.para ? (
+          {envio?.para ? (
             <p className="rounded-md border border-status-success-border bg-status-success-bg px-3 py-2 text-[12.5px] text-status-success">
               ✓ Ficha gerada com {totalItens} item(ns) e link de assinatura enviado para <strong>{envio.para}</strong>.
               O link vale por 7 dias.
             </p>
-          ) : (
+          ) : envio?.erro ? (
             <p className="rounded-md border border-status-warning-border bg-status-warning-bg px-3 py-2 text-[12.5px] text-status-warning">
               Ficha gerada com {totalItens} item(ns), mas o e-mail não foi enviado: {envio.erro} Copie o link abaixo e
-              envie para {colaborador.nome.split(" ")[0]}.
+              envie para {colaborador.nome.split(" ")[0]}, ou clique em "Tentar enviar de novo".
+            </p>
+          ) : colaborador.email ? (
+            <p className="rounded-md border border-hairline bg-surface-page px-3 py-2 text-[12.5px] text-foreground-muted">
+              Ficha gerada com {totalItens} item(ns). Confira o link abaixo e clique em <strong>Concluir</strong> para
+              enviar por e-mail para <strong>{colaborador.email}</strong>.
+            </p>
+          ) : (
+            <p className="rounded-md border border-hairline bg-surface-page px-3 py-2 text-[12.5px] text-foreground-muted">
+              Ficha gerada com {totalItens} item(ns). Este colaborador não tem e-mail cadastrado — copie o link abaixo
+              e envie manualmente. Concluir só fecha esta tela.
             </p>
           )}
           <div className="flex items-center gap-2 rounded-md border border-hairline bg-surface-page p-2">
@@ -195,7 +229,7 @@ export function RegistrarEntregaModal({
               {copiado ? "Copiado ✓" : "Copiar link"}
             </button>
           </div>
-          {!envio.para && colaborador.email && (
+          {envio?.erro && colaborador.email && (
             <a
               href={`mailto:${colaborador.email}?subject=${assunto}&body=${corpo}`}
               className="self-start text-[12px] font-medium text-brand-primary hover:text-brand-primary-hover"
@@ -208,12 +242,13 @@ export function RegistrarEntregaModal({
         <div className="flex flex-col gap-2">
           {colaborador.email ? (
             <p className="text-[11px] text-foreground-muted">
-              O link de assinatura será enviado para <strong className="text-foreground">{colaborador.email}</strong>.
+              Depois de gerar o link, clique em <strong>Concluir</strong> para enviar por e-mail para{" "}
+              <strong className="text-foreground">{colaborador.email}</strong>.
             </p>
           ) : (
             <p className="rounded-md border border-status-warning-border bg-status-warning-bg px-3 py-2 text-[11.5px] text-status-warning">
-              Este colaborador não tem e-mail profissional no Quadro de Colaboradores — cadastre o e-mail para poder
-              enviar a ficha para assinatura.
+              Este colaborador não tem e-mail profissional no Quadro de Colaboradores — dá pra gerar o link mesmo assim
+              e enviar manualmente.
             </p>
           )}
           <div className="flex items-center justify-between">
