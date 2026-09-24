@@ -256,18 +256,18 @@ export function RegistrarEntregaModal({
     const linhasExtras = extras[epi] ?? [];
     return (
       <div key={epi} className="flex flex-col gap-1.5 px-2.5 py-2">
-        <div className={GRADE_LINHA}>
-          <label className="flex min-w-0 cursor-pointer items-center gap-2 text-[12.5px] text-foreground">
+        <div className={s.marcado ? GRADE_LINHA : "flex items-center gap-2"}>
+          <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-[12.5px] text-foreground">
             <input
               type="checkbox"
               checked={s.marcado}
               onChange={(e) => alterar(epi, { marcado: e.target.checked })}
               className="accent-brand-primary"
             />
-            <span className="truncate">{epi}</span>
+            <span className={s.marcado ? "truncate" : ""}>{epi}</span>
           </label>
           {s.marcado && camposLinha(epi, s, (parcial) => alterar(epi, parcial), "principal")}
-          {s.marcado ? (
+          {s.marcado && (
             <button
               type="button"
               onClick={() => adicionarExtra(epi)}
@@ -277,8 +277,6 @@ export function RegistrarEntregaModal({
             >
               +
             </button>
-          ) : (
-            <span />
           )}
         </div>
         {s.marcado &&
