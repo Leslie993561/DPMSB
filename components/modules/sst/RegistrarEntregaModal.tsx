@@ -186,15 +186,13 @@ export function RegistrarEntregaModal({
     `Olá, ${colaborador.nome.split(" ")[0]}!\n\nSegue o link para conferir e assinar a sua ficha de entrega de EPI:\n${link ?? ""}\n\nPara assinar, entre com o seu e-mail profissional.\n\nRH · MSB`,
   );
 
+  /** Larguras fixas iguais na linha principal e nas extras, pra Quant./C.A./Entrega/Troca ficarem um embaixo do outro. */
+  const GRADE_LINHA = "grid grid-cols-[1fr_3.5rem_5rem_8.5rem_8.5rem_1.5rem] items-center gap-x-2";
+
   /** Campos de Quant./C.A./Entrega/Troca — usado na linha principal e em cada linha extra do mesmo EPI. */
-  function camposLinha(
-    epi: string,
-    valores: LinhaExtra,
-    onChange: (parcial: Partial<LinhaExtra>) => void,
-    caIdPrefix: string,
-  ) {
+  function camposLinha(epi: string, valores: LinhaExtra, onChange: (parcial: Partial<LinhaExtra>) => void, caIdPrefix: string) {
     return (
-      <div className="flex flex-wrap items-center gap-2">
+      <>
         <label className="flex flex-col text-[9.5px] text-foreground-muted">
           Quant.
           <input
@@ -237,7 +235,7 @@ export function RegistrarEntregaModal({
             type="date"
             value={valores.dataEntrega}
             onChange={(e) => onChange({ dataEntrega: e.target.value })}
-            className={INPUT}
+            className={INPUT + " w-full"}
           />
         </label>
         <label className="flex flex-col text-[9.5px] text-foreground-muted">
@@ -246,10 +244,10 @@ export function RegistrarEntregaModal({
             type="date"
             value={valores.dataTroca}
             onChange={(e) => onChange({ dataTroca: e.target.value })}
-            className={INPUT}
+            className={INPUT + " w-full"}
           />
         </label>
-      </div>
+      </>
     );
   }
 
@@ -258,8 +256,8 @@ export function RegistrarEntregaModal({
     const linhasExtras = extras[epi] ?? [];
     return (
       <div key={epi} className="flex flex-col gap-1.5 px-2.5 py-2">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-          <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-[12.5px] text-foreground">
+        <div className={GRADE_LINHA}>
+          <label className="flex min-w-0 cursor-pointer items-center gap-2 text-[12.5px] text-foreground">
             <input
               type="checkbox"
               checked={s.marcado}
@@ -269,21 +267,24 @@ export function RegistrarEntregaModal({
             <span className="truncate">{epi}</span>
           </label>
           {s.marcado && camposLinha(epi, s, (parcial) => alterar(epi, parcial), "principal")}
-          {s.marcado && (
+          {s.marcado ? (
             <button
               type="button"
               onClick={() => adicionarExtra(epi)}
               title="Registrar outra entrega deste EPI com quantidade/data diferente"
               aria-label={`Adicionar outra entrega de ${epi}`}
-              className="shrink-0 rounded-full border border-hairline px-1.5 text-[13px] font-semibold text-brand-primary hover:bg-brand-primary-050"
+              className="shrink-0 justify-self-start rounded-full border border-hairline px-1.5 text-[13px] font-semibold text-brand-primary hover:bg-brand-primary-050"
             >
               +
             </button>
+          ) : (
+            <span />
           )}
         </div>
         {s.marcado &&
           linhasExtras.map((linha, idx) => (
-            <div key={idx} className="ml-6 flex flex-wrap items-center gap-x-2 gap-y-1.5 border-l border-hairline pl-3">
+            <div key={idx} className={GRADE_LINHA}>
+              <span />
               {camposLinha(epi, linha, (parcial) => alterarExtra(epi, idx, parcial), `extra ${idx + 1}`)}
               <button
                 type="button"
