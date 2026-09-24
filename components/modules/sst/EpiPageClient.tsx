@@ -160,6 +160,12 @@ function ColaboradoresTab({
     return true;
   });
 
+  // Resumo geral (todos os colaboradores, não só os filtrados) — mesmo espírito do "2/3" de fichas que ele substitui.
+  const totalVencidos = colaboradores.reduce((acc, c) => acc + c.situacaoEpi.vencidos, 0);
+  const totalAtivos = colaboradores.reduce((acc, c) => acc + c.situacaoEpi.emDia, 0);
+  const totalPendente = colaboradores.reduce((acc, c) => acc + c.situacaoEpi.vencendo, 0);
+  const aguardandoAssinatura = resumoFichas.enviadas - resumoFichas.assinadas;
+
   return (
     <Card className="overflow-hidden p-0">
       <div className="max-h-[calc(100vh-180px)] overflow-x-auto overflow-y-auto">
@@ -199,20 +205,24 @@ function ColaboradoresTab({
                 <CampoTexto valor={busca} onChange={onBusca} placeholder="Buscar nome, cargo ou setor" />
               </CabecalhoFiltravel>
               <th className="px-2 py-1" />
-              <th className="px-2 py-1 text-right">
-                {resumoFichas.enviadas > 0 && (
-                  <span
-                    title={`De ${resumoFichas.enviadas} ficha(s) enviada(s), ${resumoFichas.assinadas} assinada(s)`}
-                    className={
-                      "rounded-full px-1.5 py-px text-[10px] font-bold tracking-normal normal-case " +
-                      (resumoFichas.assinadas < resumoFichas.enviadas
-                        ? "bg-status-warning-bg text-status-warning"
-                        : "bg-status-success-bg text-status-success")
-                    }
-                  >
-                    {resumoFichas.assinadas}/{resumoFichas.enviadas}
+              <th className="px-2 py-1 align-top text-right">
+                <div className="flex flex-nowrap items-center justify-end gap-x-2 text-[8px] leading-tight font-bold tracking-normal normal-case">
+                  <span className="whitespace-nowrap text-status-danger" title="Colaboradores com EPI vencido">
+                    Vencidos {totalVencidos}
                   </span>
-                )}
+                  <span className="whitespace-nowrap text-status-success" title="Colaboradores com EPI em dia">
+                    Ativos {totalAtivos}
+                  </span>
+                  <span
+                    className="whitespace-nowrap text-status-warning"
+                    title={`${aguardandoAssinatura} de ${resumoFichas.enviadas} ficha(s) enviada(s) ainda sem assinatura`}
+                  >
+                    Aguard. assin. {aguardandoAssinatura}
+                  </span>
+                  <span className="whitespace-nowrap text-orange-700" title="Colaboradores com EPI vencendo em breve">
+                    EPI pendente {totalPendente}
+                  </span>
+                </div>
               </th>
             </tr>
           </thead>
