@@ -8,6 +8,7 @@ import { iniciais } from "@/lib/format";
 import type { ColaboradorEpi } from "@/lib/sst/epi";
 import type { DocumentoFicha, FichaResumo } from "@/lib/sst/fichas";
 import { DocumentoFichaEpi } from "./DocumentoFichaEpi";
+import { EditarFichaModal } from "./EditarFichaModal";
 import { RegistrarEntregaModal } from "./RegistrarEntregaModal";
 
 /** "DD/MM/AAAA" anterior a hoje; sem data de troca nunca vence. */
@@ -37,6 +38,7 @@ export function FichaEpiDrawer({
   const [erroCarga, setErroCarga] = useState<string | null>(null);
   const [registrando, setRegistrando] = useState(false);
   const [documento, setDocumento] = useState<DocumentoFicha | null>(null);
+  const [editandoFicha, setEditandoFicha] = useState<string | null>(null);
   const [copiada, setCopiada] = useState<string | null>(null);
 
   const carregar = useCallback(() => {
@@ -73,6 +75,16 @@ export function FichaEpiDrawer({
     }
     carregar();
     router.refresh();
+  }
+
+  async function dispensarTroca(epi: string, dataTroca: string) {
+    if (!colaborador) return;
+    await fetch("/api/sst/epi/trocas-dispensadas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ colaboradorId: colaborador.id, epi, dataTroca }),
+    });
+    carregar();
   }
 
   async function abrirDocumento(id: string) {
@@ -139,10 +151,21 @@ export function FichaEpiDrawer({
           {fichas !== null && vencidos.length > 0 && (
             <div className="rounded-md border border-status-danger-border bg-status-danger-bg px-3 py-2.5 text-status-danger">
               <p className="text-[12.5px] font-semibold">⚠ Troca necessária: {vencidos.length} EPI(s) com prazo de troca vencido</p>
-              <ul className="mt-1.5 list-disc pl-5 text-[12px]">
+              <ul className="mt-1.5 flex flex-col gap-0.5 text-[12px]">
                 {vencidos.map((t) => (
-                  <li key={t.epi}>
-                    {t.epi} <span className="text-[11px] opacity-80">· venceu em {t.dataTroca}</span>
+                  <li key={t.epi} className="flex items-center gap-1.5">
+                    <span className="flex-1">
+                      {t.epi} <span className="text-[11px] opacity-80">· venceu em {t.dataTroca}</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void dispensarTroca(t.epi, t.dataTroca)}
+                      title="Excluir este aviso (ex.: já foi trocado ou descartado)"
+                      aria-label={`Excluir aviso de troca vencida de ${t.epi}`}
+                      className="shrink-0 rounded px-1 text-status-danger/50 hover:bg-status-danger/10 hover:text-status-danger"
+                    >
+                      ✕
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -162,7 +185,19 @@ export function FichaEpiDrawer({
               <div className="mt-2 flex flex-col divide-y divide-hairline/70 rounded-md border border-hairline">
                 {fichas.map((f) => (
                   <div key={f.id} className="flex items-center gap-2 px-3 py-2">
-                    <span className="text-[12.5px] font-medium text-foreground">{f.dataEntrega || "—"}</span>
+                    {f.status === "assinada" ? (
+                      <span className="text-[12.5px] font-medium text-foreground">{f.dataEntrega || "—"}</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setEditandoFicha(f.id)}
+                        title="Editar os itens desta ficha"
+                        aria-label={`Editar a ficha de ${f.dataEntrega}`}
+                        className="text-[12.5px] font-medium text-brand-primary underline decoration-dotted underline-offset-2 hover:text-brand-primary-hover"
+                      >
+                        {f.dataEntrega || "—"}
+                      </button>
+                    )}
                     <span className="flex-1 truncate text-center text-[10.5px] font-light whitespace-nowrap text-foreground-muted/80">{f.conteudo}</span>
                     {f.status === "assinada" ? (
                       <button
@@ -234,6 +269,19 @@ export function FichaEpiDrawer({
         >
           <DocumentoFichaEpi documento={documento} anexoHref={`/api/sst/epi/fichas/${documento.id}/anexo`} />
         </Modal>
+      )}
+
+      {editandoFicha && (
+        <EditarFichaModal
+          fichaId={editandoFicha}
+          colaboradorNome={colaborador.nome}
+          onFechar={() => setEditandoFicha(null)}
+          onSalvo={() => {
+            setEditandoFicha(null);
+            carregar();
+            router.refresh();
+          }}
+        />
       )}
     </>
   );

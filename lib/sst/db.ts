@@ -107,6 +107,18 @@ const ESQUEMA_EXTRA = `
     created_at timestamptz NOT NULL DEFAULT now()
   );
 
+  -- RH dispensa o aviso de "troca vencida" de um EPI específico (ex.: já foi
+  -- vencido e descartado, sem precisar de uma entrega nova pra sumir do
+  -- aviso). Preso à data_troca exata: se uma entrega nova mudar a data, o
+  -- aviso volta a valer pra ela.
+  CREATE TABLE IF NOT EXISTS sst_epi_trocas_dispensadas (
+    colab_id integer NOT NULL REFERENCES colaboradores(id),
+    epi text NOT NULL,
+    data_troca text NOT NULL,
+    dispensado_em timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (colab_id, epi, data_troca)
+  );
+
   CREATE TABLE IF NOT EXISTS sst_fardamento_entregas (
     id text PRIMARY KEY,
     colab_id integer NOT NULL REFERENCES colaboradores(id),

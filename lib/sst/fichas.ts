@@ -284,6 +284,81 @@ export async function criarFicha(nova: NovaFicha, responsavel: string, origem: s
   };
 }
 
+export interface ItensParaEditar {
+  itens: { epi: string; qtd: number; ca: string; dataEntrega: string; dataTroca: string | null }[];
+  fardamento: { tipo: string; qtd: number; dataEntrega: string }[];
+}
+
+/**
+ * RH edita os itens de uma ficha AINDA AGUARDANDO assinatura — clicando na
+ * data do histórico. Depois de assinada não dá mais (o comprovante já
+ * referencia os itens de então). Substitui tudo (mesmo padrão de "editar
+ * lista inteira" usado na Matriz de EPI/Exames), mantendo o mesmo ficha_id
+ * e o link de assinatura já enviado.
+ */
+export async function atualizarFicha(fichaId: string, dados: ItensParaEditar): Promise<void> {
+  const [ficha] = await sstQuery<{ colab_id: number; status: string }>(
+    "SELECT colab_id, status FROM sst_fichas_epi WHERE id = $1",
+    [fichaId],
+  );
+  if (!ficha) throw new Error("Ficha não encontrada.");
+  if (ficha.status === "assinada") throw new Error("Esta ficha já foi assinada e não pode mais ser editada.");
+  if (dados.itens.length + dados.fardamento.length === 0) throw new Error("Selecione ao menos um EPI ou fardamento.");
+
+  const colaborador = await buscarColaborador(ficha.colab_id);
+  if (!colaborador) throw new Error("Colaborador não encontrado no Quadro.");
+  const [precos, precosFardamento] = await Promise.all([obterPrecosEpi(), obterPrecosFardamento()]);
+
+  const novosIds: string[] = [];
+  await sstTransacao(async (q) => {
+    await q("DELETE FROM sst_entregas_epi WHERE ficha_id = $1", [fichaId]);
+    await q("DELETE FROM sst_fardamento_entregas WHERE ficha_id = $1", [fichaId]);
+    for (const item of dados.itens) {
+      const id = randomUUID();
+      novosIds.push(id);
+      await q(
+        `INSERT INTO sst_entregas_epi (id, colab_id, cpf, epi, qtd, ca, valor_unit, data_entrega, data_troca, responsavel, ficha_id, ts)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+        [
+          id,
+          colaborador.id,
+          colaborador.cpf ?? "",
+          item.epi,
+          item.qtd,
+          item.ca,
+          precos.get(item.epi) ?? 0,
+          isoParaBr(item.dataEntrega),
+          item.dataTroca ? isoParaBr(item.dataTroca) : "",
+          "edicao",
+          fichaId,
+          new Date().toISOString(),
+        ],
+      );
+    }
+    for (const item of dados.fardamento) {
+      const id = randomUUID();
+      novosIds.push(id);
+      await q(
+        `INSERT INTO sst_fardamento_entregas (id, colab_id, cpf, tipo, qtd, valor_unit, data_entrega, responsavel, ficha_id, ts)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        [
+          id,
+          colaborador.id,
+          colaborador.cpf ?? "",
+          item.tipo,
+          item.qtd,
+          precosFardamento.get(item.tipo) ?? 0,
+          isoParaBr(item.dataEntrega),
+          "edicao",
+          fichaId,
+          new Date().toISOString(),
+        ],
+      );
+    }
+    await q("UPDATE sst_fichas_epi SET entrega_ids = $2 WHERE id = $1", [fichaId, novosIds]);
+  });
+}
+
 /** Histórico do colaborador (uma linha por ficha) + quais EPIs já têm entrega registrada. */
 export async function listarFichasDoColaborador(colaboradorId: number, origem: string) {
   const fichas = await sstQuery<LinhaFicha>(
@@ -294,10 +369,17 @@ export async function listarFichasDoColaborador(colaboradorId: number, origem: s
   const itens = await itensDasFichas(fichas.map((f) => f.id));
   // Entrega mais recente de cada EPI (assinada ou aguardando) — uma nova entrega
   // do mesmo EPI substitui a anterior: só a troca prevista dela vale.
-  const entregues = await sstQuery<{ epi: string; data_troca: string }>(
-    "SELECT DISTINCT ON (epi) epi, data_troca FROM sst_entregas_epi WHERE colab_id = $1 ORDER BY epi, to_date(NULLIF(data_entrega, ''), 'DD/MM/YYYY') DESC NULLS LAST, created_at DESC",
-    [colaboradorId],
-  );
+  const [entregues, dispensadas] = await Promise.all([
+    sstQuery<{ epi: string; data_troca: string }>(
+      "SELECT DISTINCT ON (epi) epi, data_troca FROM sst_entregas_epi WHERE colab_id = $1 ORDER BY epi, to_date(NULLIF(data_entrega, ''), 'DD/MM/YYYY') DESC NULLS LAST, created_at DESC",
+      [colaboradorId],
+    ),
+    sstQuery<{ epi: string; data_troca: string }>(
+      "SELECT epi, data_troca FROM sst_epi_trocas_dispensadas WHERE colab_id = $1",
+      [colaboradorId],
+    ),
+  ]);
+  const chaveDispensada = new Set(dispensadas.map((d) => `${d.epi}::${d.data_troca}`));
 
   const resumo: FichaResumo[] = fichas.map((f) => ({
     id: f.id,
@@ -311,8 +393,19 @@ export async function listarFichasDoColaborador(colaboradorId: number, origem: s
   return {
     fichas: resumo,
     episEntregues: entregues.map((e) => e.epi),
-    trocas: entregues.map((e) => ({ epi: e.epi, dataTroca: e.data_troca })),
+    trocas: entregues
+      .filter((e) => !chaveDispensada.has(`${e.epi}::${e.data_troca}`))
+      .map((e) => ({ epi: e.epi, dataTroca: e.data_troca })),
   };
+}
+
+/** RH dispensa o aviso de "troca vencida" de um EPI — presa à data exata, uma entrega nova reabre o aviso. */
+export async function dispensarTrocaVencida(colaboradorId: number, epi: string, dataTroca: string): Promise<void> {
+  await sstQuery(
+    `INSERT INTO sst_epi_trocas_dispensadas (colab_id, epi, data_troca) VALUES ($1, $2, $3)
+       ON CONFLICT (colab_id, epi, data_troca) DO NOTHING`,
+    [colaboradorId, epi, dataTroca],
+  );
 }
 
 async function montarDocumento(f: LinhaFicha): Promise<DocumentoFicha> {

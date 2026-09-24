@@ -21,6 +21,9 @@ interface Selecao {
   dataTroca: string;
 }
 
+/** Linha extra do mesmo EPI (ex.: entregou parte num dia, o resto noutro) — sem "marcado", já implícita. */
+type LinhaExtra = Omit<Selecao, "marcado">;
+
 export function RegistrarEntregaModal({
   colaborador,
   catalogo,
@@ -43,6 +46,7 @@ export function RegistrarEntregaModal({
   const [selecao, setSelecao] = useState<Record<string, Selecao>>(() =>
     Object.fromEntries(opcoes.map((epi) => [epi, { marcado: false, qtd: "1", ca: caPadrao(epi), editandoCa: false, dataEntrega: hojeIso(), dataTroca: "" }])),
   );
+  const [extras, setExtras] = useState<Record<string, LinhaExtra[]>>({});
   const [fardamento, setFardamento] = useState<Record<string, { marcado: boolean; qtd: string; dataEntrega: string }>>(
     () => Object.fromEntries(itensFardamento.map((t) => [t, { marcado: false, qtd: "1", dataEntrega: hojeIso() }])),
   );
@@ -81,7 +85,8 @@ export function RegistrarEntregaModal({
   const marcados = opcoes.filter((epi) => selecao[epi].marcado);
   const todosMarcados = marcados.length === opcoes.length;
   const fardamentoMarcado = itensFardamento.filter((t) => fardamento[t].marcado);
-  const totalItens = marcados.length + fardamentoMarcado.length;
+  const totalExtras = marcados.reduce((acc, epi) => acc + (extras[epi]?.length ?? 0), 0);
+  const totalItens = marcados.length + totalExtras + fardamentoMarcado.length;
 
   function alterarFardamento(tipo: string, parcial: Partial<{ marcado: boolean; qtd: string; dataEntrega: string }>) {
     setFardamento((s) => ({ ...s, [tipo]: { ...s[tipo], ...parcial } }));
@@ -89,6 +94,22 @@ export function RegistrarEntregaModal({
 
   function alterar(epi: string, parcial: Partial<Selecao>) {
     setSelecao((s) => ({ ...s, [epi]: { ...s[epi], ...parcial } }));
+  }
+
+  /** "+" ao lado da linha: entregou o mesmo EPI em outro dia (ou com outro C.A.) além da linha principal. */
+  function adicionarExtra(epi: string) {
+    setExtras((s) => ({
+      ...s,
+      [epi]: [...(s[epi] ?? []), { qtd: "1", ca: caPadrao(epi), editandoCa: false, dataEntrega: hojeIso(), dataTroca: "" }],
+    }));
+  }
+
+  function alterarExtra(epi: string, idx: number, parcial: Partial<LinhaExtra>) {
+    setExtras((s) => ({ ...s, [epi]: (s[epi] ?? []).map((l, i) => (i === idx ? { ...l, ...parcial } : l)) }));
+  }
+
+  function removerExtra(epi: string, idx: number) {
+    setExtras((s) => ({ ...s, [epi]: (s[epi] ?? []).filter((_, i) => i !== idx) }));
   }
 
   async function enviar() {
@@ -100,13 +121,24 @@ export function RegistrarEntregaModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           colaboradorId: colaborador.id,
-          itens: marcados.map((epi) => ({
-            epi,
-            qtd: Math.max(1, Number(selecao[epi].qtd) || 1),
-            ca: selecao[epi].ca,
-            dataEntrega: selecao[epi].dataEntrega,
-            dataTroca: selecao[epi].dataTroca || null,
-          })),
+          itens: [
+            ...marcados.map((epi) => ({
+              epi,
+              qtd: Math.max(1, Number(selecao[epi].qtd) || 1),
+              ca: selecao[epi].ca,
+              dataEntrega: selecao[epi].dataEntrega,
+              dataTroca: selecao[epi].dataTroca || null,
+            })),
+            ...marcados.flatMap((epi) =>
+              (extras[epi] ?? []).map((l) => ({
+                epi,
+                qtd: Math.max(1, Number(l.qtd) || 1),
+                ca: l.ca,
+                dataEntrega: l.dataEntrega,
+                dataTroca: l.dataTroca || null,
+              })),
+            ),
+          ],
           fardamento: fardamentoMarcado.map((tipo) => ({
             tipo,
             qtd: Math.max(1, Number(fardamento[tipo].qtd) || 1),
@@ -154,77 +186,116 @@ export function RegistrarEntregaModal({
     `Olá, ${colaborador.nome.split(" ")[0]}!\n\nSegue o link para conferir e assinar a sua ficha de entrega de EPI:\n${link ?? ""}\n\nPara assinar, entre com o seu e-mail profissional.\n\nRH · MSB`,
   );
 
+  /** Campos de Quant./C.A./Entrega/Troca — usado na linha principal e em cada linha extra do mesmo EPI. */
+  function camposLinha(
+    epi: string,
+    valores: LinhaExtra,
+    onChange: (parcial: Partial<LinhaExtra>) => void,
+    caIdPrefix: string,
+  ) {
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="flex flex-col text-[9.5px] text-foreground-muted">
+          Quant.
+          <input
+            type="number"
+            min={1}
+            value={valores.qtd}
+            onChange={(e) => onChange({ qtd: e.target.value })}
+            className={INPUT + " w-14"}
+          />
+        </label>
+        <div className="flex flex-col text-[9.5px] text-foreground-muted">
+          C.A.
+          {valores.editandoCa ? (
+            <input
+              autoFocus
+              value={valores.ca}
+              onChange={(e) => onChange({ ca: e.target.value })}
+              onBlur={() => onChange({ editandoCa: false })}
+              placeholder="Nº"
+              className={INPUT + " w-20"}
+            />
+          ) : (
+            <span className="flex h-[26px] w-20 items-center justify-between rounded border border-transparent px-1 text-[11.5px] text-foreground">
+              {valores.ca || "—"}
+              <button
+                type="button"
+                onClick={() => onChange({ editandoCa: true })}
+                title="Editar C.A."
+                aria-label={`Editar C.A. de ${epi} (${caIdPrefix})`}
+                className="rounded px-0.5 text-foreground-muted hover:text-brand-primary"
+              >
+                ✏️
+              </button>
+            </span>
+          )}
+        </div>
+        <label className="flex flex-col text-[9.5px] text-foreground-muted">
+          Entrega
+          <input
+            type="date"
+            value={valores.dataEntrega}
+            onChange={(e) => onChange({ dataEntrega: e.target.value })}
+            className={INPUT}
+          />
+        </label>
+        <label className="flex flex-col text-[9.5px] text-foreground-muted">
+          Troca prevista
+          <input
+            type="date"
+            value={valores.dataTroca}
+            onChange={(e) => onChange({ dataTroca: e.target.value })}
+            className={INPUT}
+          />
+        </label>
+      </div>
+    );
+  }
+
   function linhaEpi(epi: string) {
     const s = selecao[epi];
+    const linhasExtras = extras[epi] ?? [];
     return (
-      <div key={epi} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-2.5 py-2">
-        <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-[12.5px] text-foreground">
-          <input
-            type="checkbox"
-            checked={s.marcado}
-            onChange={(e) => alterar(epi, { marcado: e.target.checked })}
-            className="accent-brand-primary"
-          />
-          <span className="truncate">{epi}</span>
-        </label>
-        {s.marcado && (
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="flex flex-col text-[9.5px] text-foreground-muted">
-              Quant.
-              <input
-                type="number"
-                min={1}
-                value={s.qtd}
-                onChange={(e) => alterar(epi, { qtd: e.target.value })}
-                className={INPUT + " w-14"}
-              />
-            </label>
-            <div className="flex flex-col text-[9.5px] text-foreground-muted">
-              C.A.
-              {s.editandoCa ? (
-                <input
-                  autoFocus
-                  value={s.ca}
-                  onChange={(e) => alterar(epi, { ca: e.target.value })}
-                  onBlur={() => alterar(epi, { editandoCa: false })}
-                  placeholder="Nº"
-                  className={INPUT + " w-20"}
-                />
-              ) : (
-                <span className="flex h-[26px] w-20 items-center justify-between rounded border border-transparent px-1 text-[11.5px] text-foreground">
-                  {s.ca || "—"}
-                  <button
-                    type="button"
-                    onClick={() => alterar(epi, { editandoCa: true })}
-                    title="Editar C.A."
-                    aria-label={`Editar C.A. de ${epi}`}
-                    className="rounded px-0.5 text-foreground-muted hover:text-brand-primary"
-                  >
-                    ✏️
-                  </button>
-                </span>
-              )}
+      <div key={epi} className="flex flex-col gap-1.5 px-2.5 py-2">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-[12.5px] text-foreground">
+            <input
+              type="checkbox"
+              checked={s.marcado}
+              onChange={(e) => alterar(epi, { marcado: e.target.checked })}
+              className="accent-brand-primary"
+            />
+            <span className="truncate">{epi}</span>
+          </label>
+          {s.marcado && camposLinha(epi, s, (parcial) => alterar(epi, parcial), "principal")}
+          {s.marcado && (
+            <button
+              type="button"
+              onClick={() => adicionarExtra(epi)}
+              title="Registrar outra entrega deste EPI com quantidade/data diferente"
+              aria-label={`Adicionar outra entrega de ${epi}`}
+              className="shrink-0 rounded-full border border-hairline px-1.5 text-[13px] font-semibold text-brand-primary hover:bg-brand-primary-050"
+            >
+              +
+            </button>
+          )}
+        </div>
+        {s.marcado &&
+          linhasExtras.map((linha, idx) => (
+            <div key={idx} className="ml-6 flex flex-wrap items-center gap-x-2 gap-y-1.5 border-l border-hairline pl-3">
+              {camposLinha(epi, linha, (parcial) => alterarExtra(epi, idx, parcial), `extra ${idx + 1}`)}
+              <button
+                type="button"
+                onClick={() => removerExtra(epi, idx)}
+                title="Remover esta entrega extra"
+                aria-label={`Remover entrega extra ${idx + 1} de ${epi}`}
+                className="rounded px-1 text-[11px] text-foreground-muted hover:bg-status-danger-bg hover:text-status-danger"
+              >
+                ✕
+              </button>
             </div>
-            <label className="flex flex-col text-[9.5px] text-foreground-muted">
-              Entrega
-              <input
-                type="date"
-                value={s.dataEntrega}
-                onChange={(e) => alterar(epi, { dataEntrega: e.target.value })}
-                className={INPUT}
-              />
-            </label>
-            <label className="flex flex-col text-[9.5px] text-foreground-muted">
-              Troca prevista
-              <input
-                type="date"
-                value={s.dataTroca}
-                onChange={(e) => alterar(epi, { dataTroca: e.target.value })}
-                className={INPUT}
-              />
-            </label>
-          </div>
-        )}
+          ))}
       </div>
     );
   }
