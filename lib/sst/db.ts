@@ -119,6 +119,17 @@ const ESQUEMA_EXTRA = `
     PRIMARY KEY (colab_id, epi, data_troca)
   );
 
+  -- RH dispensa o aviso de "divergência" (EPI obrigatório sem NENHUMA entrega
+  -- registrada) — ex.: o EPI não se aplica de fato a esse colaborador, mesmo
+  -- listado na matriz da função. Some da divergência até a RH remover a
+  -- dispensa, ou naturalmente se uma entrega for registrada de verdade.
+  CREATE TABLE IF NOT EXISTS sst_epi_divergencias_dispensadas (
+    colab_id integer NOT NULL REFERENCES colaboradores(id),
+    epi text NOT NULL,
+    dispensado_em timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (colab_id, epi)
+  );
+
   CREATE TABLE IF NOT EXISTS sst_fardamento_entregas (
     id text PRIMARY KEY,
     colab_id integer NOT NULL REFERENCES colaboradores(id),

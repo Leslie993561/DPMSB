@@ -87,6 +87,16 @@ export function FichaEpiDrawer({
     carregar();
   }
 
+  async function dispensarDivergencia(epi: string) {
+    if (!colaborador) return;
+    await fetch("/api/sst/epi/divergencias-dispensadas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ colaboradorId: colaborador.id, epi }),
+    });
+    carregar();
+  }
+
   async function abrirDocumento(id: string) {
     const r = await fetch(`/api/sst/epi/fichas/${id}`);
     const d = await r.json();
@@ -136,9 +146,20 @@ export function FichaEpiDrawer({
                 <p className="text-[12.5px] font-semibold">
                   ⚠ Divergência: {semEntrega.length} EPI(s) obrigatório(s) sem entrega registrada
                 </p>
-                <ul className="mt-1.5 list-disc pl-5 text-[12px]">
+                <ul className="mt-1.5 flex flex-col gap-0.5 text-[12px]">
                   {semEntrega.map((epi) => (
-                    <li key={epi}>{epi}</li>
+                    <li key={epi} className="flex items-center gap-1.5">
+                      <span className="flex-1">{epi}</span>
+                      <button
+                        type="button"
+                        onClick={() => void dispensarDivergencia(epi)}
+                        title="Excluir esta divergência (ex.: não se aplica de fato a este colaborador)"
+                        aria-label={`Excluir divergência de ${epi}`}
+                        className="shrink-0 rounded px-1 text-status-danger/50 hover:bg-status-danger/10 hover:text-status-danger"
+                      >
+                        ✕
+                      </button>
+                    </li>
                   ))}
                 </ul>
               </div>

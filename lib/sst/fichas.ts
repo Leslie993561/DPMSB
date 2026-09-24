@@ -370,7 +370,7 @@ export async function listarFichasDoColaborador(colaboradorId: number, origem: s
   // Entrega mais recente de cada EPI — só conta CONFIRMADA (ficha assinada, PDF
   // do modelo antigo, ou sem ficha/registro legado): enquanto a ficha só está
   // aguardando assinatura, o colaborador ainda não confirmou o recebimento.
-  const [entregues, dispensadas] = await Promise.all([
+  const [entregues, dispensadasTroca, divergenciasDispensadas] = await Promise.all([
     sstQuery<{ epi: string; data_troca: string }>(
       `SELECT DISTINCT ON (e.epi) e.epi, e.data_troca
          FROM sst_entregas_epi e
@@ -383,8 +383,9 @@ export async function listarFichasDoColaborador(colaboradorId: number, origem: s
       "SELECT epi, data_troca FROM sst_epi_trocas_dispensadas WHERE colab_id = $1",
       [colaboradorId],
     ),
+    sstQuery<{ epi: string }>("SELECT epi FROM sst_epi_divergencias_dispensadas WHERE colab_id = $1", [colaboradorId]),
   ]);
-  const chaveDispensada = new Set(dispensadas.map((d) => `${d.epi}::${d.data_troca}`));
+  const chaveDispensada = new Set(dispensadasTroca.map((d) => `${d.epi}::${d.data_troca}`));
 
   const resumo: FichaResumo[] = fichas.map((f) => ({
     id: f.id,
@@ -397,11 +398,22 @@ export async function listarFichasDoColaborador(colaboradorId: number, origem: s
   }));
   return {
     fichas: resumo,
-    episEntregues: entregues.map((e) => e.epi),
+    // Divergência dispensada entra aqui pra sumir da lista de "sem entrega" no
+    // drawer, junto com o que de fato foi entregue.
+    episEntregues: [...entregues.map((e) => e.epi), ...divergenciasDispensadas.map((d) => d.epi)],
     trocas: entregues
       .filter((e) => !chaveDispensada.has(`${e.epi}::${e.data_troca}`))
       .map((e) => ({ epi: e.epi, dataTroca: e.data_troca })),
   };
+}
+
+/** RH dispensa a divergência de um EPI obrigatório sem entrega (ex.: não se aplica de fato a este colaborador). */
+export async function dispensarDivergenciaEpi(colaboradorId: number, epi: string): Promise<void> {
+  await sstQuery(
+    `INSERT INTO sst_epi_divergencias_dispensadas (colab_id, epi) VALUES ($1, $2)
+       ON CONFLICT (colab_id, epi) DO NOTHING`,
+    [colaboradorId, epi],
+  );
 }
 
 /** RH dispensa o aviso de "troca vencida" de um EPI — presa à data exata, uma entrega nova reabre o aviso. */
