@@ -374,7 +374,8 @@ export function PlanejamentoDeFeriasTab({
                 <tr className="border-b border-hairline bg-surface-page text-left text-[9.5px] font-semibold tracking-wide text-foreground-muted uppercase">
                   <th className="px-3 py-2">Colaborador / Setor</th>
                   <th className="px-3 py-2">Admissão</th>
-                  <th className="px-3 py-2">Aquisitivo / Concessivo</th>
+                  <th className="px-3 py-2">Aquisitivo</th>
+                  <th className="px-3 py-2">Concessivo</th>
                   <th className="px-3 py-2">Início → Retorno</th>
                   <th className="px-3 py-2 text-right">Dias</th>
                   <th className="px-3 py-2">Abono</th>
@@ -425,7 +426,8 @@ export function PlanejamentoDeFeriasTab({
                     <td className="px-3 py-2 text-foreground-muted">{formatarDataBr(item.colaboradorAdmissao)}</td>
                     <td className="px-3 py-2 text-[10.5px] text-foreground-muted">
                       {formatarDataBr(item.aquisitivoInicio)} – {formatarDataBr(item.aquisitivoFim)}
-                      <br />
+                    </td>
+                    <td className="px-3 py-2 text-[10.5px] text-foreground-muted">
                       {formatarDataBr(item.concessivoInicio)} – {formatarDataBr(item.concessivoFim)}
                     </td>
                     <td className="px-3 py-2 text-[10.5px] text-foreground-muted">
