@@ -381,26 +381,29 @@ function mesEAnoBr(dataBr: string): { mes: number; ano: number } | null {
 }
 
 /**
- * Custos de EPI: quanto foi ENTREGUE de fato (sst_entregas_epi), não a
- * demanda teórica da matriz. Trimestres do ano corrente; a planilha por EPI
- * usa o preço vigente do catálogo (sst_epi_precos) quando existe, senão a
- * média do valor praticado nas entregas daquele EPI.
+ * Custos de EPI: quanto foi ENTREGUE de fato (sst_entregas_epi) NO ANO
+ * CORRENTE — entrega de anos anteriores não entra nem nos trimestres nem na
+ * planilha por EPI, pra tudo bater com a mesma base. "Valor total" é o que
+ * foi de fato pago (soma do valor_unit gravado em cada entrega, histórico —
+ * não muda se o preço do catálogo for editado depois); "Valor unitário" é a
+ * média paga quando já teve entrega, ou o preço vigente do catálogo como
+ * estimativa quando o EPI ainda não foi entregue este ano.
  */
 export async function obterCustosEpi(): Promise<DashboardCustosEpi> {
   const anoAtual = new Date().getFullYear();
 
-  const [entregas, precoPorEpi, caExtra] = await Promise.all([
+  const [todasEntregas, precoPorEpi, caExtra] = await Promise.all([
     sstQuery<LinhaEntregaEpi>(
       "SELECT epi, qtd, valor_unit::float8 AS valor_unit, data_entrega FROM sst_entregas_epi",
     ),
     obterPrecosEpi(),
     obterCaExtraEpi(),
   ]);
+  const entregas = todasEntregas.filter((e) => mesEAnoBr(e.data_entrega)?.ano === anoAtual);
 
   const trimestres: CustoTrimestre[] = ROTULO_TRIMESTRE.map((label) => ({ label, quantidade: 0, valor: 0 }));
   for (const e of entregas) {
-    const data = mesEAnoBr(e.data_entrega);
-    if (!data || data.ano !== anoAtual) continue;
+    const data = mesEAnoBr(e.data_entrega)!;
     const q = Math.floor((data.mes - 1) / 3);
     if (q < 0 || q > 3) continue;
     trimestres[q].quantidade += e.qtd;
@@ -419,10 +422,10 @@ export async function obterCustosEpi(): Promise<DashboardCustosEpi> {
   const linhas: LinhaCustoEpi[] = [...nomesEpi]
     .map((epi) => {
       const quantidade = somaQtdPorEpi.get(epi) ?? 0;
-      const somaValor = somaValorPorEpi.get(epi) ?? 0;
-      const valorUnitario = precoPorEpi.get(epi) ?? (quantidade > 0 ? somaValor / quantidade : 0);
+      const valorTotal = somaValorPorEpi.get(epi) ?? 0;
+      const valorUnitario = quantidade > 0 ? valorTotal / quantidade : (precoPorEpi.get(epi) ?? 0);
       const ca = EPI_CATALOGO.find((c) => c.equip === epi)?.ca ?? caExtra.get(epi) ?? "";
-      return { epi, ca, quantidade, valorUnitario, valorTotal: quantidade * valorUnitario };
+      return { epi, ca, quantidade, valorUnitario, valorTotal };
     })
     .sort(
       (a, b) =>
@@ -471,21 +474,36 @@ export interface LinhaCustoFardamento {
   valorTotal: number;
 }
 
-/** Fardamento entregue (sst_fardamento_entregas) × preço vigente, no mesmo formato da planilha de EPI. */
+/**
+ * Fardamento entregue (sst_fardamento_entregas) NO ANO CORRENTE, mesmo
+ * critério de obterCustosEpi: "valor total" é o histórico realmente pago,
+ * "valor unitário" é a média paga (ou o preço vigente, se nunca entregue
+ * este ano).
+ */
 export async function obterCustosFardamento(): Promise<LinhaCustoFardamento[]> {
-  const [entregas, precoPorTipo] = await Promise.all([
-    sstQuery<{ tipo: string; qtd: number }>("SELECT tipo, qtd FROM sst_fardamento_entregas"),
+  const anoAtual = new Date().getFullYear();
+  const [todasEntregas, precoPorTipo] = await Promise.all([
+    sstQuery<{ tipo: string; qtd: number; valor_unit: number; data_entrega: string }>(
+      "SELECT tipo, qtd, valor_unit::float8 AS valor_unit, data_entrega FROM sst_fardamento_entregas",
+    ),
     obterPrecosFardamento(),
   ]);
+  const entregas = todasEntregas.filter((e) => mesEAnoBr(e.data_entrega)?.ano === anoAtual);
+
   const qtdPorTipo = new Map<string, number>();
-  for (const e of entregas) qtdPorTipo.set(e.tipo, (qtdPorTipo.get(e.tipo) ?? 0) + e.qtd);
+  const valorPorTipo = new Map<string, number>();
+  for (const e of entregas) {
+    qtdPorTipo.set(e.tipo, (qtdPorTipo.get(e.tipo) ?? 0) + e.qtd);
+    valorPorTipo.set(e.tipo, (valorPorTipo.get(e.tipo) ?? 0) + e.qtd * e.valor_unit);
+  }
 
   const ordem = new Map(FARDAMENTO_CATALOGO.map((c, i) => [c.tipo, i]));
   return [...new Set([...precoPorTipo.keys(), ...qtdPorTipo.keys()])]
     .map((tipo) => {
       const quantidade = qtdPorTipo.get(tipo) ?? 0;
-      const valorUnitario = precoPorTipo.get(tipo) ?? 0;
-      return { tipo, quantidade, valorUnitario, valorTotal: quantidade * valorUnitario };
+      const valorTotal = valorPorTipo.get(tipo) ?? 0;
+      const valorUnitario = quantidade > 0 ? valorTotal / quantidade : (precoPorTipo.get(tipo) ?? 0);
+      return { tipo, quantidade, valorUnitario, valorTotal };
     })
     .sort((a, b) => (ordem.get(a.tipo) ?? 99) - (ordem.get(b.tipo) ?? 99) || a.tipo.localeCompare(b.tipo, "pt-BR"));
 }
