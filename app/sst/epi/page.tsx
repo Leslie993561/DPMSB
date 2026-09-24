@@ -1,6 +1,13 @@
 import { redirect } from "next/navigation";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
-import { EPI_CATALOGO, listarColaboradoresParaEpi, obterMatrizEpi, obterCustosEpi, obterCustosFardamento } from "@/lib/sst/epi";
+import {
+  EPI_CATALOGO,
+  listarColaboradoresParaEpi,
+  obterCaExtraEpi,
+  obterMatrizEpi,
+  obterCustosEpi,
+  obterCustosFardamento,
+} from "@/lib/sst/epi";
 import { obterResumoFichas } from "@/lib/sst/fichas";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { EpiPageClient, type AbaEpi } from "@/components/modules/sst/EpiPageClient";
@@ -26,12 +33,13 @@ export default async function SstEpiPage({
   const abaParam = (await searchParams).aba;
   const aba: AbaEpi = ABAS_VALIDAS.includes(abaParam as AbaEpi) ? (abaParam as AbaEpi) : "colaboradores";
 
-  const [colaboradores, matriz, custos, fardamento, resumoFichas] = await Promise.all([
+  const [colaboradores, matriz, custos, fardamento, resumoFichas, caExtra] = await Promise.all([
     listarColaboradoresParaEpi(),
     obterMatrizEpi(),
     obterCustosEpi(),
     obterCustosFardamento(),
     obterResumoFichas(),
+    obterCaExtraEpi(),
   ]);
 
   return (
@@ -45,6 +53,7 @@ export default async function SstEpiPage({
         custos={custos}
         fardamento={fardamento}
         resumoFichas={resumoFichas}
+        caExtra={Object.fromEntries(caExtra)}
       />
     </div>
   );

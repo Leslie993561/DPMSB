@@ -36,6 +36,7 @@ export function EpiPageClient({
   custos,
   fardamento,
   resumoFichas,
+  caExtra,
 }: {
   aba: AbaEpi;
   colaboradores: ColaboradorEpi[];
@@ -45,6 +46,8 @@ export function EpiPageClient({
   custos: { trimestres: CustoTrimestre[]; linhas: LinhaCustoEpi[] };
   fardamento: LinhaCustoFardamento[];
   resumoFichas: { enviadas: number; assinadas: number };
+  /** CA que o RH já informou pra EPIs extras (o catálogo estático tem CA fixo pros seus itens). */
+  caExtra: Record<string, string>;
 }) {
   const router = useRouter();
   // Busca fica aqui, fora da aba: continua valendo ao trocar de aba e voltar.
@@ -102,7 +105,7 @@ export function EpiPageClient({
           itensFardamento={fardamento.map((f) => f.tipo)}
         />
       )}
-      {aba === "matriz" && <MatrizTab matriz={matriz} catalogoEpi={catalogoEpi} />}
+      {aba === "matriz" && <MatrizTab matriz={matriz} catalogoEpi={catalogoEpi} caExtra={caExtra} />}
       {aba === "custos" && <CustosTab custos={custos} fardamento={fardamento} />}
     </div>
   );
@@ -258,7 +261,15 @@ function ColaboradoresTab({
   );
 }
 
-function MatrizTab({ matriz, catalogoEpi }: { matriz: (FuncaoEpi & { fixos: number })[]; catalogoEpi: string[] }) {
+function MatrizTab({
+  matriz,
+  catalogoEpi,
+  caExtra,
+}: {
+  matriz: (FuncaoEpi & { fixos: number })[];
+  catalogoEpi: string[];
+  caExtra: Record<string, string>;
+}) {
   const router = useRouter();
   const [editando, setEditando] = useState<(FuncaoEpi & { fixos: number }) | null>(null);
 
@@ -306,11 +317,9 @@ function MatrizTab({ matriz, catalogoEpi }: { matriz: (FuncaoEpi & { fixos: numb
         <EditarMatrizModal
           funcaoEpi={editando}
           catalogoEpi={catalogoEpi}
+          caExtra={caExtra}
           onFechar={() => setEditando(null)}
-          onSalvo={() => {
-            setEditando(null);
-            router.refresh();
-          }}
+          onMudou={() => router.refresh()}
         />
       )}
     </div>
@@ -320,46 +329,86 @@ function MatrizTab({ matriz, catalogoEpi }: { matriz: (FuncaoEpi & { fixos: numb
 function EditarMatrizModal({
   funcaoEpi,
   catalogoEpi,
+  caExtra,
   onFechar,
-  onSalvo,
+  onMudou,
 }: {
   funcaoEpi: FuncaoEpi & { fixos: number };
   catalogoEpi: string[];
+  caExtra: Record<string, string>;
   onFechar: () => void;
-  onSalvo: () => void;
+  /** Chamado depois de cada adição/remoção já persistida, pra atualizar a lista por trás (sem fechar o modal). */
+  onMudou: () => void;
 }) {
   const fixos = funcaoEpi.epis.slice(0, funcaoEpi.fixos);
   const [extras, setExtras] = useState<string[]>(funcaoEpi.epis.slice(funcaoEpi.fixos));
   const [novoEpi, setNovoEpi] = useState("");
+  const [novoCa, setNovoCa] = useState("");
+  const [casLocais, setCasLocais] = useState<Record<string, string>>(caExtra);
+  const [casEmEdicao, setCasEmEdicao] = useState<Record<string, string>>({});
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
-  function adicionar() {
-    const nome = novoEpi.trim();
-    if (!nome || fixos.includes(nome) || extras.includes(nome)) {
-      setNovoEpi("");
-      return;
+  async function salvarCa(equip: string, ca: string) {
+    try {
+      await fetch("/api/sst/epi/ca", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ equip, ca }),
+      });
+      setCasLocais((c) => ({ ...c, [equip]: ca }));
+    } catch {
+      // CA é só um dado auxiliar do cadastro — se falhar, o EPI extra continua
+      // adicionado normalmente, a RH tenta preencher o CA de novo depois.
     }
-    setExtras((e) => [...e, nome]);
-    setNovoEpi("");
   }
 
-  async function salvar() {
+  /** Persiste a lista de extras na hora — sem depender de um botão "Salvar" separado no rodapé. */
+  async function persistirExtras(novaLista: string[]): Promise<boolean> {
     setSalvando(true);
     setErro(null);
     try {
       const r = await fetch("/api/sst/epi/matriz", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ funcao: funcaoEpi.funcao, epis: extras }),
+        body: JSON.stringify({ funcao: funcaoEpi.funcao, epis: novaLista }),
       });
       if (!r.ok) throw new Error((await r.json()).erro ?? "Falha ao salvar.");
-      onSalvo();
+      onMudou();
+      return true;
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Falha ao salvar.");
+      return false;
     } finally {
       setSalvando(false);
     }
+  }
+
+  async function adicionar() {
+    const nome = novoEpi.trim();
+    if (!nome || fixos.includes(nome) || extras.includes(nome)) {
+      setNovoEpi("");
+      setNovoCa("");
+      return;
+    }
+    const novaLista = [...extras, nome];
+    setExtras(novaLista);
+    setNovoEpi("");
+    setNovoCa("");
+    const ok = await persistirExtras(novaLista);
+    if (!ok) {
+      setExtras((e) => e.filter((x) => x !== nome));
+      return;
+    }
+    const ca = novoCa.trim();
+    if (ca) void salvarCa(nome, ca);
+  }
+
+  async function remover(epi: string) {
+    const novaLista = extras.filter((x) => x !== epi);
+    setExtras(novaLista);
+    const ok = await persistirExtras(novaLista);
+    if (!ok) setExtras((e) => [...e, epi]);
   }
 
   const sugestoes = catalogoEpi.filter((e) => !fixos.includes(e) && !extras.includes(e));
@@ -376,17 +425,9 @@ function EditarMatrizModal({
           <button
             type="button"
             onClick={onFechar}
-            className="rounded border border-hairline px-3 py-1.5 text-[12px] font-medium text-foreground hover:bg-surface-page"
+            className="rounded bg-brand-primary px-3 py-1.5 text-[12px] font-medium text-brand-white hover:bg-brand-primary-hover"
           >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            onClick={() => void salvar()}
-            disabled={salvando}
-            className="rounded bg-brand-primary px-3 py-1.5 text-[12px] font-medium text-brand-white hover:bg-brand-primary-hover disabled:opacity-50"
-          >
-            {salvando ? "Salvando..." : "Salvar"}
+            Fechar
           </button>
         </div>
       }
@@ -416,9 +457,10 @@ function EditarMatrizModal({
                 className="flex items-center gap-1 rounded-full border border-brand-primary/40 bg-brand-primary-050 px-2 py-0.5 text-[10.5px] text-brand-primary-800"
               >
                 {epi}
+                {casLocais[epi] && <span className="text-brand-primary-800/70">· CA {casLocais[epi]}</span>}
                 <button
                   type="button"
-                  onClick={() => setExtras((e) => e.filter((x) => x !== epi))}
+                  onClick={() => void remover(epi)}
                   aria-label={`Remover ${epi}`}
                   className="text-brand-primary-800 hover:text-status-danger"
                 >
@@ -427,6 +469,37 @@ function EditarMatrizModal({
               </span>
             ))}
           </div>
+          {extras.some((epi) => !casLocais[epi]) && (
+            <div className="mt-1.5 flex flex-col gap-1">
+              {extras
+                .filter((epi) => !casLocais[epi])
+                .map((epi) => (
+                  <div key={epi} className="flex items-center gap-1.5">
+                    <span className="min-w-0 flex-1 truncate text-[11px] text-foreground-muted">Sem CA: {epi}</span>
+                    <input
+                      value={casEmEdicao[epi] ?? ""}
+                      onChange={(e) => setCasEmEdicao((c) => ({ ...c, [epi]: e.target.value }))}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && casEmEdicao[epi]?.trim()) {
+                          e.preventDefault();
+                          void salvarCa(epi, casEmEdicao[epi].trim());
+                        }
+                      }}
+                      placeholder="CA"
+                      className="w-20 shrink-0 rounded border border-hairline bg-background px-1.5 py-1 text-[11px] text-foreground outline-none focus:border-brand-primary"
+                    />
+                    <button
+                      type="button"
+                      disabled={!casEmEdicao[epi]?.trim()}
+                      onClick={() => void salvarCa(epi, casEmEdicao[epi].trim())}
+                      className="shrink-0 rounded border border-hairline px-2 py-1 text-[10.5px] font-medium text-brand-primary-800 hover:bg-brand-primary-050 disabled:opacity-40"
+                    >
+                      Salvar
+                    </button>
+                  </div>
+                ))}
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-1.5">
@@ -436,12 +509,24 @@ function EditarMatrizModal({
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
-                adicionar();
+                void adicionar();
               }
             }}
             list="catalogo-epi-sugestoes"
             placeholder="Nome do EPI"
             className="min-w-0 flex-1 rounded border border-hairline bg-background px-2 py-1.5 text-[12px] text-foreground outline-none focus:border-brand-primary"
+          />
+          <input
+            value={novoCa}
+            onChange={(e) => setNovoCa(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void adicionar();
+              }
+            }}
+            placeholder="CA (se tiver)"
+            className="w-28 shrink-0 rounded border border-hairline bg-background px-2 py-1.5 text-[12px] text-foreground outline-none focus:border-brand-primary"
           />
           <datalist id="catalogo-epi-sugestoes">
             {sugestoes.map((epi) => (
@@ -450,8 +535,9 @@ function EditarMatrizModal({
           </datalist>
           <button
             type="button"
-            onClick={adicionar}
-            className="shrink-0 rounded border border-hairline px-2.5 py-1.5 text-[11.5px] font-medium text-brand-primary-800 hover:bg-brand-primary-050"
+            onClick={() => void adicionar()}
+            disabled={salvando}
+            className="shrink-0 rounded border border-hairline px-2.5 py-1.5 text-[11.5px] font-medium text-brand-primary-800 hover:bg-brand-primary-050 disabled:opacity-50"
           >
             Adicionar
           </button>

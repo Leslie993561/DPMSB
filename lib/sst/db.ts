@@ -124,8 +124,14 @@ const ESQUEMA_EXTRA = `
 
   CREATE TABLE IF NOT EXISTS sst_epi_precos (
     equip text PRIMARY KEY,
-    valor numeric NOT NULL
+    valor numeric
   );
+  -- CA (Certificado de Aprovação) que o RH informa ao cadastrar um EPI extra
+  -- na matriz, pra quando o equip não está no catálogo estático (que já tem
+  -- CA fixo). Nullable e independente de valor: um EPI pode ganhar CA sem
+  -- ter preço definido ainda, e vice-versa.
+  ALTER TABLE sst_epi_precos ALTER COLUMN valor DROP NOT NULL;
+  ALTER TABLE sst_epi_precos ADD COLUMN IF NOT EXISTS ca text;
 
   CREATE TABLE IF NOT EXISTS sst_fardamento_precos (
     tipo text PRIMARY KEY,

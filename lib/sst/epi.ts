@@ -305,13 +305,36 @@ interface LinhaEntregaEpi {
 /** Preço vigente de cada EPI: catálogo base, sobrescrito pelo que estiver em sst_epi_precos. */
 export async function obterPrecosEpi(): Promise<Map<string, number>> {
   // ::float8 porque o pg devolve `numeric` como texto — somar texto concatenaria.
+  // valor IS NOT NULL: uma linha pode existir só pra guardar o CA de um extra, sem preço ainda.
   const precos = await sstQuery<{ equip: string; valor: number }>(
-    "SELECT equip, valor::float8 AS valor FROM sst_epi_precos",
+    "SELECT equip, valor::float8 AS valor FROM sst_epi_precos WHERE valor IS NOT NULL",
   );
   return new Map<string, number>([
     ...EPI_CATALOGO.map((c) => [c.equip, c.valor] as const),
     ...precos.map((p) => [p.equip, p.valor] as const),
   ]);
+}
+
+/** CA que o RH informou pra um EPI extra (o catálogo estático já tem CA fixo pros seus itens). */
+export async function obterCaExtraEpi(): Promise<Map<string, string>> {
+  const linhas = await sstQuery<{ equip: string; ca: string }>(
+    "SELECT equip, ca FROM sst_epi_precos WHERE ca IS NOT NULL AND ca <> ''",
+  );
+  return new Map(linhas.map((l) => [l.equip, l.ca]));
+}
+
+/**
+ * RH informa o CA de um EPI extra ao cadastrá-lo na matriz — pra ele entrar
+ * "validado" na Gestão de EPI: aparece com CA certo em Custo e Valores e já
+ * vem preenchido ao registrar entrega, sem precisar digitar de novo toda vez.
+ */
+export async function definirCaEpi(equip: string, ca: string): Promise<void> {
+  const limpo = ca.trim();
+  await sstQuery(
+    `INSERT INTO sst_epi_precos (equip, ca) VALUES ($1, $2)
+       ON CONFLICT (equip) DO UPDATE SET ca = EXCLUDED.ca`,
+    [equip, limpo || null],
+  );
 }
 
 export interface CustoTrimestre {
@@ -352,11 +375,12 @@ function mesEAnoBr(dataBr: string): { mes: number; ano: number } | null {
 export async function obterCustosEpi(): Promise<DashboardCustosEpi> {
   const anoAtual = new Date().getFullYear();
 
-  const [entregas, precoPorEpi] = await Promise.all([
+  const [entregas, precoPorEpi, caExtra] = await Promise.all([
     sstQuery<LinhaEntregaEpi>(
       "SELECT epi, qtd, valor_unit::float8 AS valor_unit, data_entrega FROM sst_entregas_epi",
     ),
     obterPrecosEpi(),
+    obterCaExtraEpi(),
   ]);
 
   const trimestres: CustoTrimestre[] = ROTULO_TRIMESTRE.map((label) => ({ label, quantidade: 0, valor: 0 }));
@@ -377,13 +401,13 @@ export async function obterCustosEpi(): Promise<DashboardCustosEpi> {
     somaValorPorEpi.set(e.epi, (somaValorPorEpi.get(e.epi) ?? 0) + e.qtd * e.valor_unit);
   }
 
-  const nomesEpi = new Set<string>([...precoPorEpi.keys(), ...somaQtdPorEpi.keys()]);
+  const nomesEpi = new Set<string>([...precoPorEpi.keys(), ...somaQtdPorEpi.keys(), ...caExtra.keys()]);
   const linhas: LinhaCustoEpi[] = [...nomesEpi]
     .map((epi) => {
       const quantidade = somaQtdPorEpi.get(epi) ?? 0;
       const somaValor = somaValorPorEpi.get(epi) ?? 0;
       const valorUnitario = precoPorEpi.get(epi) ?? (quantidade > 0 ? somaValor / quantidade : 0);
-      const ca = EPI_CATALOGO.find((c) => c.equip === epi)?.ca ?? "";
+      const ca = EPI_CATALOGO.find((c) => c.equip === epi)?.ca ?? caExtra.get(epi) ?? "";
       return { epi, ca, quantidade, valorUnitario, valorTotal: quantidade * valorUnitario };
     })
     .sort(
