@@ -55,41 +55,38 @@ export function funcaoDaMatriz(cargo: string | null, departamento: string | null
   return melhor?.funcao ?? null;
 }
 
-/** EPIs extras que o RH cadastrou por função, além dos fixos da matriz (sst_matriz_epi_extra). */
-async function obterExtrasMatriz(): Promise<Map<string, string[]>> {
+/**
+ * Lista de EPIs que a RH já editou por função (sst_matriz_epi_extra) —
+ * quando existe, essa lista INTEIRA substitui a matriz estática pra aquela
+ * função (não é só um "extra" somado aos fixos: todo item, fixo ou não, pode
+ * ser editado ou removido pela tela).
+ */
+async function obterListaEditadaMatriz(): Promise<Map<string, string[]>> {
   const linhas = await sstQuery<{ funcao: string; epis: string[] }>("SELECT funcao, epis FROM sst_matriz_epi_extra");
   return new Map(linhas.map((l) => [l.funcao, l.epis]));
 }
 
-/** Fixos da matriz + extras cadastrados pelo RH, sem repetir o que já é fixo. */
-function mesclarComExtras(fixos: string[], extras: string[] | undefined): string[] {
-  if (!extras || extras.length === 0) return fixos;
-  return [...fixos, ...extras.filter((e) => !fixos.includes(e))];
-}
-
 /**
- * Matriz para exibir/editar: cada função com os EPIs fixos + extras do RH.
- * `fixos` é a contagem dos primeiros itens de `epis` que vêm da matriz
- * estática (não podem ser removidos por aqui) — o resto são extras editáveis.
+ * Matriz para exibir/editar: cada função com sua lista de EPIs — a lista
+ * estática (`MATRIZ_EPI`) até a RH editar algo pela tela; a partir daí, o que
+ * estiver salvo em sst_matriz_epi_extra manda.
  */
-export async function obterMatrizEpi(): Promise<(FuncaoEpi & { fixos: number })[]> {
-  const extras = await obterExtrasMatriz();
+export async function obterMatrizEpi(): Promise<FuncaoEpi[]> {
+  const editadas = await obterListaEditadaMatriz();
   return MATRIZ_EPI.map((f) => ({
     funcao: f.funcao,
-    epis: mesclarComExtras(f.epis, extras.get(f.funcao)),
-    fixos: f.epis.length,
+    epis: editadas.get(f.funcao) ?? f.epis,
   }));
 }
 
-/** RH adiciona EPI(s) extra(s) a uma função da matriz — os fixos continuam intocáveis. */
+/** RH edita a lista de EPIs de uma função (adicionar, remover ou renomear qualquer item). */
 export async function atualizarEpisExtrasDaFuncao(funcao: string, epis: string[]): Promise<void> {
-  const base = MATRIZ_EPI.find((f) => f.funcao === funcao);
-  if (!base) throw new Error("Função não encontrada na matriz de EPI.");
-  const extras = [...new Set(epis.map((e) => e.trim()).filter(Boolean))].filter((e) => !base.epis.includes(e));
+  if (!MATRIZ_EPI.some((f) => f.funcao === funcao)) throw new Error("Função não encontrada na matriz de EPI.");
+  const limpos = [...new Set(epis.map((e) => e.trim()).filter(Boolean))];
   await sstQuery(
     `INSERT INTO sst_matriz_epi_extra (funcao, epis, atualizado_em) VALUES ($1, $2, now())
        ON CONFLICT (funcao) DO UPDATE SET epis = EXCLUDED.epis, atualizado_em = now()`,
-    [funcao, extras],
+    [funcao, limpos],
   );
 }
 
@@ -107,7 +104,7 @@ export async function listarColaboradoresParaEpi(): Promise<ColaboradorEpi[]> {
       `SELECT DISTINCT ON (colab_id, epi) colab_id, epi, data_troca
          FROM sst_entregas_epi ORDER BY colab_id, epi, to_date(NULLIF(data_entrega, ''), 'DD/MM/YYYY') DESC NULLS LAST, created_at DESC`,
     ),
-    obterExtrasMatriz(),
+    obterListaEditadaMatriz(),
   ]);
   const trocaPorColaborador = new Map<number, Map<string, string>>();
   for (const e of ultimasEntregas) {
@@ -121,7 +118,7 @@ export async function listarColaboradoresParaEpi(): Promise<ColaboradorEpi[]> {
     .filter((c) => c.status !== "desligado")
     .map((c) => {
       const funcao = funcaoDaMatriz(c.cargo, c.departamento);
-      const episObrigatorios = funcao ? mesclarComExtras(funcao.epis, extras.get(funcao.funcao)) : [];
+      const episObrigatorios = funcao ? (extras.get(funcao.funcao) ?? funcao.epis) : [];
       return {
         id: c.id,
         nome: c.nome,

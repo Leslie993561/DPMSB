@@ -40,7 +40,7 @@ export function EpiPageClient({
 }: {
   aba: AbaEpi;
   colaboradores: ColaboradorEpi[];
-  matriz: (FuncaoEpi & { fixos: number })[];
+  matriz: FuncaoEpi[];
   /** Nomes de todos os EPIs do catálogo — sugestão ao adicionar EPI extra numa função. */
   catalogoEpi: string[];
   custos: { trimestres: CustoTrimestre[]; linhas: LinhaCustoEpi[] };
@@ -266,12 +266,12 @@ function MatrizTab({
   catalogoEpi,
   caExtra,
 }: {
-  matriz: (FuncaoEpi & { fixos: number })[];
+  matriz: FuncaoEpi[];
   catalogoEpi: string[];
   caExtra: Record<string, string>;
 }) {
   const router = useRouter();
-  const [editando, setEditando] = useState<(FuncaoEpi & { fixos: number }) | null>(null);
+  const [editando, setEditando] = useState<FuncaoEpi | null>(null);
 
   return (
     <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
@@ -333,19 +333,20 @@ function EditarMatrizModal({
   onFechar,
   onMudou,
 }: {
-  funcaoEpi: FuncaoEpi & { fixos: number };
+  funcaoEpi: FuncaoEpi;
   catalogoEpi: string[];
   caExtra: Record<string, string>;
   onFechar: () => void;
-  /** Chamado depois de cada adição/remoção já persistida, pra atualizar a lista por trás (sem fechar o modal). */
+  /** Chamado depois de cada edição já persistida, pra atualizar a lista por trás (sem fechar o modal). */
   onMudou: () => void;
 }) {
-  const fixos = funcaoEpi.epis.slice(0, funcaoEpi.fixos);
-  const [extras, setExtras] = useState<string[]>(funcaoEpi.epis.slice(funcaoEpi.fixos));
+  const [epis, setEpis] = useState<string[]>(funcaoEpi.epis);
   const [novoEpi, setNovoEpi] = useState("");
   const [novoCa, setNovoCa] = useState("");
   const [casLocais, setCasLocais] = useState<Record<string, string>>(caExtra);
-  const [casEmEdicao, setCasEmEdicao] = useState<Record<string, string>>({});
+  const [editandoIdx, setEditandoIdx] = useState<number | null>(null);
+  const [nomeEmEdicao, setNomeEmEdicao] = useState("");
+  const [caEmEdicao, setCaEmEdicao] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -358,13 +359,13 @@ function EditarMatrizModal({
       });
       setCasLocais((c) => ({ ...c, [equip]: ca }));
     } catch {
-      // CA é só um dado auxiliar do cadastro — se falhar, o EPI extra continua
-      // adicionado normalmente, a RH tenta preencher o CA de novo depois.
+      // CA é só um dado auxiliar do cadastro — se falhar, o EPI continua
+      // adicionado/renomeado normalmente, a RH tenta preencher de novo depois.
     }
   }
 
-  /** Persiste a lista de extras na hora — sem depender de um botão "Salvar" separado no rodapé. */
-  async function persistirExtras(novaLista: string[]): Promise<boolean> {
+  /** Persiste a lista inteira na hora — sem depender de um botão "Salvar" separado no rodapé. */
+  async function persistir(novaLista: string[]): Promise<boolean> {
     setSalvando(true);
     setErro(null);
     try {
@@ -386,18 +387,19 @@ function EditarMatrizModal({
 
   async function adicionar() {
     const nome = novoEpi.trim();
-    if (!nome || fixos.includes(nome) || extras.includes(nome)) {
+    if (!nome || epis.includes(nome)) {
       setNovoEpi("");
       setNovoCa("");
       return;
     }
-    const novaLista = [...extras, nome];
-    setExtras(novaLista);
+    const anterior = epis;
+    const novaLista = [...epis, nome];
+    setEpis(novaLista);
     setNovoEpi("");
     setNovoCa("");
-    const ok = await persistirExtras(novaLista);
+    const ok = await persistir(novaLista);
     if (!ok) {
-      setExtras((e) => e.filter((x) => x !== nome));
+      setEpis(anterior);
       return;
     }
     const ca = novoCa.trim();
@@ -405,13 +407,43 @@ function EditarMatrizModal({
   }
 
   async function remover(epi: string) {
-    const novaLista = extras.filter((x) => x !== epi);
-    setExtras(novaLista);
-    const ok = await persistirExtras(novaLista);
-    if (!ok) setExtras((e) => [...e, epi]);
+    const anterior = epis;
+    const novaLista = epis.filter((x) => x !== epi);
+    setEpis(novaLista);
+    const ok = await persistir(novaLista);
+    if (!ok) setEpis(anterior);
   }
 
-  const sugestoes = catalogoEpi.filter((e) => !fixos.includes(e) && !extras.includes(e));
+  function iniciarEdicao(idx: number) {
+    setEditandoIdx(idx);
+    setNomeEmEdicao(epis[idx]);
+    setCaEmEdicao(casLocais[epis[idx]] ?? "");
+  }
+
+  async function confirmarEdicao() {
+    if (editandoIdx === null) return;
+    const nomeAntigo = epis[editandoIdx];
+    const nomeNovo = nomeEmEdicao.trim();
+    if (!nomeNovo || (epis.includes(nomeNovo) && nomeNovo !== nomeAntigo)) {
+      setErro(!nomeNovo ? "Informe o nome do EPI." : "Já existe um EPI com esse nome nesta função.");
+      return;
+    }
+    const anterior = epis;
+    const novaLista = epis.map((e, i) => (i === editandoIdx ? nomeNovo : e));
+    setEpis(novaLista);
+    setEditandoIdx(null);
+    const ok = await persistir(novaLista);
+    if (!ok) {
+      setEpis(anterior);
+      return;
+    }
+    const ca = caEmEdicao.trim();
+    if (nomeNovo !== nomeAntigo || ca !== (casLocais[nomeAntigo] ?? "")) {
+      if (ca) void salvarCa(nomeNovo, ca);
+    }
+  }
+
+  const sugestoes = catalogoEpi.filter((e) => !epis.includes(e));
 
   return (
     <Modal
@@ -434,72 +466,79 @@ function EditarMatrizModal({
     >
       <div className="flex flex-col gap-2.5">
         <div>
-          <p className="text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">Fixos da matriz</p>
-          <div className="mt-1 flex flex-wrap gap-1">
-            {fixos.map((epi) => (
-              <span
-                key={epi}
-                className="rounded-full border border-hairline bg-surface-page px-2 py-0.5 text-[10.5px] text-foreground-muted"
-              >
-                {epi}
-              </span>
-            ))}
+          <p className="text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">EPIs desta função</p>
+          <div className="mt-1 flex flex-col divide-y divide-hairline/70 rounded-md border border-hairline">
+            {epis.length === 0 && <p className="px-2.5 py-2 text-[11px] text-foreground-muted">Nenhum EPI ainda.</p>}
+            {epis.map((epi, idx) =>
+              editandoIdx === idx ? (
+                <div key={idx} className="flex items-center gap-1.5 px-2 py-1.5">
+                  <input
+                    value={nomeEmEdicao}
+                    onChange={(e) => setNomeEmEdicao(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void confirmarEdicao();
+                      }
+                    }}
+                    autoFocus
+                    className="min-w-0 flex-1 rounded border border-hairline bg-background px-2 py-1 text-[11.5px] text-foreground outline-none focus:border-brand-primary"
+                  />
+                  <input
+                    value={caEmEdicao}
+                    onChange={(e) => setCaEmEdicao(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void confirmarEdicao();
+                      }
+                    }}
+                    placeholder="CA"
+                    className="w-16 shrink-0 rounded border border-hairline bg-background px-1.5 py-1 text-[11.5px] text-foreground outline-none focus:border-brand-primary"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void confirmarEdicao()}
+                    className="shrink-0 rounded px-1.5 py-1 text-[13px] text-status-success hover:bg-status-success-bg"
+                    aria-label="Confirmar edição"
+                  >
+                    ✓
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditandoIdx(null)}
+                    className="shrink-0 rounded px-1.5 py-1 text-[13px] text-foreground-muted hover:bg-surface-page"
+                    aria-label="Cancelar edição"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ) : (
+                <div key={epi} className="flex items-center gap-2 px-2.5 py-1.5">
+                  <span className="min-w-0 flex-1 truncate text-[11.5px] text-foreground">
+                    {epi}
+                    {casLocais[epi] && <span className="text-foreground-muted"> · CA {casLocais[epi]}</span>}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => iniciarEdicao(idx)}
+                    aria-label={`Editar ${epi}`}
+                    className="shrink-0 rounded px-1 py-0.5 text-[11px] text-foreground-muted hover:bg-surface-page hover:text-brand-primary-800"
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void remover(epi)}
+                    aria-label={`Remover ${epi}`}
+                    className="shrink-0 rounded px-1 py-0.5 text-[11px] text-foreground-muted hover:bg-status-danger-bg hover:text-status-danger"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ),
+            )}
           </div>
-        </div>
-
-        <div>
-          <p className="text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">EPIs extras</p>
-          <div className="mt-1 flex flex-wrap gap-1">
-            {extras.length === 0 && <p className="text-[11px] text-foreground-muted">Nenhum EPI extra ainda.</p>}
-            {extras.map((epi) => (
-              <span
-                key={epi}
-                className="flex items-center gap-1 rounded-full border border-brand-primary/40 bg-brand-primary-050 px-2 py-0.5 text-[10.5px] text-brand-primary-800"
-              >
-                {epi}
-                {casLocais[epi] && <span className="text-brand-primary-800/70">· CA {casLocais[epi]}</span>}
-                <button
-                  type="button"
-                  onClick={() => void remover(epi)}
-                  aria-label={`Remover ${epi}`}
-                  className="text-brand-primary-800 hover:text-status-danger"
-                >
-                  ✕
-                </button>
-              </span>
-            ))}
-          </div>
-          {extras.some((epi) => !casLocais[epi]) && (
-            <div className="mt-1.5 flex flex-col gap-1">
-              {extras
-                .filter((epi) => !casLocais[epi])
-                .map((epi) => (
-                  <div key={epi} className="flex items-center gap-1.5">
-                    <span className="min-w-0 flex-1 truncate text-[11px] text-foreground-muted">Sem CA: {epi}</span>
-                    <input
-                      value={casEmEdicao[epi] ?? ""}
-                      onChange={(e) => setCasEmEdicao((c) => ({ ...c, [epi]: e.target.value }))}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && casEmEdicao[epi]?.trim()) {
-                          e.preventDefault();
-                          void salvarCa(epi, casEmEdicao[epi].trim());
-                        }
-                      }}
-                      placeholder="CA"
-                      className="w-20 shrink-0 rounded border border-hairline bg-background px-1.5 py-1 text-[11px] text-foreground outline-none focus:border-brand-primary"
-                    />
-                    <button
-                      type="button"
-                      disabled={!casEmEdicao[epi]?.trim()}
-                      onClick={() => void salvarCa(epi, casEmEdicao[epi].trim())}
-                      className="shrink-0 rounded border border-hairline px-2 py-1 text-[10.5px] font-medium text-brand-primary-800 hover:bg-brand-primary-050 disabled:opacity-40"
-                    >
-                      Salvar
-                    </button>
-                  </div>
-                ))}
-            </div>
-          )}
         </div>
 
         <div className="flex items-center gap-1.5">
