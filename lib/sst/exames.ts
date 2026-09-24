@@ -4,23 +4,42 @@ import { sstQuery } from "./db";
 import { CATALOGO_EXAMES_OCUPACIONAIS } from "./domain";
 
 /**
- * Funções da matriz — as MESMAS 10 funções da Matriz de EPI (mesmos cargos,
- * mesma empresa): reaproveita só os NOMES, como ponto de partida pro RH
- * montar quais exames e quais riscos cada uma tem. Nasce tudo vazio de
- * propósito — não existe mais o JSON estático do Portal SST antigo com essa
- * informação (só o catálogo de exames sobrou, ver domain.ts), então inventar
- * "função X exige exame Y" seria dado de segurança do trabalho fabricado.
+ * As 31 funções da Matriz Ocupacional real da empresa (Leslie repassou a
+ * planilha função → exame). Bem mais ampla que a Matriz de EPI (10 funções,
+ * só quem usa EPI) porque exame ocupacional é para todo mundo, não só o
+ * chão de fábrica.
  */
 export const FUNCOES_MATRIZ_EXAMES = [
+  "Analista Administrativo",
+  "Analista De Engenharia",
+  "Analista De Engenharia De Processo",
+  "Analista De Engenharia De Produtos",
+  "Analista De Engenharia De Projetos",
+  "Analista De Gente E Gestão",
+  "Analista De Melhoria Contínua",
+  "Analista De Pcp",
+  "Analista De Qualidade",
+  "Analista Financeiro",
+  "Assistente De Controle Da Qualidade",
+  "Assistente De Operações De Vendas",
+  "Assistente De Pcp",
+  "Assistente De Rh",
+  "Assistente De Tecnologia Da Informação",
+  "Assistente De Vendas",
   "Assistente Logístico",
   "Auxiliar De Produção",
   "Auxiliar De Produção I",
   "Auxiliar De Produção II",
   "Auxiliar De Produção III",
   "Auxiliar De Serviços Gerais",
+  "Coordenador (a) De Garantia Da Qualidade E Assuntos Regulatórios",
+  "Estagiário De Projetos",
   "Inspetora Da Qualidade",
+  "Jovem Aprendiz Administrativo",
+  "Jovem Aprendiz De Logística",
   "Líder De Manutenção",
   "Supervisor (a) De Produção",
+  "Supervisor De Vendas",
   "Técnico Em Manutenção Geral",
 ];
 

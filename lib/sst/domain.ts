@@ -272,4 +272,7 @@ export const CATALOGO_EXAMES_OCUPACIONAIS: CatalogoExameOcupacional[] = [
   { codigo: "0658", nome: "GLICEMIA", valor: 0, cargos: 2, obs: [] },
   { codigo: "0300", nome: "AVALIAÇÃO PSICOSSOCIAL", valor: 0, cargos: 2, obs: [] },
   { codigo: "0536", nome: "EEG", valor: 0, cargos: 2, obs: [] },
+  // Sem código numérico na planilha original da Matriz Ocupacional — só entra
+  // pra Líder de Manutenção e Técnico em Manutenção Geral.
+  { codigo: "", nome: "TESTE DE ROMBERG", valor: 0, cargos: 2, obs: [] },
 ];
