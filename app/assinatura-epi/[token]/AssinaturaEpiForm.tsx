@@ -8,6 +8,7 @@ export function AssinaturaEpiForm({ token }: { token: string }) {
   const [documento, setDocumento] = useState<DocumentoFicha | null>(null);
   const [erroCarga, setErroCarga] = useState<string | null>(null);
   const [concordo, setConcordo] = useState(false);
+  const [confirmoAnexo, setConfirmoAnexo] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [assinadoAgora, setAssinadoAgora] = useState(false);
@@ -71,11 +72,22 @@ export function AssinaturaEpiForm({ token }: { token: string }) {
           />
           {CONCORDANCIA}
         </label>
+        {documento.anexoUrl && (
+          <label className="flex cursor-pointer items-start gap-2 text-[12.5px] text-foreground">
+            <input
+              type="checkbox"
+              checked={confirmoAnexo}
+              onChange={(e) => setConfirmoAnexo(e.target.checked)}
+              className="mt-0.5 accent-brand-primary"
+            />
+            Confirmo que o documento/foto anexado acima corresponde ao que foi de fato entregue.
+          </label>
+        )}
         <p className="text-[11px] text-foreground-muted">{AVISO_LGPD}</p>
         {erro && <p className="text-[12px] text-status-danger">{erro}</p>}
         <button
           type="submit"
-          disabled={!concordo || enviando}
+          disabled={!concordo || (Boolean(documento.anexoUrl) && !confirmoAnexo) || enviando}
           className="rounded-md bg-brand-primary px-3 py-2 text-[13px] font-semibold text-brand-white hover:bg-brand-primary-hover disabled:opacity-50"
         >
           {enviando ? "Assinando..." : "Assinar ficha"}
