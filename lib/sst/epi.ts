@@ -14,6 +14,8 @@ export interface ColaboradorEpi {
   funcaoMatriz: string | null;
   episObrigatorios: string[];
   situacaoEpi: SituacaoEpi;
+  /** Tem ficha enviada e ainda não assinada (nem por assinatura eletrônica, nem por PDF anexado). */
+  aguardandoAssinatura: boolean;
 }
 
 const PALAVRAS_IGNORADAS = new Set(["de", "da", "do", "das", "dos", "em", "e", "a", "i", "ii", "iii"]);
@@ -96,7 +98,7 @@ export async function atualizarEpisExtrasDaFuncao(funcao: string, epis: string[]
  * referenciam `colaboradores` direto, sem espelho.
  */
 export async function listarColaboradoresParaEpi(): Promise<ColaboradorEpi[]> {
-  const [todos, ultimasEntregas, extras] = await Promise.all([
+  const [todos, ultimasEntregas, extras, fichasAguardando] = await Promise.all([
     listarColaboradores(),
     // Só a entrega mais recente de cada EPI vale para o vencimento: uma nova entrega
     // do mesmo EPI substitui a anterior (por data de entrega; empate, a última lançada).
@@ -105,6 +107,10 @@ export async function listarColaboradoresParaEpi(): Promise<ColaboradorEpi[]> {
          FROM sst_entregas_epi ORDER BY colab_id, epi, to_date(NULLIF(data_entrega, ''), 'DD/MM/YYYY') DESC NULLS LAST, created_at DESC`,
     ),
     obterListaEditadaMatriz(),
+    sstQuery<{ colab_id: string }>(
+      `SELECT DISTINCT colab_id FROM sst_fichas_epi
+         WHERE NOT (status = 'assinada' OR assinatura_storage_path IS NOT NULL)`,
+    ),
   ]);
   const trocaPorColaborador = new Map<number, Map<string, string>>();
   for (const e of ultimasEntregas) {
@@ -113,6 +119,7 @@ export async function listarColaboradoresParaEpi(): Promise<ColaboradorEpi[]> {
     mapa.set(e.epi, e.data_troca);
     trocaPorColaborador.set(id, mapa);
   }
+  const idsAguardando = new Set(fichasAguardando.map((f) => Number(f.colab_id)));
 
   return todos
     .filter((c) => c.status !== "desligado")
@@ -129,6 +136,7 @@ export async function listarColaboradoresParaEpi(): Promise<ColaboradorEpi[]> {
         funcaoMatriz: funcao?.funcao ?? null,
         episObrigatorios,
         situacaoEpi: situacaoDosEpis(episObrigatorios, trocaPorColaborador.get(c.id) ?? new Map()),
+        aguardandoAssinatura: idsAguardando.has(c.id),
       };
     });
 }
@@ -334,6 +342,15 @@ export async function definirCaEpi(equip: string, ca: string): Promise<void> {
   );
 }
 
+/** RH edita o valor unitário de um EPI em Custo e Valores — sobrescreve o catálogo estático (ou a média das entregas). */
+export async function definirPrecoEpi(equip: string, valor: number): Promise<void> {
+  await sstQuery(
+    `INSERT INTO sst_epi_precos (equip, valor) VALUES ($1, $2)
+       ON CONFLICT (equip) DO UPDATE SET valor = EXCLUDED.valor`,
+    [equip, valor],
+  );
+}
+
 export interface CustoTrimestre {
   label: string;
   quantidade: number;
@@ -436,6 +453,15 @@ export async function obterPrecosFardamento(): Promise<Map<string, number>> {
     ...FARDAMENTO_CATALOGO.map((c) => [c.tipo, c.valor] as const),
     ...precos.map((p) => [p.tipo, p.valor] as const),
   ]);
+}
+
+/** RH edita o valor unitário de um item de fardamento em Custo e Valores. */
+export async function definirPrecoFardamento(tipo: string, valor: number): Promise<void> {
+  await sstQuery(
+    `INSERT INTO sst_fardamento_precos (tipo, valor) VALUES ($1, $2)
+       ON CONFLICT (tipo) DO UPDATE SET valor = EXCLUDED.valor`,
+    [tipo, valor],
+  );
 }
 
 export interface LinhaCustoFardamento {

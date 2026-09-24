@@ -148,23 +148,38 @@ function ColaboradoresTab({
   const [fichaAberta, setFichaAberta] = useState<ColaboradorEpi | null>(null);
   const [colunaAberta, setColunaAberta] = useState<"vinculo" | "texto" | null>(null);
   const [filtroVinculo, setFiltroVinculo] = useState<string>("");
+  const [filtroResumo, setFiltroResumo] = useState<"vencidos" | "ativos" | "aguardando" | "pendente" | null>(null);
 
   const vinculosDisponiveis = Array.from(
     new Set(colaboradores.map((c) => c.vinculo).filter((v): v is Vinculo => Boolean(v))),
   ).sort();
 
+  /** "EPI pendente" = tem EPI obrigatório na matriz mas nunca teve NENHUMA entrega registrada (não é "vencendo em breve"). */
+  function semNenhumRegistro(c: ColaboradorEpi): boolean {
+    const s = c.situacaoEpi;
+    return s.total > 0 && s.vencidos + s.vencendo + s.emDia === 0;
+  }
+
   const termo = busca.trim().toLowerCase();
   const filtrados = colaboradores.filter((c) => {
     if (filtroVinculo && c.vinculo !== filtroVinculo) return false;
     if (termo && ![c.nome, c.cargo, c.departamento].some((v) => v?.toLowerCase().includes(termo))) return false;
+    if (filtroResumo === "vencidos" && c.situacaoEpi.vencidos === 0) return false;
+    if (filtroResumo === "ativos" && c.situacaoEpi.emDia === 0) return false;
+    if (filtroResumo === "aguardando" && !c.aguardandoAssinatura) return false;
+    if (filtroResumo === "pendente" && !semNenhumRegistro(c)) return false;
     return true;
   });
 
-  // Resumo geral (todos os colaboradores, não só os filtrados) — mesmo espírito do "2/3" de fichas que ele substitui.
-  const totalVencidos = colaboradores.reduce((acc, c) => acc + c.situacaoEpi.vencidos, 0);
-  const totalAtivos = colaboradores.reduce((acc, c) => acc + c.situacaoEpi.emDia, 0);
-  const totalPendente = colaboradores.reduce((acc, c) => acc + c.situacaoEpi.vencendo, 0);
-  const aguardandoAssinatura = resumoFichas.enviadas - resumoFichas.assinadas;
+  // Resumo geral (todos os colaboradores, não só os filtrados pela busca/vínculo) — mesmo espírito do "2/3" de fichas que ele substitui.
+  const totalVencidos = colaboradores.reduce((acc, c) => acc + (c.situacaoEpi.vencidos > 0 ? 1 : 0), 0);
+  const totalAtivos = colaboradores.reduce((acc, c) => acc + (c.situacaoEpi.emDia > 0 ? 1 : 0), 0);
+  const totalAguardando = colaboradores.reduce((acc, c) => acc + (c.aguardandoAssinatura ? 1 : 0), 0);
+  const totalPendente = colaboradores.reduce((acc, c) => acc + (semNenhumRegistro(c) ? 1 : 0), 0);
+
+  function alternarFiltroResumo(v: "vencidos" | "ativos" | "aguardando" | "pendente") {
+    setFiltroResumo((atual) => (atual === v ? null : v));
+  }
 
   return (
     <Card className="overflow-hidden p-0">
@@ -206,22 +221,39 @@ function ColaboradoresTab({
               </CabecalhoFiltravel>
               <th className="px-2 py-1" />
               <th className="px-2 py-1 align-top text-right">
-                <div className="flex flex-nowrap items-center justify-end gap-x-2 text-[8px] leading-tight font-bold tracking-normal normal-case">
-                  <span className="whitespace-nowrap text-status-danger" title="Colaboradores com EPI vencido">
-                    Vencidos {totalVencidos}
-                  </span>
-                  <span className="whitespace-nowrap text-status-success" title="Colaboradores com EPI em dia">
-                    Ativos {totalAtivos}
-                  </span>
-                  <span
-                    className="whitespace-nowrap text-status-warning"
-                    title={`${aguardandoAssinatura} de ${resumoFichas.enviadas} ficha(s) enviada(s) ainda sem assinatura`}
+                <div className="flex flex-nowrap items-center justify-end gap-x-2 text-[9.5px] leading-tight font-bold tracking-normal normal-case">
+                  <button
+                    type="button"
+                    onClick={() => alternarFiltroResumo("vencidos")}
+                    title="Colaboradores com EPI vencido"
+                    className={cn("whitespace-nowrap text-status-danger", filtroResumo === "vencidos" && "underline underline-offset-2")}
                   >
-                    Aguard. assin. {aguardandoAssinatura}
-                  </span>
-                  <span className="whitespace-nowrap text-orange-700" title="Colaboradores com EPI vencendo em breve">
+                    Vencidos {totalVencidos}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => alternarFiltroResumo("ativos")}
+                    title="Colaboradores com EPI em dia"
+                    className={cn("whitespace-nowrap text-status-success", filtroResumo === "ativos" && "underline underline-offset-2")}
+                  >
+                    Ativos {totalAtivos}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => alternarFiltroResumo("aguardando")}
+                    title="Colaboradores com ficha de EPI enviada e ainda não assinada"
+                    className={cn("whitespace-nowrap text-status-warning", filtroResumo === "aguardando" && "underline underline-offset-2")}
+                  >
+                    Aguard. assin. {totalAguardando}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => alternarFiltroResumo("pendente")}
+                    title="Colaboradores com EPI na matriz mas sem nenhuma entrega registrada ainda"
+                    className={cn("whitespace-nowrap text-orange-700", filtroResumo === "pendente" && "underline underline-offset-2")}
+                  >
                     EPI pendente {totalPendente}
-                  </span>
+                  </button>
                 </div>
               </th>
             </tr>
@@ -533,9 +565,11 @@ function EditarMatrizModal({
                     type="button"
                     onClick={() => iniciarEdicao(idx)}
                     aria-label={`Editar ${epi}`}
-                    className="shrink-0 rounded px-1 py-0.5 text-[11px] text-foreground-muted hover:bg-surface-page hover:text-brand-primary-800"
+                    className="shrink-0 rounded p-1 text-foreground-muted/50 hover:bg-surface-page hover:text-foreground"
                   >
-                    ✏️
+                    <svg viewBox="0 0 20 20" fill="currentColor" className="h-2.5 w-2.5" aria-hidden>
+                      <path d="M14.85 2.15a1.5 1.5 0 0 1 2.12 0l.88.88a1.5 1.5 0 0 1 0 2.12l-1.1 1.1-3-3 1.1-1.1Zm-2.16 2.16 3 3L6.94 16.06a1 1 0 0 1-.46.26l-3.1.83.83-3.1a1 1 0 0 1 .26-.46L12.7 4.3Z" />
+                    </svg>
                   </button>
                   <button
                     type="button"
@@ -604,8 +638,35 @@ function CustosTab({
   custos: { trimestres: CustoTrimestre[]; linhas: LinhaCustoEpi[] };
   fardamento: LinhaCustoFardamento[];
 }) {
+  const router = useRouter();
+  const [editandoPreco, setEditandoPreco] = useState<{ chave: string; tipo: "epi" | "fardamento" } | null>(null);
+  const [valorEmEdicao, setValorEmEdicao] = useState("");
+  const [salvandoPreco, setSalvandoPreco] = useState(false);
+
   const totalFardamento = fardamento.reduce((acc, l) => acc + l.valorTotal, 0);
   const totalGeral = custos.linhas.reduce((acc, l) => acc + l.valorTotal, 0);
+
+  function iniciarEdicaoPreco(chave: string, tipo: "epi" | "fardamento", valorAtual: number) {
+    setEditandoPreco({ chave, tipo });
+    setValorEmEdicao(valorAtual.toFixed(2).replace(".", ","));
+  }
+
+  async function salvarPreco() {
+    if (!editandoPreco) return;
+    const valor = Number(valorEmEdicao.replace(",", "."));
+    if (!Number.isFinite(valor) || valor < 0) return;
+    setSalvandoPreco(true);
+    try {
+      const rota = editandoPreco.tipo === "epi" ? "/api/sst/epi/preco" : "/api/sst/epi/preco-fardamento";
+      const corpo =
+        editandoPreco.tipo === "epi" ? { equip: editandoPreco.chave, valor } : { tipo: editandoPreco.chave, valor };
+      await fetch(rota, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) });
+      setEditandoPreco(null);
+      router.refresh();
+    } finally {
+      setSalvandoPreco(false);
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -641,7 +702,50 @@ function CustosTab({
                 <tr key={l.epi} className="border-t border-hairline/60">
                   <td className="px-3 py-1.5 font-semibold text-foreground">{l.epi}</td>
                   <td className="px-3 py-1.5 text-right text-foreground">{l.quantidade}</td>
-                  <td className="px-3 py-1.5 text-right text-foreground-muted">{formatarMoeda(l.valorUnitario)}</td>
+                  <td className="px-3 py-1.5 text-right text-foreground-muted">
+                    {editandoPreco?.tipo === "epi" && editandoPreco.chave === l.epi ? (
+                      <div className="flex items-center justify-end gap-1">
+                        <input
+                          value={valorEmEdicao}
+                          onChange={(e) => setValorEmEdicao(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && void salvarPreco()}
+                          autoFocus
+                          className="w-16 rounded border border-hairline bg-background px-1.5 py-0.5 text-right text-[11.5px] text-foreground outline-none focus:border-brand-primary"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => void salvarPreco()}
+                          disabled={salvandoPreco}
+                          className="rounded px-1 py-0.5 text-[12px] text-status-success hover:bg-status-success-bg"
+                          aria-label="Confirmar valor"
+                        >
+                          ✓
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditandoPreco(null)}
+                          className="rounded px-1 py-0.5 text-[12px] text-foreground-muted hover:bg-surface-page"
+                          aria-label="Cancelar edição"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="inline-flex items-center gap-1">
+                        {formatarMoeda(l.valorUnitario)}
+                        <button
+                          type="button"
+                          onClick={() => iniciarEdicaoPreco(l.epi, "epi", l.valorUnitario)}
+                          aria-label={`Editar valor de ${l.epi}`}
+                          className="rounded p-0.5 text-foreground-muted/50 hover:bg-surface-page hover:text-foreground"
+                        >
+                          <svg viewBox="0 0 20 20" fill="currentColor" className="h-2.5 w-2.5" aria-hidden>
+                            <path d="M14.85 2.15a1.5 1.5 0 0 1 2.12 0l.88.88a1.5 1.5 0 0 1 0 2.12l-1.1 1.1-3-3 1.1-1.1Zm-2.16 2.16 3 3L6.94 16.06a1 1 0 0 1-.46.26l-3.1.83.83-3.1a1 1 0 0 1 .26-.46L12.7 4.3Z" />
+                          </svg>
+                        </button>
+                      </span>
+                    )}
+                  </td>
                   <td className="px-3 py-1.5 text-right font-semibold text-brand-primary-800">
                     {formatarMoeda(l.valorTotal)}
                   </td>
@@ -679,7 +783,50 @@ function CustosTab({
                 <tr key={l.tipo} className="border-t border-hairline/60">
                   <td className="px-3 py-1.5 font-semibold text-foreground">{l.tipo}</td>
                   <td className="px-3 py-1.5 text-right text-foreground">{l.quantidade}</td>
-                  <td className="px-3 py-1.5 text-right text-foreground-muted">{formatarMoeda(l.valorUnitario)}</td>
+                  <td className="px-3 py-1.5 text-right text-foreground-muted">
+                    {editandoPreco?.tipo === "fardamento" && editandoPreco.chave === l.tipo ? (
+                      <div className="flex items-center justify-end gap-1">
+                        <input
+                          value={valorEmEdicao}
+                          onChange={(e) => setValorEmEdicao(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && void salvarPreco()}
+                          autoFocus
+                          className="w-16 rounded border border-hairline bg-background px-1.5 py-0.5 text-right text-[11.5px] text-foreground outline-none focus:border-brand-primary"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => void salvarPreco()}
+                          disabled={salvandoPreco}
+                          className="rounded px-1 py-0.5 text-[12px] text-status-success hover:bg-status-success-bg"
+                          aria-label="Confirmar valor"
+                        >
+                          ✓
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditandoPreco(null)}
+                          className="rounded px-1 py-0.5 text-[12px] text-foreground-muted hover:bg-surface-page"
+                          aria-label="Cancelar edição"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="inline-flex items-center gap-1">
+                        {formatarMoeda(l.valorUnitario)}
+                        <button
+                          type="button"
+                          onClick={() => iniciarEdicaoPreco(l.tipo, "fardamento", l.valorUnitario)}
+                          aria-label={`Editar valor de ${l.tipo}`}
+                          className="rounded p-0.5 text-foreground-muted/50 hover:bg-surface-page hover:text-foreground"
+                        >
+                          <svg viewBox="0 0 20 20" fill="currentColor" className="h-2.5 w-2.5" aria-hidden>
+                            <path d="M14.85 2.15a1.5 1.5 0 0 1 2.12 0l.88.88a1.5 1.5 0 0 1 0 2.12l-1.1 1.1-3-3 1.1-1.1Zm-2.16 2.16 3 3L6.94 16.06a1 1 0 0 1-.46.26l-3.1.83.83-3.1a1 1 0 0 1 .26-.46L12.7 4.3Z" />
+                          </svg>
+                        </button>
+                      </span>
+                    )}
+                  </td>
                   <td className="px-3 py-1.5 text-right font-semibold text-brand-primary-800">{formatarMoeda(l.valorTotal)}</td>
                 </tr>
               ))}
