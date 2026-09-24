@@ -296,6 +296,8 @@ export function FichaEpiDrawer({
         <EditarFichaModal
           fichaId={editandoFicha}
           colaboradorNome={colaborador.nome}
+          catalogoEpi={catalogo}
+          itensFardamento={itensFardamento}
           onFechar={() => setEditandoFicha(null)}
           onSalvo={() => {
             setEditandoFicha(null);

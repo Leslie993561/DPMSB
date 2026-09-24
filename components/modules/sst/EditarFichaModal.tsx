@@ -35,11 +35,16 @@ interface LinhaEditavel {
 export function EditarFichaModal({
   fichaId,
   colaboradorNome,
+  catalogoEpi,
+  itensFardamento,
   onFechar,
   onSalvo,
 }: {
   fichaId: string;
   colaboradorNome: string;
+  /** Nomes de EPI conhecidos (Matriz de EPI + catálogo) — sugestão ao adicionar item na ficha. */
+  catalogoEpi: { epi: string; ca: string }[];
+  itensFardamento: string[];
   onFechar: () => void;
   onSalvo: () => void;
 }) {
@@ -233,9 +238,15 @@ export function EditarFichaModal({
                   adicionar();
                 }
               }}
+              list="catalogo-item-sugestoes"
               placeholder="Nome do item"
               className={INPUT + " min-w-0 flex-1"}
             />
+            <datalist id="catalogo-item-sugestoes">
+              {(novaCategoria === "epi" ? catalogoEpi.map((c) => c.epi) : itensFardamento).map((nome) => (
+                <option key={nome} value={nome} />
+              ))}
+            </datalist>
             <button
               type="button"
               onClick={adicionar}
