@@ -121,6 +121,10 @@ export interface CargoOcupacional {
   epis: string[];
   /** Nomes dos exames — mesmo catálogo de domain.ts; periodicidade vem de lá, não é repetida aqui. */
   exames: string[];
+  /** Quantos colaboradores reais do Quadro têm esse cargo neste departamento. */
+  totalColaboradores: number;
+  /** Nenhum cargo cadastrado (planilha de riscos) deu match — ainda não tem risco/EPI/exame levantado para este cargo real. */
+  semDadosCadastrados: boolean;
 }
 
 export interface SetorOcupacional {
@@ -128,24 +132,64 @@ export interface SetorOcupacional {
   cargos: CargoOcupacional[];
 }
 
+interface CargoCadastrado {
+  cargo: string;
+  cbo: string;
+  setor: string;
+  riscos: RiscoCargo[];
+  epis: string[];
+  exames: string[];
+}
+
+async function obterCargosCadastrados(): Promise<CargoCadastrado[]> {
+  return sstQuery<CargoCadastrado>(
+    "SELECT cargo, cbo, setor, riscos, epis, exames FROM sst_cargos_ocupacionais ORDER BY cargo",
+  );
+}
+
 /**
- * Dado real da empresa (planilha do Portal SST antigo, repassada pela
- * Leslie) — ver scripts/seed-cargos-ocupacionais.js. Diferente da Matriz por
- * Função (que é por FUNÇÃO, mais genérica e editável pela tela): aqui é por
- * CARGO/setor, com risco+frequência e EPI por cargo — ainda sem edição pela
- * tela, só visualização (é o que foi pedido: separar em listas e navegar).
+ * Matriz Ocupacional agrupada pelo Departamento e Cargo REAIS do Quadro de
+ * Colaboradores — não pela planilha de riscos isolada, porque "os cargos que
+ * envolvem cada setor dependem do que for colocado no quadro" (ela muda
+ * conforme contratações). O risco/EPI/exame de cada cargo real vem do melhor
+ * match (mesmo algoritmo de radical usado pra Matriz por Função) contra a
+ * planilha de riscos (scripts/seed-cargos-ocupacionais.js); sem match
+ * confiável, o cargo aparece mesmo assim, só marcado como sem dados — nunca
+ * inventamos risco pra fechar a lista.
  */
 export async function obterCargosOcupacionais(): Promise<SetorOcupacional[]> {
-  const linhas = await sstQuery<{ cargo: string; cbo: string; setor: string; riscos: RiscoCargo[]; epis: string[]; exames: string[] }>(
-    "SELECT cargo, cbo, setor, riscos, epis, exames FROM sst_cargos_ocupacionais ORDER BY setor, cargo",
-  );
-  const porSetor = new Map<string, CargoOcupacional[]>();
-  for (const l of linhas) {
-    const lista = porSetor.get(l.setor) ?? [];
-    lista.push({ cargo: l.cargo, cbo: l.cbo, setor: l.setor, riscos: l.riscos, epis: l.epis, exames: l.exames });
-    porSetor.set(l.setor, lista);
+  const [colaboradores, cadastrados] = await Promise.all([listarColaboradores(), obterCargosCadastrados()]);
+  const nomesCadastrados = cadastrados.map((c) => c.cargo);
+
+  const porDepartamento = new Map<string, Map<string, number>>();
+  for (const c of colaboradores) {
+    if (!c.cargo || !c.departamento) continue;
+    const porCargo = porDepartamento.get(c.departamento) ?? new Map<string, number>();
+    porCargo.set(c.cargo, (porCargo.get(c.cargo) ?? 0) + 1);
+    porDepartamento.set(c.departamento, porCargo);
   }
-  return [...porSetor.entries()].map(([setor, cargos]) => ({ setor, cargos }));
+
+  return [...porDepartamento.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([departamento, porCargo]) => ({
+      setor: departamento,
+      cargos: [...porCargo.entries()]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([cargoReal, totalColaboradores]) => {
+          const nomeMatch = funcaoCorrespondente(cargoReal, departamento, nomesCadastrados);
+          const dados = nomeMatch ? cadastrados.find((c) => c.cargo === nomeMatch) : undefined;
+          return {
+            cargo: cargoReal,
+            cbo: dados?.cbo ?? "",
+            setor: departamento,
+            riscos: dados?.riscos ?? [],
+            epis: dados?.epis ?? [],
+            exames: dados?.exames ?? [],
+            totalColaboradores,
+            semDadosCadastrados: !dados,
+          };
+        }),
+    }));
 }
 
 // ---------- Vencimento (periodicidade do catálogo × última realização) ----------

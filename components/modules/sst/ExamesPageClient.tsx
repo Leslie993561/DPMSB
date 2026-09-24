@@ -826,7 +826,6 @@ function MatrizOcupacionalTab({
                 >
                   <span className="min-w-0">
                     <span className="block truncate text-[12px] font-medium text-foreground">{c.cargo}</span>
-                    <span className="text-[10px] text-foreground-muted">CBO {c.cbo || "—"}</span>
                   </span>
                   <span aria-hidden className="shrink-0 text-foreground-muted">
                     ›
@@ -847,6 +846,11 @@ function MatrizOcupacionalTab({
           largura="32rem"
         >
           <div className="flex flex-col gap-4">
+            {cargoAberto.semDadosCadastrados && (
+              <div className="rounded-md border border-hairline bg-surface-page px-3 py-2.5 text-[12px] text-foreground-muted">
+                Este cargo ainda não tem risco, EPI ou exame levantado na planilha de SST.
+              </div>
+            )}
             <div>
               <p className="text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">Riscos ocupacionais</p>
               {cargoAberto.riscos.length === 0 ? (
@@ -884,24 +888,28 @@ function MatrizOcupacionalTab({
 
             <div>
               <p className="text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">Exames obrigatórios</p>
-              <div className="mt-1.5 overflow-hidden rounded-md border border-hairline">
-                <table className="w-full text-[11.5px]">
-                  <thead>
-                    <tr className="border-b border-hairline bg-surface-page text-left text-[9.5px] font-semibold tracking-wide text-foreground-muted uppercase">
-                      <th className="px-2.5 py-1.5">Exame</th>
-                      <th className="px-2.5 py-1.5 text-right">Periodicidade</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {cargoAberto.exames.map((exame) => (
-                      <tr key={exame} className="border-t border-hairline/70">
-                        <td className="px-2.5 py-1.5 text-foreground">{exame}</td>
-                        <td className="px-2.5 py-1.5 text-right text-foreground-muted">{periodicidadePorExame.get(exame) || "—"}</td>
+              {cargoAberto.exames.length === 0 ? (
+                <p className="mt-1 text-[12px] text-foreground-muted">Nenhum exame levantado para este cargo.</p>
+              ) : (
+                <div className="mt-1.5 overflow-hidden rounded-md border border-hairline">
+                  <table className="w-full text-[11.5px]">
+                    <thead>
+                      <tr className="border-b border-hairline bg-surface-page text-left text-[9.5px] font-semibold tracking-wide text-foreground-muted uppercase">
+                        <th className="px-2.5 py-1.5">Exame</th>
+                        <th className="px-2.5 py-1.5 text-right">Periodicidade</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {cargoAberto.exames.map((exame) => (
+                        <tr key={exame} className="border-t border-hairline/70">
+                          <td className="px-2.5 py-1.5 text-foreground">{exame}</td>
+                          <td className="px-2.5 py-1.5 text-right text-foreground-muted">{periodicidadePorExame.get(exame) || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         </Modal>
