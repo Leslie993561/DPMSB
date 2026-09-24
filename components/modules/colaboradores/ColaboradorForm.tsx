@@ -84,20 +84,26 @@ function ListaDocumentosManual({
 
   useEffect(carregar, [colaboradorId, origem]);
 
-  async function anexar(arquivo: File) {
+  async function anexarVarios(arquivos: FileList | File[]) {
     setErro(null);
     setEnviando(true);
+    const falhas: string[] = [];
     try {
-      const form = new FormData();
-      form.append("arquivo", arquivo);
-      form.append("origem", origem);
-      const r = await fetch(`/api/colaboradores/${colaboradorId}/documentos`, { method: "POST", body: form });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.erro ?? "Falha ao anexar o documento.");
-      carregar();
-    } catch (e) {
-      setErro(e instanceof Error ? e.message : "Falha ao anexar o documento.");
+      for (const arquivo of Array.from(arquivos)) {
+        const form = new FormData();
+        form.append("arquivo", arquivo);
+        form.append("origem", origem);
+        try {
+          const r = await fetch(`/api/colaboradores/${colaboradorId}/documentos`, { method: "POST", body: form });
+          const d = await r.json();
+          if (!r.ok) falhas.push(`${arquivo.name}: ${d.erro ?? "falha ao anexar"}`);
+        } catch {
+          falhas.push(`${arquivo.name}: falha ao anexar`);
+        }
+      }
+      if (falhas.length > 0) setErro(falhas.join(" · "));
     } finally {
+      carregar();
       setEnviando(false);
     }
   }
@@ -121,11 +127,12 @@ function ListaDocumentosManual({
           <input
             type="file"
             accept="application/pdf,image/jpeg,image/png"
+            multiple
             className="hidden"
             disabled={enviando}
             onChange={(e) => {
-              const arquivo = e.target.files?.[0];
-              if (arquivo) void anexar(arquivo);
+              const arquivos = e.target.files;
+              if (arquivos && arquivos.length > 0) void anexarVarios(arquivos);
               e.target.value = "";
             }}
           />
