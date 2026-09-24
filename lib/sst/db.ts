@@ -137,6 +137,28 @@ const ESQUEMA_EXTRA = `
     epis text[] NOT NULL DEFAULT '{}',
     atualizado_em timestamptz NOT NULL DEFAULT now()
   );
+
+  -- Exames Ocupacionais: matriz função → exames obrigatórios (mesmo espírito
+  -- da sst_matriz_epi_extra, mas sem "fixos" — aqui nada vem pré-cadastrado,
+  -- o RH monta do zero pelo lápis da tela).
+  CREATE TABLE IF NOT EXISTS sst_matriz_exames_funcao (
+    funcao text PRIMARY KEY,
+    exames text[] NOT NULL DEFAULT '{}',
+    atualizado_em timestamptz NOT NULL DEFAULT now()
+  );
+
+  -- Matriz Ocupacional: função → riscos (agentes físico/químico/biológico/
+  -- ergonômico) que justificam os exames — tela separada da matriz de exames.
+  CREATE TABLE IF NOT EXISTS sst_matriz_riscos_funcao (
+    funcao text PRIMARY KEY,
+    riscos jsonb NOT NULL DEFAULT '[]',
+    atualizado_em timestamptz NOT NULL DEFAULT now()
+  );
+
+  CREATE TABLE IF NOT EXISTS sst_exame_precos (
+    codigo text PRIMARY KEY,
+    valor numeric NOT NULL
+  );
 `;
 
 let esquemaPronto: Promise<void> | null = null;
