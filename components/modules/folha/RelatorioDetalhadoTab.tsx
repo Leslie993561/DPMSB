@@ -7,6 +7,7 @@ import { Card } from "@/components/shared/Card";
 import { RiskCallout } from "@/components/shared/RiskCallout";
 import { cn } from "@/lib/cn";
 import { formatarHoras } from "@/lib/folha/horas";
+import { useSessaoResumo } from "@/lib/authClient";
 
 interface VerbaColaborador {
   colaboradorId: number;
@@ -120,6 +121,10 @@ function LinhaCusto({ rotulo, percentual, valor }: { rotulo: string; percentual?
 }
 
 export function RelatorioDetalhadoTab() {
+  // Gestor liberado pro Breakdown só enxerga: edição (fechar/reabrir mês),
+  // importar planilha e exportar ficam só com o RH.
+  const sessao = useSessaoResumo();
+  const souGestor = sessao?.tipo === "gestor";
   const [competencia, setCompetencia] = useState(competenciaAtual());
   const [linhas, setLinhas] = useState<VerbaColaborador[]>([]);
   const [carregando, setCarregando] = useState(true);
@@ -275,29 +280,31 @@ export function RelatorioDetalhadoTab() {
         titulo="Relatório detalhado da folha"
         subtitulo="Importe o relatório da folha para atualizar o breakdown de custo por colaborador"
         acao={
-          <div className="flex flex-wrap items-center gap-2">
-          <ExportarPopover
-            aberto={exportarAberto}
-            onAbrir={() => {
-              setExportarAberto((v) => !v);
-              setImportarAberto(false);
-            }}
-            onFechar={() => setExportarAberto(false)}
-            competencia={competencia}
-            linhas={linhas}
-            setores={setores}
-          />
-          <ImportarPopover
-            aberto={importarAberto}
-            onAbrir={() => {
-              setImportarAberto((v) => !v);
-              setExportarAberto(false);
-            }}
-            onFechar={() => setImportarAberto(false)}
-            competenciaInicial={competencia}
-            onImportado={() => void recarregar()}
-          />
-          </div>
+          souGestor ? undefined : (
+            <div className="flex flex-wrap items-center gap-2">
+              <ExportarPopover
+                aberto={exportarAberto}
+                onAbrir={() => {
+                  setExportarAberto((v) => !v);
+                  setImportarAberto(false);
+                }}
+                onFechar={() => setExportarAberto(false)}
+                competencia={competencia}
+                linhas={linhas}
+                setores={setores}
+              />
+              <ImportarPopover
+                aberto={importarAberto}
+                onAbrir={() => {
+                  setImportarAberto((v) => !v);
+                  setExportarAberto(false);
+                }}
+                onFechar={() => setImportarAberto(false)}
+                competenciaInicial={competencia}
+                onImportado={() => void recarregar()}
+              />
+            </div>
+          )
         }
       />
 
@@ -310,7 +317,13 @@ export function RelatorioDetalhadoTab() {
             </span>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {fechado ? (
+            {souGestor ? (
+              fechado && (
+                <span className="flex items-center gap-1 rounded-full border border-status-success-border bg-status-success-bg px-2.5 py-1 text-[10.5px] font-bold text-status-success">
+                  <span aria-hidden>🔒</span> Mês fechado
+                </span>
+              )
+            ) : fechado ? (
               <button
                 type="button"
                 onClick={() => void alternarFechamento()}

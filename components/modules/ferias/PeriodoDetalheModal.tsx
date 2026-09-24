@@ -109,7 +109,7 @@ export function PeriodoDetalheModal({
 
   function exigirOperador(): boolean {
     if (!operador.trim()) {
-      setErro("Informe o nome do operador (campo no cabeçalho) antes de continuar.");
+      setErro("Não foi possível identificar seu usuário — recarregue a página e tente de novo.");
       return false;
     }
     return true;

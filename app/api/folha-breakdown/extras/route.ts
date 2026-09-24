@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { obterSessaoAtual } from "@/lib/auth/sessao";
 import { bloquearSeFechada } from "@/lib/db/fechamento";
 import { parsearPlanilha } from "@/lib/parsing/spreadsheet";
 import { parsearFolhaExtrasPdf } from "@/lib/parsing/pdfFolhaExtras";
@@ -9,8 +10,17 @@ export const runtime = "nodejs";
 
 const schema = z.object({ competencia: z.string().regex(/^\d{4}-\d{2}$/) });
 
-/** Lê a planilha (ou PDF) de verbas extras e aplica em uma competência — "Importar planilha" do Relatório detalhado. */
+/**
+ * Lê a planilha (ou PDF) de verbas extras e aplica em uma competência —
+ * "Importar planilha" do Relatório detalhado. Gestor liberado pro Breakdown
+ * só vê — importar é do RH.
+ */
 export async function POST(request: Request) {
+  const sessao = await obterSessaoAtual();
+  if (!sessao || sessao.tipo !== "administrador") {
+    return Response.json({ erro: "Sem permissão." }, { status: 403 });
+  }
+
   const formData = await request.formData();
   const arquivo = formData.get("arquivo");
   const parsed = schema.safeParse({ competencia: formData.get("competencia") });

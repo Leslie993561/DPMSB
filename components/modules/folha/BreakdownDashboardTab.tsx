@@ -5,6 +5,7 @@ import { formatarMoeda } from "@/lib/format";
 import { Card } from "@/components/shared/Card";
 import { RiskCallout } from "@/components/shared/RiskCallout";
 import { cn } from "@/lib/cn";
+import { useSessaoResumo } from "@/lib/authClient";
 
 interface VerbaColaborador {
   colaboradorId: number;
@@ -157,6 +158,10 @@ function resumirGrupo(itens: VerbaColaborador[]): ResumoGrupo {
 }
 
 export function BreakdownDashboardTab() {
+  // Gestor liberado pro Breakdown só enxerga: fechar mês e gerar leitura com
+  // IA (que consome créditos) ficam só com o RH.
+  const sessao = useSessaoResumo();
+  const souGestor = sessao?.tipo === "gestor";
   const [competencia, setCompetencia] = useState(competenciaAtual());
   const [linhas, setLinhas] = useState<VerbaColaborador[]>([]);
   const [fechado, setFechado] = useState(false);
@@ -329,28 +334,33 @@ export function BreakdownDashboardTab() {
             className="rounded-md border border-brand-surface bg-background px-3 py-1.5 text-sm text-foreground dark:border-brand-neutral/30"
           />
         </label>
-        {fechado ? (
+        {fechado && (
           <span className="rounded-full bg-status-success-bg px-2.5 py-1 text-xs font-semibold text-status-success">
             Mês fechado
           </span>
-        ) : (
-          <button
-            type="button"
-            onClick={fecharMes}
-            disabled={fechando || linhas.length === 0}
-            className="rounded-md bg-brand-primary px-3 py-1.5 text-xs font-semibold text-brand-white transition-colors hover:bg-brand-primary-hover disabled:opacity-50"
-          >
-            {fechando ? "Fechando..." : "Fechar mês"}
-          </button>
         )}
-        <button
-          type="button"
-          onClick={gerarLeitura}
-          disabled={gerandoLeitura || linhas.length === 0}
-          className="ml-auto rounded-md border border-brand-surface px-3 py-1.5 text-xs font-semibold text-foreground-muted transition-colors hover:border-brand-primary hover:text-brand-primary-800 disabled:opacity-50 dark:border-brand-neutral/30"
-        >
-          {gerandoLeitura ? "Gerando..." : "✨ Gerar leitura com IA"}
-        </button>
+        {!souGestor && (
+          <>
+            {!fechado && (
+              <button
+                type="button"
+                onClick={fecharMes}
+                disabled={fechando || linhas.length === 0}
+                className="rounded-md bg-brand-primary px-3 py-1.5 text-xs font-semibold text-brand-white transition-colors hover:bg-brand-primary-hover disabled:opacity-50"
+              >
+                {fechando ? "Fechando..." : "Fechar mês"}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={gerarLeitura}
+              disabled={gerandoLeitura || linhas.length === 0}
+              className="ml-auto rounded-md border border-brand-surface px-3 py-1.5 text-xs font-semibold text-foreground-muted transition-colors hover:border-brand-primary hover:text-brand-primary-800 disabled:opacity-50 dark:border-brand-neutral/30"
+            >
+              {gerandoLeitura ? "Gerando..." : "✨ Gerar leitura com IA"}
+            </button>
+          </>
+        )}
       </div>
 
       {leitura && (

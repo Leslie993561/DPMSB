@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 import { z } from "zod";
+import { obterSessaoAtual } from "@/lib/auth/sessao";
 import { obterBreakdown } from "@/lib/db/folhaBreakdown";
 import { formatarHoras } from "@/lib/folha/horas";
 import { nomeParaPlanilha, padronizarColunaDeNome } from "@/lib/planilhas/nomeColaborador";
@@ -8,8 +9,17 @@ export const runtime = "nodejs";
 
 const schema = z.object({ competencia: z.string().regex(/^\d{4}-\d{2}$/), setor: z.string().nullable() });
 
-/** Exporta o breakdown de custo por colaborador (Relatório detalhado) — uma linha por colaborador, uma coluna por verba. */
+/**
+ * Exporta o breakdown de custo por colaborador (Relatório detalhado) — uma
+ * linha por colaborador, uma coluna por verba. Gestor liberado pro Breakdown
+ * só vê na tela — exportar planilha é do RH.
+ */
 export async function GET(request: Request) {
+  const sessao = await obterSessaoAtual();
+  if (!sessao || sessao.tipo !== "administrador") {
+    return Response.json({ erro: "Sem permissão." }, { status: 403 });
+  }
+
   const { searchParams } = new URL(request.url);
   const parsed = schema.safeParse({ competencia: searchParams.get("competencia"), setor: searchParams.get("setor") });
   if (!parsed.success) {

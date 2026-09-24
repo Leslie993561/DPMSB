@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { obterSessaoAtual } from "@/lib/auth/sessao";
 import { getAnthropicClient } from "@/lib/ai/client";
 
 export const runtime = "nodejs";
@@ -20,9 +21,15 @@ const schema = z.object({
  * Gera só a NARRATIVA em cima de números já calculados pelo motor
  * determinístico (`lib/db/folhaBreakdown.ts`) — o modelo nunca soma, nunca
  * calcula, apenas interpreta o que já foi enviado no prompt. Mesmo princípio
- * de `lib/ai/tools.ts` para o chat.
+ * de `lib/ai/tools.ts` para o chat. Gestor liberado pro Breakdown só vê — a
+ * leitura com IA (consome créditos) é do RH.
  */
 export async function POST(request: Request) {
+  const sessao = await obterSessaoAtual();
+  if (!sessao || sessao.tipo !== "administrador") {
+    return Response.json({ erro: "Sem permissão." }, { status: 403 });
+  }
+
   const body = await request.json();
   const parsed = schema.safeParse(body);
   if (!parsed.success) {

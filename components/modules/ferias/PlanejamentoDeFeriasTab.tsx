@@ -51,12 +51,21 @@ function LinhaValor({ rotulo, valor, destaque }: { rotulo: string; valor: number
 
 export function PlanejamentoDeFeriasTab({
   ano,
+  souGestor,
   lancarAberto,
   onFecharLancar,
+  manualAberto,
+  onAbrirManual,
+  onFecharManual,
 }: {
   ano: number;
+  /** Gestor só confirma o próprio lançamento manual — quem baixa (confirma gozo) e importa em lote é o RH. */
+  souGestor: boolean;
   lancarAberto: boolean;
   onFecharLancar: () => void;
+  manualAberto: boolean;
+  onAbrirManual: () => void;
+  onFecharManual: () => void;
 }) {
   const { operador } = useOperador();
   const [itens, setItens] = useState<ItemProgramacaoFerias[]>([]);
@@ -68,7 +77,6 @@ export function PlanejamentoDeFeriasTab({
   const [revertendoId, setRevertendoId] = useState<number | null>(null);
   const [confirmandoId, setConfirmandoId] = useState<number | null>(null);
   const [erroAcao, setErroAcao] = useState<string | null>(null);
-  const [manualAberto, setManualAberto] = useState(false);
   const [cancelando, setCancelando] = useState<ItemProgramacaoFerias | null>(null);
 
   async function recarregar() {
@@ -87,7 +95,7 @@ export function PlanejamentoDeFeriasTab({
 
   async function desfazerBaixa(item: ItemProgramacaoFerias) {
     if (!operador.trim()) {
-      setErroAcao("Informe o nome do operador (campo no cabeçalho) antes de continuar.");
+      setErroAcao("Não foi possível identificar seu usuário — recarregue a página e tente de novo.");
       return;
     }
     const confirmou = window.confirm(
@@ -121,7 +129,7 @@ export function PlanejamentoDeFeriasTab({
    */
   async function cancelarLancamento(item: ItemProgramacaoFerias, motivo: string) {
     if (!operador.trim()) {
-      setErroAcao("Informe o nome do operador (campo no cabeçalho) antes de continuar.");
+      setErroAcao("Não foi possível identificar seu usuário — recarregue a página e tente de novo.");
       return;
     }
     setErroAcao(null);
@@ -145,7 +153,7 @@ export function PlanejamentoDeFeriasTab({
 
   async function confirmarGozo(item: ItemProgramacaoFerias) {
     if (!operador.trim()) {
-      setErroAcao("Informe o nome do operador (campo no cabeçalho) antes de continuar.");
+      setErroAcao("Não foi possível identificar seu usuário — recarregue a página e tente de novo.");
       return;
     }
     setErroAcao(null);
@@ -390,7 +398,7 @@ export function PlanejamentoDeFeriasTab({
                         type="button"
                         onClick={() => setItemDetalhe(item)}
                         title="Ver cálculo das férias"
-                        className="flex items-center gap-2 text-left hover:text-brand-primary-800"
+                        className="group flex min-w-0 items-center gap-1.5 rounded px-1 py-0.5 text-left hover:bg-brand-primary-050"
                       >
                         <div className="min-w-0">
                           <div className="flex items-center gap-1 truncate font-medium text-foreground uppercase">
@@ -405,6 +413,12 @@ export function PlanejamentoDeFeriasTab({
                             {item.colaboradorCargo ?? "—"} · {item.colaboradorDepartamento ?? "—"}
                           </div>
                         </div>
+                        <span
+                          aria-hidden
+                          className="shrink-0 rounded px-1 py-0.5 text-[10px] font-semibold whitespace-nowrap text-brand-primary opacity-70 group-hover:opacity-100"
+                        >
+                          🧮 Ver cálculo
+                        </span>
                       </button>
                       </div>
                     </td>
@@ -453,16 +467,29 @@ export function PlanejamentoDeFeriasTab({
                       )}
                     </td>
                     <td className="px-3 py-2 text-right">
+                      {/* Confirmar gozo (e desfazer) é do RH, não do gestor — quem
+                          programou não é quem confere se a pessoa realmente saiu
+                          de férias. Pro gestor fica só o status, sem botão. */}
                       {baixado(item.status) ? (
-                        <button
-                          type="button"
-                          title="Clique para desfazer a baixa"
-                          disabled={revertendoId === item.lancamentoId}
-                          onClick={() => void desfazerBaixa(item)}
-                          className="inline-block rounded-full bg-status-success-bg px-2 py-0.5 text-[10.5px] font-bold whitespace-nowrap text-status-success transition-opacity hover:opacity-70 disabled:opacity-50"
-                        >
-                          {revertendoId === item.lancamentoId ? "Desfazendo…" : "Baixado"}
-                        </button>
+                        souGestor ? (
+                          <span className="inline-block rounded-full bg-status-success-bg px-2 py-0.5 text-[10.5px] font-bold whitespace-nowrap text-status-success">
+                            Baixado
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            title="Clique para desfazer a baixa"
+                            disabled={revertendoId === item.lancamentoId}
+                            onClick={() => void desfazerBaixa(item)}
+                            className="inline-block rounded-full bg-status-success-bg px-2 py-0.5 text-[10.5px] font-bold whitespace-nowrap text-status-success transition-opacity hover:opacity-70 disabled:opacity-50"
+                          >
+                            {revertendoId === item.lancamentoId ? "Desfazendo…" : "Baixado"}
+                          </button>
+                        )
+                      ) : souGestor ? (
+                        <span className="rounded bg-status-warning-bg px-2.5 py-1 text-[11px] font-medium whitespace-nowrap text-status-warning">
+                          Aguardando o RH
+                        </span>
                       ) : (
                         <button
                           type="button"
@@ -530,7 +557,7 @@ export function PlanejamentoDeFeriasTab({
           onFechar={onFecharLancar}
           onLancarManualmente={() => {
             onFecharLancar();
-            setManualAberto(true);
+            onAbrirManual();
           }}
           onSucesso={() => {
             onFecharLancar();
@@ -541,9 +568,9 @@ export function PlanejamentoDeFeriasTab({
 
       {manualAberto && (
         <LancarManualmenteModal
-          onFechar={() => setManualAberto(false)}
+          onFechar={onFecharManual}
           onSucesso={() => {
-            setManualAberto(false);
+            onFecharManual();
             void recarregar();
           }}
         />

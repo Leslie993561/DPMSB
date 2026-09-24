@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { useSessaoResumo } from "@/lib/authClient";
 import { ControleDeFeriasTab } from "./ControleDeFeriasTab";
 import { PlanejamentoDeFeriasTab } from "./PlanejamentoDeFeriasTab";
 
@@ -25,8 +26,14 @@ export function FeriasPageClient() {
   const aba: Aba = abaParam && ABAS_VALIDAS.has(abaParam) ? (abaParam as Aba) : "controle";
   const [ano, setAno] = useState(ANO_ATUAL);
   const [lancarAberto, setLancarAberto] = useState(false);
+  const [manualAberto, setManualAberto] = useState(false);
   const [importarAberto, setImportarAberto] = useState(false);
   const [exportarAberto, setExportarAberto] = useState(false);
+  const sessao = useSessaoResumo();
+  // Gestor só lança férias da própria equipe, uma de cada vez — importação em
+  // lote mexe com a empresa inteira e fica só com o RH (mesma regra já usada
+  // no atalho do Dashboard, ver DashboardFeriasClient.tsx).
+  const souGestor = sessao?.tipo === "gestor";
 
   return (
     <div className="space-y-5">
@@ -56,13 +63,23 @@ export function FeriasPageClient() {
             </div>
           ) : aba === "planejamento" ? (
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setLancarAberto(true)}
-                className="flex items-center gap-1.5 rounded bg-brand-primary px-3 py-1.5 text-[12.5px] font-medium text-brand-white shadow-card transition-colors hover:bg-brand-primary-hover"
-              >
-                <span aria-hidden>+</span> Lançar programação
-              </button>
+              {souGestor ? (
+                <button
+                  type="button"
+                  onClick={() => setManualAberto(true)}
+                  className="flex items-center gap-1.5 rounded bg-brand-primary px-3 py-1.5 text-[12.5px] font-medium text-brand-white shadow-card transition-colors hover:bg-brand-primary-hover"
+                >
+                  <span aria-hidden>+</span> Lançar manualmente
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setLancarAberto(true)}
+                  className="flex items-center gap-1.5 rounded bg-brand-primary px-3 py-1.5 text-[12.5px] font-medium text-brand-white shadow-card transition-colors hover:bg-brand-primary-hover"
+                >
+                  <span aria-hidden>+</span> Lançar programação
+                </button>
+              )}
               <select
                 value={ano}
                 onChange={(e) => setAno(Number(e.target.value))}
@@ -90,8 +107,12 @@ export function FeriasPageClient() {
       {aba === "planejamento" && (
         <PlanejamentoDeFeriasTab
           ano={ano}
+          souGestor={souGestor}
           lancarAberto={lancarAberto}
           onFecharLancar={() => setLancarAberto(false)}
+          manualAberto={manualAberto}
+          onAbrirManual={() => setManualAberto(true)}
+          onFecharManual={() => setManualAberto(false)}
         />
       )}
     </div>

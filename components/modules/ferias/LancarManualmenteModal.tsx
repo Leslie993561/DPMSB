@@ -31,7 +31,7 @@ export function LancarManualmenteModal({
   onFechar: () => void;
   onSucesso: () => void;
 }) {
-  const { operador, setOperador } = useOperador();
+  const { operador } = useOperador();
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [colaboradorId, setColaboradorId] = useState("");
   const [periodos, setPeriodos] = useState<PeriodoDoHistorico[]>([]);
@@ -124,7 +124,7 @@ export function LancarManualmenteModal({
   async function lancar() {
     if (!periodo) return;
     if (!operador.trim()) {
-      setErro("Informe quem está lançando (campo abaixo) antes de continuar.");
+      setErro("Não foi possível identificar seu usuário — recarregue a página e tente de novo.");
       return;
     }
     setErro(null);
@@ -287,21 +287,6 @@ export function LancarManualmenteModal({
               {/* A observação que impede a ação: dias acima do disponível, período
                   abaixo do mínimo legal ou mais de 3 fracionamentos. */}
               {validacao && !validacao.ok && <RiskCallout nivel="critico">{validacao.erro}</RiskCallout>}
-
-              {/* Quem está lançando — fica aqui, e não só no cabeçalho, para o
-                  lançamento não travar sem que se saiba onde preencher. */}
-              <label className="block text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">
-                Quem está lançando
-                <input
-                  value={operador}
-                  onChange={(e) => {
-                    setOperador(e.target.value);
-                    setErro(null);
-                  }}
-                  placeholder="Seu nome — fica registrado no lançamento"
-                  className={`mt-1 font-normal normal-case ${INPUT_CLASS}`}
-                />
-              </label>
             </>
           )}
 
