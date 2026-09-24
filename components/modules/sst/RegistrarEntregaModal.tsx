@@ -36,7 +36,9 @@ export function RegistrarEntregaModal({
   onFechar: () => void;
   onCriada: () => void;
 }) {
-  const opcoes = colaborador.episObrigatorios.length > 0 ? colaborador.episObrigatorios : catalogo.map((c) => c.epi);
+  const obrigatorios = colaborador.episObrigatorios;
+  const naoObrigatorios = catalogo.map((c) => c.epi).filter((epi) => !obrigatorios.includes(epi));
+  const opcoes = [...obrigatorios, ...naoObrigatorios];
   const caPadrao = (epi: string) => catalogo.find((c) => c.epi === epi)?.ca ?? "";
   const [selecao, setSelecao] = useState<Record<string, Selecao>>(() =>
     Object.fromEntries(opcoes.map((epi) => [epi, { marcado: false, qtd: "1", ca: caPadrao(epi), editandoCa: false, dataEntrega: hojeIso(), dataTroca: "" }])),
@@ -152,6 +154,81 @@ export function RegistrarEntregaModal({
     `Olá, ${colaborador.nome.split(" ")[0]}!\n\nSegue o link para conferir e assinar a sua ficha de entrega de EPI:\n${link ?? ""}\n\nPara assinar, entre com o seu e-mail profissional.\n\nRH · MSB`,
   );
 
+  function linhaEpi(epi: string) {
+    const s = selecao[epi];
+    return (
+      <div key={epi} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-2.5 py-2">
+        <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-[12.5px] text-foreground">
+          <input
+            type="checkbox"
+            checked={s.marcado}
+            onChange={(e) => alterar(epi, { marcado: e.target.checked })}
+            className="accent-brand-primary"
+          />
+          <span className="truncate">{epi}</span>
+        </label>
+        {s.marcado && (
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex flex-col text-[9.5px] text-foreground-muted">
+              Quant.
+              <input
+                type="number"
+                min={1}
+                value={s.qtd}
+                onChange={(e) => alterar(epi, { qtd: e.target.value })}
+                className={INPUT + " w-14"}
+              />
+            </label>
+            <div className="flex flex-col text-[9.5px] text-foreground-muted">
+              C.A.
+              {s.editandoCa ? (
+                <input
+                  autoFocus
+                  value={s.ca}
+                  onChange={(e) => alterar(epi, { ca: e.target.value })}
+                  onBlur={() => alterar(epi, { editandoCa: false })}
+                  placeholder="Nº"
+                  className={INPUT + " w-20"}
+                />
+              ) : (
+                <span className="flex h-[26px] w-20 items-center justify-between rounded border border-transparent px-1 text-[11.5px] text-foreground">
+                  {s.ca || "—"}
+                  <button
+                    type="button"
+                    onClick={() => alterar(epi, { editandoCa: true })}
+                    title="Editar C.A."
+                    aria-label={`Editar C.A. de ${epi}`}
+                    className="rounded px-0.5 text-foreground-muted hover:text-brand-primary"
+                  >
+                    ✏️
+                  </button>
+                </span>
+              )}
+            </div>
+            <label className="flex flex-col text-[9.5px] text-foreground-muted">
+              Entrega
+              <input
+                type="date"
+                value={s.dataEntrega}
+                onChange={(e) => alterar(epi, { dataEntrega: e.target.value })}
+                className={INPUT}
+              />
+            </label>
+            <label className="flex flex-col text-[9.5px] text-foreground-muted">
+              Troca prevista
+              <input
+                type="date"
+                value={s.dataTroca}
+                onChange={(e) => alterar(epi, { dataTroca: e.target.value })}
+                className={INPUT}
+              />
+            </label>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <Modal
       aberto
@@ -253,9 +330,7 @@ export function RegistrarEntregaModal({
           )}
           <div className="flex items-center justify-between">
             <p className="text-[11px] text-foreground-muted">
-              {colaborador.funcaoMatriz
-                ? `EPIs da função ${colaborador.funcaoMatriz}`
-                : "Cargo sem função na matriz — mostrando todo o catálogo"}
+              {colaborador.funcaoMatriz ? `Função ${colaborador.funcaoMatriz}` : "Cargo sem função na matriz"}
             </p>
             <button
               type="button"
@@ -297,82 +372,25 @@ export function RegistrarEntregaModal({
             {erroAnexo && <span className="text-status-danger">{erroAnexo}</span>}
           </div>
 
-          <div className="flex flex-col divide-y divide-hairline/70 rounded-md border border-hairline">
-            {opcoes.map((epi) => {
-              const s = selecao[epi];
-              return (
-                <div key={epi} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-2.5 py-2">
-                  <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-[12.5px] text-foreground">
-                    <input
-                      type="checkbox"
-                      checked={s.marcado}
-                      onChange={(e) => alterar(epi, { marcado: e.target.checked })}
-                      className="accent-brand-primary"
-                    />
-                    <span className="truncate">{epi}</span>
-                  </label>
-                  {s.marcado && (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <label className="flex flex-col text-[9.5px] text-foreground-muted">
-                        Quant.
-                        <input
-                          type="number"
-                          min={1}
-                          value={s.qtd}
-                          onChange={(e) => alterar(epi, { qtd: e.target.value })}
-                          className={INPUT + " w-14"}
-                        />
-                      </label>
-                      <div className="flex flex-col text-[9.5px] text-foreground-muted">
-                        C.A.
-                        {s.editandoCa ? (
-                          <input
-                            autoFocus
-                            value={s.ca}
-                            onChange={(e) => alterar(epi, { ca: e.target.value })}
-                            onBlur={() => alterar(epi, { editandoCa: false })}
-                            placeholder="Nº"
-                            className={INPUT + " w-20"}
-                          />
-                        ) : (
-                          <span className="flex h-[26px] w-20 items-center justify-between rounded border border-transparent px-1 text-[11.5px] text-foreground">
-                            {s.ca || "—"}
-                            <button
-                              type="button"
-                              onClick={() => alterar(epi, { editandoCa: true })}
-                              title="Editar C.A."
-                              aria-label={`Editar C.A. de ${epi}`}
-                              className="rounded px-0.5 text-foreground-muted hover:text-brand-primary"
-                            >
-                              ✏️
-                            </button>
-                          </span>
-                        )}
-                      </div>
-                      <label className="flex flex-col text-[9.5px] text-foreground-muted">
-                        Entrega
-                        <input
-                          type="date"
-                          value={s.dataEntrega}
-                          onChange={(e) => alterar(epi, { dataEntrega: e.target.value })}
-                          className={INPUT}
-                        />
-                      </label>
-                      <label className="flex flex-col text-[9.5px] text-foreground-muted">
-                        Troca prevista
-                        <input
-                          type="date"
-                          value={s.dataTroca}
-                          onChange={(e) => alterar(epi, { dataTroca: e.target.value })}
-                          className={INPUT}
-                        />
-                      </label>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          {obrigatorios.length > 0 && (
+            <div>
+              <p className="mb-1 text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">Obrigatórios para o cargo</p>
+              <div className="flex flex-col divide-y divide-hairline/70 rounded-md border border-hairline">
+                {obrigatorios.map((epi) => linhaEpi(epi))}
+              </div>
+            </div>
+          )}
+
+          {naoObrigatorios.length > 0 && (
+            <div>
+              <p className="mb-1 text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">
+                Outros EPIs (não obrigatórios para o cargo)
+              </p>
+              <div className="flex flex-col divide-y divide-hairline/70 rounded-md border border-hairline">
+                {naoObrigatorios.map((epi) => linhaEpi(epi))}
+              </div>
+            </div>
+          )}
 
           <div className="flex items-center justify-between pt-2">
             <p className="text-[11px] font-semibold tracking-wide text-foreground uppercase">Fardamento</p>
