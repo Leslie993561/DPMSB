@@ -218,23 +218,22 @@ function MesCalendario({
         {semanas.map((semana, i) => (
           <div key={i} className="grid grid-cols-7 gap-0.5">
             {semana.map((dia, j) => {
-              const doDia = dia ? (eventosPorDia.get(dia) ?? []) : [];
+              if (!dia) return <span key={j} className="h-6" />;
+              const doDia = eventosPorDia.get(dia) ?? [];
               const selecionado = dia === diaSelecionado;
               return (
                 <button
                   key={j}
                   type="button"
-                  disabled={!dia}
-                  onClick={() => dia && onSelecionarDia(dia)}
+                  onClick={() => onSelecionarDia(dia)}
                   className={cn(
                     "flex h-6 flex-col items-center justify-center rounded text-[9.5px]",
-                    !dia && "cursor-default",
-                    dia && dia === hoje && "font-bold text-brand-primary",
-                    dia && !selecionado && "text-foreground-muted hover:bg-surface-page",
+                    dia === hoje && "font-bold text-brand-primary",
+                    !selecionado && "text-foreground-muted hover:bg-surface-page",
                     selecionado && "bg-brand-primary-100 text-brand-primary-800",
                   )}
                 >
-                  {dia ? Number(dia.slice(8, 10)) : ""}
+                  {Number(dia.slice(8, 10))}
                   {doDia.length > 0 && <span className="-mt-0.5 h-1 w-1 rounded-full bg-brand-accent" title={doDia.map((e) => e.titulo).join(", ")} />}
                 </button>
               );
