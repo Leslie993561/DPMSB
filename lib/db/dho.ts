@@ -30,6 +30,15 @@ export async function excluirEventoCalendario(id: number): Promise<void> {
   await db.execute({ sql: "DELETE FROM dho_eventos_calendario WHERE id = ?", args: [id] });
 }
 
+export async function atualizarEventoCalendario(id: number, data: string, titulo: string): Promise<EventoCalendario> {
+  const db = await getDb();
+  const resultado = await db.execute({
+    sql: "UPDATE dho_eventos_calendario SET data = ?, titulo = ? WHERE id = ? RETURNING id, data, titulo",
+    args: [data, titulo, id],
+  });
+  return (resultado.rows as unknown as EventoCalendario[])[0];
+}
+
 export interface MaterialKit {
   id: number;
   nome: string;

@@ -49,6 +49,9 @@ export function EndomarketingDashboardClient({
   const [diaSelecionado, setDiaSelecionado] = useState<string | null>(null);
   const [novoTitulo, setNovoTitulo] = useState("");
   const [salvando, setSalvando] = useState(false);
+  const [editandoEvento, setEditandoEvento] = useState<number | null>(null);
+  const [rascunhoData, setRascunhoData] = useState("");
+  const [rascunhoTitulo, setRascunhoTitulo] = useState("");
 
   const eventosPorDia = useMemo(() => {
     const mapa = new Map<string, EventoCalendario[]>();
@@ -95,6 +98,31 @@ export function EndomarketingDashboardClient({
   async function excluirEvento(id: number) {
     setEventos((atual) => atual.filter((e) => e.id !== id));
     await fetch(`/api/dho/eventos/${id}`, { method: "DELETE" });
+  }
+
+  function iniciarEdicaoEvento(evento: EventoCalendario) {
+    setEditandoEvento(evento.id);
+    setRascunhoData(evento.data);
+    setRascunhoTitulo(evento.titulo);
+  }
+
+  async function salvarEdicaoEvento(id: number) {
+    if (!rascunhoData || !rascunhoTitulo.trim()) return;
+    setSalvando(true);
+    try {
+      const res = await fetch(`/api/dho/eventos/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: rascunhoData, titulo: rascunhoTitulo.trim() }),
+      });
+      const dados = await res.json();
+      if (res.ok) {
+        setEventos((atual) => atual.map((e) => (e.id === id ? dados.evento : e)));
+        setEditandoEvento(null);
+      }
+    } finally {
+      setSalvando(false);
+    }
   }
 
   return (
@@ -174,12 +202,65 @@ export function EndomarketingDashboardClient({
           {proximosEventos.length === 0 ? (
             <p className="text-[12px] text-foreground-muted">Nenhum evento cadastrado a partir de hoje.</p>
           ) : (
-            proximosEventos.map((e) => (
-              <div key={e.id} className="rounded border border-hairline px-2.5 py-1.5">
-                <p className="text-[10.5px] font-semibold text-brand-primary-800">{formatarDataBr(e.data)}</p>
-                <p className="text-[12px] text-foreground">{e.titulo}</p>
-              </div>
-            ))
+            proximosEventos.map((e) =>
+              editandoEvento === e.id ? (
+                <div key={e.id} className="space-y-1.5 rounded border border-brand-primary px-2.5 py-1.5">
+                  <input
+                    type="date"
+                    value={rascunhoData}
+                    onChange={(ev) => setRascunhoData(ev.target.value)}
+                    className="w-full rounded border border-hairline bg-background px-2 py-1 text-[11.5px] text-foreground"
+                  />
+                  <input
+                    value={rascunhoTitulo}
+                    onChange={(ev) => setRascunhoTitulo(ev.target.value)}
+                    className="w-full rounded border border-hairline bg-background px-2 py-1 text-[12px] text-foreground"
+                  />
+                  <div className="flex gap-1.5">
+                    <button
+                      type="button"
+                      disabled={salvando}
+                      onClick={() => salvarEdicaoEvento(e.id)}
+                      className="flex-1 rounded bg-brand-primary px-2 py-1 text-[11px] font-medium text-brand-white hover:bg-brand-primary-hover disabled:opacity-50"
+                    >
+                      Salvar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditandoEvento(null)}
+                      className="rounded border border-hairline px-2 py-1 text-[11px] text-foreground-muted hover:bg-surface-page"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div key={e.id} className="flex items-start justify-between gap-2 rounded border border-hairline px-2.5 py-1.5">
+                  <div className="min-w-0">
+                    <p className="text-[10.5px] font-semibold text-brand-primary-800">{formatarDataBr(e.data)}</p>
+                    <p className="text-[12px] text-foreground">{e.titulo}</p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <button
+                      type="button"
+                      title="Editar"
+                      onClick={() => iniciarEdicaoEvento(e)}
+                      className="text-[11px] text-foreground-muted hover:text-brand-primary"
+                    >
+                      ✎
+                    </button>
+                    <button
+                      type="button"
+                      title="Excluir"
+                      onClick={() => excluirEvento(e.id)}
+                      className="text-[11px] text-foreground-muted hover:text-status-danger"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              ),
+            )
           )}
         </div>
       </Card>
