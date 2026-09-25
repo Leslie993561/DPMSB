@@ -36,6 +36,21 @@ export interface VersaoProgramaSaude {
   diasRestantes: number | null;
 }
 
+function paraVersao(l: LinhaProgramaSaude): VersaoProgramaSaude {
+  return {
+    id: l.id,
+    programa: l.programa,
+    vigenciaInicio: l.vigencia_inicio,
+    vigenciaFim: l.vigencia_fim,
+    precisaoFim: l.precisao_fim,
+    autor: l.autor,
+    anexoNome: l.anexo_nome,
+    ts: l.ts,
+    status: computeProgramaStatus(l.vigencia_fim, l.precisao_fim),
+    diasRestantes: diasRestantesPrograma(l.vigencia_fim, l.precisao_fim),
+  };
+}
+
 /** Última versão carregada de cada programa (PCMSO/LTCAT/PGR) — null para o que nunca foi cadastrado. */
 export async function listarProgramasSaude(): Promise<Record<ProgramaSaude, VersaoProgramaSaude | null>> {
   const linhas = await sstQuery<LinhaProgramaSaude>(
@@ -49,22 +64,18 @@ export async function listarProgramasSaude(): Promise<Record<ProgramaSaude, Vers
   const resultado = {} as Record<ProgramaSaude, VersaoProgramaSaude | null>;
   for (const programa of PROGRAMAS_SAUDE) {
     const l = porPrograma.get(programa);
-    resultado[programa] = l
-      ? {
-          id: l.id,
-          programa: l.programa,
-          vigenciaInicio: l.vigencia_inicio,
-          vigenciaFim: l.vigencia_fim,
-          precisaoFim: l.precisao_fim,
-          autor: l.autor,
-          anexoNome: l.anexo_nome,
-          ts: l.ts,
-          status: computeProgramaStatus(l.vigencia_fim, l.precisao_fim),
-          diasRestantes: diasRestantesPrograma(l.vigencia_fim, l.precisao_fim),
-        }
-      : null;
+    resultado[programa] = l ? paraVersao(l) : null;
   }
   return resultado;
+}
+
+/** Todas as versões já carregadas de um programa, da mais recente pra mais antiga — o histórico completo. */
+export async function listarHistoricoPrograma(programa: ProgramaSaude): Promise<VersaoProgramaSaude[]> {
+  const linhas = await sstQuery<LinhaProgramaSaude>(
+    "SELECT id, programa, vigencia_inicio, vigencia_fim, precisao_fim, autor, anexo_url, anexo_nome, ts FROM sst_programas_saude WHERE programa = $1 ORDER BY ts DESC",
+    [programa],
+  );
+  return linhas.map(paraVersao);
 }
 
 export interface NovaVersaoPrograma {

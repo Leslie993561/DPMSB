@@ -47,61 +47,14 @@ export function ProgramasSaudeClient({
   return (
     <>
       <div className="grid gap-3 md:grid-cols-3">
-        {PROGRAMAS_SAUDE.map((programa) => {
-          const versao = programasIniciais[programa];
-          return (
-            <Card key={programa} className="flex flex-col gap-2.5 p-4">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="text-[13px] font-semibold text-foreground">{programa}</p>
-                  <p className="text-[10.5px] text-foreground-muted">{DESCRICAO_PROGRAMA[programa]}</p>
-                </div>
-                {versao && (
-                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${ESTILO_STATUS[versao.status]}`}>
-                    {versao.status}
-                  </span>
-                )}
-              </div>
-
-              {versao ? (
-                <>
-                  <div className="flex items-center gap-4 text-[12px] text-foreground">
-                    <span>
-                      <span className="text-foreground-muted">Início: </span>
-                      <span className="font-medium">{formatarVigencia(versao.vigenciaInicio, versao.precisaoFim)}</span>
-                    </span>
-                    <span>
-                      <span className="text-foreground-muted">Validade: </span>
-                      <span className="font-medium">{formatarVigencia(versao.vigenciaFim, versao.precisaoFim)}</span>
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-foreground-muted">{rotuloDiasRestantes(versao.diasRestantes)}</p>
-                  <p className="text-[11px] text-foreground-muted">Autor: {versao.autor || "—"}</p>
-                  {versao.anexoNome && (
-                    <a
-                      href={`/api/sst/programas/${versao.id}/anexo`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[11px] text-brand-primary underline underline-offset-2 hover:text-brand-primary-hover"
-                    >
-                      📎 {versao.anexoNome}
-                    </a>
-                  )}
-                </>
-              ) : (
-                <p className="text-[12px] text-foreground-muted">Nenhum documento cadastrado ainda.</p>
-              )}
-
-              <button
-                type="button"
-                onClick={() => setProgramaAberto(programa)}
-                className="mt-1 flex items-center justify-center gap-1.5 rounded border border-hairline px-3 py-2 text-[12px] font-medium text-foreground-muted transition-colors hover:bg-surface-page"
-              >
-                <span aria-hidden>⬆</span> Carregar novo documento
-              </button>
-            </Card>
-          );
-        })}
+        {PROGRAMAS_SAUDE.map((programa) => (
+          <CardPrograma
+            key={programa}
+            programa={programa}
+            versao={programasIniciais[programa]}
+            onCarregarNovoDocumento={() => setProgramaAberto(programa)}
+          />
+        ))}
       </div>
 
       {programaAberto && (
@@ -115,6 +68,142 @@ export function ProgramasSaudeClient({
         />
       )}
     </>
+  );
+}
+
+function CardPrograma({
+  programa,
+  versao,
+  onCarregarNovoDocumento,
+}: {
+  programa: ProgramaSaude;
+  versao: VersaoProgramaSaude | null;
+  onCarregarNovoDocumento: () => void;
+}) {
+  const [historico, setHistorico] = useState<VersaoProgramaSaude[] | null>(null);
+  const [carregandoHistorico, setCarregandoHistorico] = useState(false);
+  const [linhaExpandida, setLinhaExpandida] = useState<string | null>(null);
+
+  async function alternarHistorico() {
+    if (historico) {
+      setHistorico(null);
+      return;
+    }
+    setCarregandoHistorico(true);
+    try {
+      const res = await fetch(`/api/sst/programas/historico?programa=${programa}`);
+      const dados = await res.json();
+      setHistorico(dados.versoes ?? []);
+    } finally {
+      setCarregandoHistorico(false);
+    }
+  }
+
+  return (
+    <Card className="flex flex-col gap-2.5 p-4">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="text-[13px] font-semibold text-foreground">{programa}</p>
+          <p className="text-[10.5px] text-foreground-muted">{DESCRICAO_PROGRAMA[programa]}</p>
+        </div>
+        {versao && (
+          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${ESTILO_STATUS[versao.status]}`}>
+            {versao.status}
+          </span>
+        )}
+      </div>
+
+      {versao ? (
+        <>
+          <div className="flex items-center gap-4 text-[12px] text-foreground">
+            <span>
+              <span className="text-foreground-muted">Início: </span>
+              <span className="font-medium">{formatarVigencia(versao.vigenciaInicio, versao.precisaoFim)}</span>
+            </span>
+            <span>
+              <span className="text-foreground-muted">Validade: </span>
+              <span className="font-medium">{formatarVigencia(versao.vigenciaFim, versao.precisaoFim)}</span>
+            </span>
+          </div>
+          <p className="text-[11px] text-foreground-muted">{rotuloDiasRestantes(versao.diasRestantes)}</p>
+          <p className="text-[11px] text-foreground-muted">Autor: {versao.autor || "—"}</p>
+          {versao.anexoNome && (
+            <a
+              href={`/api/sst/programas/${versao.id}/anexo`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-[11px] text-brand-primary underline underline-offset-2 hover:text-brand-primary-hover"
+            >
+              📎 {versao.anexoNome}
+            </a>
+          )}
+        </>
+      ) : (
+        <p className="text-[12px] text-foreground-muted">Nenhum documento cadastrado ainda.</p>
+      )}
+
+      <button
+        type="button"
+        onClick={alternarHistorico}
+        className="text-left text-[11px] font-medium text-brand-primary hover:text-brand-primary-hover"
+      >
+        {carregandoHistorico ? "Carregando..." : historico ? "Ocultar histórico ▴" : "Ver histórico ▾"}
+      </button>
+
+      {historico && (
+        <div className="-mt-1 space-y-1 border-t border-hairline pt-2">
+          {historico.length === 0 ? (
+            <p className="text-[11px] text-foreground-muted">Sem versões carregadas.</p>
+          ) : (
+            historico.map((v) => {
+              const expandida = linhaExpandida === v.id;
+              return (
+                <div key={v.id} className="rounded border border-hairline/70 px-2 py-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] text-foreground">
+                      {formatarVigencia(v.vigenciaInicio, v.precisaoFim)} → {formatarVigencia(v.vigenciaFim, v.precisaoFim)}
+                    </span>
+                    <button
+                      type="button"
+                      title="Ver autor e anexo"
+                      onClick={() => setLinhaExpandida(expandida ? null : v.id)}
+                      className="shrink-0 text-[13px] hover:opacity-70"
+                    >
+                      📎
+                    </button>
+                  </div>
+                  {expandida && (
+                    <div className="mt-1.5 space-y-1 border-t border-hairline/70 pt-1.5">
+                      <p className="text-[10.5px] text-foreground-muted">Autor: {v.autor || "—"}</p>
+                      {v.anexoNome ? (
+                        <a
+                          href={`/api/sst/programas/${v.id}/anexo`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block text-[10.5px] text-brand-primary underline underline-offset-2 hover:text-brand-primary-hover"
+                        >
+                          📎 {v.anexoNome}
+                        </a>
+                      ) : (
+                        <p className="text-[10.5px] text-foreground-muted">Sem anexo.</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={onCarregarNovoDocumento}
+        className="mt-1 flex items-center justify-center gap-1.5 rounded border border-hairline px-3 py-2 text-[12px] font-medium text-foreground-muted transition-colors hover:bg-surface-page"
+      >
+        <span aria-hidden>⬆</span> Carregar novo documento
+      </button>
+    </Card>
   );
 }
 
