@@ -15,8 +15,6 @@ export function KitDetalheClient({ kitInicial }: { kitInicial: DetalheKit }) {
   const [kit, setKit] = useState(kitInicial);
   const [selecionados, setSelecionados] = useState<Set<number>>(new Set());
   const [enviarAberto, setEnviarAberto] = useState(false);
-  const [editandoValor, setEditandoValor] = useState<number | null>(null);
-  const [valorEmEdicao, setValorEmEdicao] = useState("");
 
   async function recarregar() {
     const res = await fetch(`/api/dho/kits/${kit.id}`);
@@ -40,16 +38,6 @@ export function KitDetalheClient({ kitInicial }: { kitInicial: DetalheKit }) {
     setKit((atual) => ({ ...atual, historico: atual.historico.filter((h) => h.id !== entregaId) }));
     await fetch(`/api/dho/kits/entregas/${entregaId}`, { method: "DELETE" });
     void recarregar();
-  }
-
-  function iniciarEdicaoValor(materialId: number, valorAtual: number) {
-    setEditandoValor(materialId);
-    setValorEmEdicao(String(valorAtual));
-  }
-
-  async function confirmarEdicaoValor(materialId: number, quantidadeEstoque: number) {
-    await salvarMaterial(materialId, Number(valorEmEdicao) || 0, quantidadeEstoque);
-    setEditandoValor(null);
   }
 
   function alternarSelecao(materialId: number) {
@@ -93,58 +81,20 @@ export function KitDetalheClient({ kitInicial }: { kitInicial: DetalheKit }) {
                 </td>
                 <td className="px-4 py-2 text-foreground">{m.nome}</td>
                 <td className="px-4 py-2">
-                  {editandoValor === m.id ? (
-                    <div className="flex items-center gap-1">
-                      <input
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={valorEmEdicao}
-                        onChange={(e) => setValorEmEdicao(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && void confirmarEdicaoValor(m.id, m.quantidadeEstoque)}
-                        autoFocus
-                        className="w-20 rounded border border-hairline bg-background px-2 py-1 text-[12.5px] text-foreground outline-none focus:border-brand-primary"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => confirmarEdicaoValor(m.id, m.quantidadeEstoque)}
-                        className="rounded px-1 py-0.5 text-[12px] text-status-success hover:bg-status-success-bg"
-                        aria-label="Confirmar valor"
-                      >
-                        ✓
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditandoValor(null)}
-                        className="rounded px-1 py-0.5 text-[12px] text-foreground-muted hover:bg-surface-page"
-                        aria-label="Cancelar edição"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 text-foreground">
-                      {formatarMoeda(m.valor)}
-                      <button
-                        type="button"
-                        onClick={() => iniciarEdicaoValor(m.id, m.valor)}
-                        aria-label={`Editar valor de ${m.nome}`}
-                        className="rounded p-0.5 text-foreground-muted/50 hover:bg-surface-page hover:text-foreground"
-                      >
-                        <svg viewBox="0 0 20 20" fill="currentColor" className="h-2.5 w-2.5" aria-hidden>
-                          <path d="M14.85 2.15a1.5 1.5 0 0 1 2.12 0l.88.88a1.5 1.5 0 0 1 0 2.12l-1.1 1.1-3-3 1.1-1.1Zm-2.16 2.16 3 3L6.94 16.06a1 1 0 0 1-.46.26l-3.1.83.83-3.1a1 1 0 0 1 .26-.46L12.7 4.3Z" />
-                        </svg>
-                      </button>
-                    </span>
-                  )}
+                  <CampoEditavel
+                    valor={m.valor}
+                    formatarExibicao={formatarMoeda}
+                    step="0.01"
+                    ariaLabel={`Editar valor de ${m.nome}`}
+                    onSalvar={(novoValor) => salvarMaterial(m.id, novoValor, m.quantidadeEstoque)}
+                  />
                 </td>
                 <td className="px-4 py-2">
-                  <input
-                    type="number"
-                    min={0}
-                    defaultValue={m.quantidadeEstoque}
-                    onBlur={(e) => salvarMaterial(m.id, m.valor, Number(e.target.value) || 0)}
-                    className="w-20 rounded border border-hairline bg-background px-2 py-1 text-[12.5px] text-foreground"
+                  <CampoEditavel
+                    valor={m.quantidadeEstoque}
+                    formatarExibicao={(v) => String(v)}
+                    ariaLabel={`Editar quantidade em estoque de ${m.nome}`}
+                    onSalvar={(novaQuantidade) => salvarMaterial(m.id, m.valor, novaQuantidade)}
                   />
                 </td>
               </tr>
@@ -308,5 +258,80 @@ function ModalDirecionar({
         </div>
       </div>
     </div>
+  );
+}
+
+/** Valor fixo + lápis do lado — clicar abre edição inline. Mesmo padrão do Custo e Valores do EPI. */
+function CampoEditavel({
+  valor,
+  formatarExibicao,
+  onSalvar,
+  ariaLabel,
+  step,
+}: {
+  valor: number;
+  formatarExibicao: (v: number) => string;
+  onSalvar: (novoValor: number) => void;
+  ariaLabel: string;
+  step?: string;
+}) {
+  const [editando, setEditando] = useState(false);
+  const [rascunho, setRascunho] = useState(String(valor));
+
+  function confirmar() {
+    onSalvar(Number(rascunho) || 0);
+    setEditando(false);
+  }
+
+  if (editando) {
+    return (
+      <div className="flex items-center gap-1">
+        <input
+          type="number"
+          min={0}
+          step={step}
+          value={rascunho}
+          onChange={(e) => setRascunho(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && confirmar()}
+          autoFocus
+          className="w-20 rounded border border-hairline bg-background px-2 py-1 text-[12.5px] text-foreground outline-none focus:border-brand-primary"
+        />
+        <button
+          type="button"
+          onClick={confirmar}
+          className="rounded px-1 py-0.5 text-[12px] text-status-success hover:bg-status-success-bg"
+          aria-label="Confirmar valor"
+        >
+          ✓
+        </button>
+        <button
+          type="button"
+          onClick={() => setEditando(false)}
+          className="rounded px-1 py-0.5 text-[12px] text-foreground-muted hover:bg-surface-page"
+          aria-label="Cancelar edição"
+        >
+          ✕
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1 text-foreground">
+      {formatarExibicao(valor)}
+      <button
+        type="button"
+        onClick={() => {
+          setRascunho(String(valor));
+          setEditando(true);
+        }}
+        aria-label={ariaLabel}
+        className="rounded p-0.5 text-foreground-muted/50 hover:bg-surface-page hover:text-foreground"
+      >
+        <svg viewBox="0 0 20 20" fill="currentColor" className="h-2.5 w-2.5" aria-hidden>
+          <path d="M14.85 2.15a1.5 1.5 0 0 1 2.12 0l.88.88a1.5 1.5 0 0 1 0 2.12l-1.1 1.1-3-3 1.1-1.1Zm-2.16 2.16 3 3L6.94 16.06a1 1 0 0 1-.46.26l-3.1.83.83-3.1a1 1 0 0 1 .26-.46L12.7 4.3Z" />
+        </svg>
+      </button>
+    </span>
   );
 }

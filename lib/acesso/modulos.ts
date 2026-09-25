@@ -1,8 +1,13 @@
 /**
- * Árvore de módulos/submódulos do Portal Recursos Humanos usada no controle de acesso de
- * gestores. As chaves espelham as rotas reais do Sidebar (`components/nav/Sidebar.tsx`)
- * — mudou uma lá, muda aqui também, senão a tela de permissões libera algo
- * que não existe mais ou esquece algo novo.
+ * Árvore de módulos/submódulos de CADA portal (DP, SST, DHO) usada no
+ * controle de acesso de gestores. As chaves espelham as rotas reais do
+ * Sidebar (`components/nav/Sidebar.tsx`) — mudou uma lá, muda aqui também,
+ * senão a tela de permissões libera algo que não existe mais ou esquece algo
+ * novo.
+ *
+ * Gestor liberado num módulo só VÊ os dados (GET) — cadastrar, editar e
+ * excluir continuam exclusivos do administrador, mesmo padrão já usado nos
+ * módulos do Portal DP (ex.: só admin cadastra colaborador).
  */
 export interface ModuloAcesso {
   chave: string;
@@ -10,7 +15,13 @@ export interface ModuloAcesso {
   filhos?: ModuloAcesso[];
 }
 
-export const MODULOS_PORTAL: ModuloAcesso[] = [
+export interface PortalAcesso {
+  chave: "dp" | "sst" | "dho";
+  label: string;
+  modulos: ModuloAcesso[];
+}
+
+const MODULOS_DP: ModuloAcesso[] = [
   {
     chave: "colaboradores",
     label: "Colaboradores",
@@ -48,7 +59,28 @@ export const MODULOS_PORTAL: ModuloAcesso[] = [
   { chave: "chat", label: "Chat com o Assistente" },
 ];
 
-/** Todas as chaves (pais e filhos) — usado para validar o que chega da API. */
-export function todasAsChaves(modulos: ModuloAcesso[] = MODULOS_PORTAL): string[] {
+const MODULOS_SST: ModuloAcesso[] = [
+  { chave: "sst.dashboard", label: "Dashboard" },
+  { chave: "sst.epi", label: "Gestão de EPI" },
+  { chave: "sst.exames", label: "Exames Ocupacionais" },
+  { chave: "sst.programas", label: "Programas SST" },
+];
+
+const MODULOS_DHO: ModuloAcesso[] = [
+  { chave: "dho.dashboard", label: "Endomarketing · Dashboard" },
+  { chave: "dho.kits", label: "Endomarketing · Estoque de Kits" },
+];
+
+export const PORTAIS_ACESSO: PortalAcesso[] = [
+  { chave: "dp", label: "Portal DP", modulos: MODULOS_DP },
+  { chave: "sst", label: "Portal SST", modulos: MODULOS_SST },
+  { chave: "dho", label: "Portal DHO", modulos: MODULOS_DHO },
+];
+
+/** Mantido pelo nome antigo — só o Portal DP, pra quem já importava a lista solta. */
+export const MODULOS_PORTAL = MODULOS_DP;
+
+/** Todas as chaves (pais e filhos) de todos os portais — usado pra validar o que chega da API. */
+export function todasAsChaves(modulos: ModuloAcesso[] = PORTAIS_ACESSO.flatMap((p) => p.modulos)): string[] {
   return modulos.flatMap((m) => [m.chave, ...(m.filhos ? todasAsChaves(m.filhos) : [])]);
 }

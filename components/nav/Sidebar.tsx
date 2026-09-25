@@ -308,8 +308,11 @@ export function Sidebar({ counts, sessao }: { counts?: NavCounts; sessao: Sessao
 
       <nav className="flex flex-1 flex-col gap-1 px-3 pb-2">
         {(frenteAtual === "sst" ? MODULOS_SST : frenteAtual === "dho" ? MODULOS_DHO : []).map((m) => {
-            // O Dashboard é a raiz /sst: com startsWith ele acendia junto em /sst/epi etc.
-            const ativo = m.href === "/sst" ? pathname === "/sst" : pathname === m.href || pathname?.startsWith(`${m.href}/`);
+            // Dashboards que são prefixo de outro item (/sst e a raiz do Endomarketing)
+            // precisam de match exato — com startsWith os dois acendiam juntos ao
+            // entrar em /sst/epi ou em /dho/endomarketing/kits.
+            const ehRaizComFilho = m.href === "/sst" || m.href === "/dho/endomarketing";
+            const ativo = ehRaizComFilho ? pathname === m.href : pathname === m.href || pathname?.startsWith(`${m.href}/`);
             return (
               <Link
                 key={m.id}
