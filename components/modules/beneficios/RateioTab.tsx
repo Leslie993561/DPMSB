@@ -101,7 +101,6 @@ export function RateioTab() {
   const [busca, setBusca] = useState("");
   const [carregando, setCarregando] = useState(true);
   const [importarAberto, setImportarAberto] = useState(false);
-  const [menuMes, setMenuMes] = useState<number | null>(null);
   // Meses fechados no Breakdown: fechar lá vale para o portal inteiro, então o
   // cadeado tem de aparecer aqui também. Sem ele a pessoa só descobria que o
   // mês estava fechado quando a gravação era recusada.
@@ -113,10 +112,8 @@ export function RateioTab() {
   const feriadosRef = useRef<HTMLDivElement>(null);
   const [mesCalendario, setMesCalendario] = useState<number>(Number(competencia.slice(5, 7)));
   const [salvandoFeriado, setSalvandoFeriado] = useState<string | null>(null);
-  const [editandoMes, setEditandoMes] = useState<number | null>(null);
-  const [valorEdicaoDiasUteis, setValorEdicaoDiasUteis] = useState("");
-  const [salvandoDiasUteis, setSalvandoDiasUteis] = useState(false);
   const [colaboradorHover, setColaboradorHover] = useState<number | null>(null);
+  const ajustouCompetenciaInicial = useRef(false);
 
   const recarregar = useCallback(async function recarregar() {
     try {
@@ -212,38 +209,28 @@ export function RateioTab() {
       .then((r) => r.json())
       .then((d: { meses?: { mes: number; fechado?: boolean }[] }) => {
         if (cancelado) return;
-        setMesesFechados((d.meses ?? []).filter((m) => m.fechado).map((m) => m.mes));
+        const fechados = (d.meses ?? []).filter((m) => m.fechado).map((m) => m.mes);
+        setMesesFechados(fechados);
+
+        // Ao entrar na aba, pula direto para o próximo mês aberto: cair num mês
+        // fechado obriga a pessoa a clicar de novo antes de conseguir lançar algo.
+        if (!ajustouCompetenciaInicial.current) {
+          ajustouCompetenciaInicial.current = true;
+          const mesAtual = Number(competencia.slice(5, 7));
+          if (fechados.includes(mesAtual)) {
+            const proximoAberto = Array.from({ length: 12 - mesAtual }, (_, i) => mesAtual + 1 + i).find(
+              (mesNum) => !fechados.includes(mesNum),
+            );
+            if (proximoAberto) setCompetencia(`${ano}-${String(proximoAberto).padStart(2, "0")}`);
+          }
+        }
       })
       .catch(() => {});
     return () => {
       cancelado = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ano]);
-
-  async function abrirEdicaoDiasUteis(mesNum: number) {
-    setMenuMes(null);
-    setEditandoMes(mesNum);
-    setValorEdicaoDiasUteis("");
-    const res = await fetch(`/api/beneficios/dias-uteis?ano=${ano}`);
-    const data = await res.json();
-    const doMes = (data.meses ?? []).find((mm: { mes: number; diasUteis: number }) => mm.mes === mesNum);
-    if (doMes) setValorEdicaoDiasUteis(String(doMes.diasUteis));
-  }
-
-  async function salvarDiasUteis(mesNum: number) {
-    setSalvandoDiasUteis(true);
-    try {
-      await fetch("/api/beneficios/dias-uteis", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ano: Number(ano), mes: mesNum, diasUteis: Number(valorEdicaoDiasUteis) }),
-      });
-      setEditandoMes(null);
-      await recarregar();
-    } finally {
-      setSalvandoDiasUteis(false);
-    }
-  }
 
   // As ações da aba ficam na mesma linha do título, como no Quadro de
   // Colaboradores. Por isso a aba desenha o próprio cabeçalho: os botões
@@ -281,93 +268,25 @@ export function RateioTab() {
           {MESES_ABREV.map((m, i) => {
             const mesNum = i + 1;
             const ativo = Number(competencia.slice(5, 7)) === mesNum;
-            const menuAberto = menuMes === mesNum;
-            const editandoEsteMs = editandoMes === mesNum;
             return (
-              <div key={m} className="relative">
-                <button
-                  type="button"
-                  onClick={() => setMenuMes(menuAberto ? null : mesNum)}
-                  className={cn(
-                    "rounded-full border px-3 py-1.5 text-[12px] font-medium transition-colors",
-                    ativo
-                      ? "border-brand-primary-100 bg-brand-primary-100 font-bold text-brand-primary-800"
-                      : "border-hairline bg-background text-foreground-muted hover:border-brand-primary",
-                  )}
-                >
-                  {mesesFechados.includes(mesNum) && (
-                    <span aria-label="mês fechado" title="Mês fechado no Breakdown de folha" className="mr-1">
-                      🔒
-                    </span>
-                  )}
-                  {m}
-                </button>
-
-                {menuAberto && (
-                  <>
-                    <div className="fixed inset-0 z-20" onClick={() => setMenuMes(null)} />
-                    <div className="absolute top-full left-0 z-30 mt-1.5 w-44 rounded-md border border-hairline bg-background py-1 shadow-drawer">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCompetencia(`${ano}-${String(mesNum).padStart(2, "0")}`);
-                          setMenuMes(null);
-                        }}
-                        className="block w-full px-3 py-1.5 text-left text-[12px] text-foreground hover:bg-surface-page"
-                      >
-                        Rateio do mês
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => abrirEdicaoDiasUteis(mesNum)}
-                        className="block w-full px-3 py-1.5 text-left text-[12px] text-foreground hover:bg-surface-page"
-                      >
-                        Editar
-                      </button>
-                    </div>
-                  </>
+              <button
+                key={m}
+                type="button"
+                onClick={() => setCompetencia(`${ano}-${String(mesNum).padStart(2, "0")}`)}
+                className={cn(
+                  "rounded-full border px-3 py-1.5 text-[12px] font-medium transition-colors",
+                  ativo
+                    ? "border-brand-primary-100 bg-brand-primary-100 font-bold text-brand-primary-800"
+                    : "border-hairline bg-background text-foreground-muted hover:border-brand-primary",
                 )}
-
-                {editandoEsteMs && (
-                  <>
-                    <div className="fixed inset-0 z-20" onClick={() => setEditandoMes(null)} />
-                    <div className="absolute top-full left-0 z-30 mt-1.5 w-56 rounded-md border border-hairline bg-background p-3 shadow-drawer">
-                      <p className="text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">
-                        Dias úteis · {m}/{ano}
-                      </p>
-                      <p className="mt-0.5 text-[10px] text-foreground-muted">
-                        vale a partir deste mês, até o próximo ajuste
-                      </p>
-                      <input
-                        type="number"
-                        min={0}
-                        max={31}
-                        autoFocus
-                        value={valorEdicaoDiasUteis}
-                        onChange={(e) => setValorEdicaoDiasUteis(e.target.value)}
-                        className="mt-2 w-full rounded-md border border-brand-primary bg-background px-2 py-1 text-sm text-foreground"
-                      />
-                      <div className="mt-2 flex gap-1.5">
-                        <button
-                          type="button"
-                          disabled={salvandoDiasUteis}
-                          onClick={() => salvarDiasUteis(mesNum)}
-                          className="flex-1 rounded bg-brand-primary px-2 py-1.5 text-[11px] font-semibold text-brand-white hover:bg-brand-primary-700 disabled:opacity-50"
-                        >
-                          {salvandoDiasUteis ? "Salvando..." : "Salvar"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setEditandoMes(null)}
-                          className="rounded border border-hairline px-2 py-1.5 text-[11px] text-foreground-muted hover:bg-surface-page"
-                        >
-                          Cancelar
-                        </button>
-                      </div>
-                    </div>
-                  </>
+              >
+                {mesesFechados.includes(mesNum) && (
+                  <span aria-label="mês fechado" title="Mês fechado no Breakdown de folha" className="mr-1">
+                    🔒
+                  </span>
                 )}
-              </div>
+                {m}
+              </button>
             );
           })}
         </div>
