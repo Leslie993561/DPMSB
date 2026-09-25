@@ -5,8 +5,10 @@ import { listarColaboradores } from "./colaboradores";
 import { estaNaFolha } from "@/lib/folha/vigencia";
 import { casarPorNome } from "@/lib/folha/casarNome";
 import { diasUteisDeFeriasNoMes, proporcionalAosDiasTrabalhados, type JanelaDeFerias } from "@/lib/folha/feriasNoMes";
+import { diasUteisFeriadosNoMes } from "@/lib/folha/feriadosEmpresa";
 import { listarProgramacaoFerias } from "./programacaoFerias";
 import { obterDiasUteis } from "./beneficiosDiasUteis";
+import { listarFeriadosEmpresa } from "./beneficiosFeriados";
 import { obterExtras, listarCompetenciasFechadas } from "./folhaBreakdown";
 import { obterVariaveis, type ItemVariavel } from "./beneficiosVariaveis";
 import { detalharTransporteDoMes, arredondar, VT_DIARIO_IMPLAUSIVEL, type OrigemTransporte } from "@/lib/calc";
@@ -72,6 +74,10 @@ export async function gerarRateio(competencia: string): Promise<{ linhas: LinhaR
   const { ano, mes } = competenciaParaAnoMes(competencia);
   const diasUteis = await obterDiasUteis(ano, mes);
   const extras = await obterOverridesRateio(competencia);
+  // Feriados marcados no calendário do Rateio — só abatem o Vale-Transporte
+  // (tipoTransporte diferente de vm_fixo); Mobilidade e Alimentação seguem os
+  // dias úteis normais, por pedido do DP.
+  const diasFeriadosEmpresa = diasUteisFeriadosNoMes(competencia, await listarFeriadosEmpresa(ano));
 
   // Janelas de gozo vindas da Programação/Controle de Férias — a mesma fonte
   // que as duas telas usam. Cancelada não conta: as férias não vão acontecer.
@@ -111,7 +117,11 @@ export async function gerarRateio(competencia: string): Promise<{ linhas: LinhaR
     }, 0);
 
   const linhas: LinhaRateio[] = doMes.map((c) => {
-    const transporte = detalharTransporteDoMes(c, diasUteis);
+    // Feriado da empresa só desconta de Vale-Transporte — Mobilidade (vm_fixo)
+    // usa sempre os dias úteis "normais" do mês, mesmo quando cadastrada por dia.
+    const diasUteisParaTransporte =
+      c.tipoTransporte === "vm_fixo" ? diasUteis : Math.max(0, diasUteis - diasFeriadosEmpresa);
+    const transporte = detalharTransporteDoMes(c, diasUteisParaTransporte);
 
     // Transporte e mobilidade pagam deslocamento: em dia de férias não há
     // deslocamento. Alimentação fica fora — o DP paga o mês cheio.

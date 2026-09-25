@@ -73,6 +73,27 @@ function rotuloVale(tipoTransporte: string): string {
   return tipoTransporte === "vm_fixo" ? "VM" : "VT";
 }
 
+const DIAS_SEMANA = ["D", "S", "T", "Q", "Q", "S", "S"];
+
+/** Semanas (domingo a sábado) do mês, em datas AAAA-MM-DD — null nas células fora do mês. */
+function gradeDoMes(ano: number, mes: number): (string | null)[][] {
+  const ultimoDia = new Date(ano, mes, 0).getDate();
+  const offset = new Date(ano, mes - 1, 1).getDay();
+  const celulas: (string | null)[] = Array(offset).fill(null);
+  for (let dia = 1; dia <= ultimoDia; dia++) {
+    celulas.push(`${ano}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`);
+  }
+  while (celulas.length % 7 !== 0) celulas.push(null);
+  const semanas: (string | null)[][] = [];
+  for (let i = 0; i < celulas.length; i += 7) semanas.push(celulas.slice(i, i + 7));
+  return semanas;
+}
+
+function ehFimDeSemana(dataIso: string): boolean {
+  const dia = new Date(`${dataIso}T00:00:00Z`).getUTCDay();
+  return dia === 0 || dia === 6;
+}
+
 export function RateioTab() {
   const [competencia, setCompetencia] = useState(competenciaAtual());
   const [linhas, setLinhas] = useState<LinhaRateio[]>([]);
@@ -87,6 +108,11 @@ export function RateioTab() {
   const [mesesFechados, setMesesFechados] = useState<number[]>([]);
   const [avisosAbertos, setAvisosAbertos] = useState(false);
   const avisosRef = useRef<HTMLDivElement>(null);
+  const [feriados, setFeriados] = useState<Set<string>>(new Set());
+  const [feriadosAbertos, setFeriadosAbertos] = useState(false);
+  const feriadosRef = useRef<HTMLDivElement>(null);
+  const [mesCalendario, setMesCalendario] = useState<number>(Number(competencia.slice(5, 7)));
+  const [salvandoFeriado, setSalvandoFeriado] = useState<string | null>(null);
   const [editandoMes, setEditandoMes] = useState<number | null>(null);
   const [valorEdicaoDiasUteis, setValorEdicaoDiasUteis] = useState("");
   const [salvandoDiasUteis, setSalvandoDiasUteis] = useState(false);
@@ -134,6 +160,51 @@ export function RateioTab() {
   }, [avisosAbertos]);
 
   const ano = competencia.slice(0, 4);
+
+  const carregarFeriados = useCallback(() => {
+    fetch(`/api/beneficios/feriados?ano=${ano}`)
+      .then((r) => r.json())
+      .then((d: { feriados?: string[] }) => setFeriados(new Set(d.feriados ?? [])))
+      .catch(() => {});
+  }, [ano]);
+
+  useEffect(() => {
+    carregarFeriados();
+  }, [carregarFeriados]);
+
+  useEffect(() => {
+    if (!feriadosAbertos) return;
+    const aoClicarFora = (e: MouseEvent) => {
+      if (!feriadosRef.current?.contains(e.target as Node)) setFeriadosAbertos(false);
+    };
+    document.addEventListener("mousedown", aoClicarFora);
+    return () => document.removeEventListener("mousedown", aoClicarFora);
+  }, [feriadosAbertos]);
+
+  async function alternarFeriado(data: string) {
+    setSalvandoFeriado(data);
+    setFeriados((s) => {
+      const novo = new Set(s);
+      if (novo.has(data)) novo.delete(data);
+      else novo.add(data);
+      return novo;
+    });
+    try {
+      const r = await fetch("/api/beneficios/feriados", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data }),
+      });
+      if (!r.ok) {
+        carregarFeriados(); // desfaz o otimista se a API recusou (ex.: mês fechado)
+        window.alert((await r.json()).erro ?? "Não foi possível salvar.");
+        return;
+      }
+      await recarregar();
+    } finally {
+      setSalvandoFeriado(null);
+    }
+  }
 
   useEffect(() => {
     let cancelado = false;
@@ -313,7 +384,8 @@ export function RateioTab() {
         </label>
       </div>
 
-      {(semValorNoCadastro.length > 0 || diarioImplausivel.length > 0) && (
+      <div className="flex flex-wrap items-start gap-2">
+        {(semValorNoCadastro.length > 0 || diarioImplausivel.length > 0) && (
         <div ref={avisosRef} className="relative self-start">
           {/* Os dois avisos ocupavam um terço da tela toda vez que a aba abria.
               Ficam atrás de uma bolinha: o número continua à vista, o texto
@@ -366,7 +438,102 @@ export function RateioTab() {
            </div>
           )}
         </div>
-      )}
+        )}
+
+        <div ref={feriadosRef} className="relative self-start">
+          <button
+            type="button"
+            onClick={() => {
+              setMesCalendario(Number(competencia.slice(5, 7)));
+              setFeriadosAbertos((v) => !v);
+            }}
+            aria-expanded={feriadosAbertos}
+            aria-label={`${feriados.size} dia(s) sem expediente marcado(s) em ${ano}`}
+            className={cn(
+              "flex items-center gap-2 rounded-full border py-1.5 pr-3 pl-2 text-[12px] font-semibold transition-colors",
+              feriados.size > 0
+                ? "border-brand-primary/40 bg-brand-primary-050 text-brand-primary-800 hover:brightness-95"
+                : "border-hairline bg-background text-foreground-muted hover:border-brand-primary",
+            )}
+          >
+            <span
+              aria-hidden
+              className={cn(
+                "inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold text-brand-white",
+                feriados.size > 0 ? "bg-brand-primary" : "bg-brand-neutral",
+              )}
+            >
+              📅
+            </span>
+            Dias sem expediente {feriadosAbertos ? "▴" : "▾"}
+          </button>
+
+          {feriadosAbertos && (
+            <div className="absolute top-full left-0 z-50 mt-1.5 w-64 rounded-xl border border-hairline bg-background p-3 shadow-lg dark:border-brand-neutral/30">
+              <p className="text-[11px] text-foreground-muted">
+                Marque os dias em que a empresa não vai funcionar (feriado local, ponto facultativo, recesso). Só
+                abate do <strong>Vale-Transporte</strong> — Mobilidade e Alimentação não mudam.
+              </p>
+              <div className="mt-2 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setMesCalendario((m) => (m === 1 ? 12 : m - 1))}
+                  aria-label="Mês anterior"
+                  className="rounded px-1.5 py-0.5 text-foreground-muted hover:bg-surface-page"
+                >
+                  ◀
+                </button>
+                <span className="text-[12.5px] font-semibold text-foreground">
+                  {MESES_COMPLETOS[mesCalendario - 1]} de {ano}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setMesCalendario((m) => (m === 12 ? 1 : m + 1))}
+                  aria-label="Próximo mês"
+                  className="rounded px-1.5 py-0.5 text-foreground-muted hover:bg-surface-page"
+                >
+                  ▶
+                </button>
+              </div>
+              <div className="mt-2 grid grid-cols-7 gap-1 text-center text-[10px] font-semibold text-foreground-muted">
+                {DIAS_SEMANA.map((d, i) => (
+                  <span key={i}>{d}</span>
+                ))}
+              </div>
+              <div className="mt-1 flex flex-col gap-1">
+                {gradeDoMes(Number(ano), mesCalendario).map((semana, i) => (
+                  <div key={i} className="grid grid-cols-7 gap-1">
+                    {semana.map((dataIso, j) => {
+                      if (!dataIso) return <span key={j} />;
+                      const fimDeSemana = ehFimDeSemana(dataIso);
+                      const marcado = feriados.has(dataIso);
+                      return (
+                        <button
+                          key={dataIso}
+                          type="button"
+                          disabled={fimDeSemana || salvandoFeriado === dataIso}
+                          onClick={() => void alternarFeriado(dataIso)}
+                          title={fimDeSemana ? "Fim de semana — não conta como dia útil" : dataIso}
+                          className={cn(
+                            "flex h-6 items-center justify-center rounded text-[11px] transition-colors",
+                            fimDeSemana
+                              ? "text-foreground-muted/40"
+                              : marcado
+                                ? "bg-brand-primary font-bold text-brand-white"
+                                : "text-foreground hover:bg-surface-page",
+                          )}
+                        >
+                          {Number(dataIso.slice(8, 10))}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
       {carregando ? (
         <p className="text-sm text-foreground-muted">Carregando...</p>

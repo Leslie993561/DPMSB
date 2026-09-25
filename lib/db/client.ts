@@ -256,6 +256,15 @@ CREATE TABLE IF NOT EXISTS beneficios_dias_uteis (
   PRIMARY KEY (ano, mes)
 );
 
+-- Dias específicos em que a empresa não funciona (feriado local, ponto
+-- facultativo, recesso) além do fim de semana — marcados no calendário do
+-- Rateio. Só abatem o Vale-Transporte (quem não vai à empresa não desloca);
+-- Mobilidade e Alimentação continuam pelo cálculo normal de dias úteis, por
+-- pedido explícito do DP.
+CREATE TABLE IF NOT EXISTS beneficios_feriados_empresa (
+  data TEXT PRIMARY KEY
+);
+
 -- Totais REAIS de benefícios por mês, informados pelo DP.
 --
 -- O rateio calcula VT/VR pelo cadastro, colaborador a colaborador, e isso
