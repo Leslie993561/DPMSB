@@ -370,6 +370,53 @@ ALTER TABLE convites_cadastro ALTER COLUMN colaborador_id DROP NOT NULL;
 ALTER TABLE convites_cadastro DROP CONSTRAINT IF EXISTS convites_cadastro_colaborador_id_fkey;
 ALTER TABLE convites_cadastro ADD CONSTRAINT convites_cadastro_colaborador_id_fkey
   FOREIGN KEY (colaborador_id) REFERENCES colaboradores(id) ON DELETE CASCADE;
+
+-- Endomarketing (Portal DHO): calendário de ações/datas comemorativas e
+-- controle de estoque/entrega dos kits (onboarding, reconhecimento).
+
+CREATE TABLE IF NOT EXISTS dho_eventos_calendario (
+  id SERIAL PRIMARY KEY,
+  data TEXT NOT NULL,
+  titulo TEXT NOT NULL,
+  criado_em TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')
+);
+
+CREATE TABLE IF NOT EXISTS dho_kits (
+  id SERIAL PRIMARY KEY,
+  nome TEXT NOT NULL UNIQUE
+);
+INSERT INTO dho_kits (nome) VALUES ('Kit Onboarding'), ('Kit MSB Reconhece') ON CONFLICT (nome) DO NOTHING;
+
+-- Estoque e custo ficam por MATERIAL, não pelo kit inteiro: o kit é uma
+-- entrega que pode mandar um item só ou todos (ver dho_kit_entregas), então o
+-- estoque de verdade é o de cada item.
+CREATE TABLE IF NOT EXISTS dho_kit_materiais (
+  id SERIAL PRIMARY KEY,
+  kit_id INTEGER NOT NULL REFERENCES dho_kits(id) ON DELETE CASCADE,
+  nome TEXT NOT NULL,
+  valor DOUBLE PRECISION NOT NULL DEFAULT 0,
+  quantidade_estoque INTEGER NOT NULL DEFAULT 0,
+  UNIQUE (kit_id, nome)
+);
+INSERT INTO dho_kit_materiais (kit_id, nome)
+  SELECT k.id, m.nome FROM dho_kits k, unnest(ARRAY['Mochila', 'Caderno', 'Garrafa', 'Caneta', 'Mousepad', 'Fone']) AS m(nome)
+  WHERE k.nome = 'Kit Onboarding'
+  ON CONFLICT (kit_id, nome) DO NOTHING;
+INSERT INTO dho_kit_materiais (kit_id, nome)
+  SELECT k.id, m.nome FROM dho_kits k, unnest(ARRAY['Garrafa', 'Chaveiro', 'Caneta', 'Caderno']) AS m(nome)
+  WHERE k.nome = 'Kit MSB Reconhece'
+  ON CONFLICT (kit_id, nome) DO NOTHING;
+
+-- Histórico de entregas: um kit direcionado a um colaborador, com um ou mais
+-- materiais escolhidos (ou todos) numa única data.
+CREATE TABLE IF NOT EXISTS dho_kit_entregas (
+  id SERIAL PRIMARY KEY,
+  kit_id INTEGER NOT NULL REFERENCES dho_kits(id) ON DELETE CASCADE,
+  colaborador_id INTEGER NOT NULL REFERENCES colaboradores(id),
+  materiais TEXT NOT NULL,
+  responsavel TEXT NOT NULL,
+  criado_em TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')
+);
 `;
 
 /**

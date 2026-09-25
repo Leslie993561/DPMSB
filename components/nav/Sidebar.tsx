@@ -96,6 +96,22 @@ function IconeProgramas() {
   );
 }
 
+function IconeEndomarketing() {
+  return (
+    <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+      <path d="M2 8a2 2 0 0 1 2-2h2l7-3v14l-7-3H4a2 2 0 0 1-2-2V8Zm10-4.36v12.72l4.5-1.93a1 1 0 0 0 .5-.87V6.44a1 1 0 0 0-.5-.87L12 3.64ZM6 12v3a1 1 0 0 0 1 1h1v-4H6Z" />
+    </svg>
+  );
+}
+
+function IconeKit() {
+  return (
+    <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+      <path d="M10 2 3 5.5V14.5L10 18l7-3.5V5.5L10 2Zm0 2.24 4.5 2.26L10 8.76 5.5 6.5 10 4.24ZM5 8.3l4 2v5.4l-4-2V8.3Zm10 5.4-4 2V10.3l4-2v5.4Z" />
+    </svg>
+  );
+}
+
 function IconeSair() {
   return (
     <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
@@ -186,6 +202,11 @@ const MODULOS_SST = [
   { id: "sst-epi", label: "Gestão de EPI", href: "/sst/epi", Icone: IconeEpi },
   { id: "sst-exames", label: "Exames Ocupacionais", href: "/sst/exames", Icone: IconeExames },
   { id: "sst-programas", label: "Programas SST", href: "/sst/programas", Icone: IconeProgramas },
+] as const;
+
+const MODULOS_DHO = [
+  { id: "dho-endo-dashboard", label: "Endomarketing", href: "/dho/endomarketing", Icone: IconeEndomarketing },
+  { id: "dho-endo-kits", label: "Estoque de Kits", href: "/dho/endomarketing/kits", Icone: IconeKit },
 ] as const;
 
 export function Sidebar({ counts, sessao }: { counts?: NavCounts; sessao: SessaoPayload }) {
@@ -286,11 +307,7 @@ export function Sidebar({ counts, sessao }: { counts?: NavCounts; sessao: Sessao
       </div>
 
       <nav className="flex flex-1 flex-col gap-1 px-3 pb-2">
-        {frenteAtual === "dho" && (
-          <p className="px-2 py-2 text-[11.5px] text-foreground-muted">Nenhum módulo de DHO cadastrado ainda.</p>
-        )}
-        {frenteAtual === "sst" &&
-          MODULOS_SST.map((m) => {
+        {(frenteAtual === "sst" ? MODULOS_SST : frenteAtual === "dho" ? MODULOS_DHO : []).map((m) => {
             // O Dashboard é a raiz /sst: com startsWith ele acendia junto em /sst/epi etc.
             const ativo = m.href === "/sst" ? pathname === "/sst" : pathname === m.href || pathname?.startsWith(`${m.href}/`);
             return (
