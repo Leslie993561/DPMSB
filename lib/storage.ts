@@ -41,6 +41,24 @@ export async function subirArquivoPrivado(pasta: string, nomeOriginal: string, a
   return { url: caminho, nome: nomeOriginal };
 }
 
+/**
+ * Gera uma URL assinada de upload: o NAVEGADOR sobe o arquivo direto pro Supabase,
+ * sem passar pelo corpo da requisição do Next.js. Existe porque a Vercel recusa
+ * (413, texto puro em vez de JSON) qualquer corpo de requisição acima de ~4,5MB nas
+ * Serverless Functions — um PDF assinado digitalmente passa disso com facilidade.
+ * O token só autoriza ESTE caminho, por 2h; não precisa da service role no navegador.
+ */
+export async function criarUrlUploadDireto(
+  pasta: string,
+  nomeOriginal: string,
+): Promise<{ bucket: string; caminho: string; nome: string; signedUrl: string; token: string }> {
+  const extensao = nomeOriginal.includes(".") ? nomeOriginal.slice(nomeOriginal.lastIndexOf(".")) : "";
+  const caminho = `${pasta}/${crypto.randomUUID()}${extensao}`;
+  const { data, error } = await obterCliente().storage.from(BUCKET).createSignedUploadUrl(caminho);
+  if (error || !data) throw new Error(`Falha ao gerar link de upload do Supabase Storage: ${error?.message}`);
+  return { bucket: BUCKET, caminho, nome: nomeOriginal, signedUrl: data.signedUrl, token: data.token };
+}
+
 /** Busca os bytes de um arquivo privado do bucket, pelo caminho guardado no banco. */
 export async function baixarArquivoPrivado(caminho: string): Promise<Response> {
   const { data, error } = await obterCliente().storage.from(BUCKET).download(caminho);
