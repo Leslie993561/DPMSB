@@ -81,6 +81,8 @@ export interface EntregaKit {
   id: number;
   colaboradorId: number;
   colaboradorNome: string;
+  colaboradorCargo: string | null;
+  colaboradorDepartamento: string | null;
   materiais: string[];
   responsavel: string;
   criadoEm: string;
@@ -105,7 +107,8 @@ export async function obterKit(kitId: number): Promise<DetalheKit | null> {
   });
 
   const entregas = await db.execute({
-    sql: `SELECT e.id, e.colaborador_id, c.nome AS colaborador_nome, e.materiais, e.responsavel, e.criado_em
+    sql: `SELECT e.id, e.colaborador_id, c.nome AS colaborador_nome, c.cargo AS colaborador_cargo,
+                 c.departamento AS colaborador_departamento, e.materiais, e.responsavel, e.criado_em
           FROM dho_kit_entregas e JOIN colaboradores c ON c.id = e.colaborador_id
           WHERE e.kit_id = ? ORDER BY e.criado_em DESC`,
     args: [kitId],
@@ -120,6 +123,8 @@ export async function obterKit(kitId: number): Promise<DetalheKit | null> {
         id: number;
         colaborador_id: number;
         colaborador_nome: string;
+        colaborador_cargo: string | null;
+        colaborador_departamento: string | null;
         materiais: string;
         responsavel: string;
         criado_em: string;
@@ -128,6 +133,8 @@ export async function obterKit(kitId: number): Promise<DetalheKit | null> {
       id: e.id,
       colaboradorId: e.colaborador_id,
       colaboradorNome: e.colaborador_nome,
+      colaboradorCargo: e.colaborador_cargo,
+      colaboradorDepartamento: e.colaborador_departamento,
       materiais: JSON.parse(e.materiais) as string[],
       responsavel: e.responsavel,
       criadoEm: e.criado_em,
@@ -167,5 +174,22 @@ export async function enviarKit(dados: {
       sql: "INSERT INTO dho_kit_entregas (kit_id, colaborador_id, materiais, responsavel) VALUES (?, ?, ?, ?)",
       args: [dados.kitId, dados.colaboradorId, JSON.stringify(linhas.map((m) => m.nome)), dados.responsavel],
     },
+  ]);
+}
+
+/** Apaga um registro do histórico e devolve ao estoque os materiais daquela entrega — desfaz por completo, não só o registro. */
+export async function excluirEntregaKit(entregaId: number): Promise<void> {
+  const db = await getDb();
+  const entrega = await db.execute({ sql: "SELECT kit_id, materiais FROM dho_kit_entregas WHERE id = ?", args: [entregaId] });
+  const linha = (entrega.rows as unknown as { kit_id: number; materiais: string }[])[0];
+  if (!linha) return;
+  const nomes = JSON.parse(linha.materiais) as string[];
+
+  await db.batch([
+    ...nomes.map((nome) => ({
+      sql: "UPDATE dho_kit_materiais SET quantidade_estoque = quantidade_estoque + 1 WHERE kit_id = ? AND nome = ?",
+      args: [linha.kit_id, nome],
+    })),
+    { sql: "DELETE FROM dho_kit_entregas WHERE id = ?", args: [entregaId] },
   ]);
 }

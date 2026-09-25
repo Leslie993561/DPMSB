@@ -45,7 +45,6 @@ export function EndomarketingDashboardClient({
   eventosIniciais: EventoCalendario[];
 }) {
   const [ano, setAno] = useState(anoInicial);
-  const [mes, setMes] = useState(new Date().getMonth() + 1);
   const [eventos, setEventos] = useState(eventosIniciais);
   const [diaSelecionado, setDiaSelecionado] = useState<string | null>(null);
   const [novoTitulo, setNovoTitulo] = useState("");
@@ -66,26 +65,12 @@ export function EndomarketingDashboardClient({
     return [...eventos].filter((e) => e.data >= hoje).sort((a, b) => a.data.localeCompare(b.data));
   }, [eventos]);
 
-  async function carregarAno(novoAno: number) {
+  async function mudarAno(novoAno: number) {
     setAno(novoAno);
+    setDiaSelecionado(null);
     const res = await fetch(`/api/dho/eventos?ano=${novoAno}`);
     const dados = await res.json();
     setEventos(dados.eventos ?? []);
-  }
-
-  function mudarMes(delta: number) {
-    let novoMes = mes + delta;
-    let novoAno = ano;
-    if (novoMes < 1) {
-      novoMes = 12;
-      novoAno--;
-      void carregarAno(novoAno);
-    } else if (novoMes > 12) {
-      novoMes = 1;
-      novoAno++;
-      void carregarAno(novoAno);
-    }
-    setMes(novoMes);
   }
 
   async function adicionarEvento() {
@@ -112,69 +97,41 @@ export function EndomarketingDashboardClient({
     await fetch(`/api/dho/eventos/${id}`, { method: "DELETE" });
   }
 
-  const semanas = gradeDoMes(ano, mes);
-
   return (
     <div className="grid gap-3 lg:grid-cols-[1fr_320px]">
       <Card className="p-4">
         <div className="mb-3 flex items-center justify-between">
           <button
             type="button"
-            onClick={() => mudarMes(-1)}
+            onClick={() => mudarAno(ano - 1)}
             className="rounded border border-hairline px-2 py-1 text-[12px] text-foreground-muted hover:bg-surface-page"
           >
             ‹
           </button>
-          <p className="text-[13.5px] font-semibold text-foreground">
-            {MESES_COMPLETOS[mes - 1]} de {ano}
-          </p>
+          <p className="text-[13.5px] font-semibold text-foreground">{ano}</p>
           <button
             type="button"
-            onClick={() => mudarMes(1)}
+            onClick={() => mudarAno(ano + 1)}
             className="rounded border border-hairline px-2 py-1 text-[12px] text-foreground-muted hover:bg-surface-page"
           >
             ›
           </button>
         </div>
 
-        <div className="grid grid-cols-7 gap-1 text-center text-[10.5px] font-semibold text-foreground-muted">
-          {DIAS_SEMANA.map((d, i) => (
-            <div key={i} className="py-1">
-              {d}
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-1 space-y-1">
-          {semanas.map((semana, i) => (
-            <div key={i} className="grid grid-cols-7 gap-1">
-              {semana.map((dia, j) => {
-                const doDia = dia ? (eventosPorDia.get(dia) ?? []) : [];
-                const selecionado = dia === diaSelecionado;
-                return (
-                  <button
-                    key={j}
-                    type="button"
-                    disabled={!dia}
-                    onClick={() => {
-                      setDiaSelecionado(dia === diaSelecionado ? null : dia);
-                      setNovoTitulo("");
-                    }}
-                    className={cn(
-                      "flex h-14 flex-col items-center justify-start rounded-md border p-1 text-[11px]",
-                      !dia && "border-transparent",
-                      dia && !selecionado && "border-hairline hover:border-brand-primary",
-                      selecionado && "border-brand-primary bg-brand-primary-050",
-                    )}
-                  >
-                    {dia && <span className="text-foreground-muted">{Number(dia.slice(8, 10))}</span>}
-                    {doDia.length > 0 && (
-                      <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-brand-accent" title={doDia.map((e) => e.titulo).join(", ")} />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+          {MESES_COMPLETOS.map((nomeMes, i) => (
+            <MesCalendario
+              key={i}
+              ano={ano}
+              mes={i + 1}
+              nomeMes={nomeMes}
+              eventosPorDia={eventosPorDia}
+              diaSelecionado={diaSelecionado}
+              onSelecionarDia={(dia) => {
+                setDiaSelecionado(dia === diaSelecionado ? null : dia);
+                setNovoTitulo("");
+              }}
+            />
           ))}
         </div>
 
@@ -226,6 +183,65 @@ export function EndomarketingDashboardClient({
           )}
         </div>
       </Card>
+    </div>
+  );
+}
+
+/** Um mês do ano-calendário inteiro — clicável por dia (com ponto nos dias com evento). */
+function MesCalendario({
+  ano,
+  mes,
+  nomeMes,
+  eventosPorDia,
+  diaSelecionado,
+  onSelecionarDia,
+}: {
+  ano: number;
+  mes: number;
+  nomeMes: string;
+  eventosPorDia: Map<string, EventoCalendario[]>;
+  diaSelecionado: string | null;
+  onSelecionarDia: (dia: string) => void;
+}) {
+  const semanas = gradeDoMes(ano, mes);
+  const hoje = new Date().toISOString().slice(0, 10);
+
+  return (
+    <div className="rounded-md border border-hairline p-2">
+      <p className="mb-1.5 text-[11.5px] font-semibold text-foreground">{nomeMes}</p>
+      <div className="grid grid-cols-7 gap-0.5 text-center text-[8.5px] font-semibold text-foreground-muted">
+        {DIAS_SEMANA.map((d, i) => (
+          <div key={i}>{d}</div>
+        ))}
+      </div>
+      <div className="mt-0.5 space-y-0.5">
+        {semanas.map((semana, i) => (
+          <div key={i} className="grid grid-cols-7 gap-0.5">
+            {semana.map((dia, j) => {
+              const doDia = dia ? (eventosPorDia.get(dia) ?? []) : [];
+              const selecionado = dia === diaSelecionado;
+              return (
+                <button
+                  key={j}
+                  type="button"
+                  disabled={!dia}
+                  onClick={() => dia && onSelecionarDia(dia)}
+                  className={cn(
+                    "flex h-6 flex-col items-center justify-center rounded text-[9.5px]",
+                    !dia && "cursor-default",
+                    dia && dia === hoje && "font-bold text-brand-primary",
+                    dia && !selecionado && "text-foreground-muted hover:bg-surface-page",
+                    selecionado && "bg-brand-primary-100 text-brand-primary-800",
+                  )}
+                >
+                  {dia ? Number(dia.slice(8, 10)) : ""}
+                  {doDia.length > 0 && <span className="-mt-0.5 h-1 w-1 rounded-full bg-brand-accent" title={doDia.map((e) => e.titulo).join(", ")} />}
+                </button>
+              );
+            })}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

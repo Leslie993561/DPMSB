@@ -15,6 +15,8 @@ export function KitDetalheClient({ kitInicial }: { kitInicial: DetalheKit }) {
   const [kit, setKit] = useState(kitInicial);
   const [selecionados, setSelecionados] = useState<Set<number>>(new Set());
   const [enviarAberto, setEnviarAberto] = useState(false);
+  const [editandoValor, setEditandoValor] = useState<number | null>(null);
+  const [valorEmEdicao, setValorEmEdicao] = useState("");
 
   async function recarregar() {
     const res = await fetch(`/api/dho/kits/${kit.id}`);
@@ -32,6 +34,22 @@ export function KitDetalheClient({ kitInicial }: { kitInicial: DetalheKit }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ valor, quantidadeEstoque }),
     });
+  }
+
+  async function excluirEntrega(entregaId: number) {
+    setKit((atual) => ({ ...atual, historico: atual.historico.filter((h) => h.id !== entregaId) }));
+    await fetch(`/api/dho/kits/entregas/${entregaId}`, { method: "DELETE" });
+    void recarregar();
+  }
+
+  function iniciarEdicaoValor(materialId: number, valorAtual: number) {
+    setEditandoValor(materialId);
+    setValorEmEdicao(String(valorAtual));
+  }
+
+  async function confirmarEdicaoValor(materialId: number, quantidadeEstoque: number) {
+    await salvarMaterial(materialId, Number(valorEmEdicao) || 0, quantidadeEstoque);
+    setEditandoValor(null);
   }
 
   function alternarSelecao(materialId: number) {
@@ -75,14 +93,50 @@ export function KitDetalheClient({ kitInicial }: { kitInicial: DetalheKit }) {
                 </td>
                 <td className="px-4 py-2 text-foreground">{m.nome}</td>
                 <td className="px-4 py-2">
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    defaultValue={m.valor}
-                    onBlur={(e) => salvarMaterial(m.id, Number(e.target.value) || 0, m.quantidadeEstoque)}
-                    className="w-24 rounded border border-hairline bg-background px-2 py-1 text-[12.5px] text-foreground"
-                  />
+                  {editandoValor === m.id ? (
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={valorEmEdicao}
+                        onChange={(e) => setValorEmEdicao(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && void confirmarEdicaoValor(m.id, m.quantidadeEstoque)}
+                        autoFocus
+                        className="w-20 rounded border border-hairline bg-background px-2 py-1 text-[12.5px] text-foreground outline-none focus:border-brand-primary"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => confirmarEdicaoValor(m.id, m.quantidadeEstoque)}
+                        className="rounded px-1 py-0.5 text-[12px] text-status-success hover:bg-status-success-bg"
+                        aria-label="Confirmar valor"
+                      >
+                        ✓
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditandoValor(null)}
+                        className="rounded px-1 py-0.5 text-[12px] text-foreground-muted hover:bg-surface-page"
+                        aria-label="Cancelar edição"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-foreground">
+                      {formatarMoeda(m.valor)}
+                      <button
+                        type="button"
+                        onClick={() => iniciarEdicaoValor(m.id, m.valor)}
+                        aria-label={`Editar valor de ${m.nome}`}
+                        className="rounded p-0.5 text-foreground-muted/50 hover:bg-surface-page hover:text-foreground"
+                      >
+                        <svg viewBox="0 0 20 20" fill="currentColor" className="h-2.5 w-2.5" aria-hidden>
+                          <path d="M14.85 2.15a1.5 1.5 0 0 1 2.12 0l.88.88a1.5 1.5 0 0 1 0 2.12l-1.1 1.1-3-3 1.1-1.1Zm-2.16 2.16 3 3L6.94 16.06a1 1 0 0 1-.46.26l-3.1.83.83-3.1a1 1 0 0 1 .26-.46L12.7 4.3Z" />
+                        </svg>
+                      </button>
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-2">
                   <input
@@ -124,12 +178,25 @@ export function KitDetalheClient({ kitInicial }: { kitInicial: DetalheKit }) {
             kit.historico.map((h) => (
               <div key={h.id} className="flex items-center justify-between gap-2 rounded border border-hairline px-3 py-2">
                 <div>
-                  <p className="text-[12.5px] font-medium text-foreground">{h.colaboradorNome}</p>
-                  <p className="text-[10.5px] text-foreground-muted">{h.materiais.join(", ")}</p>
+                  <p className="text-[12.5px] font-medium text-foreground uppercase">{h.colaboradorNome}</p>
+                  <p className="text-[10.5px] text-foreground-muted">
+                    {h.colaboradorCargo ?? "—"} · {h.colaboradorDepartamento ?? "—"}
+                  </p>
+                  <p className="mt-0.5 text-[10.5px] text-foreground-muted">{h.materiais.join(", ")}</p>
                 </div>
-                <div className="text-right text-[10.5px] text-foreground-muted">
-                  <p>{formatarDataBr(h.criadoEm.slice(0, 10))}</p>
-                  <p>{h.responsavel}</p>
+                <div className="flex items-start gap-3">
+                  <div className="text-right text-[10.5px] text-foreground-muted">
+                    <p>{formatarDataBr(h.criadoEm.slice(0, 10))}</p>
+                    <p>{h.responsavel}</p>
+                  </div>
+                  <button
+                    type="button"
+                    title="Excluir registro"
+                    onClick={() => excluirEntrega(h.id)}
+                    className="text-[12px] text-status-danger hover:opacity-70"
+                  >
+                    ✕
+                  </button>
                 </div>
               </div>
             ))
