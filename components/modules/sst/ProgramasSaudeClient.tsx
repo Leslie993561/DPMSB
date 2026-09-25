@@ -6,13 +6,16 @@ import { Modal } from "@/components/shared/Modal";
 import { formatarDataBr } from "@/lib/format";
 import type { VersaoProgramaSaude } from "@/lib/sst/programas";
 import { PROGRAMAS_SAUDE, type PrecisaoData, type ProgramaSaude, type StatusPrograma } from "@/lib/sst/domain";
-import { subirArquivoDireto } from "@/lib/supabaseBrowser";
 
 const DESCRICAO_PROGRAMA: Record<ProgramaSaude, string> = {
   PCMSO: "Programa de Controle Médico de Saúde Ocupacional",
   LTCAT: "Laudo Técnico das Condições do Ambiente de Trabalho",
   PGR: "Programa de Gerenciamento de Riscos",
 };
+
+// A hospedagem recusa o corpo da requisição acima disso (413) antes até de chegar
+// na rota — mesmo teto do TAMANHO_MAX em app/api/sst/programas/anexo/route.ts.
+const TAMANHO_MAX_PDF = 4 * 1024 * 1024;
 
 const ESTILO_STATUS: Record<StatusPrograma, string> = {
   Vigente: "bg-status-success-bg text-status-success",
@@ -198,27 +201,23 @@ function ModalVersaoPrograma({
       setErro("Preencha início, vencimento e autor.");
       return;
     }
+    if (arquivo && arquivo.size > TAMANHO_MAX_PDF) {
+      setErro("Esse PDF passa de 4MB — o servidor recusa antes de chegar no portal. Comprima o arquivo e tente de novo.");
+      return;
+    }
     setSalvando(true);
     setErro(null);
     try {
       let anexoUrl: string | null = null;
       let anexoNome: string | null = null;
       if (arquivo) {
-        // O navegador sobe o PDF direto pro Supabase (ver lib/supabaseBrowser.ts) —
-        // essa rota só devolve a URL assinada, nunca recebe o arquivo em si.
-        const resIniciar = await fetch("/api/sst/programas/anexo", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ nomeOriginal: arquivo.name }),
-        });
-        const dadosIniciar = await parseRespostaJson(resIniciar);
-        if (!resIniciar.ok) throw new Error(dadosIniciar.erro ?? "Falha ao preparar o upload.");
-        await subirArquivoDireto(
-          { bucket: dadosIniciar.bucket as string, caminho: dadosIniciar.caminho as string, token: dadosIniciar.token as string },
-          arquivo,
-        );
-        anexoUrl = dadosIniciar.caminho as string;
-        anexoNome = dadosIniciar.nome as string;
+        const form = new FormData();
+        form.append("arquivo", arquivo);
+        const resUpload = await fetch("/api/sst/programas/anexo", { method: "POST", body: form });
+        const dadosUpload = await parseRespostaJson(resUpload);
+        if (!resUpload.ok) throw new Error(dadosUpload.erro ?? "Falha ao subir o PDF.");
+        anexoUrl = (dadosUpload.url as string) ?? null;
+        anexoNome = (dadosUpload.nome as string) ?? null;
       }
 
       const corpo = { vigenciaInicio, vigenciaFim, precisaoFim: precisao, autor: autor.trim(), anexoUrl, anexoNome };
