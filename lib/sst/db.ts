@@ -238,6 +238,22 @@ const ESQUEMA_EXTRA = `
     data_prevista text,
     created_at timestamptz NOT NULL DEFAULT now()
   );
+
+  -- Programas de saúde ocupacional (PCMSO, LTCAT, PGR): uma linha por versão
+  -- carregada, nunca sobrescrita — histórico fica intacto e o "vigente" é
+  -- sempre a versão de maior ts (ver versoesMaisRecentes, domain.ts).
+  CREATE TABLE IF NOT EXISTS sst_programas_saude (
+    id text PRIMARY KEY,
+    programa text NOT NULL,
+    vigencia_inicio text NOT NULL DEFAULT '',
+    vigencia_fim text NOT NULL,
+    precisao_fim text NOT NULL DEFAULT 'mes',
+    autor text NOT NULL DEFAULT '',
+    anexo_url text,
+    anexo_nome text,
+    ts text NOT NULL DEFAULT '',
+    created_at timestamptz NOT NULL DEFAULT now()
+  );
 `;
 
 let esquemaPronto: Promise<void> | null = null;
