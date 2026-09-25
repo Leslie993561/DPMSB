@@ -212,6 +212,11 @@ const MODULOS_DHO = [
 export function Sidebar({ counts, sessao }: { counts?: NavCounts; sessao: SessaoPayload }) {
   const pathname = usePathname();
   const [abertoMobile, setAbertoMobile] = useState(false);
+  // Fica FORA do <aside>: ele tem transform (translate-x, pro slide no celular),
+  // e qualquer transform vira containing block de position:fixed — o modal
+  // (fixed inset-0) ficava preso na largura da sidebar em vez do viewport
+  // inteiro, daí ele nascer pequeno e grudado no canto.
+  const [acessoAberto, setAcessoAberto] = useState(false);
   // Troca de página fecha a gaveta no celular — sem isso o menu ficava aberto
   // por cima do conteúdo depois de tocar num link.
   useEffect(() => setAbertoMobile(false), [pathname]);
@@ -393,15 +398,18 @@ export function Sidebar({ counts, sessao }: { counts?: NavCounts; sessao: Sessao
 
       </nav>
 
-      <UserCard sessao={sessao} />
+      <UserCard sessao={sessao} onAbrirAcesso={() => setAcessoAberto(true)} />
       </aside>
+
+      {sessao.tipo === "administrador" && (
+        <GerenciarAcessoModal aberto={acessoAberto} onFechar={() => setAcessoAberto(false)} />
+      )}
     </>
   );
 }
 
-function UserCard({ sessao }: { sessao: SessaoPayload }) {
+function UserCard({ sessao, onAbrirAcesso }: { sessao: SessaoPayload; onAbrirAcesso: () => void }) {
   const router = useRouter();
-  const [acessoAberto, setAcessoAberto] = useState(false);
   const [saindo, setSaindo] = useState(false);
   const ehAdmin = sessao.tipo === "administrador";
 
@@ -432,7 +440,7 @@ function UserCard({ sessao }: { sessao: SessaoPayload }) {
         {ehAdmin && (
           <button
             type="button"
-            onClick={() => setAcessoAberto(true)}
+            onClick={onAbrirAcesso}
             title="Gerenciar acesso de gestores ao portal"
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-foreground-muted transition-colors hover:bg-surface-page hover:text-brand-primary-800"
           >
@@ -449,8 +457,6 @@ function UserCard({ sessao }: { sessao: SessaoPayload }) {
           <IconeSair />
         </button>
       </div>
-
-      {ehAdmin && <GerenciarAcessoModal aberto={acessoAberto} onFechar={() => setAcessoAberto(false)} />}
     </div>
   );
 }
