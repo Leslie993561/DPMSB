@@ -155,24 +155,27 @@ export function GerenciarAcessoModal({ aberto, onFechar }: { aberto: boolean; on
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-primary text-[12px] font-bold text-brand-white">
                   {iniciais(gestor.nome)}
                 </span>
-                <div className="min-w-0 flex-1">
-                  <button type="button" onClick={() => setGestorSelecionado(gestor)} title="Ver permissões de acesso" className="block text-left">
-                    <span className="block truncate text-[13px] font-semibold text-brand-primary-800 hover:underline">{gestor.nome}</span>
-                    <span className="mt-0.5 block truncate text-[11.5px] text-foreground-muted">{gestor.email}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void alternarStatus(gestor)}
-                    className={`mt-1.5 inline-block rounded-full px-2.5 py-1 text-[10.5px] font-bold ${
-                      gestor.status === "ativo"
-                        ? "bg-status-success/15 text-status-success"
-                        : "bg-brand-surface text-foreground-muted"
-                    }`}
-                    title="Clique para alternar ativo/inativo"
-                  >
-                    {gestor.status === "ativo" ? "Ativo" : "Inativo"}
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setGestorSelecionado(gestor)}
+                  title="Ver permissões de acesso"
+                  className="min-w-0 flex-1 text-left"
+                >
+                  <span className="block truncate text-[13px] font-semibold text-brand-primary-800 hover:underline">{gestor.nome}</span>
+                  <span className="mt-0.5 block truncate text-[11.5px] text-foreground-muted">{gestor.email}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void alternarStatus(gestor)}
+                  className={`shrink-0 rounded-full px-2.5 py-1 text-[10.5px] font-bold ${
+                    gestor.status === "ativo"
+                      ? "bg-status-success/15 text-status-success"
+                      : "bg-brand-surface text-foreground-muted"
+                  }`}
+                  title="Clique para alternar ativo/inativo"
+                >
+                  {gestor.status === "ativo" ? "Ativo" : "Inativo"}
+                </button>
               </div>
             ))}
           </div>
