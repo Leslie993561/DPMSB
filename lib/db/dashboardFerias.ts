@@ -41,6 +41,7 @@ export interface FatiaMes {
   valor: number;
   periodos: number;
   dias: number;
+  colaboradores: { nome: string; dias: number }[];
 }
 
 export interface PrevistoMesVigente {
@@ -340,6 +341,7 @@ export async function obterDashboardFerias(
     valor: arredondar(lista.reduce((s, i) => s + i.custoPrevisto, 0)),
     periodos: lista.length,
     dias: lista.reduce((s, i) => s + i.dias, 0),
+    colaboradores: lista.map((i) => ({ nome: i.colaboradorNome, dias: i.dias })),
   });
 
   const previsto: PrevistoMesVigente = {

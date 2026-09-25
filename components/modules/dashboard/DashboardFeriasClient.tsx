@@ -404,7 +404,7 @@ export function DashboardFeriasClient() {
             {/* O total do mês é a soma das duas linhas abaixo — férias que já
                 aconteceram e férias que ainda vão acontecer no mesmo mês. */}
             <div className="mt-2 space-y-1">
-              <div className="flex items-baseline justify-between gap-2">
+              <div className="group relative flex cursor-help items-baseline justify-between gap-2">
                 <span className="text-[11px] text-foreground-muted">
                   Já tiradas
                   <span className="ml-1 text-[10px] text-foreground-muted/70">
@@ -414,8 +414,9 @@ export function DashboardFeriasClient() {
                 <span className="text-[11.5px] font-semibold text-status-success">
                   {formatarMoeda(dados.previsto.tiradas.valor)}
                 </span>
+                <PainelColaboradoresFatia colaboradores={dados.previsto.tiradas.colaboradores} />
               </div>
-              <div className="flex items-baseline justify-between gap-2">
+              <div className="group relative flex cursor-help items-baseline justify-between gap-2">
                 <span className="text-[11px] text-foreground-muted">
                   A tirar (planejadas)
                   <span className="ml-1 text-[10px] text-foreground-muted/70">
@@ -425,6 +426,7 @@ export function DashboardFeriasClient() {
                 <span className="text-[11.5px] font-semibold text-brand-primary-800">
                   {formatarMoeda(dados.previsto.aTirar.valor)}
                 </span>
+                <PainelColaboradoresFatia colaboradores={dados.previsto.aTirar.colaboradores} />
               </div>
             </div>
             <p className="mt-1.5 border-t border-hairline pt-1.5 text-[11px] text-foreground-muted">
@@ -576,6 +578,23 @@ export function DashboardFeriasClient() {
           </Card>
         </div>
       </section>
+    </div>
+  );
+}
+
+/** Lista os colaboradores por trás do valor de uma fatia do "Previsto", ao passar o mouse — mesmo padrão do CartaoVencimento. */
+function PainelColaboradoresFatia({ colaboradores }: { colaboradores: { nome: string; dias: number }[] }) {
+  if (colaboradores.length === 0) return null;
+  return (
+    <div className="pointer-events-none absolute top-full right-0 z-50 mt-1.5 hidden w-64 rounded-md border border-hairline bg-background p-2.5 text-left shadow-drawer group-hover:block">
+      <ul className="space-y-1">
+        {colaboradores.map((c, i) => (
+          <li key={i} className="flex items-baseline justify-between gap-2">
+            <span className="text-[11px] font-medium text-foreground uppercase">{c.nome}</span>
+            <span className="shrink-0 text-[10px] text-foreground-muted normal-case">{c.dias}d</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
