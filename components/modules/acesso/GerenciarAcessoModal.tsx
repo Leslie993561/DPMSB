@@ -82,7 +82,7 @@ export function GerenciarAcessoModal({ aberto, onFechar }: { aberto: boolean; on
         eyebrow="Meu perfil"
         titulo="Gerenciar acesso"
         subtitulo="Gestores autorizados a acessar o Portal Recursos Humanos pelo e-mail corporativo"
-        largura="32rem"
+        largura="40rem"
       >
         <div className="flex flex-col gap-3">
           {!formAberto ? (
@@ -151,8 +151,8 @@ export function GerenciarAcessoModal({ aberto, onFechar }: { aberto: boolean; on
               <p className="px-3 py-4 text-center text-[12px] text-foreground-muted">Nenhum gestor cadastrado ainda.</p>
             )}
             {gestores.map((gestor) => (
-              <div key={gestor.id} className="flex items-center gap-2.5 px-3 py-2">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary text-[11px] font-bold text-brand-white">
+              <div key={gestor.id} className="flex items-start gap-3 px-3 py-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-primary text-[12px] font-bold text-brand-white">
                   {iniciais(gestor.nome)}
                 </span>
                 <button
@@ -161,15 +161,13 @@ export function GerenciarAcessoModal({ aberto, onFechar }: { aberto: boolean; on
                   title="Ver permissões de acesso"
                   className="min-w-0 flex-1 text-left"
                 >
-                  <span className="block truncate text-[12.5px] font-semibold text-brand-primary-800 hover:underline">
-                    {gestor.nome}
-                  </span>
-                  <span className="block truncate text-[11px] text-foreground-muted">{gestor.email}</span>
+                  <span className="block text-[13px] font-semibold text-brand-primary-800 hover:underline">{gestor.nome}</span>
+                  <span className="mt-0.5 block text-[11.5px] text-foreground-muted">{gestor.email}</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => void alternarStatus(gestor)}
-                  className={`shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-bold ${
+                  className={`mt-0.5 shrink-0 rounded-full px-2.5 py-1 text-[10.5px] font-bold ${
                     gestor.status === "ativo"
                       ? "bg-status-success/15 text-status-success"
                       : "bg-brand-surface text-foreground-muted"
