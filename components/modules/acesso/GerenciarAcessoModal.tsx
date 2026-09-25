@@ -161,7 +161,7 @@ export function GerenciarAcessoModal({ aberto, onFechar }: { aberto: boolean; on
                   title="Ver permissões de acesso"
                   className="min-w-0 flex-1 text-left"
                 >
-                  <span className="block truncate text-[13px] font-semibold text-brand-primary-800 hover:underline">{gestor.nome}</span>
+                  <span className="block truncate text-[13px] font-semibold text-brand-primary-800 uppercase hover:underline">{gestor.nome}</span>
                   <span className="mt-0.5 block truncate text-[11.5px] text-foreground-muted">{gestor.email}</span>
                 </button>
                 <button

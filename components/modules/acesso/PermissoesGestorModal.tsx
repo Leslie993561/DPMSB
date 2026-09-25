@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { Modal } from "@/components/shared/Modal";
-import { MODULOS_PORTAL, type ModuloAcesso } from "@/lib/acesso/modulos";
+import { cn } from "@/lib/cn";
+import { PORTAIS_ACESSO, todasAsChaves, type ModuloAcesso, type PortalAcesso } from "@/lib/acesso/modulos";
 import type { GestorAcesso } from "@/lib/db/acessoGestores";
 
 function Toggle({ ligado, onClick, titulo }: { ligado: boolean; onClick: () => void; titulo: string }) {
@@ -36,11 +37,13 @@ export function PermissoesGestorModal({
   const [carregando, setCarregando] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [portalSelecionado, setPortalSelecionado] = useState<PortalAcesso["chave"]>("dp");
 
   useEffect(() => {
     if (!gestor) return;
     setCarregando(true);
     setErro(null);
+    setPortalSelecionado("dp");
     fetch(`/api/acesso-gestores/${gestor.id}/permissoes`)
       .then((r) => r.json())
       .then((data) => setLiberados(new Set<string>(data.liberados ?? [])))
@@ -86,78 +89,125 @@ export function PermissoesGestorModal({
     void persistir(proximo);
   }
 
+  function alternarPortal(portal: PortalAcesso) {
+    const chaves = todasAsChaves(portal.modulos);
+    const todosLigados = chaves.every((c) => liberados.has(c));
+    const proximo = new Set(liberados);
+    for (const c of chaves) {
+      if (todosLigados) proximo.delete(c);
+      else proximo.add(c);
+    }
+    void persistir(proximo);
+  }
+
+  const portalAtual = PORTAIS_ACESSO.find((p) => p.chave === portalSelecionado) ?? PORTAIS_ACESSO[0];
+
   return (
     <Modal
       aberto={Boolean(gestor)}
       onFechar={onFechar}
       eyebrow="Controle de acesso"
-      titulo={gestor ? `Permissões de ${gestor.nome}` : ""}
+      titulo={gestor ? `Permissões de ${gestor.nome.toUpperCase()}` : ""}
       subtitulo={gestor?.email}
-      largura="56rem"
+      largura="64rem"
     >
       {carregando ? (
         <p className="py-6 text-center text-[13px] text-foreground-muted">Carregando…</p>
       ) : (
         <div className="flex flex-col gap-4">
-          <p className="text-[12.5px] text-foreground-muted">
-            Marque os módulos e submódulos que {gestor?.nome} pode ver no portal. Tudo começa bloqueado.
-          </p>
-          <p className="rounded-md bg-brand-primary-050 px-3.5 py-2.5 text-[12px] text-brand-primary-800">
-            A mudança vale a partir do próximo login — se {gestor?.nome} já estiver com o portal aberto, precisa
-            sair e entrar de novo pra ver o efeito.
-          </p>
           {erro && <p className="rounded-md bg-status-danger/10 px-3.5 py-2.5 text-[12.5px] text-status-danger">{erro}</p>}
 
-          <div className="grid gap-3 md:grid-cols-2">
-            {MODULOS_PORTAL.map((modulo) => {
-              const filhos = modulo.filhos ?? [];
-              const todosLigados = filhos.length > 0 && filhos.every((f) => liberados.has(f.chave));
-              const algumLigado = filhos.some((f) => liberados.has(f.chave));
-
-              return (
-                <div key={modulo.chave} className="rounded-md border border-hairline px-4 py-3.5">
-                  <div className="flex items-center gap-3">
-                    <span className="min-w-0 flex-1 text-[14.5px] font-semibold text-foreground">{modulo.label}</span>
-                    {filhos.length > 0 ? (
-                      <>
-                        {algumLigado && !todosLigados && (
-                          <span className="text-[11px] text-foreground-muted">parcial</span>
-                        )}
-                        <Toggle
-                          ligado={todosLigados}
-                          onClick={() => alternarTodos(modulo)}
-                          titulo="Liberar/bloquear todos os submódulos"
-                        />
-                      </>
-                    ) : (
+          <div className="flex gap-4">
+            <div className="flex w-52 shrink-0 flex-col gap-1.5">
+              {PORTAIS_ACESSO.map((portal) => {
+                const chaves = todasAsChaves(portal.modulos);
+                const todosLigados = chaves.length > 0 && chaves.every((c) => liberados.has(c));
+                const algumLigado = chaves.some((c) => liberados.has(c));
+                const selecionado = portal.chave === portalSelecionado;
+                return (
+                  <div
+                    key={portal.chave}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setPortalSelecionado(portal.chave)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") setPortalSelecionado(portal.chave);
+                    }}
+                    className={cn(
+                      "flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2.5 text-left transition-colors",
+                      selecionado ? "border-brand-primary bg-brand-primary-050" : "border-hairline hover:bg-surface-page",
+                    )}
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[13px] font-semibold text-foreground">{portal.label}</span>
+                      {algumLigado && !todosLigados && <span className="text-[10px] text-foreground-muted">parcial</span>}
+                    </span>
+                    <span onClick={(e) => e.stopPropagation()}>
                       <Toggle
-                        ligado={liberados.has(modulo.chave)}
-                        onClick={() => alternarFolha(modulo.chave)}
-                        titulo={`Liberar/bloquear ${modulo.label}`}
+                        ligado={todosLigados}
+                        onClick={() => alternarPortal(portal)}
+                        titulo={`Liberar/bloquear ${portal.label} inteiro`}
                       />
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="grid flex-1 auto-rows-min gap-3 md:grid-cols-2">
+              {portalAtual.modulos.map((modulo) => {
+                const filhos = modulo.filhos ?? [];
+                const todosLigados = filhos.length > 0 && filhos.every((f) => liberados.has(f.chave));
+                const algumLigado = filhos.some((f) => liberados.has(f.chave));
+
+                return (
+                  <div key={modulo.chave} className="rounded-md border border-hairline px-4 py-3.5">
+                    <div className="flex items-center gap-3">
+                      <span className="min-w-0 flex-1 text-[14.5px] font-semibold text-foreground">{modulo.label}</span>
+                      {filhos.length > 0 ? (
+                        <>
+                          {algumLigado && !todosLigados && (
+                            <span className="text-[11px] text-foreground-muted">parcial</span>
+                          )}
+                          <Toggle
+                            ligado={todosLigados}
+                            onClick={() => alternarTodos(modulo)}
+                            titulo="Liberar/bloquear todos os submódulos"
+                          />
+                        </>
+                      ) : (
+                        <Toggle
+                          ligado={liberados.has(modulo.chave)}
+                          onClick={() => alternarFolha(modulo.chave)}
+                          titulo={`Liberar/bloquear ${modulo.label}`}
+                        />
+                      )}
+                    </div>
+
+                    {filhos.length > 0 && (
+                      <div className="mt-3 ml-1 flex flex-col gap-3 border-l border-hairline pl-4">
+                        {filhos.map((filho) => (
+                          <div key={filho.chave} className="flex items-center gap-3">
+                            <span className="min-w-0 flex-1 text-[13.5px] text-foreground-muted">{filho.label}</span>
+                            <Toggle
+                              ligado={liberados.has(filho.chave)}
+                              onClick={() => alternarFolha(filho.chave)}
+                              titulo={`Liberar/bloquear ${filho.label}`}
+                            />
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
-
-                  {filhos.length > 0 && (
-                    <div className="mt-3 ml-1 flex flex-col gap-3 border-l border-hairline pl-4">
-                      {filhos.map((filho) => (
-                        <div key={filho.chave} className="flex items-center gap-3">
-                          <span className="min-w-0 flex-1 text-[13.5px] text-foreground-muted">{filho.label}</span>
-                          <Toggle
-                            ligado={liberados.has(filho.chave)}
-                            onClick={() => alternarFolha(filho.chave)}
-                            titulo={`Liberar/bloquear ${filho.label}`}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
 
-          <p className="text-[11.5px] text-foreground-muted">{salvando ? "Salvando…" : "Alterações salvas automaticamente."}</p>
+          <p className="text-[11.5px] text-foreground-muted">
+            {salvando ? "Salvando…" : "Alterações salvas automaticamente."} A mudança vale a partir do próximo
+            login de {gestor?.nome.toUpperCase()}.
+          </p>
         </div>
       )}
     </Modal>
