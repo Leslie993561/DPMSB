@@ -109,6 +109,28 @@ export async function registrarVersaoPrograma(nova: NovaVersaoPrograma): Promise
   return { id };
 }
 
+export interface EdicaoVersaoPrograma {
+  vigenciaInicio: string;
+  vigenciaFim: string;
+  precisaoFim: PrecisaoData;
+  autor: string;
+  anexoUrl?: string | null;
+  anexoNome?: string | null;
+}
+
+/** Corrige os dados de uma versão já lançada (erro de digitação, anexo errado) — não cria uma versão nova. */
+export async function atualizarVersaoPrograma(id: string, edicao: EdicaoVersaoPrograma): Promise<boolean> {
+  const atualizadas = await sstQuery<{ id: string }>(
+    `UPDATE sst_programas_saude
+     SET vigencia_inicio = $1, vigencia_fim = $2, precisao_fim = $3, autor = $4,
+         anexo_url = COALESCE($5, anexo_url), anexo_nome = COALESCE($6, anexo_nome)
+     WHERE id = $7
+     RETURNING id`,
+    [edicao.vigenciaInicio, edicao.vigenciaFim, edicao.precisaoFim, edicao.autor, edicao.anexoUrl ?? null, edicao.anexoNome ?? null, id],
+  );
+  return atualizadas.length > 0;
+}
+
 export async function obterAnexoProgramaSaude(id: string): Promise<{ url: string; nome: string | null } | null> {
   const [p] = await sstQuery<{ anexo_url: string | null; anexo_nome: string | null }>(
     "SELECT anexo_url, anexo_nome FROM sst_programas_saude WHERE id = $1",

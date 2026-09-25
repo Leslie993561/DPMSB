@@ -1,7 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Card } from "@/components/shared/Card";
 import { Modal } from "@/components/shared/Modal";
 import { formatarDataBr } from "@/lib/format";
@@ -13,6 +12,10 @@ const DESCRICAO_PROGRAMA: Record<ProgramaSaude, string> = {
   LTCAT: "Laudo Técnico das Condições do Ambiente de Trabalho",
   PGR: "Programa de Gerenciamento de Riscos",
 };
+
+// A hospedagem recusa o corpo da requisição acima disso (413) antes até de chegar
+// na rota — mesmo teto do TAMANHO_MAX em app/api/sst/programas/anexo/route.ts.
+const TAMANHO_MAX_PDF = 4 * 1024 * 1024;
 
 const ESTILO_STATUS: Record<StatusPrograma, string> = {
   Vigente: "bg-status-success-bg text-status-success",
@@ -36,68 +39,50 @@ function rotuloDiasRestantes(dias: number | null): string {
   return `${dias} dia(s) restante(s)`;
 }
 
+/** A hospedagem recusa corpo grande demais antes até de chegar na rota (ex.: PDF grande) e devolve
+ * texto puro, não JSON — sem isso, `.json()` quebra com "Unexpected token" em vez de um erro legível. */
+async function parseRespostaJson(res: Response): Promise<{ erro?: string; [chave: string]: unknown }> {
+  try {
+    return await res.json();
+  } catch {
+    return { erro: res.status === 413 ? "Arquivo muito grande para o servidor aceitar." : `Falha inesperada (HTTP ${res.status}).` };
+  }
+}
+
 export function ProgramasSaudeClient({
   programasIniciais,
 }: {
   programasIniciais: Record<ProgramaSaude, VersaoProgramaSaude | null>;
 }) {
-  const router = useRouter();
-  const [programaAberto, setProgramaAberto] = useState<ProgramaSaude | null>(null);
-
   return (
-    <>
-      <div className="grid gap-3 md:grid-cols-3">
-        {PROGRAMAS_SAUDE.map((programa) => (
-          <CardPrograma
-            key={programa}
-            programa={programa}
-            versao={programasIniciais[programa]}
-            onCarregarNovoDocumento={() => setProgramaAberto(programa)}
-          />
-        ))}
-      </div>
-
-      {programaAberto && (
-        <ModalNovaVersao
-          programa={programaAberto}
-          onFechar={() => setProgramaAberto(null)}
-          onSalvo={() => {
-            setProgramaAberto(null);
-            router.refresh();
-          }}
-        />
-      )}
-    </>
+    <div className="grid gap-3 md:grid-cols-3">
+      {PROGRAMAS_SAUDE.map((programa) => (
+        <CardPrograma key={programa} programa={programa} versaoInicial={programasIniciais[programa]} />
+      ))}
+    </div>
   );
 }
 
-function CardPrograma({
-  programa,
-  versao,
-  onCarregarNovoDocumento,
-}: {
-  programa: ProgramaSaude;
-  versao: VersaoProgramaSaude | null;
-  onCarregarNovoDocumento: () => void;
-}) {
-  const [historico, setHistorico] = useState<VersaoProgramaSaude[] | null>(null);
-  const [carregandoHistorico, setCarregandoHistorico] = useState(false);
-  const [linhaExpandida, setLinhaExpandida] = useState<string | null>(null);
+type ModalAberto = { modo: "novo" } | { modo: "editar"; versao: VersaoProgramaSaude };
 
-  async function alternarHistorico() {
-    if (historico) {
-      setHistorico(null);
-      return;
-    }
-    setCarregandoHistorico(true);
-    try {
-      const res = await fetch(`/api/sst/programas/historico?programa=${programa}`);
-      const dados = await res.json();
-      setHistorico(dados.versoes ?? []);
-    } finally {
-      setCarregandoHistorico(false);
-    }
-  }
+function CardPrograma({ programa, versaoInicial }: { programa: ProgramaSaude; versaoInicial: VersaoProgramaSaude | null }) {
+  const [historico, setHistorico] = useState<VersaoProgramaSaude[] | null>(null);
+  const [linhaExpandida, setLinhaExpandida] = useState<string | null>(null);
+  const [modal, setModal] = useState<ModalAberto | null>(null);
+
+  const carregarHistorico = useCallback(() => {
+    return fetch(`/api/sst/programas/historico?programa=${programa}`)
+      .then((r) => r.json())
+      .then((dados) => setHistorico(dados.versoes ?? []));
+  }, [programa]);
+
+  useEffect(() => {
+    void carregarHistorico();
+  }, [carregarHistorico]);
+
+  // Enquanto o histórico ainda não carregou, usa o que o servidor já mandou
+  // pronto (evita o card nascer vazio); depois disso o histórico manda.
+  const versaoAtual = historico && historico.length > 0 ? historico[0] : historico ? null : versaoInicial;
 
   return (
     <Card className="flex flex-col gap-2.5 p-4">
@@ -106,54 +91,17 @@ function CardPrograma({
           <p className="text-[13px] font-semibold text-foreground">{programa}</p>
           <p className="text-[10.5px] text-foreground-muted">{DESCRICAO_PROGRAMA[programa]}</p>
         </div>
-        {versao && (
-          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${ESTILO_STATUS[versao.status]}`}>
-            {versao.status}
+        {versaoAtual && (
+          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${ESTILO_STATUS[versaoAtual.status]}`}>
+            {versaoAtual.status}
           </span>
         )}
       </div>
 
-      {versao ? (
-        <>
-          <div className="flex items-center gap-4 text-[12px] text-foreground">
-            <span>
-              <span className="text-foreground-muted">Início: </span>
-              <span className="font-medium">{formatarVigencia(versao.vigenciaInicio, versao.precisaoFim)}</span>
-            </span>
-            <span>
-              <span className="text-foreground-muted">Validade: </span>
-              <span className="font-medium">{formatarVigencia(versao.vigenciaFim, versao.precisaoFim)}</span>
-            </span>
-          </div>
-          <p className="text-[11px] text-foreground-muted">{rotuloDiasRestantes(versao.diasRestantes)}</p>
-          <p className="text-[11px] text-foreground-muted">Autor: {versao.autor || "—"}</p>
-          {versao.anexoNome && (
-            <a
-              href={`/api/sst/programas/${versao.id}/anexo`}
-              target="_blank"
-              rel="noreferrer"
-              className="text-[11px] text-brand-primary underline underline-offset-2 hover:text-brand-primary-hover"
-            >
-              📎 {versao.anexoNome}
-            </a>
-          )}
-        </>
-      ) : (
-        <p className="text-[12px] text-foreground-muted">Nenhum documento cadastrado ainda.</p>
-      )}
-
-      <button
-        type="button"
-        onClick={alternarHistorico}
-        className="text-left text-[11px] font-medium text-brand-primary hover:text-brand-primary-hover"
-      >
-        {carregandoHistorico ? "Carregando..." : historico ? "Ocultar histórico ▴" : "Ver histórico ▾"}
-      </button>
-
       {historico && (
-        <div className="-mt-1 space-y-1 border-t border-hairline pt-2">
+        <div className="space-y-1">
           {historico.length === 0 ? (
-            <p className="text-[11px] text-foreground-muted">Sem versões carregadas.</p>
+            <p className="text-[12px] text-foreground-muted">Nenhum documento cadastrado ainda.</p>
           ) : (
             historico.map((v) => {
               const expandida = linhaExpandida === v.id;
@@ -187,6 +135,13 @@ function CardPrograma({
                       ) : (
                         <p className="text-[10.5px] text-foreground-muted">Sem anexo.</p>
                       )}
+                      <button
+                        type="button"
+                        onClick={() => setModal({ modo: "editar", versao: v })}
+                        className="text-[10.5px] font-medium text-brand-primary hover:text-brand-primary-hover"
+                      >
+                        ✎ Editar
+                      </button>
                     </div>
                   )}
                 </div>
@@ -198,28 +153,43 @@ function CardPrograma({
 
       <button
         type="button"
-        onClick={onCarregarNovoDocumento}
+        onClick={() => setModal({ modo: "novo" })}
         className="mt-1 flex items-center justify-center gap-1.5 rounded border border-hairline px-3 py-2 text-[12px] font-medium text-foreground-muted transition-colors hover:bg-surface-page"
       >
         <span aria-hidden>⬆</span> Carregar novo documento
       </button>
+
+      {modal && (
+        <ModalVersaoPrograma
+          programa={programa}
+          versaoEditar={modal.modo === "editar" ? modal.versao : undefined}
+          onFechar={() => setModal(null)}
+          onSalvo={() => {
+            setModal(null);
+            void carregarHistorico();
+          }}
+        />
+      )}
     </Card>
   );
 }
 
-function ModalNovaVersao({
+function ModalVersaoPrograma({
   programa,
+  versaoEditar,
   onFechar,
   onSalvo,
 }: {
   programa: ProgramaSaude;
+  versaoEditar?: VersaoProgramaSaude;
   onFechar: () => void;
   onSalvo: () => void;
 }) {
-  const [precisao, setPrecisao] = useState<PrecisaoData>("mes");
-  const [vigenciaInicio, setVigenciaInicio] = useState("");
-  const [vigenciaFim, setVigenciaFim] = useState("");
-  const [autor, setAutor] = useState("");
+  const editando = Boolean(versaoEditar);
+  const [precisao, setPrecisao] = useState<PrecisaoData>(versaoEditar?.precisaoFim ?? "mes");
+  const [vigenciaInicio, setVigenciaInicio] = useState(versaoEditar?.vigenciaInicio ?? "");
+  const [vigenciaFim, setVigenciaFim] = useState(versaoEditar?.vigenciaFim ?? "");
+  const [autor, setAutor] = useState(versaoEditar?.autor ?? "");
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -231,6 +201,10 @@ function ModalNovaVersao({
       setErro("Preencha início, vencimento e autor.");
       return;
     }
+    if (arquivo && arquivo.size > TAMANHO_MAX_PDF) {
+      setErro("Esse PDF passa de 4MB — o servidor recusa antes de chegar no portal. Comprima o arquivo e tente de novo.");
+      return;
+    }
     setSalvando(true);
     setErro(null);
     try {
@@ -240,18 +214,25 @@ function ModalNovaVersao({
         const form = new FormData();
         form.append("arquivo", arquivo);
         const resUpload = await fetch("/api/sst/programas/anexo", { method: "POST", body: form });
-        const dadosUpload = await resUpload.json();
+        const dadosUpload = await parseRespostaJson(resUpload);
         if (!resUpload.ok) throw new Error(dadosUpload.erro ?? "Falha ao subir o PDF.");
-        anexoUrl = dadosUpload.url;
-        anexoNome = dadosUpload.nome;
+        anexoUrl = (dadosUpload.url as string) ?? null;
+        anexoNome = (dadosUpload.nome as string) ?? null;
       }
 
-      const res = await fetch("/api/sst/programas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ programa, vigenciaInicio, vigenciaFim, precisaoFim: precisao, autor: autor.trim(), anexoUrl, anexoNome }),
-      });
-      const dados = await res.json();
+      const corpo = { vigenciaInicio, vigenciaFim, precisaoFim: precisao, autor: autor.trim(), anexoUrl, anexoNome };
+      const res = editando
+        ? await fetch(`/api/sst/programas/${versaoEditar!.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(corpo),
+          })
+        : await fetch("/api/sst/programas", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ programa, ...corpo }),
+          });
+      const dados = await parseRespostaJson(res);
       if (!res.ok) throw new Error(dados.erro ?? "Falha ao salvar.");
       onSalvo();
     } catch (e) {
@@ -266,8 +247,8 @@ function ModalNovaVersao({
       aberto
       onFechar={onFechar}
       eyebrow="SST · Programas"
-      titulo={`Novo documento — ${programa}`}
-      subtitulo="Registra uma nova versão; o histórico anterior fica guardado"
+      titulo={editando ? `Editar documento — ${programa}` : `Novo documento — ${programa}`}
+      subtitulo={editando ? "Corrige os dados desta versão — não cria uma nova" : "Registra uma nova versão; o histórico anterior fica guardado"}
       rodape={
         <>
           <button
@@ -335,7 +316,12 @@ function ModalNovaVersao({
         </label>
 
         <label className="block">
-          <span className="mb-1 block text-[11px] font-medium text-foreground-muted">Documento (PDF, opcional)</span>
+          <span className="mb-1 block text-[11px] font-medium text-foreground-muted">
+            Documento (PDF{editando ? ", deixe em branco para manter o atual" : ", opcional"})
+          </span>
+          {editando && versaoEditar?.anexoNome && !arquivo && (
+            <p className="mb-1 text-[10.5px] text-foreground-muted">Atual: 📎 {versaoEditar.anexoNome}</p>
+          )}
           <input
             type="file"
             accept="application/pdf"
