@@ -45,47 +45,51 @@ export function EpiPageClient({
   const router = useRouter();
   // Busca fica aqui, fora da aba: continua valendo ao trocar de aba e voltar.
   const [busca, setBusca] = useState("");
+  const [exportarAberto, setExportarAberto] = useState(false);
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-1.5">
-        <label className="flex w-60 items-center gap-1.5 rounded-full border border-hairline bg-background px-2.5 py-1 focus-within:border-brand-primary">
-          <span aria-hidden className="text-[11px] text-foreground-muted">🔍</span>
-          <input
-            value={busca}
-            onChange={(e) => {
-              setBusca(e.target.value);
-              if (aba !== "colaboradores") router.push("/sst/epi?aba=colaboradores");
-            }}
-            placeholder="Pesquisar colaborador"
-            aria-label="Pesquisar colaborador"
-            className="min-w-0 flex-1 bg-transparent text-[11.5px] text-foreground outline-none"
-          />
-          {busca && (
-            <button
-              type="button"
-              onClick={() => setBusca("")}
-              aria-label="Limpar pesquisa"
-              className="text-[11px] text-foreground-muted hover:text-foreground"
-            >
-              ✕
-            </button>
-          )}
-        </label>
-        {ABAS.map((a) => (
-          <Link
-            key={a.id}
-            href={`/sst/epi?aba=${a.id}`}
-            className={cn(
-              "rounded-full border px-2.5 py-1 text-[11px] font-medium whitespace-nowrap transition-colors",
-              aba === a.id
-                ? "border-brand-primary/50 bg-brand-primary-100 text-brand-primary-800"
-                : "border-hairline bg-background text-foreground hover:border-brand-primary hover:bg-brand-primary-050 hover:text-brand-primary-800",
+      <div className="flex flex-wrap items-center justify-between gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <label className="flex w-60 items-center gap-1.5 rounded-full border border-hairline bg-background px-2.5 py-1 focus-within:border-brand-primary">
+            <span aria-hidden className="text-[11px] text-foreground-muted">🔍</span>
+            <input
+              value={busca}
+              onChange={(e) => {
+                setBusca(e.target.value);
+                if (aba !== "colaboradores") router.push("/sst/epi?aba=colaboradores");
+              }}
+              placeholder="Pesquisar colaborador"
+              aria-label="Pesquisar colaborador"
+              className="min-w-0 flex-1 bg-transparent text-[11.5px] text-foreground outline-none"
+            />
+            {busca && (
+              <button
+                type="button"
+                onClick={() => setBusca("")}
+                aria-label="Limpar pesquisa"
+                className="text-[11px] text-foreground-muted hover:text-foreground"
+              >
+                ✕
+              </button>
             )}
-          >
-            {a.label}
-          </Link>
-        ))}
+          </label>
+          {ABAS.map((a) => (
+            <Link
+              key={a.id}
+              href={`/sst/epi?aba=${a.id}`}
+              className={cn(
+                "rounded-full border px-2.5 py-1 text-[11px] font-medium whitespace-nowrap transition-colors",
+                aba === a.id
+                  ? "border-brand-primary/50 bg-brand-primary-100 text-brand-primary-800"
+                  : "border-hairline bg-background text-foreground hover:border-brand-primary hover:bg-brand-primary-050 hover:text-brand-primary-800",
+              )}
+            >
+              {a.label}
+            </Link>
+          ))}
+        </div>
+        <ExportarEpiPopover aberto={exportarAberto} onAbrir={() => setExportarAberto((v) => !v)} onFechar={() => setExportarAberto(false)} />
       </div>
 
       {aba === "colaboradores" && (
@@ -100,6 +104,139 @@ export function EpiPageClient({
       )}
       {aba === "matriz" && <MatrizTab matriz={matriz} catalogoEpi={catalogoEpi} caExtra={caExtra} />}
       {aba === "custos" && <CustosTab custos={custos} fardamento={fardamento} />}
+    </div>
+  );
+}
+
+const MESES_EXPORTAR = [
+  "Janeiro",
+  "Fevereiro",
+  "Março",
+  "Abril",
+  "Maio",
+  "Junho",
+  "Julho",
+  "Agosto",
+  "Setembro",
+  "Outubro",
+  "Novembro",
+  "Dezembro",
+];
+
+function ExportarEpiPopover({
+  aberto,
+  onAbrir,
+  onFechar,
+}: {
+  aberto: boolean;
+  onAbrir: () => void;
+  onFechar: () => void;
+}) {
+  const hoje = new Date();
+  const [modo, setModo] = useState<"mensal" | "anual">("mensal");
+  const [mes, setMes] = useState(hoje.getMonth() + 1);
+  const [ano, setAno] = useState(hoje.getFullYear());
+  const anos = Array.from({ length: 6 }, (_, i) => hoje.getFullYear() - 1 + i);
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={onAbrir}
+        className={cn(
+          "flex items-center gap-1.5 rounded-md bg-brand-primary px-3 py-2 text-[12.5px] font-semibold text-brand-white transition-colors hover:bg-brand-primary-700",
+          aberto && "ring-2 ring-[#E6A020] ring-offset-1",
+        )}
+      >
+        <span aria-hidden>📄</span> Exportar <span aria-hidden className="text-[9px]">▾</span>
+      </button>
+      {aberto && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={onFechar} />
+          <div className="absolute top-full right-0 z-50 mt-1.5 w-[320px] rounded-md border border-hairline bg-background p-4 shadow-drawer">
+            <p className="text-[12.5px] font-bold text-foreground">Opção 1 · O que já foi entregue</p>
+            <p className="mt-1 text-[11px] leading-relaxed text-foreground-muted">
+              Gera um .xlsx com uma linha por entrega de EPI e fardamento já confirmada (ficha assinada).
+            </p>
+            <a
+              href="/api/sst/epi/exportar/entregues"
+              download
+              onClick={onFechar}
+              className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-md border border-hairline px-3 py-2 text-[12px] font-semibold text-brand-primary-800 transition-colors hover:bg-brand-primary-050"
+            >
+              ↓ Exportar entregas
+            </a>
+
+            <div className="my-3 border-t border-hairline" />
+
+            <p className="text-[12.5px] font-bold text-foreground">Opção 2 · Projeção de vencimentos</p>
+            <p className="mt-1 text-[11px] leading-relaxed text-foreground-muted">Quais EPIs vão vencer — por mês ou o ano inteiro.</p>
+
+            <div className="mt-2.5 flex gap-1.5">
+              <button
+                type="button"
+                onClick={() => setModo("mensal")}
+                className={cn(
+                  "flex-1 rounded-md border px-2 py-1.5 text-[11.5px] font-medium transition-colors",
+                  modo === "mensal"
+                    ? "border-brand-primary/50 bg-brand-primary-100 text-brand-primary-800"
+                    : "border-hairline text-foreground-muted hover:bg-surface-page",
+                )}
+              >
+                Mensal
+              </button>
+              <button
+                type="button"
+                onClick={() => setModo("anual")}
+                className={cn(
+                  "flex-1 rounded-md border px-2 py-1.5 text-[11.5px] font-medium transition-colors",
+                  modo === "anual"
+                    ? "border-brand-primary/50 bg-brand-primary-100 text-brand-primary-800"
+                    : "border-hairline text-foreground-muted hover:bg-surface-page",
+                )}
+              >
+                Ano completo
+              </button>
+            </div>
+
+            <div className="mt-2 flex gap-1.5">
+              {modo === "mensal" && (
+                <select
+                  value={mes}
+                  onChange={(e) => setMes(Number(e.target.value))}
+                  className="flex-1 rounded-md border border-hairline bg-background px-2 py-1.5 text-[12px] text-foreground"
+                >
+                  {MESES_EXPORTAR.map((m, i) => (
+                    <option key={m} value={i + 1}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <select
+                value={ano}
+                onChange={(e) => setAno(Number(e.target.value))}
+                className="flex-1 rounded-md border border-hairline bg-background px-2 py-1.5 text-[12px] text-foreground"
+              >
+                {anos.map((a) => (
+                  <option key={a} value={a}>
+                    {a}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <a
+              href={`/api/sst/epi/exportar/vencimentos?modo=${modo}&ano=${ano}${modo === "mensal" ? `&mes=${mes}` : ""}`}
+              download
+              onClick={onFechar}
+              className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-md bg-brand-primary px-3 py-2 text-[12.5px] font-semibold text-brand-white transition-colors hover:bg-brand-primary-700"
+            >
+              ↓ Exportar projeção
+            </a>
+          </div>
+        </>
+      )}
     </div>
   );
 }

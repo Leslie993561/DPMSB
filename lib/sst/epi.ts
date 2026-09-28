@@ -92,6 +92,40 @@ export async function atualizarEpisExtrasDaFuncao(funcao: string, epis: string[]
   );
 }
 
+interface LinhaTroca {
+  colab_id: string;
+  epi: string;
+  data_troca: string;
+}
+
+/**
+ * Só a entrega mais recente de cada EPI vale para o vencimento: uma nova entrega
+ * do mesmo EPI substitui a anterior (por data de entrega; empate, a última lançada).
+ * Só conta entrega CONFIRMADA (ficha assinada, PDF do modelo antigo anexado, ou
+ * sem ficha — registro legado de antes de existir esse controle): enquanto a
+ * ficha só está "aguardando assinatura", o colaborador ainda não confirmou que
+ * recebeu, então não pode contar como EPI em dia.
+ */
+async function obterUltimasTrocasConfirmadas(): Promise<LinhaTroca[]> {
+  return sstQuery<LinhaTroca>(
+    `SELECT DISTINCT ON (e.colab_id, e.epi) e.colab_id, e.epi, e.data_troca
+       FROM sst_entregas_epi e
+       LEFT JOIN sst_fichas_epi f ON f.id = e.ficha_id
+       WHERE e.ficha_id IS NULL OR f.status = 'assinada' OR f.assinatura_storage_path IS NOT NULL
+       ORDER BY e.colab_id, e.epi, to_date(NULLIF(e.data_entrega, ''), 'DD/MM/YYYY') DESC NULLS LAST, e.created_at DESC`,
+  );
+}
+
+/**
+ * RH já dispensou o aviso de "troca vencida" pra este EPI, presa à mesma data
+ * de troca — enquanto não houver uma entrega nova, não deve mais contar como
+ * vencido (nem nos contadores da lista, nem na ficha do colaborador, nem na
+ * projeção de vencimentos exportada).
+ */
+async function obterTrocasDispensadas(): Promise<LinhaTroca[]> {
+  return sstQuery<LinhaTroca>("SELECT colab_id, epi, data_troca FROM sst_epi_trocas_dispensadas");
+}
+
 /**
  * Usa o MESMO cadastro do Quadro de Colaboradores — não uma base à parte. As
  * tabelas do SST (sst_entregas_epi etc.) vivem no mesmo banco hoje e
@@ -100,28 +134,13 @@ export async function atualizarEpisExtrasDaFuncao(funcao: string, epis: string[]
 export async function listarColaboradoresParaEpi(): Promise<ColaboradorEpi[]> {
   const [todos, ultimasEntregas, extras, fichasAguardando, trocasDispensadas] = await Promise.all([
     listarColaboradores(),
-    // Só a entrega mais recente de cada EPI vale para o vencimento: uma nova entrega
-    // do mesmo EPI substitui a anterior (por data de entrega; empate, a última lançada).
-    // Só conta entrega CONFIRMADA (ficha assinada, PDF do modelo antigo anexado, ou
-    // sem ficha — registro legado de antes de existir esse controle): enquanto a
-    // ficha só está "aguardando assinatura", o colaborador ainda não confirmou que
-    // recebeu, então não pode contar como EPI em dia.
-    sstQuery<{ colab_id: string; epi: string; data_troca: string }>(
-      `SELECT DISTINCT ON (e.colab_id, e.epi) e.colab_id, e.epi, e.data_troca
-         FROM sst_entregas_epi e
-         LEFT JOIN sst_fichas_epi f ON f.id = e.ficha_id
-         WHERE e.ficha_id IS NULL OR f.status = 'assinada' OR f.assinatura_storage_path IS NOT NULL
-         ORDER BY e.colab_id, e.epi, to_date(NULLIF(e.data_entrega, ''), 'DD/MM/YYYY') DESC NULLS LAST, e.created_at DESC`,
-    ),
+    obterUltimasTrocasConfirmadas(),
     obterListaEditadaMatriz(),
     sstQuery<{ colab_id: string }>(
       `SELECT DISTINCT colab_id FROM sst_fichas_epi
          WHERE NOT (status = 'assinada' OR assinatura_storage_path IS NOT NULL)`,
     ),
-    // RH já dispensou o aviso de "troca vencida" pra este EPI, presa à mesma
-    // data de troca — enquanto não houver uma entrega nova, não deve mais
-    // contar como vencido (nem aqui, nem na ficha do colaborador).
-    sstQuery<{ colab_id: string; epi: string; data_troca: string }>("SELECT colab_id, epi, data_troca FROM sst_epi_trocas_dispensadas"),
+    obterTrocasDispensadas(),
   ]);
   const trocaPorColaborador = new Map<number, Map<string, string>>();
   for (const e of ultimasEntregas) {
@@ -161,6 +180,143 @@ export async function listarColaboradoresParaEpi(): Promise<ColaboradorEpi[]> {
         aguardandoAssinatura: idsAguardando.has(c.id),
       };
     });
+}
+
+export interface EntregaEpiExportLinha {
+  nome: string;
+  cargo: string | null;
+  departamento: string | null;
+  categoria: "EPI" | "Fardamento";
+  item: string;
+  ca: string;
+  qtd: number;
+  valorUnit: number;
+  dataEntrega: string;
+  dataTroca: string;
+  responsavel: string;
+}
+
+/** "DD/MM/AAAA" → "AAAAMMDD" (ordenável); string vazia se inválida/ausente. */
+function chaveOrdenacaoData(dataBr: string): string {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dataBr.trim());
+  return m ? `${m[3]}${m[2]}${m[1]}` : "";
+}
+
+/**
+ * Todas as entregas de EPI e fardamento já CONFIRMADAS (mesmo critério de
+ * "em dia" da lista de colaboradores: ficha assinada, PDF antigo anexado, ou
+ * sem ficha — nunca uma que ainda está só aguardando assinatura). Para a
+ * exportação "O que já foi entregue".
+ */
+export async function listarEntregasConfirmadasParaExportacao(): Promise<EntregaEpiExportLinha[]> {
+  const [todos, entregasEpi, entregasFardamento] = await Promise.all([
+    listarColaboradores(),
+    sstQuery<{
+      colab_id: string;
+      epi: string;
+      ca: string;
+      qtd: number;
+      valor_unit: string;
+      data_entrega: string;
+      data_troca: string;
+      responsavel: string;
+    }>(
+      `SELECT e.colab_id, e.epi, e.ca, e.qtd, e.valor_unit, e.data_entrega, e.data_troca, e.responsavel
+         FROM sst_entregas_epi e
+         LEFT JOIN sst_fichas_epi f ON f.id = e.ficha_id
+         WHERE e.ficha_id IS NULL OR f.status = 'assinada' OR f.assinatura_storage_path IS NOT NULL`,
+    ),
+    sstQuery<{
+      colab_id: string;
+      tipo: string;
+      qtd: number;
+      valor_unit: string;
+      data_entrega: string;
+      responsavel: string;
+    }>(
+      `SELECT e.colab_id, e.tipo, e.qtd, e.valor_unit, e.data_entrega, e.responsavel
+         FROM sst_fardamento_entregas e
+         LEFT JOIN sst_fichas_epi f ON f.id = e.ficha_id
+         WHERE e.ficha_id IS NULL OR f.status = 'assinada' OR f.assinatura_storage_path IS NOT NULL`,
+    ),
+  ]);
+  const porId = new Map(todos.map((c) => [c.id, c]));
+
+  const linhas: EntregaEpiExportLinha[] = [
+    ...entregasEpi.map((e) => {
+      const c = porId.get(Number(e.colab_id));
+      return {
+        nome: c?.nome ?? "Colaborador removido",
+        cargo: c?.cargo ?? null,
+        departamento: c?.departamento ?? null,
+        categoria: "EPI" as const,
+        item: e.epi,
+        ca: e.ca,
+        qtd: Number(e.qtd),
+        valorUnit: Number(e.valor_unit),
+        dataEntrega: e.data_entrega,
+        dataTroca: e.data_troca,
+        responsavel: e.responsavel,
+      };
+    }),
+    ...entregasFardamento.map((e) => {
+      const c = porId.get(Number(e.colab_id));
+      return {
+        nome: c?.nome ?? "Colaborador removido",
+        cargo: c?.cargo ?? null,
+        departamento: c?.departamento ?? null,
+        categoria: "Fardamento" as const,
+        item: e.tipo,
+        ca: "",
+        qtd: Number(e.qtd),
+        valorUnit: Number(e.valor_unit),
+        dataEntrega: e.data_entrega,
+        dataTroca: "",
+        responsavel: e.responsavel,
+      };
+    }),
+  ];
+
+  return linhas.sort(
+    (a, b) => a.nome.localeCompare(b.nome, "pt-BR") || chaveOrdenacaoData(a.dataEntrega).localeCompare(chaveOrdenacaoData(b.dataEntrega)),
+  );
+}
+
+export interface ProjecaoVencimentoLinha {
+  nome: string;
+  cargo: string | null;
+  departamento: string | null;
+  epi: string;
+  dataTroca: string;
+}
+
+/**
+ * Pela troca prevista da última entrega CONFIRMADA de cada EPI (mesma base do
+ * cálculo de vencidos/vencendo da lista de colaboradores) — para a exportação
+ * "Projeção de vencimentos", que o RH filtra por mês/ano na hora de gerar.
+ */
+export async function listarProjecaoVencimentosEpi(): Promise<ProjecaoVencimentoLinha[]> {
+  const [todos, ultimasEntregas, trocasDispensadas] = await Promise.all([
+    listarColaboradores(),
+    obterUltimasTrocasConfirmadas(),
+    obterTrocasDispensadas(),
+  ]);
+  const dispensadas = new Set(trocasDispensadas.map((d) => `${d.colab_id}::${d.epi}::${d.data_troca}`));
+  const porId = new Map(todos.map((c) => [c.id, c]));
+
+  return ultimasEntregas
+    .filter((e) => e.data_troca.trim() !== "" && !dispensadas.has(`${e.colab_id}::${e.epi}::${e.data_troca}`))
+    .map((e) => {
+      const c = porId.get(Number(e.colab_id));
+      return {
+        nome: c?.nome ?? "Colaborador removido",
+        cargo: c?.cargo ?? null,
+        departamento: c?.departamento ?? null,
+        epi: e.epi,
+        dataTroca: e.data_troca,
+      };
+    })
+    .sort((a, b) => chaveOrdenacaoData(a.dataTroca).localeCompare(chaveOrdenacaoData(b.dataTroca)) || a.nome.localeCompare(b.nome, "pt-BR"));
 }
 
 export interface SituacaoEpi {
