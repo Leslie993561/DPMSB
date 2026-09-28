@@ -380,6 +380,31 @@ CREATE TABLE IF NOT EXISTS dho_eventos_calendario (
   titulo TEXT NOT NULL,
   criado_em TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')
 );
+-- Vira uma "ação" completa: data (início) + fim (pode passar de um dia),
+-- objetivo, público-alvo e descrição — além do título curto que já existia.
+ALTER TABLE dho_eventos_calendario ADD COLUMN IF NOT EXISTS data_fim TEXT;
+ALTER TABLE dho_eventos_calendario ADD COLUMN IF NOT EXISTS objetivo TEXT NOT NULL DEFAULT '';
+ALTER TABLE dho_eventos_calendario ADD COLUMN IF NOT EXISTS publico_alvo TEXT NOT NULL DEFAULT '';
+ALTER TABLE dho_eventos_calendario ADD COLUMN IF NOT EXISTS descricao TEXT NOT NULL DEFAULT '';
+
+-- Itens de custo de uma ação — o "Utilizado" da tabela de orçamento mensal é
+-- a soma disso, agrupado pelo mês da data de início da ação.
+CREATE TABLE IF NOT EXISTS dho_evento_itens (
+  id SERIAL PRIMARY KEY,
+  evento_id INTEGER NOT NULL REFERENCES dho_eventos_calendario(id) ON DELETE CASCADE,
+  nome TEXT NOT NULL,
+  quantidade INTEGER NOT NULL DEFAULT 1,
+  valor_unitario DOUBLE PRECISION NOT NULL DEFAULT 0
+);
+
+-- "Aprovado" por mês é digitado à mão (lápis na tela); "Utilizado" nunca fica
+-- salvo aqui — vem sempre calculado dos itens das ações (dho_evento_itens).
+CREATE TABLE IF NOT EXISTS dho_orcamento_mensal (
+  ano INTEGER NOT NULL,
+  mes INTEGER NOT NULL,
+  aprovado DOUBLE PRECISION NOT NULL DEFAULT 0,
+  PRIMARY KEY (ano, mes)
+);
 
 CREATE TABLE IF NOT EXISTS dho_kits (
   id SERIAL PRIMARY KEY,
