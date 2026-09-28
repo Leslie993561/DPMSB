@@ -96,6 +96,7 @@ export function EpiPageClient({
         <ColaboradoresTab
           colaboradores={colaboradores}
           precos={custos.linhas}
+          matriz={matriz}
           busca={busca}
           onBusca={setBusca}
           resumoFichas={resumoFichas}
@@ -244,6 +245,7 @@ function ExportarEpiPopover({
 function ColaboradoresTab({
   colaboradores,
   precos,
+  matriz,
   busca,
   onBusca,
   resumoFichas,
@@ -251,6 +253,7 @@ function ColaboradoresTab({
 }: {
   colaboradores: ColaboradorEpi[];
   precos: { epi: string; ca: string; valorUnitario: number }[];
+  matriz: FuncaoEpi[];
   busca: string;
   onBusca: (v: string) => void;
   resumoFichas: { enviadas: number; assinadas: number };
@@ -260,6 +263,11 @@ function ColaboradoresTab({
   const [colunaAberta, setColunaAberta] = useState<"vinculo" | "texto" | null>(null);
   const [filtroVinculo, setFiltroVinculo] = useState<string>("");
   const [filtroResumo, setFiltroResumo] = useState<"vencidos" | "ativos" | "aguardando" | "pendente" | null>(null);
+
+  // Só o que está de fato cadastrado em alguma função da Matriz de EPI pode
+  // aparecer no registro de entrega — nada que só tenha preço/C.A. lançado
+  // em Custo e Valores sem estar na matriz.
+  const nomesEpiDaMatriz = Array.from(new Set(matriz.flatMap((f) => f.epis))).sort((a, b) => a.localeCompare(b, "pt-BR"));
 
   const vinculosDisponiveis = Array.from(
     new Set(colaboradores.map((c) => c.vinculo).filter((v): v is Vinculo => Boolean(v))),
@@ -411,8 +419,13 @@ function ColaboradoresTab({
           </tbody>
         </table>
       </div>
-      <FichaEpiDrawer colaborador={fichaAberta} catalogo={precos.map((p) => ({ epi: p.epi, ca: p.ca }))}
-        itensFardamento={itensFardamento} onFechar={() => setFichaAberta(null)} />
+      <FichaEpiDrawer
+        colaborador={fichaAberta}
+        catalogo={precos.map((p) => ({ epi: p.epi, ca: p.ca }))}
+        nomesEpiDaMatriz={nomesEpiDaMatriz}
+        itensFardamento={itensFardamento}
+        onFechar={() => setFichaAberta(null)}
+      />
     </Card>
   );
 }

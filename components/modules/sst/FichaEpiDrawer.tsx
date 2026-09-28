@@ -22,12 +22,15 @@ function trocaVencida(dataBr: string): boolean {
 export function FichaEpiDrawer({
   colaborador,
   catalogo,
+  nomesEpiDaMatriz,
   itensFardamento,
   onFechar,
 }: {
   colaborador: ColaboradorEpi | null;
   /** Todos os EPIs do catálogo com o C.A. padrão. */
   catalogo: { epi: string; ca: string }[];
+  /** Todos os nomes de EPI cadastrados em alguma função da Matriz de EPI. */
+  nomesEpiDaMatriz: string[];
   itensFardamento: string[];
   onFechar: () => void;
 }) {
@@ -272,6 +275,7 @@ export function FichaEpiDrawer({
         <RegistrarEntregaModal
           colaborador={colaborador}
           catalogo={catalogo}
+          nomesEpiDaMatriz={nomesEpiDaMatriz}
           itensFardamento={itensFardamento}
           onFechar={() => setRegistrando(false)}
           onCriada={() => {

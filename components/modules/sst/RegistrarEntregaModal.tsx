@@ -27,20 +27,23 @@ type LinhaExtra = Omit<Selecao, "marcado">;
 export function RegistrarEntregaModal({
   colaborador,
   catalogo,
+  nomesEpiDaMatriz,
   itensFardamento,
   onFechar,
   onCriada,
 }: {
   colaborador: ColaboradorEpi;
-  /** Catálogo com C.A. padrão; a lista completa só aparece quando o cargo não tem função na matriz. */
+  /** Preço/C.A. padrão de cada EPI conhecido — só para preencher o campo C.A., não decide quais itens aparecem. */
   catalogo: { epi: string; ca: string }[];
+  /** Todos os nomes de EPI cadastrados em alguma função da Matriz de EPI — só isso pode aparecer no registro. */
+  nomesEpiDaMatriz: string[];
   /** Itens de fardamento do catálogo (Custo e Valores). */
   itensFardamento: string[];
   onFechar: () => void;
   onCriada: () => void;
 }) {
   const obrigatorios = colaborador.episObrigatorios;
-  const naoObrigatorios = catalogo.map((c) => c.epi).filter((epi) => !obrigatorios.includes(epi));
+  const naoObrigatorios = nomesEpiDaMatriz.filter((epi) => !obrigatorios.includes(epi));
   const opcoes = [...obrigatorios, ...naoObrigatorios];
   const caPadrao = (epi: string) => catalogo.find((c) => c.epi === epi)?.ca ?? "";
   const [selecao, setSelecao] = useState<Record<string, Selecao>>(() =>
