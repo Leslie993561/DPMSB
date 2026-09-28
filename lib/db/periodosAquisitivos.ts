@@ -82,6 +82,8 @@ interface LinhaLancamentoResumo {
   status: "programada" | "concluida" | "cancelada" | "alterada";
   data_inicio_prevista: string | null;
   data_inicio_gozo: string | null;
+  abono: number;
+  dias_abono: number;
 }
 
 /**
@@ -91,7 +93,7 @@ interface LinhaLancamentoResumo {
 async function buscarTodosLancamentosAtivos(): Promise<Map<number, LinhaLancamentoResumo[]>> {
   const db = await getDb();
   const resultado = await db.execute(
-    "SELECT periodo_aquisitivo_id, dias, status, data_inicio_prevista, data_inicio_gozo FROM lancamentos_ferias WHERE status != 'cancelada'",
+    "SELECT periodo_aquisitivo_id, dias, status, data_inicio_prevista, data_inicio_gozo, abono, dias_abono FROM lancamentos_ferias WHERE status != 'cancelada'",
   );
   const linhas = resultado.rows as unknown as LinhaLancamentoResumo[];
   const porPeriodo = new Map<number, LinhaLancamentoResumo[]>();
@@ -144,12 +146,26 @@ function enriquecerPeriodo(
   // programação futura ainda não confirmada (Confirmar gozo) não deve reduzir o
   // saldo restante do Controle de Férias, só reserva a data no Planejamento.
   const confirmados = lancamentosResumo.filter((l) => l.status === "concluida" || l.status === "alterada");
+
+  // `periodo.abonoUtilizado`/`diasAbono` deveriam refletir o abono do
+  // lançamento, mas duas importações históricas (Relação de Férias Calculadas
+  // e Aviso e Recibo de Férias do DP) gravaram o abono só no lançamento, sem
+  // atualizar o período — aí o saldo aqui contava os dias vendidos como se
+  // ainda estivessem em aberto, mesmo o histórico da pessoa mostrando o
+  // período como concluído. Sempre que o lançamento diz que houve abono, ele
+  // manda — o campo do período só complementa quando NENHUM lançamento tem essa
+  // informação (períodos antigos que registraram o abono direto nele).
+  const abonoDoLancamento = confirmados.find((l) => l.abono);
+  const periodoParaCalculo: PeriodoAquisitivo = abonoDoLancamento
+    ? { ...periodo, abonoUtilizado: true, diasAbono: abonoDoLancamento.dias_abono }
+    : periodo;
+
   const estado = calcularEstadoPeriodo(
-    periodo,
+    periodoParaCalculo,
     confirmados.map((l): LancamentoInfo => ({ dias: l.dias })),
   );
   const estadoComProgramados = calcularEstadoPeriodo(
-    periodo,
+    periodoParaCalculo,
     lancamentosResumo.map((l): LancamentoInfo => ({ dias: l.dias })),
   );
 
@@ -179,7 +195,7 @@ function enriquecerPeriodo(
   const riscoDobro = avaliarRiscoDobro(limiteGozo, proximaDataInicio ? new Date(proximaDataInicio) : null, hoje);
 
   return {
-    ...periodo,
+    ...periodoParaCalculo,
     colaboradorNome: colaborador.nome,
     colaboradorCargo: colaborador.cargo,
     colaboradorDepartamento: colaborador.departamento,
