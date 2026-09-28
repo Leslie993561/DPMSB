@@ -98,7 +98,7 @@ export async function atualizarEpisExtrasDaFuncao(funcao: string, epis: string[]
  * referenciam `colaboradores` direto, sem espelho.
  */
 export async function listarColaboradoresParaEpi(): Promise<ColaboradorEpi[]> {
-  const [todos, ultimasEntregas, extras, fichasAguardando] = await Promise.all([
+  const [todos, ultimasEntregas, extras, fichasAguardando, trocasDispensadas] = await Promise.all([
     listarColaboradores(),
     // Só a entrega mais recente de cada EPI vale para o vencimento: uma nova entrega
     // do mesmo EPI substitui a anterior (por data de entrega; empate, a última lançada).
@@ -118,6 +118,10 @@ export async function listarColaboradoresParaEpi(): Promise<ColaboradorEpi[]> {
       `SELECT DISTINCT colab_id FROM sst_fichas_epi
          WHERE NOT (status = 'assinada' OR assinatura_storage_path IS NOT NULL)`,
     ),
+    // RH já dispensou o aviso de "troca vencida" pra este EPI, presa à mesma
+    // data de troca — enquanto não houver uma entrega nova, não deve mais
+    // contar como vencido (nem aqui, nem na ficha do colaborador).
+    sstQuery<{ colab_id: string; epi: string; data_troca: string }>("SELECT colab_id, epi, data_troca FROM sst_epi_trocas_dispensadas"),
   ]);
   const trocaPorColaborador = new Map<number, Map<string, string>>();
   for (const e of ultimasEntregas) {
@@ -127,6 +131,13 @@ export async function listarColaboradoresParaEpi(): Promise<ColaboradorEpi[]> {
     trocaPorColaborador.set(id, mapa);
   }
   const idsAguardando = new Set(fichasAguardando.map((f) => Number(f.colab_id)));
+  const dispensadasPorColaborador = new Map<number, Set<string>>();
+  for (const d of trocasDispensadas) {
+    const id = Number(d.colab_id);
+    const set = dispensadasPorColaborador.get(id) ?? new Set<string>();
+    set.add(`${d.epi}::${d.data_troca}`);
+    dispensadasPorColaborador.set(id, set);
+  }
 
   return todos
     .filter((c) => c.status !== "desligado")
@@ -142,7 +153,11 @@ export async function listarColaboradoresParaEpi(): Promise<ColaboradorEpi[]> {
         email: c.email,
         funcaoMatriz: funcao?.funcao ?? null,
         episObrigatorios,
-        situacaoEpi: situacaoDosEpis(episObrigatorios, trocaPorColaborador.get(c.id) ?? new Map()),
+        situacaoEpi: situacaoDosEpis(
+          episObrigatorios,
+          trocaPorColaborador.get(c.id) ?? new Map(),
+          dispensadasPorColaborador.get(c.id) ?? new Set(),
+        ),
         aguardandoAssinatura: idsAguardando.has(c.id),
       };
     });
@@ -171,16 +186,19 @@ function diasAte(dataBr: string, hoje: Date): number | null {
  * Pela troca prevista da última entrega de cada EPI: vencido (troca já passou),
  * vencendo (até 30 dias) ou em dia (mais longe ou sem data de troca). EPI
  * obrigatório nunca entregue não entra em nenhuma — é divergência, na ficha.
+ * `dispensadas` (chave `epi::dataTroca`) são avisos de troca vencida que a RH
+ * já dispensou na ficha — contam como em dia até uma entrega nova.
  */
-function situacaoDosEpis(obrigatorios: string[], trocaPorEpi: Map<string, string>): SituacaoEpi {
+function situacaoDosEpis(obrigatorios: string[], trocaPorEpi: Map<string, string>, dispensadas: Set<string>): SituacaoEpi {
   const base = obrigatorios.length > 0 ? obrigatorios : [...trocaPorEpi.keys()];
   const hoje = new Date();
   const situacao: SituacaoEpi = { vencidos: 0, vencendo: 0, emDia: 0, total: base.length };
   for (const epi of base) {
-    if (!trocaPorEpi.has(epi)) continue;
-    const dias = diasAte(trocaPorEpi.get(epi) ?? "", hoje);
-    if (dias !== null && dias < 0) situacao.vencidos++;
-    else if (dias !== null && dias <= DIAS_ALERTA_VENCIMENTO) situacao.vencendo++;
+    const dataTroca = trocaPorEpi.get(epi);
+    if (dataTroca === undefined) continue;
+    const dias = diasAte(dataTroca, hoje);
+    if (dias !== null && dias < 0 && !dispensadas.has(`${epi}::${dataTroca}`)) situacao.vencidos++;
+    else if (dias !== null && dias >= 0 && dias <= DIAS_ALERTA_VENCIMENTO) situacao.vencendo++;
     else situacao.emDia++;
   }
   return situacao;

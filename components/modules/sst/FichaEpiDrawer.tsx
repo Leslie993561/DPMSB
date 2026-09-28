@@ -85,6 +85,7 @@ export function FichaEpiDrawer({
       body: JSON.stringify({ colaboradorId: colaborador.id, epi, dataTroca }),
     });
     carregar();
+    router.refresh();
   }
 
   async function dispensarDivergencia(epi: string) {
@@ -95,6 +96,7 @@ export function FichaEpiDrawer({
       body: JSON.stringify({ colaboradorId: colaborador.id, epi }),
     });
     carregar();
+    router.refresh();
   }
 
   async function abrirDocumento(id: string) {
