@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Card } from "@/components/shared/Card";
 import { formatarDataBr, formatarMoeda } from "@/lib/format";
 import { cn } from "@/lib/cn";
-import type { EventoCalendario, LinhaOrcamentoMes } from "@/lib/db/dho";
+import type { CategoriaDataComemorativa, DataComemorativa, EventoCalendario, LinhaOrcamentoMes } from "@/lib/db/dho";
 
 export type AbaEndomarketing = "calendario" | "lancamentos" | "orcamento";
 
@@ -15,6 +15,14 @@ const ABAS: { id: AbaEndomarketing; label: string }[] = [
   { id: "lancamentos", label: "Lançamentos mensais" },
   { id: "orcamento", label: "Orçamento" },
 ];
+
+/** Cor de cada categoria de data comemorativa + a cor usada pros dias com ação (Lançamentos mensais). */
+const CATEGORIAS_DATA: { id: CategoriaDataComemorativa; label: string; dot: string }[] = [
+  { id: "nacional", label: "Feriado nacional", dot: "bg-brand-primary" },
+  { id: "regional", label: "Feriado regional/municipal", dot: "bg-status-warning" },
+  { id: "ponte", label: "Ponte de feriado", dot: "bg-status-emcurso" },
+];
+const COR_ACAO_DOT = "bg-brand-accent";
 
 const MESES_COMPLETOS = [
   "Janeiro",
@@ -60,16 +68,23 @@ export function EndomarketingDashboardClient({
   anoInicial,
   eventosIniciais,
   orcamentoInicial,
+  datasComemorativasIniciais,
 }: {
   aba: AbaEndomarketing;
   anoInicial: number;
   eventosIniciais: EventoCalendario[];
   orcamentoInicial: LinhaOrcamentoMes[];
+  datasComemorativasIniciais: DataComemorativa[];
 }) {
   const router = useRouter();
   const [ano, setAno] = useState(anoInicial);
   const [eventos, setEventos] = useState(eventosIniciais);
   const [orcamento, setOrcamento] = useState(orcamentoInicial);
+  const [datasComemorativas, setDatasComemorativas] = useState(datasComemorativasIniciais);
+  const [novaDataData, setNovaDataData] = useState("");
+  const [novaDataNome, setNovaDataNome] = useState("");
+  const [novaDataCategoria, setNovaDataCategoria] = useState<CategoriaDataComemorativa>("nacional");
+  const [salvandoData, setSalvandoData] = useState(false);
 
   const [editandoId, setEditandoId] = useState<number | null>(null);
   const [formData, setFormData] = useState("");
@@ -94,14 +109,56 @@ export function EndomarketingDashboardClient({
 
   const eventosOrdenados = useMemo(() => [...eventos].sort((a, b) => a.data.localeCompare(b.data)), [eventos]);
 
+  const datasComemorativasPorDia = useMemo(() => {
+    const mapa = new Map<string, DataComemorativa[]>();
+    for (const d of datasComemorativas) {
+      const lista = mapa.get(d.data) ?? [];
+      lista.push(d);
+      mapa.set(d.data, lista);
+    }
+    return mapa;
+  }, [datasComemorativas]);
+
+  const datasComemorativasOrdenadas = useMemo(
+    () => [...datasComemorativas].sort((a, b) => a.data.localeCompare(b.data)),
+    [datasComemorativas],
+  );
+
   async function carregarAno(novoAno: number) {
     setAno(novoAno);
-    const [resEventos, resOrcamento] = await Promise.all([
+    const [resEventos, resOrcamento, resDatas] = await Promise.all([
       fetch(`/api/dho/eventos?ano=${novoAno}`),
       fetch(`/api/dho/orcamento?ano=${novoAno}`),
+      fetch(`/api/dho/datas-comemorativas?ano=${novoAno}`),
     ]);
     setEventos((await resEventos.json()).eventos ?? []);
     setOrcamento((await resOrcamento.json()).meses ?? []);
+    setDatasComemorativas((await resDatas.json()).datas ?? []);
+  }
+
+  async function adicionarDataComemorativa() {
+    if (!novaDataData || !novaDataNome.trim()) return;
+    setSalvandoData(true);
+    try {
+      const res = await fetch("/api/dho/datas-comemorativas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: novaDataData, nome: novaDataNome.trim(), categoria: novaDataCategoria }),
+      });
+      const dados = await res.json();
+      if (res.ok) {
+        setDatasComemorativas((atual) => [...atual, dados.item]);
+        setNovaDataData("");
+        setNovaDataNome("");
+      }
+    } finally {
+      setSalvandoData(false);
+    }
+  }
+
+  async function excluirDataComemorativa(id: number) {
+    setDatasComemorativas((atual) => atual.filter((d) => d.id !== id));
+    await fetch(`/api/dho/datas-comemorativas/${id}`, { method: "DELETE" });
   }
 
   function limparForm() {
@@ -250,25 +307,110 @@ export function EndomarketingDashboardClient({
       </div>
 
       {aba === "calendario" && (
-        <Card className="p-3">
-          <div className="mb-2 flex items-center justify-between">
+        <div className="space-y-3">
+          <Card className="flex items-center justify-between p-3">
             <p className="text-[12px] font-semibold text-foreground">{ano}</p>
             {seletorAno}
-          </div>
-          <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {MESES_COMPLETOS.map((nomeMes, i) => (
-              <MesCalendario
-                key={nomeMes}
-                ano={ano}
-                mes={i + 1}
-                nomeMes={nomeMes}
-                eventosPorDia={eventosPorDia}
-                diaSelecionado={formData}
-                onSelecionarDia={(dia) => iniciarNovaAcao(dia)}
-              />
-            ))}
-          </div>
-        </Card>
+          </Card>
+
+          <Card className="p-4">
+            <p className="mb-2 text-[11px] font-bold tracking-wide text-foreground-muted uppercase">Datas comemorativas</p>
+            <div className="flex flex-wrap items-end gap-1.5">
+              <label className="block">
+                <span className="mb-0.5 block text-[10.5px] font-medium text-foreground-muted">Data</span>
+                <input
+                  type="date"
+                  value={novaDataData}
+                  onChange={(e) => setNovaDataData(e.target.value)}
+                  className="rounded-md border border-hairline bg-background px-2 py-1.5 text-[12px] text-foreground"
+                />
+              </label>
+              <label className="block min-w-0 flex-1">
+                <span className="mb-0.5 block text-[10.5px] font-medium text-foreground-muted">Nome do evento</span>
+                <input
+                  value={novaDataNome}
+                  onChange={(e) => setNovaDataNome(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && adicionarDataComemorativa()}
+                  placeholder="Ex.: Tiradentes"
+                  className="w-full min-w-[10rem] rounded-md border border-hairline bg-background px-2.5 py-1.5 text-[12px] text-foreground"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-0.5 block text-[10.5px] font-medium text-foreground-muted">Categoria</span>
+                <select
+                  value={novaDataCategoria}
+                  onChange={(e) => setNovaDataCategoria(e.target.value as CategoriaDataComemorativa)}
+                  className="rounded-md border border-hairline bg-background px-2 py-1.5 text-[12px] text-foreground"
+                >
+                  {CATEGORIAS_DATA.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                disabled={salvandoData || !novaDataData || !novaDataNome.trim()}
+                onClick={adicionarDataComemorativa}
+                className="rounded-md bg-brand-primary px-3 py-1.5 text-[12px] font-medium text-brand-white hover:bg-brand-primary-hover disabled:opacity-50"
+              >
+                {salvandoData ? "Salvando..." : "Adicionar"}
+              </button>
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-3 text-[10.5px] text-foreground-muted">
+              {CATEGORIAS_DATA.map((c) => (
+                <span key={c.id} className="flex items-center gap-1">
+                  <span aria-hidden className={cn("h-1.5 w-1.5 rounded-full", c.dot)} /> {c.label}
+                </span>
+              ))}
+              <span className="flex items-center gap-1">
+                <span aria-hidden className={cn("h-1.5 w-1.5 rounded-full", COR_ACAO_DOT)} /> Ação (Lançamentos mensais)
+              </span>
+            </div>
+
+            {datasComemorativasOrdenadas.length > 0 && (
+              <div className="mt-3 flex max-h-40 flex-col divide-y divide-hairline/70 overflow-y-auto rounded-md border border-hairline">
+                {datasComemorativasOrdenadas.map((d) => {
+                  const cor = CATEGORIAS_DATA.find((c) => c.id === d.categoria);
+                  return (
+                    <div key={d.id} className="flex items-center gap-2 px-2.5 py-1.5 text-[11.5px]">
+                      <span aria-hidden className={cn("h-1.5 w-1.5 shrink-0 rounded-full", cor?.dot)} />
+                      <span className="w-20 shrink-0 text-foreground-muted">{formatarDataBr(d.data)}</span>
+                      <span className="min-w-0 flex-1 truncate text-foreground">{d.nome}</span>
+                      <button
+                        type="button"
+                        onClick={() => excluirDataComemorativa(d.id)}
+                        aria-label={`Excluir ${d.nome}`}
+                        className="shrink-0 rounded px-1 text-foreground-muted hover:bg-status-danger-bg hover:text-status-danger"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+
+          <Card className="p-3">
+            <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {MESES_COMPLETOS.map((nomeMes, i) => (
+                <MesCalendario
+                  key={nomeMes}
+                  ano={ano}
+                  mes={i + 1}
+                  nomeMes={nomeMes}
+                  eventosPorDia={eventosPorDia}
+                  datasComemorativasPorDia={datasComemorativasPorDia}
+                  diaSelecionado={formData}
+                  onSelecionarDia={(dia) => iniciarNovaAcao(dia)}
+                />
+              ))}
+            </div>
+          </Card>
+        </div>
       )}
 
       {aba === "orcamento" && (
@@ -479,12 +621,13 @@ export function EndomarketingDashboardClient({
   );
 }
 
-/** Um mês do Calendário — clicável por dia, com ponto nos dias com ação. */
+/** Um mês do Calendário — clicável por dia, com um ponto por ação (cor fixa) e um por data comemorativa (cor da categoria). */
 function MesCalendario({
   ano,
   mes,
   nomeMes,
   eventosPorDia,
+  datasComemorativasPorDia,
   diaSelecionado,
   onSelecionarDia,
 }: {
@@ -492,6 +635,7 @@ function MesCalendario({
   mes: number;
   nomeMes: string;
   eventosPorDia: Map<string, EventoCalendario[]>;
+  datasComemorativasPorDia: Map<string, DataComemorativa[]>;
   diaSelecionado: string | null;
   onSelecionarDia: (dia: string) => void;
 }) {
@@ -511,13 +655,16 @@ function MesCalendario({
           <div key={i} className="grid grid-cols-7 gap-0.5">
             {semana.map((dia, j) => {
               if (!dia) return <span key={j} className="h-6" />;
-              const doDia = eventosPorDia.get(dia) ?? [];
+              const acoesDoDia = eventosPorDia.get(dia) ?? [];
+              const datasDoDia = datasComemorativasPorDia.get(dia) ?? [];
               const selecionado = dia === diaSelecionado;
+              const titulo = [...datasDoDia.map((d) => d.nome), ...acoesDoDia.map((e) => e.titulo)].join(", ");
               return (
                 <button
                   key={j}
                   type="button"
                   onClick={() => onSelecionarDia(dia)}
+                  title={titulo || undefined}
                   className={cn(
                     "flex h-6 flex-col items-center justify-center rounded text-[9.5px]",
                     dia === hoje && "font-bold text-brand-primary",
@@ -526,7 +673,18 @@ function MesCalendario({
                   )}
                 >
                   {Number(dia.slice(8, 10))}
-                  {doDia.length > 0 && <span className="-mt-0.5 h-1 w-1 rounded-full bg-brand-accent" title={doDia.map((e) => e.titulo).join(", ")} />}
+                  {(datasDoDia.length > 0 || acoesDoDia.length > 0) && (
+                    <span className="-mt-0.5 flex gap-0.5">
+                      {datasDoDia.slice(0, 1).map((d) => (
+                        <span
+                          key={d.id}
+                          aria-hidden
+                          className={cn("h-1 w-1 rounded-full", CATEGORIAS_DATA.find((c) => c.id === d.categoria)?.dot)}
+                        />
+                      ))}
+                      {acoesDoDia.length > 0 && <span aria-hidden className={cn("h-1 w-1 rounded-full", COR_ACAO_DOT)} />}
+                    </span>
+                  )}
                 </button>
               );
             })}

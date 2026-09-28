@@ -387,6 +387,16 @@ ALTER TABLE dho_eventos_calendario ADD COLUMN IF NOT EXISTS objetivo TEXT NOT NU
 ALTER TABLE dho_eventos_calendario ADD COLUMN IF NOT EXISTS publico_alvo TEXT NOT NULL DEFAULT '';
 ALTER TABLE dho_eventos_calendario ADD COLUMN IF NOT EXISTS descricao TEXT NOT NULL DEFAULT '';
 
+-- Datas comemorativas/feriados marcados no Calendário — bem mais simples que
+-- uma ação (só data + nome + categoria, sem custo nem público-alvo), pra não
+-- obrigar o preenchimento do formulário inteiro só pra marcar um feriado.
+CREATE TABLE IF NOT EXISTS dho_datas_comemorativas (
+  id SERIAL PRIMARY KEY,
+  data TEXT NOT NULL,
+  nome TEXT NOT NULL,
+  categoria TEXT NOT NULL DEFAULT 'nacional'
+);
+
 -- Itens de custo de uma ação — o "Utilizado" da tabela de orçamento mensal é
 -- a soma disso, agrupado pelo mês da data de início da ação.
 CREATE TABLE IF NOT EXISTS dho_evento_itens (

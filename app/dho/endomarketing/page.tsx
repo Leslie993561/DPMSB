@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
-import { listarEventosCalendario, obterOrcamentoAnual } from "@/lib/db/dho";
+import { listarDatasComemorativas, listarEventosCalendario, obterOrcamentoAnual } from "@/lib/db/dho";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { EndomarketingDashboardClient, type AbaEndomarketing } from "@/components/modules/dho/EndomarketingDashboardClient";
 
@@ -20,12 +20,22 @@ export default async function EndomarketingPage({
   const abaParam = (await searchParams).aba;
   const aba: AbaEndomarketing = ABAS_VALIDAS.includes(abaParam as AbaEndomarketing) ? (abaParam as AbaEndomarketing) : "calendario";
 
-  const [eventos, orcamento] = await Promise.all([listarEventosCalendario(ANO_ATUAL), obterOrcamentoAnual(ANO_ATUAL)]);
+  const [eventos, orcamento, datasComemorativas] = await Promise.all([
+    listarEventosCalendario(ANO_ATUAL),
+    obterOrcamentoAnual(ANO_ATUAL),
+    listarDatasComemorativas(ANO_ATUAL),
+  ]);
 
   return (
     <div className="space-y-4">
       <PageHeader eyebrow="DHO · Endomarketing" titulo="Dashboard" subtitulo="Calendário de ações e datas comemorativas" />
-      <EndomarketingDashboardClient aba={aba} anoInicial={ANO_ATUAL} eventosIniciais={eventos} orcamentoInicial={orcamento} />
+      <EndomarketingDashboardClient
+        aba={aba}
+        anoInicial={ANO_ATUAL}
+        eventosIniciais={eventos}
+        orcamentoInicial={orcamento}
+        datasComemorativasIniciais={datasComemorativas}
+      />
     </div>
   );
 }

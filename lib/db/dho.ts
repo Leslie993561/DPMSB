@@ -126,6 +126,46 @@ export async function excluirEventoCalendario(id: number): Promise<void> {
   await db.execute({ sql: "DELETE FROM dho_eventos_calendario WHERE id = ?", args: [id] });
 }
 
+export type CategoriaDataComemorativa = "nacional" | "regional" | "ponte";
+
+export interface DataComemorativa {
+  id: number;
+  data: string;
+  nome: string;
+  categoria: CategoriaDataComemorativa;
+}
+
+interface LinhaDataComemorativa {
+  id: number;
+  data: string;
+  nome: string;
+  categoria: CategoriaDataComemorativa;
+}
+
+/** Feriados/datas comemorativas marcados no Calendário — mais simples que uma ação: só data, nome e categoria (pra cor). */
+export async function listarDatasComemorativas(ano: number): Promise<DataComemorativa[]> {
+  const db = await getDb();
+  const resultado = await db.execute({
+    sql: "SELECT id, data, nome, categoria FROM dho_datas_comemorativas WHERE data LIKE ? ORDER BY data",
+    args: [`${ano}-%`],
+  });
+  return resultado.rows as unknown as LinhaDataComemorativa[];
+}
+
+export async function criarDataComemorativa(dados: { data: string; nome: string; categoria: CategoriaDataComemorativa }): Promise<DataComemorativa> {
+  const db = await getDb();
+  const resultado = await db.execute({
+    sql: "INSERT INTO dho_datas_comemorativas (data, nome, categoria) VALUES (?, ?, ?) RETURNING id, data, nome, categoria",
+    args: [dados.data, dados.nome, dados.categoria],
+  });
+  return (resultado.rows as unknown as LinhaDataComemorativa[])[0];
+}
+
+export async function excluirDataComemorativa(id: number): Promise<void> {
+  const db = await getDb();
+  await db.execute({ sql: "DELETE FROM dho_datas_comemorativas WHERE id = ?", args: [id] });
+}
+
 export interface LinhaOrcamentoMes {
   mes: number;
   aprovado: number;
