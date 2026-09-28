@@ -128,10 +128,15 @@ function ColaboradoresTab({
     new Set(colaboradores.map((c) => c.vinculo).filter((v): v is Vinculo => Boolean(v))),
   ).sort();
 
-  /** "EPI pendente" = tem EPI obrigatório na matriz mas nunca teve NENHUMA entrega registrada (não é "vencendo em breve"). */
+  /**
+   * "EPI pendente" = tem EPI obrigatório na matriz mas nunca teve NENHUMA entrega
+   * registrada (não é "vencendo em breve"). Uma ficha já lançada e aguardando
+   * assinatura não conta mais como pendente — ela sai daqui e fica só em
+   * "Aguard. assin." até ser assinada (ou excluída).
+   */
   function semNenhumRegistro(c: ColaboradorEpi): boolean {
     const s = c.situacaoEpi;
-    return s.total > 0 && s.vencidos + s.vencendo + s.emDia === 0;
+    return s.total > 0 && s.vencidos + s.vencendo + s.emDia === 0 && !c.aguardandoAssinatura;
   }
 
   const termo = busca.trim().toLowerCase();
