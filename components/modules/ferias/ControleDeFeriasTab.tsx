@@ -17,6 +17,23 @@ const ROTULO_SITUACAO: Record<SituacaoPeriodo, { label: string; cor: CorBadge }>
   concluido: { label: "Concluído", cor: "verde" },
 };
 
+/** 3 meses — a partir daqui (ou já vencido) a situação exibida vira "Urgente". */
+const LIMITE_URGENTE_DIAS = 90;
+
+/**
+ * Rótulo exibido na coluna Situação: Concluído (sem saldo), Programada, ou —
+ * pelo prazo até o limite p/ gozo — Em aberto (mais de 3 meses) ou Urgente (3
+ * meses ou menos, inclusive já vencido). Não usa `ROTULO_SITUACAO` direto pra
+ * "a_vencer"/"vencida": a cor/rótulo aqui depende de quão perto está o
+ * vencimento, não só de já ter passado ou não.
+ */
+function situacaoExibida(p: PeriodoAquisitivoAberto): { label: string; cor: CorBadge } {
+  if (p.situacao === "concluido") return ROTULO_SITUACAO.concluido;
+  if (p.situacao === "programada") return ROTULO_SITUACAO.programada;
+  if (p.vencida || p.diasParaVencer <= LIMITE_URGENTE_DIAS) return { label: "Urgente", cor: "vermelho" };
+  return { label: "Em aberto", cor: "amarelo" };
+}
+
 /**
  * A tabela mistura duas coisas: períodos aquisitivos com saldo e colaboradores
  * sem nada pendente. São tipos diferentes de propósito — quem está em dia não
@@ -833,7 +850,7 @@ function LinhaPeriodo({
         {formatarDataBr(p.limiteGozo)}
       </td>
       <td className="px-3 py-2">
-        <Badge cor={ROTULO_SITUACAO[p.situacao].cor}>{ROTULO_SITUACAO[p.situacao].label}</Badge>
+        <Badge cor={situacaoExibida(p).cor}>{situacaoExibida(p).label}</Badge>
       </td>
     </tr>
   );
