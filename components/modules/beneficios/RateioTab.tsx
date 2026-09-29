@@ -94,6 +94,85 @@ function ehFimDeSemana(dataIso: string): boolean {
   return dia === 0 || dia === 6;
 }
 
+/** Valor + lápis: clicar troca por um campo editável ali mesmo na célula (mesmo padrão do Custo e Valores do EPI e do Orçamento do Endomarketing). */
+function CelulaValorEditavel({
+  valor,
+  editando,
+  rascunho,
+  salvando,
+  bloqueado,
+  corTexto,
+  ariaLabel,
+  onIniciarEdicao,
+  onMudarRascunho,
+  onSalvar,
+  onCancelar,
+}: {
+  valor: number;
+  editando: boolean;
+  rascunho: string;
+  salvando: boolean;
+  bloqueado: boolean;
+  corTexto?: string;
+  ariaLabel: string;
+  onIniciarEdicao: () => void;
+  onMudarRascunho: (v: string) => void;
+  onSalvar: () => void;
+  onCancelar: () => void;
+}) {
+  if (editando) {
+    return (
+      <div className="flex items-center justify-end gap-1">
+        <input
+          type="number"
+          min={0}
+          step="0.01"
+          value={rascunho}
+          onChange={(e) => onMudarRascunho(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && onSalvar()}
+          autoFocus
+          className="w-20 rounded border border-hairline bg-background px-1.5 py-0.5 text-right text-[11.5px] text-foreground outline-none focus:border-brand-primary"
+        />
+        <button
+          type="button"
+          onClick={onSalvar}
+          disabled={salvando}
+          className="rounded px-1 py-0.5 text-[12px] text-status-success hover:bg-status-success-bg disabled:opacity-50"
+          aria-label="Confirmar valor"
+        >
+          ✓
+        </button>
+        <button
+          type="button"
+          onClick={onCancelar}
+          className="rounded px-1 py-0.5 text-[12px] text-foreground-muted hover:bg-surface-page"
+          aria-label="Cancelar edição"
+        >
+          ✕
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center justify-end gap-1">
+      <div className={corTexto ?? "text-foreground"}>{formatarMoeda(valor)}</div>
+      <button
+        type="button"
+        onClick={onIniciarEdicao}
+        disabled={bloqueado}
+        title="Editar valor"
+        aria-label={ariaLabel}
+        className="rounded p-0.5 text-foreground-muted/50 hover:bg-surface-page hover:text-foreground disabled:opacity-30"
+      >
+        <svg viewBox="0 0 20 20" fill="currentColor" className="h-2.5 w-2.5" aria-hidden>
+          <path d="M14.85 2.15a1.5 1.5 0 0 1 2.12 0l.88.88a1.5 1.5 0 0 1 0 2.12l-1.1 1.1-3-3 1.1-1.1Zm-2.16 2.16 3 3L6.94 16.06a1 1 0 0 1-.46.26l-3.1.83.83-3.1a1 1 0 0 1 .26-.46L12.7 4.3Z" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
 export function RateioTab() {
   const [competencia, setCompetencia] = useState(competenciaAtual());
   const [linhas, setLinhas] = useState<LinhaRateio[]>([]);
@@ -113,9 +192,9 @@ export function RateioTab() {
   const [mesCalendario, setMesCalendario] = useState<number>(Number(competencia.slice(5, 7)));
   const [salvandoFeriado, setSalvandoFeriado] = useState<string | null>(null);
   const [colaboradorHover, setColaboradorHover] = useState<number | null>(null);
-  const [edicaoVtId, setEdicaoVtId] = useState<number | null>(null);
-  const [vtRascunho, setVtRascunho] = useState("");
-  const [salvandoVt, setSalvandoVt] = useState(false);
+  const [edicaoValor, setEdicaoValor] = useState<{ colaboradorId: number; campo: "vt" | "va" } | null>(null);
+  const [valorRascunho, setValorRascunho] = useState("");
+  const [salvandoValor, setSalvandoValor] = useState(false);
   const ajustouCompetenciaInicial = useRef(false);
 
   const recarregar = useCallback(async function recarregar() {
@@ -206,30 +285,35 @@ export function RateioTab() {
     }
   }
 
-  function iniciarEdicaoVt(colaboradorId: number, valorAtual: number) {
-    setEdicaoVtId(colaboradorId);
-    setVtRascunho(String(valorAtual));
+  function iniciarEdicaoValor(colaboradorId: number, campo: "vt" | "va", valorAtual: number) {
+    setEdicaoValor({ colaboradorId, campo });
+    setValorRascunho(String(valorAtual));
   }
 
-  /** Corrige o VT/VM desta pessoa nesta competência — grava como override (mesma tabela da importação de planilha). */
-  async function salvarVt(colaboradorId: number) {
-    const valor = Number(vtRascunho.replace(",", "."));
+  /** Corrige o VT/VM ou o VA desta pessoa nesta competência — grava como override (mesma tabela da importação de planilha). */
+  async function salvarValor() {
+    if (!edicaoValor) return;
+    const valor = Number(valorRascunho.replace(",", "."));
     if (!Number.isFinite(valor) || valor < 0) return;
-    setSalvandoVt(true);
+    setSalvandoValor(true);
     try {
+      const corpo =
+        edicaoValor.campo === "vt"
+          ? { colaboradorId: edicaoValor.colaboradorId, competencia, valeTransporte: valor }
+          : { colaboradorId: edicaoValor.colaboradorId, competencia, valeAlimentacao: valor };
       const r = await fetch("/api/beneficios/rateio", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ colaboradorId, competencia, valeTransporte: valor }),
+        body: JSON.stringify(corpo),
       });
       if (!r.ok) {
         window.alert((await r.json()).erro ?? "Não foi possível salvar.");
         return;
       }
-      setEdicaoVtId(null);
+      setEdicaoValor(null);
       await recarregar();
     } finally {
-      setSalvandoVt(false);
+      setSalvandoValor(false);
     }
   }
 
@@ -558,58 +642,37 @@ export function RateioTab() {
                     {/* Valor integral do vale: valor do dia × dias úteis do mês.
                         Sem abater os 6% do empregado — é o valor do benefício, e
                         é ele que fecha com a fatura da operadora. */}
-                    {edicaoVtId === l.colaboradorId ? (
-                      <div className="flex items-center justify-end gap-1">
-                        <input
-                          type="number"
-                          min={0}
-                          step="0.01"
-                          value={vtRascunho}
-                          onChange={(e) => setVtRascunho(e.target.value)}
-                          onKeyDown={(e) => e.key === "Enter" && void salvarVt(l.colaboradorId)}
-                          autoFocus
-                          className="w-20 rounded border border-hairline bg-background px-1.5 py-0.5 text-right text-[11.5px] text-foreground outline-none focus:border-brand-primary"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => void salvarVt(l.colaboradorId)}
-                          disabled={salvandoVt}
-                          className="rounded px-1 py-0.5 text-[12px] text-status-success hover:bg-status-success-bg disabled:opacity-50"
-                          aria-label="Confirmar valor"
-                        >
-                          ✓
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setEdicaoVtId(null)}
-                          className="rounded px-1 py-0.5 text-[12px] text-foreground-muted hover:bg-surface-page"
-                          aria-label="Cancelar edição"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-end gap-1">
-                        <div className="text-foreground">{formatarMoeda(l.valeTransporte)}</div>
-                        <button
-                          type="button"
-                          onClick={() => iniciarEdicaoVt(l.colaboradorId, l.valeTransporte)}
-                          disabled={mesesFechados.includes(Number(competencia.slice(5, 7)))}
-                          title="Editar valor de VT/VM"
-                          aria-label={`Editar VT de ${l.nome}`}
-                          className="rounded p-0.5 text-foreground-muted/50 hover:bg-surface-page hover:text-foreground disabled:opacity-30"
-                        >
-                          <svg viewBox="0 0 20 20" fill="currentColor" className="h-2.5 w-2.5" aria-hidden>
-                            <path d="M14.85 2.15a1.5 1.5 0 0 1 2.12 0l.88.88a1.5 1.5 0 0 1 0 2.12l-1.1 1.1-3-3 1.1-1.1Zm-2.16 2.16 3 3L6.94 16.06a1 1 0 0 1-.46.26l-3.1.83.83-3.1a1 1 0 0 1 .26-.46L12.7 4.3Z" />
-                          </svg>
-                        </button>
-                      </div>
-                    )}
+                    <CelulaValorEditavel
+                      valor={l.valeTransporte}
+                      editando={edicaoValor?.colaboradorId === l.colaboradorId && edicaoValor.campo === "vt"}
+                      rascunho={valorRascunho}
+                      salvando={salvandoValor}
+                      bloqueado={mesesFechados.includes(Number(competencia.slice(5, 7)))}
+                      ariaLabel={`Editar VT de ${l.nome}`}
+                      onIniciarEdicao={() => iniciarEdicaoValor(l.colaboradorId, "vt", l.valeTransporte)}
+                      onMudarRascunho={setValorRascunho}
+                      onSalvar={() => void salvarValor()}
+                      onCancelar={() => setEdicaoValor(null)}
+                    />
                     <div className="text-[10.5px] text-foreground-muted">
                       {rotuloVale(l.tipoTransporte)} · {l.cidade ?? "—"}
                     </div>
                   </td>
-                  <td className="px-4 py-2 text-right text-[#2b82c2]">{formatarMoeda(l.valeAlimentacao)}</td>
+                  <td className="px-4 py-2 text-right">
+                    <CelulaValorEditavel
+                      valor={l.valeAlimentacao}
+                      editando={edicaoValor?.colaboradorId === l.colaboradorId && edicaoValor.campo === "va"}
+                      rascunho={valorRascunho}
+                      salvando={salvandoValor}
+                      bloqueado={mesesFechados.includes(Number(competencia.slice(5, 7)))}
+                      corTexto="text-[#2b82c2]"
+                      ariaLabel={`Editar VA de ${l.nome}`}
+                      onIniciarEdicao={() => iniciarEdicaoValor(l.colaboradorId, "va", l.valeAlimentacao)}
+                      onMudarRascunho={setValorRascunho}
+                      onSalvar={() => void salvarValor()}
+                      onCancelar={() => setEdicaoValor(null)}
+                    />
+                  </td>
                   <td className="px-4 py-2 text-right">
                     {l.variaveisItens.length === 0 ? (
                       <span className="text-foreground-muted">{formatarMoeda(0)}</span>

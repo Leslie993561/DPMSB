@@ -17,13 +17,18 @@ export async function GET(request: Request) {
   return Response.json({ diasUteis, linhas });
 }
 
-const schemaEditar = z.object({
-  colaboradorId: z.number().int().positive(),
-  competencia: z.string().regex(/^\d{4}-\d{2}$/),
-  valeTransporte: z.number().min(0),
-});
+const schemaEditar = z
+  .object({
+    colaboradorId: z.number().int().positive(),
+    competencia: z.string().regex(/^\d{4}-\d{2}$/),
+    valeTransporte: z.number().min(0).optional(),
+    valeAlimentacao: z.number().min(0).optional(),
+  })
+  .refine((d) => d.valeTransporte !== undefined || d.valeAlimentacao !== undefined, {
+    message: "Informe ao menos um valor para editar.",
+  });
 
-/** RH corrige na hora o VT/VM de um colaborador nesta competência — mesmo mecanismo da importação de planilha (grava em `beneficios_rateio_extras`), só que célula a célula. */
+/** RH corrige na hora o VT/VM ou o VA de um colaborador nesta competência — mesmo mecanismo da importação de planilha (grava em `beneficios_rateio_extras`), só que célula a célula. */
 export async function PATCH(request: Request) {
   const parsed = schemaEditar.safeParse(await request.json());
   if (!parsed.success) {
@@ -34,8 +39,8 @@ export async function PATCH(request: Request) {
   if (bloqueio) return bloqueio;
 
   await upsertOverrideRateio(parsed.data.colaboradorId, parsed.data.competencia, {
-    valeTransporte: parsed.data.valeTransporte,
-    valeAlimentacao: null,
+    valeTransporte: parsed.data.valeTransporte ?? null,
+    valeAlimentacao: parsed.data.valeAlimentacao ?? null,
     variaveis: null,
   });
   return Response.json({ ok: true });
