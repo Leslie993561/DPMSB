@@ -14,6 +14,7 @@ export async function GET(request: Request) {
 }
 
 const schemaItem = z.object({
+  tema: z.string().trim().min(1).nullable().optional(),
   nome: z.string().trim().min(1, "Informe o nome do item."),
   quantidade: z.number().int().min(1),
   valorUnitario: z.number().min(0),

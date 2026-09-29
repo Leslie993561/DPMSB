@@ -7,7 +7,7 @@ import { Card } from "@/components/shared/Card";
 import { Modal } from "@/components/shared/Modal";
 import { formatarDataBr, formatarMoeda } from "@/lib/format";
 import { cn } from "@/lib/cn";
-import type { CategoriaDataComemorativa, DataComemorativa, EventoCalendario, LinhaOrcamentoMes } from "@/lib/db/dho";
+import type { CategoriaDataComemorativa, DataComemorativa, EventoCalendario, ItemEvento, LinhaOrcamentoMes } from "@/lib/db/dho";
 
 export type AbaEndomarketing = "calendario" | "lancamentos" | "orcamento";
 
@@ -59,12 +59,53 @@ function gradeDoMes(ano: number, mes: number): (string | null)[][] {
 }
 
 interface ItemForm {
+  id: string;
+  blocoId: string;
   nome: string;
   quantidade: string;
   valorUnitario: string;
 }
 
-const ITEM_VAZIO: ItemForm = { nome: "", quantidade: "1", valorUnitario: "0" };
+/** Bloco temático de itens (ex.: "Brindes", "Brinquedos") — agrupa itens dentro do mesmo formulário de ação. */
+interface BlocoForm {
+  id: string;
+  tema: string;
+}
+
+function criarIdLocal(): string {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2);
+}
+
+function novoBloco(): BlocoForm {
+  return { id: criarIdLocal(), tema: "" };
+}
+
+function novoItem(blocoId: string): ItemForm {
+  return { id: criarIdLocal(), blocoId, nome: "", quantidade: "1", valorUnitario: "0" };
+}
+
+/** Reconstrói blocos a partir dos itens salvos (que só guardam o nome do tema) — um bloco por tema distinto, na ordem em que aparece. */
+function blocosEItensDoFormulario(itens: ItemEvento[]): { blocos: BlocoForm[]; itens: ItemForm[] } {
+  if (itens.length === 0) {
+    const bloco = novoBloco();
+    return { blocos: [bloco], itens: [novoItem(bloco.id)] };
+  }
+  const blocos: BlocoForm[] = [];
+  const blocoIdPorTema = new Map<string, string>();
+  const itensForm: ItemForm[] = [];
+  for (const item of itens) {
+    const tema = item.tema ?? "";
+    let blocoId = blocoIdPorTema.get(tema);
+    if (!blocoId) {
+      const bloco: BlocoForm = { id: criarIdLocal(), tema };
+      blocos.push(bloco);
+      blocoId = bloco.id;
+      blocoIdPorTema.set(tema, blocoId);
+    }
+    itensForm.push({ id: criarIdLocal(), blocoId, nome: item.nome, quantidade: String(item.quantidade), valorUnitario: String(item.valorUnitario) });
+  }
+  return { blocos, itens: itensForm };
+}
 
 export function EndomarketingDashboardClient({
   aba,
@@ -104,7 +145,8 @@ export function EndomarketingDashboardClient({
   const [formObjetivo, setFormObjetivo] = useState("");
   const [formPublicoAlvo, setFormPublicoAlvo] = useState("");
   const [formDescricao, setFormDescricao] = useState("");
-  const [formItens, setFormItens] = useState<ItemForm[]>([{ ...ITEM_VAZIO }]);
+  const [formBlocos, setFormBlocos] = useState<BlocoForm[]>([novoBloco()]);
+  const [formItens, setFormItens] = useState<ItemForm[]>(() => [novoItem(formBlocos[0].id)]);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -194,7 +236,9 @@ export function EndomarketingDashboardClient({
     setFormObjetivo("");
     setFormPublicoAlvo("");
     setFormDescricao("");
-    setFormItens([{ ...ITEM_VAZIO }]);
+    const bloco = novoBloco();
+    setFormBlocos([bloco]);
+    setFormItens([novoItem(bloco.id)]);
     setErro(null);
   }
 
@@ -216,11 +260,9 @@ export function EndomarketingDashboardClient({
     setFormObjetivo(evento.objetivo);
     setFormPublicoAlvo(evento.publicoAlvo);
     setFormDescricao(evento.descricao);
-    setFormItens(
-      evento.itens.length > 0
-        ? evento.itens.map((i) => ({ nome: i.nome, quantidade: String(i.quantidade), valorUnitario: String(i.valorUnitario) }))
-        : [{ ...ITEM_VAZIO }],
-    );
+    const { blocos, itens } = blocosEItensDoFormulario(evento.itens);
+    setFormBlocos(blocos);
+    setFormItens(itens);
     setErro(null);
   }
 
@@ -281,8 +323,32 @@ export function EndomarketingDashboardClient({
     fecharModalFeriado();
   }
 
-  function atualizarItem(idx: number, campo: keyof ItemForm, valor: string) {
-    setFormItens((atual) => atual.map((it, i) => (i === idx ? { ...it, [campo]: valor } : it)));
+  function atualizarItem(id: string, campo: "nome" | "quantidade" | "valorUnitario", valor: string) {
+    setFormItens((atual) => atual.map((it) => (it.id === id ? { ...it, [campo]: valor } : it)));
+  }
+
+  function removerItem(id: string) {
+    setFormItens((atual) => atual.filter((it) => it.id !== id));
+  }
+
+  /** "+ Adicionar bloco" — um novo tema (ex.: Brindes, Brinquedos) já com um item em branco pra começar a preencher. */
+  function adicionarBloco() {
+    const bloco = novoBloco();
+    setFormBlocos((atual) => [...atual, bloco]);
+    setFormItens((atual) => [...atual, novoItem(bloco.id)]);
+  }
+
+  function renomearBloco(blocoId: string, tema: string) {
+    setFormBlocos((atual) => atual.map((b) => (b.id === blocoId ? { ...b, tema } : b)));
+  }
+
+  function removerBloco(blocoId: string) {
+    setFormBlocos((atual) => atual.filter((b) => b.id !== blocoId));
+    setFormItens((atual) => atual.filter((it) => it.blocoId !== blocoId));
+  }
+
+  function adicionarItemNoBloco(blocoId: string) {
+    setFormItens((atual) => [...atual, novoItem(blocoId)]);
   }
 
   async function salvarAcao(): Promise<boolean> {
@@ -299,6 +365,7 @@ export function EndomarketingDashboardClient({
       publicoAlvo: formPublicoAlvo.trim(),
       descricao: formDescricao.trim(),
       itens: itensValidos.map((i) => ({
+        tema: formBlocos.find((b) => b.id === i.blocoId)?.tema.trim() || null,
         nome: i.nome.trim(),
         quantidade: Number(i.quantidade) || 1,
         valorUnitario: Number(i.valorUnitario) || 0,
@@ -418,58 +485,91 @@ export function EndomarketingDashboardClient({
         />
       </label>
 
-      <div className="mt-3">
-        <div className="mb-1 grid grid-cols-[1fr_50px_70px_70px] gap-1.5 text-[10px] font-semibold text-foreground-muted uppercase">
-          <span>Item</span>
-          <span>Qtd</span>
-          <span>Val. unid.</span>
-          <span>Total</span>
-        </div>
-        <div className="space-y-1.5">
-          {formItens.map((item, idx) => (
-            <div key={idx} className="grid grid-cols-[1fr_50px_70px_70px_18px] items-center gap-1.5">
-              <input
-                value={item.nome}
-                onChange={(e) => atualizarItem(idx, "nome", e.target.value)}
-                placeholder="Nome"
-                className="rounded border border-hairline bg-background px-1.5 py-1 text-[11.5px] text-foreground"
-              />
-              <input
-                type="number"
-                min={1}
-                value={item.quantidade}
-                onChange={(e) => atualizarItem(idx, "quantidade", e.target.value)}
-                className="rounded border border-hairline bg-background px-1.5 py-1 text-[11.5px] text-foreground"
-              />
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                value={item.valorUnitario}
-                onChange={(e) => atualizarItem(idx, "valorUnitario", e.target.value)}
-                className="rounded border border-hairline bg-background px-1.5 py-1 text-[11.5px] text-foreground"
-              />
-              <span className="truncate text-[11px] text-foreground-muted">
-                {formatarMoeda((Number(item.quantidade) || 0) * (Number(item.valorUnitario) || 0))}
-              </span>
+      <div className="mt-3 space-y-2.5">
+        {formBlocos.map((bloco) => {
+          const itensDoBloco = formItens.filter((it) => it.blocoId === bloco.id);
+          const totalBloco = itensDoBloco.reduce((s, i) => s + (Number(i.quantidade) || 0) * (Number(i.valorUnitario) || 0), 0);
+          return (
+            <div key={bloco.id} className="rounded-md border border-hairline p-2.5">
+              <div className="mb-1.5 flex items-center gap-1.5">
+                <input
+                  value={bloco.tema}
+                  onChange={(e) => renomearBloco(bloco.id, e.target.value)}
+                  placeholder="Nome do bloco (ex.: Brindes)"
+                  className="min-w-0 flex-1 rounded border border-hairline bg-background px-2 py-1 text-[11.5px] font-semibold text-foreground"
+                />
+                {formBlocos.length > 1 && (
+                  <button
+                    type="button"
+                    title="Remover bloco"
+                    onClick={() => removerBloco(bloco.id)}
+                    className="shrink-0 text-[11px] text-status-danger hover:opacity-70"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              <div className="mb-1 grid grid-cols-[1fr_50px_70px_70px] gap-1.5 text-[10px] font-semibold text-foreground-muted uppercase">
+                <span>Item</span>
+                <span>Qtd</span>
+                <span>Val. unid.</span>
+                <span>Total</span>
+              </div>
+              <div className="space-y-1.5">
+                {itensDoBloco.map((item) => (
+                  <div key={item.id} className="grid grid-cols-[1fr_50px_70px_70px_18px] items-center gap-1.5">
+                    <input
+                      value={item.nome}
+                      onChange={(e) => atualizarItem(item.id, "nome", e.target.value)}
+                      placeholder="Nome"
+                      className="rounded border border-hairline bg-background px-1.5 py-1 text-[11.5px] text-foreground"
+                    />
+                    <input
+                      type="number"
+                      min={1}
+                      value={item.quantidade}
+                      onChange={(e) => atualizarItem(item.id, "quantidade", e.target.value)}
+                      className="rounded border border-hairline bg-background px-1.5 py-1 text-[11.5px] text-foreground"
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={item.valorUnitario}
+                      onChange={(e) => atualizarItem(item.id, "valorUnitario", e.target.value)}
+                      className="rounded border border-hairline bg-background px-1.5 py-1 text-[11.5px] text-foreground"
+                    />
+                    <span className="truncate text-[11px] text-foreground-muted">
+                      {formatarMoeda((Number(item.quantidade) || 0) * (Number(item.valorUnitario) || 0))}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removerItem(item.id)}
+                      className="text-[11px] text-status-danger hover:opacity-70"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
               <button
                 type="button"
-                onClick={() => setFormItens((atual) => atual.filter((_, i) => i !== idx))}
-                className="text-[11px] text-status-danger hover:opacity-70"
+                onClick={() => adicionarItemNoBloco(bloco.id)}
+                className="mt-1.5 text-[11px] font-medium text-brand-primary hover:text-brand-primary-hover"
               >
-                ✕
+                + Adicionar item
               </button>
+              <p className="mt-1.5 text-right text-[11px] font-medium text-foreground-muted">Subtotal: {formatarMoeda(totalBloco)}</p>
             </div>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={() => setFormItens((atual) => [...atual, { ...ITEM_VAZIO }])}
-          className="mt-1.5 text-[11px] font-medium text-brand-primary hover:text-brand-primary-hover"
-        >
-          + Adicionar item
+          );
+        })}
+
+        <button type="button" onClick={adicionarBloco} className="text-[11.5px] font-semibold text-brand-primary hover:text-brand-primary-hover">
+          + Adicionar bloco
         </button>
-        <p className="mt-1.5 text-right text-[11.5px] font-semibold text-foreground">Total: {formatarMoeda(totalItensForm)}</p>
+
+        <p className="text-right text-[11.5px] font-semibold text-foreground">Total: {formatarMoeda(totalItensForm)}</p>
       </div>
     </>
   );

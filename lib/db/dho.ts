@@ -3,6 +3,8 @@ import { getDb } from "./client";
 
 export interface ItemEvento {
   id: number;
+  /** Bloco temático a que o item pertence (ex.: "Brindes", "Brinquedos") — null/vazio é um item sem bloco. */
+  tema: string | null;
   nome: string;
   quantidade: number;
   valorUnitario: number;
@@ -32,6 +34,7 @@ interface LinhaEvento {
 interface LinhaItemEvento {
   id: number;
   evento_id: number;
+  tema: string | null;
   nome: string;
   quantidade: number;
   valor_unitario: number;
@@ -44,7 +47,7 @@ export interface DadosEvento {
   objetivo: string;
   publicoAlvo: string;
   descricao: string;
-  itens: { nome: string; quantidade: number; valorUnitario: number }[];
+  itens: { tema?: string | null; nome: string; quantidade: number; valorUnitario: number }[];
 }
 
 export async function listarEventosCalendario(ano: number): Promise<EventoCalendario[]> {
@@ -57,7 +60,7 @@ export async function listarEventosCalendario(ano: number): Promise<EventoCalend
   if (linhas.length === 0) return [];
 
   const itens = await db.execute({
-    sql: "SELECT id, evento_id, nome, quantidade, valor_unitario FROM dho_evento_itens WHERE evento_id = ANY(?::int[])",
+    sql: "SELECT id, evento_id, tema, nome, quantidade, valor_unitario FROM dho_evento_itens WHERE evento_id = ANY(?::int[])",
     args: [linhas.map((l) => l.id)],
   });
   const linhasItens = itens.rows as unknown as LinhaItemEvento[];
@@ -74,7 +77,7 @@ function paraEvento(l: LinhaEvento, itens: LinhaItemEvento[]): EventoCalendario 
     objetivo: l.objetivo,
     publicoAlvo: l.publico_alvo,
     descricao: l.descricao,
-    itens: itens.map((i) => ({ id: i.id, nome: i.nome, quantidade: i.quantidade, valorUnitario: i.valor_unitario })),
+    itens: itens.map((i) => ({ id: i.id, tema: i.tema, nome: i.nome, quantidade: i.quantidade, valorUnitario: i.valor_unitario })),
   };
 }
 
@@ -83,8 +86,8 @@ async function salvarItensEvento(eventoId: number, itens: DadosEvento["itens"]):
   await db.batch([
     { sql: "DELETE FROM dho_evento_itens WHERE evento_id = ?", args: [eventoId] },
     ...itens.map((i) => ({
-      sql: "INSERT INTO dho_evento_itens (evento_id, nome, quantidade, valor_unitario) VALUES (?, ?, ?, ?)",
-      args: [eventoId, i.nome, i.quantidade, i.valorUnitario],
+      sql: "INSERT INTO dho_evento_itens (evento_id, tema, nome, quantidade, valor_unitario) VALUES (?, ?, ?, ?, ?)",
+      args: [eventoId, i.tema ?? null, i.nome, i.quantidade, i.valorUnitario],
     })),
   ]);
 }
@@ -99,7 +102,7 @@ export async function criarEventoCalendario(dados: DadosEvento): Promise<EventoC
   const linha = (resultado.rows as unknown as LinhaEvento[])[0];
   await salvarItensEvento(linha.id, dados.itens);
   const itens = await db.execute({
-    sql: "SELECT id, evento_id, nome, quantidade, valor_unitario FROM dho_evento_itens WHERE evento_id = ?",
+    sql: "SELECT id, evento_id, tema, nome, quantidade, valor_unitario FROM dho_evento_itens WHERE evento_id = ?",
     args: [linha.id],
   });
   return paraEvento(linha, itens.rows as unknown as LinhaItemEvento[]);
@@ -115,7 +118,7 @@ export async function atualizarEventoCalendario(id: number, dados: DadosEvento):
   const linha = (resultado.rows as unknown as LinhaEvento[])[0];
   await salvarItensEvento(id, dados.itens);
   const itens = await db.execute({
-    sql: "SELECT id, evento_id, nome, quantidade, valor_unitario FROM dho_evento_itens WHERE evento_id = ?",
+    sql: "SELECT id, evento_id, tema, nome, quantidade, valor_unitario FROM dho_evento_itens WHERE evento_id = ?",
     args: [id],
   });
   return paraEvento(linha, itens.rows as unknown as LinhaItemEvento[]);

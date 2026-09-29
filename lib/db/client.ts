@@ -203,6 +203,10 @@ const MIGRACOES: { tabela: string; coluna: string; definicao: string }[] = [
   // Marca a primeira vez que o link de auto-cadastro foi aberto — a segunda
   // tentativa de abrir (recarregar, reenviar o link) já não é permitida.
   { tabela: "convites_cadastro", coluna: "aberto_em", definicao: "TEXT" },
+  // Agrupa os itens de uma ação em blocos temáticos (ex.: "Brindes",
+  // "Brinquedos") dentro do mesmo formulário — vazio/null é um único bloco
+  // sem título, o comportamento de antes desta coluna existir.
+  { tabela: "dho_evento_itens", coluna: "tema", definicao: "TEXT" },
 ];
 
 /**
