@@ -6,6 +6,7 @@ import { formatarMoeda } from "@/lib/format";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Card } from "@/components/shared/Card";
 import {
+  BlocoCustoMensalEpiExames,
   BlocoExamesOcupacionais,
   BlocoGestaoEpi,
   SectionTitle,
@@ -121,6 +122,8 @@ export default async function SstDashboardPage() {
 
       <BlocoExamesOcupacionais dados={data} />
 
+      <BlocoCustoMensalEpiExames dados={data.custoMensalEpiExames} />
+
       <section className="space-y-3">
         <SectionTitle
           aside={
@@ -153,19 +156,14 @@ export default async function SstDashboardPage() {
                     <td className="px-3 py-1.5 text-right text-foreground-muted">{formatarMoeda(m.entrega)}</td>
                     <td className="px-3 py-1.5 text-right text-foreground-muted">{formatarMoeda(m.reparo)}</td>
                     <td className="px-3 py-1.5 text-right font-semibold text-foreground">{formatarMoeda(m.realizado)}</td>
-                    <td className="px-3 py-1.5 text-right text-foreground-muted">{formatarMoeda(m.orcado)}</td>
-                    <td className={`px-3 py-1.5 text-right font-semibold ${m.dif > 0 ? "text-status-danger" : "text-status-success"}`}>
-                      {m.dif >= 0 ? "+" : "−"} {formatarMoeda(Math.abs(m.dif))}
+                    <td className="px-3 py-1.5 text-right text-foreground-muted">{m.orcado > 0 ? formatarMoeda(m.orcado) : "—"}</td>
+                    <td
+                      className={`px-3 py-1.5 text-right font-semibold ${m.orcado === 0 ? "text-foreground-muted" : m.dif > 0 ? "text-status-danger" : "text-status-success"}`}
+                    >
+                      {m.orcado === 0 ? "—" : `${m.dif >= 0 ? "+" : "−"} ${formatarMoeda(Math.abs(m.dif))}`}
                     </td>
                   </tr>
                 ))}
-                {data.custoFardamento.meses.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="px-3 py-3 text-foreground-muted">
-                      Nenhum orçamento mensal cadastrado ainda.
-                    </td>
-                  </tr>
-                )}
               </tbody>
             </table>
           </div>

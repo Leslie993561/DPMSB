@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/shared/Card";
+import { GraficoBarrasMensal } from "@/components/shared/GraficoBarrasMensal";
 import { Modal } from "@/components/shared/Modal";
 import { formatarDataBr, formatarMoeda } from "@/lib/format";
 import { cn } from "@/lib/cn";
@@ -803,48 +804,64 @@ export function EndomarketingDashboardClient({
       </Modal>
 
       {aba === "orcamento" && (
-        <Card className="overflow-hidden">
-          <div className="flex items-center justify-between border-b border-hairline px-4 py-2.5">
-            <p className="text-[12px] font-bold tracking-wide text-foreground-muted uppercase">Orçamento {ano}</p>
-            {seletorAno}
-          </div>
-          <table className="w-full text-left text-[12px]">
-            <thead className="border-b border-hairline bg-surface-page text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">
-              <tr>
-                <th className="px-3 py-2">Mês</th>
-                <th className="px-3 py-2">Aprovado</th>
-                <th className="px-3 py-2">Utilizado</th>
-                <th className="px-3 py-2">Gap</th>
-                <th className="px-3 py-2">Saving</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-hairline">
-              {orcamento.map((l) => (
-                <tr key={l.mes}>
-                  <td className="px-3 py-2 font-medium text-foreground">{MESES_ABREV[l.mes - 1]}</td>
-                  <td className="px-3 py-2">
-                    <CampoAprovado valor={l.aprovado} onSalvar={(v) => salvarAprovado(l.mes, v)} />
-                  </td>
-                  <td className="px-3 py-2 text-foreground-muted">{formatarMoeda(l.utilizado)}</td>
-                  {/* Gap (estourou o aprovado) e Saving (sobrou) nunca coexistem no mesmo
-                      mês — é o mesmo número com sinal trocado, então só uma das duas
-                      colunas mostra valor por vez; a outra fica em traço. */}
-                  <td className="px-3 py-2 font-medium text-status-danger">{l.gap < 0 ? formatarMoeda(l.gap) : "—"}</td>
-                  <td className="px-3 py-2 text-status-success">{l.gap > 0 ? formatarMoeda(l.saving) : "—"}</td>
+        <div className="space-y-3">
+          <Card className="p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-[12px] font-bold tracking-wide text-foreground-muted uppercase">Custo total do portal · {ano}</p>
+              {seletorAno}
+            </div>
+            <GraficoBarrasMensal
+              series={[
+                { label: "Aprovado", cor: "bg-brand-surface" },
+                { label: "Realizado", cor: "bg-brand-primary" },
+              ]}
+              dados={orcamento.map((l) => ({ mesLabel: MESES_ABREV[l.mes - 1], valores: [l.aprovado, l.utilizado] }))}
+            />
+          </Card>
+
+          <Card className="overflow-hidden">
+            <div className="flex items-center justify-between border-b border-hairline px-4 py-2.5">
+              <p className="text-[12px] font-bold tracking-wide text-foreground-muted uppercase">Orçamento {ano}</p>
+              {seletorAno}
+            </div>
+            <table className="w-full text-left text-[12px]">
+              <thead className="border-b border-hairline bg-surface-page text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">
+                <tr>
+                  <th className="px-3 py-2">Mês</th>
+                  <th className="px-3 py-2">Aprovado</th>
+                  <th className="px-3 py-2">Utilizado</th>
+                  <th className="px-3 py-2">Gap</th>
+                  <th className="px-3 py-2">Saving</th>
                 </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="border-t border-hairline bg-surface-page font-semibold">
-                <td className="px-3 py-2 text-foreground">Total</td>
-                <td className="px-3 py-2 text-foreground">{formatarMoeda(totalAprovado)}</td>
-                <td className="px-3 py-2 text-foreground">{formatarMoeda(totalUtilizado)}</td>
-                <td className="px-3 py-2 text-status-danger">{totalGap < 0 ? formatarMoeda(totalGap) : "—"}</td>
-                <td className="px-3 py-2 text-status-success">{totalGap > 0 ? formatarMoeda(totalGap) : "—"}</td>
-              </tr>
-            </tfoot>
-          </table>
-        </Card>
+              </thead>
+              <tbody className="divide-y divide-hairline">
+                {orcamento.map((l) => (
+                  <tr key={l.mes}>
+                    <td className="px-3 py-2 font-medium text-foreground">{MESES_ABREV[l.mes - 1]}</td>
+                    <td className="px-3 py-2">
+                      <CampoAprovado valor={l.aprovado} onSalvar={(v) => salvarAprovado(l.mes, v)} />
+                    </td>
+                    <td className="px-3 py-2 text-foreground-muted">{formatarMoeda(l.utilizado)}</td>
+                    {/* Gap (estourou o aprovado) e Saving (sobrou) nunca coexistem no mesmo
+                        mês — é o mesmo número com sinal trocado, então só uma das duas
+                        colunas mostra valor por vez; a outra fica em traço. */}
+                    <td className="px-3 py-2 font-medium text-status-danger">{l.gap < 0 ? formatarMoeda(l.gap) : "—"}</td>
+                    <td className="px-3 py-2 text-status-success">{l.gap > 0 ? formatarMoeda(l.saving) : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-hairline bg-surface-page font-semibold">
+                  <td className="px-3 py-2 text-foreground">Total</td>
+                  <td className="px-3 py-2 text-foreground">{formatarMoeda(totalAprovado)}</td>
+                  <td className="px-3 py-2 text-foreground">{formatarMoeda(totalUtilizado)}</td>
+                  <td className="px-3 py-2 text-status-danger">{totalGap < 0 ? formatarMoeda(totalGap) : "—"}</td>
+                  <td className="px-3 py-2 text-status-success">{totalGap > 0 ? formatarMoeda(totalGap) : "—"}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </Card>
+        </div>
       )}
 
       {aba === "lancamentos" && (

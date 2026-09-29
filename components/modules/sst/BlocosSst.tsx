@@ -3,6 +3,7 @@ import type { BadgeTone } from "@/lib/sst/domain";
 import { formatarMoeda } from "@/lib/format";
 import { Card } from "@/components/shared/Card";
 import { Badge, type CorBadge } from "@/components/shared/Badge";
+import { GraficoBarrasMensal } from "@/components/shared/GraficoBarrasMensal";
 
 /** Blocos do Dashboard SST. */
 
@@ -216,25 +217,18 @@ export function BlocoGestaoEpi({
                 {custoEpi.meses.map((m) => (
                   <tr key={m.mes} className="border-t border-hairline/60">
                     <td className="px-3 py-1.5 font-semibold text-foreground">{m.mesLabel}</td>
-                    <td className="px-3 py-1.5 text-right text-foreground-muted">{formatarMoeda(m.orcado)}</td>
+                    <td className="px-3 py-1.5 text-right text-foreground-muted">{m.orcado > 0 ? formatarMoeda(m.orcado) : "—"}</td>
                     <td className="px-3 py-1.5 text-right font-semibold text-foreground">{formatarMoeda(m.realizado)}</td>
                     <td
-                      className={`px-3 py-1.5 text-right font-semibold ${m.dif > 0 ? "text-status-danger" : "text-status-success"}`}
+                      className={`px-3 py-1.5 text-right font-semibold ${m.orcado === 0 ? "text-foreground-muted" : m.dif > 0 ? "text-status-danger" : "text-status-success"}`}
                     >
-                      {m.dif >= 0 ? "+" : "−"} {formatarMoeda(Math.abs(m.dif))}
+                      {m.orcado === 0 ? "—" : `${m.dif >= 0 ? "+" : "−"} ${formatarMoeda(Math.abs(m.dif))}`}
                     </td>
                     <td className="px-3 py-1.5">
-                      <Badge cor={TOM_BADGE[m.pctTone]}>{m.pctConsumo}%</Badge>
+                      {m.orcado > 0 ? <Badge cor={TOM_BADGE[m.pctTone]}>{m.pctConsumo}%</Badge> : <span className="text-foreground-muted">—</span>}
                     </td>
                   </tr>
                 ))}
-                {custoEpi.meses.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="px-3 py-3 text-foreground-muted">
-                      Nenhum orçamento mensal cadastrado ainda.
-                    </td>
-                  </tr>
-                )}
               </tbody>
             </table>
           </div>
@@ -298,6 +292,24 @@ export function BlocoExamesOcupacionais({
         valor). Realizado: {exames.examesRealizadosCount} exame(s) lançado(s) nas fichas.
         {!exames.hasPrevisto && " Cadastre o valor dos exames na matriz ocupacional para alimentar o previsto."}
       </p>
+    </section>
+  );
+}
+
+/** Valor de EPI (entregas confirmadas) + Exames Ocupacionais (realizados), mês a mês do ano corrente. */
+export function BlocoCustoMensalEpiExames({ dados }: { dados: DashboardSst["custoMensalEpiExames"] }) {
+  return (
+    <section className="space-y-2">
+      <SectionTitle>Valor de EPI e Exames Ocupacionais · 12 meses</SectionTitle>
+      <Card className="px-3 py-3">
+        <GraficoBarrasMensal
+          series={[
+            { label: "EPI", cor: "bg-brand-primary" },
+            { label: "Exames ocupacionais", cor: "bg-brand-accent" },
+          ]}
+          dados={dados.map((m) => ({ mesLabel: m.mesLabel, valores: [m.epi, m.exames] }))}
+        />
+      </Card>
     </section>
   );
 }

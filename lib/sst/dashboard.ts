@@ -46,17 +46,12 @@ interface EntregaEpiRow {
   ficha_id: string | null;
 }
 
-interface CustoEpiMesRow {
-  mes: string;
-  orcado: number;
-  realizado_base: number;
-}
-
 interface FardamentoEntregaRow {
   colab_id: number;
   valor_unit: number;
   qtd: number;
   data_entrega: string;
+  ficha_id: string | null;
 }
 
 interface FardamentoReparoRow {
@@ -65,20 +60,14 @@ interface FardamentoReparoRow {
   data_reparo: string;
 }
 
-interface CustoFardamentoMesRow {
-  mes: string;
-  orcado: number;
-  entrega_base: number;
-  reparo_base: number;
-}
-
 interface ExamePrecoRow {
   codigo: string;
   valor: number;
 }
 
-interface AnexoExameRow {
-  valor: number;
+interface ExameRealizadoRow {
+  exame: string;
+  data_realizacao: string;
 }
 
 interface FichaEpiRow {
@@ -190,6 +179,14 @@ export interface ProgramaAtencao {
   status: StatusPrograma;
 }
 
+/** Um mês do gráfico "Valor de EPI e Exames Ocupacionais" — só valor, sem orçado (não existe cadastro de orçamento para isso ainda). */
+export interface CustoMensalEpiExames {
+  mes: string;
+  mesLabel: string;
+  epi: number;
+  exames: number;
+}
+
 export interface DashboardSst {
   kpi: {
     colaboradores: number;
@@ -228,6 +225,8 @@ export interface DashboardSst {
     dif: number;
     hasPrevisto: boolean;
   };
+  /** Valor de EPI (entregas confirmadas) + Exames Ocupacionais (realizados) por mês do ano corrente. */
+  custoMensalEpiExames: CustoMensalEpiExames[];
   fichasEpi: {
     total: number;
     assinadas: number;
@@ -264,12 +263,10 @@ export async function obterDashboardSst(): Promise<DashboardSst> {
   const [
     colaboradoresRows,
     entregasEpiRows,
-    custosEpiMesRows,
     fardamentoEntregasRows,
     fardamentoReparosRows,
-    custosFardamentoMesRows,
     examePrecosRows,
-    anexosExamesRows,
+    examesRealizadosRows,
     fichasEpiRows,
     asoDemissionalPendentesRows,
     programasSaudeRows,
@@ -285,18 +282,15 @@ export async function obterDashboardSst(): Promise<DashboardSst> {
       "SELECT id, cpf, nome, cargo, departamento, epis, exames, nascimento, desligado, data_desligamento, motivo_desligamento, desligado_by FROM sst_colaboradores_legado",
     ),
     tolerante<EntregaEpiRow>("sst_entregas_epi", "SELECT colab_id, valor_unit, qtd, data_entrega, ficha_id FROM sst_entregas_epi"),
-    tolerante<CustoEpiMesRow>("sst_custos_epi_mes", "SELECT mes, orcado, realizado_base FROM sst_custos_epi_mes ORDER BY mes ASC"),
     tolerante<FardamentoEntregaRow>(
       "sst_fardamento_entregas",
-      "SELECT colab_id, valor_unit, qtd, data_entrega FROM sst_fardamento_entregas",
+      "SELECT colab_id, valor_unit, qtd, data_entrega, ficha_id FROM sst_fardamento_entregas",
     ),
+    // sst_fardamento_reparos ainda não tem tela de cadastro — tolerante() devolve
+    // [] até o dia em que a funcionalidade existir, em vez de quebrar o Dashboard.
     tolerante<FardamentoReparoRow>("sst_fardamento_reparos", "SELECT colab_id, valor, data_reparo FROM sst_fardamento_reparos"),
-    tolerante<CustoFardamentoMesRow>(
-      "sst_custos_fardamento_mes",
-      "SELECT mes, orcado, entrega_base, reparo_base FROM sst_custos_fardamento_mes ORDER BY mes ASC",
-    ),
     tolerante<ExamePrecoRow>("sst_exame_precos", "SELECT codigo, valor FROM sst_exame_precos"),
-    tolerante<AnexoExameRow>("sst_anexos_exames", "SELECT valor FROM sst_anexos_exames"),
+    tolerante<ExameRealizadoRow>("sst_exames_realizados", "SELECT exame, data_realizacao FROM sst_exames_realizados"),
     tolerante<FichaEpiRow>("sst_fichas_epi", "SELECT id, colab_id, assinatura_storage_path, status FROM sst_fichas_epi"),
     tolerante<AsoDemissionalPendenteRow>(
       "sst_aso_demissional_pendentes",
@@ -379,26 +373,53 @@ export async function obterDashboardSst(): Promise<DashboardSst> {
     { label: "Necessita revisão", count: statusCount["Necessita revisão"], color: "var(--color-brand-primary-800)" },
   ];
 
+  // ---------- fichas de EPI assinadas — usado no filtro de custo (abaixo) e nas pendências (mais abaixo) ----------
+
+  const fichaAssinadaIds = new Set(
+    fichasEpiRows
+      .filter((f) => f.status === "assinada" || statusFichaEpi(f.assinatura_storage_path) === "assinada")
+      .map((f) => f.id),
+  );
+  // "Confirmada" = ficha assinada pelo colaborador, PDF do modelo antigo, OU sem
+  // ficha (registro legado, direto no histórico) — mesmo critério de
+  // listarFichasDoColaborador (lib/sst/fichas.ts). Enquanto a ficha só está
+  // aguardando assinatura, o colaborador ainda não confirmou o recebimento, então
+  // não conta como custo/entrega realizada ainda.
+  const confirmada = (fichaId: string | null) => fichaId === null || fichaAssinadaIds.has(fichaId);
+
+  const anoAtual = hoje.getFullYear();
+
+  /** Os 12 meses (Jan–Dez) do ano corrente — sempre presentes no gráfico/tabela, mesmo sem nenhum lançamento naquele mês. */
+  function mesesDoAno(ano: number): { mes: string; mesLabel: string }[] {
+    return Array.from({ length: 12 }, (_, i) => {
+      const mesNum = i + 1;
+      return { mes: `${ano}-${String(mesNum).padStart(2, "0")}`, mesLabel: `${mesAbrev(mesNum)}/${String(ano).slice(2)}` };
+    });
+  }
+
   // ---------- custos de EPI ----------
 
   const colabById = new Map(colaboradoresRows.map((c) => [c.id, c]));
+  const entregasEpiConfirmadas = entregasEpiRows.filter((e) => confirmada(e.ficha_id));
 
   const realizadoByMes: Record<string, number> = {};
-  entregasEpiRows.forEach((e) => {
+  entregasEpiConfirmadas.forEach((e) => {
     const mes = mesISOfromBR(e.data_entrega);
     if (!mes) return;
     realizadoByMes[mes] = (realizadoByMes[mes] ?? 0) + Number(e.valor_unit) * Number(e.qtd);
   });
 
-  const custoMesesEpi: CustoMesEpi[] = custosEpiMesRows.map((r) => {
-    const realizado = Number(r.realizado_base) + (realizadoByMes[r.mes] ?? 0);
-    const orcado = Number(r.orcado);
+  // Ainda não existe cadastro de orçamento mensal para EPI — "orçado" fica 0 e as
+  // colunas que dependem dele (Diferença, % consumo) só fazem sentido quando o RH
+  // cadastrar um valor de verdade (ver render: 0 vira "—", não "estourou o orçamento").
+  const custoMesesEpi: CustoMesEpi[] = mesesDoAno(anoAtual).map(({ mes, mesLabel }) => {
+    const realizado = realizadoByMes[mes] ?? 0;
+    const orcado = 0;
     const dif = realizado - orcado;
     const pctConsumo = orcado > 0 ? Math.round((100 * realizado) / orcado) : 0;
-    const [ano, mes] = r.mes.split("-");
     return {
-      mes: r.mes,
-      mesLabel: `${mesAbrev(Number(mes))}/${ano.slice(2)}`,
+      mes,
+      mesLabel,
       orcado,
       realizado,
       dif,
@@ -415,7 +436,7 @@ export async function obterDashboardSst(): Promise<DashboardSst> {
   const epiQtdByDept = new Map<string, number>();
   const epiValorByColab = new Map<string, number>();
   const epiQtdByColab = new Map<string, number>();
-  entregasEpiRows.forEach((e) => {
+  entregasEpiConfirmadas.forEach((e) => {
     const c = colabById.get(e.colab_id);
     const dept = deptName(c?.departamento);
     const nome = titleCase(c?.nome ?? "—");
@@ -430,8 +451,12 @@ export async function obterDashboardSst(): Promise<DashboardSst> {
 
   // ---------- custos de fardamento ----------
 
+  // Mesmo critério de "confirmada" do EPI: fardamento entregue mas ainda
+  // aguardando assinatura não conta como recebido pelo colaborador.
+  const fardamentoEntregasConfirmadas = fardamentoEntregasRows.filter((e) => confirmada(e.ficha_id));
+
   const fardEntregaByMes: Record<string, number> = {};
-  fardamentoEntregasRows.forEach((e) => {
+  fardamentoEntregasConfirmadas.forEach((e) => {
     const mes = mesISOfromBR(e.data_entrega);
     if (!mes) return;
     fardEntregaByMes[mes] = (fardEntregaByMes[mes] ?? 0) + Number(e.valor_unit) * Number(e.qtd);
@@ -443,22 +468,14 @@ export async function obterDashboardSst(): Promise<DashboardSst> {
     fardReparoByMes[mes] = (fardReparoByMes[mes] ?? 0) + Number(r.valor);
   });
 
-  const custoMesesFard: CustoMesFardamento[] = custosFardamentoMesRows.map((r) => {
-    const entrega = Number(r.entrega_base) + (fardEntregaByMes[r.mes] ?? 0);
-    const reparo = Number(r.reparo_base) + (fardReparoByMes[r.mes] ?? 0);
+  // Mesma ausência de cadastro de orçamento do bloco de EPI acima — "orçado" fica 0.
+  const custoMesesFard: CustoMesFardamento[] = mesesDoAno(anoAtual).map(({ mes, mesLabel }) => {
+    const entrega = fardEntregaByMes[mes] ?? 0;
+    const reparo = fardReparoByMes[mes] ?? 0;
     const realizado = entrega + reparo;
-    const orcado = Number(r.orcado);
+    const orcado = 0;
     const dif = realizado - orcado;
-    const [ano, mes] = r.mes.split("-");
-    return {
-      mes: r.mes,
-      mesLabel: `${mesAbrev(Number(mes))}/${ano.slice(2)}`,
-      orcado,
-      entrega,
-      reparo,
-      realizado,
-      dif,
-    };
+    return { mes, mesLabel, orcado, entrega, reparo, realizado, dif };
   });
   const fardEntAno = custoMesesFard.reduce((acc, m) => acc + m.entrega, 0);
   const fardRepAno = custoMesesFard.reduce((acc, m) => acc + m.reparo, 0);
@@ -469,7 +486,7 @@ export async function obterDashboardSst(): Promise<DashboardSst> {
   const fardQtdByDept = new Map<string, number>();
   const fardValorByColab = new Map<string, number>();
   const fardQtdByColab = new Map<string, number>();
-  fardamentoEntregasRows.forEach((e) => {
+  fardamentoEntregasConfirmadas.forEach((e) => {
     const c = colabById.get(e.colab_id);
     const dept = deptName(c?.departamento);
     const nome = titleCase(c?.nome ?? "—");
@@ -494,20 +511,36 @@ export async function obterDashboardSst(): Promise<DashboardSst> {
   const examePrecoOverride = new Map(examePrecosRows.map((r) => [r.codigo, Number(r.valor)]));
   const catExames = CATALOGO_EXAMES_OCUPACIONAIS;
   const valorExame = (codigo: string) => examePrecoOverride.get(codigo) ?? catExames.find((e) => e.codigo === codigo)?.valor ?? 0;
+  const codigoPorExame = new Map(catExames.map((e) => [e.nome, e.codigo]));
   const examesComValor = catExames.filter((e) => valorExame(e.codigo) > 0).length;
   const previstoExamesAno = catExames.reduce((acc, e) => acc + valorExame(e.codigo) * (Number(e.cargos) || 0), 0);
-  const realizadoExamesTotal = anexosExamesRows.reduce((acc, a) => acc + (Number(a.valor) || 0), 0);
-  const examesRealizadosCount = anexosExamesRows.length;
+  // Realizado = exames de fato lançados (sst_exames_realizados, ficha de ASO) NESTE
+  // ano, no preço vigente — comparável ao previsto, que também é estimativa pro ano
+  // corrente. (Antes lia sst_anexos_exames, tabela do Portal SST antigo que nunca
+  // existiu neste banco — o Realizado ficava sempre zerado.)
+  const examesRealizadosAno = examesRealizadosRows.filter((r) => mesISOfromBR(r.data_realizacao).startsWith(`${anoAtual}-`));
+  const realizadoExamesTotal = examesRealizadosAno.reduce((acc, r) => acc + valorExame(codigoPorExame.get(r.exame) ?? ""), 0);
+  const examesRealizadosCount = examesRealizadosAno.length;
   const difExamesSST = realizadoExamesTotal - previstoExamesAno;
+
+  const examesValorByMes: Record<string, number> = {};
+  examesRealizadosRows.forEach((r) => {
+    const mes = mesISOfromBR(r.data_realizacao);
+    if (!mes) return;
+    examesValorByMes[mes] = (examesValorByMes[mes] ?? 0) + valorExame(codigoPorExame.get(r.exame) ?? "");
+  });
+
+  const custoMensalEpiExames: CustoMensalEpiExames[] = mesesDoAno(anoAtual).map(({ mes, mesLabel }) => ({
+    mes,
+    mesLabel,
+    epi: realizadoByMes[mes] ?? 0,
+    exames: examesValorByMes[mes] ?? 0,
+  }));
 
   // ---------- fichas de EPI pendentes de assinatura ----------
 
   const totalFichasEpi = fichasEpiRows.length;
-  // Assinada = assinatura eletrônica pelo link (status) ou PDF assinado anexado
-  // (modelo antigo do Portal SST). O resto foi entregue e ainda não assinado.
-  const fichasAssinadas = fichasEpiRows.filter(
-    (f) => f.status === "assinada" || statusFichaEpi(f.assinatura_storage_path) === "assinada",
-  ).length;
+  const fichasAssinadas = fichaAssinadaIds.size;
   const fichasAguardando = totalFichasEpi - fichasAssinadas;
   // Quem tem EPI obrigatório pela função (cadastro do Quadro × matriz) e ainda
   // não recebeu nenhuma ficha para assinar.
@@ -595,6 +628,7 @@ export async function obterDashboardSst(): Promise<DashboardSst> {
       dif: difExamesSST,
       hasPrevisto: previstoExamesAno > 0,
     },
+    custoMensalEpiExames,
     fichasEpi: {
       total: totalFichasEpi,
       assinadas: fichasAssinadas,
