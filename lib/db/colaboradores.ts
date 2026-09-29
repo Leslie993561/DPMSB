@@ -9,6 +9,7 @@ export type Vinculo = "CLT" | "CLT-bio" | "PJ" | "EST" | "JÁ";
 export type TipoTransporte = "vt_diario" | "vm_fixo";
 export type StatusColaborador = "ativo" | "desligado";
 export type SexoColaborador = "M" | "F";
+export type DeficienteStatus = "sim" | "nao";
 
 /** Centro de rateio do D365 — administrativo ou produção. */
 export type RateioD365 = "ADM" | "PRO";
@@ -72,14 +73,28 @@ export interface Colaborador {
   conjugeNascimento: string | null;
   conjugeSexo: SexoColaborador | null;
   // Documentos pessoais
+  rg: string | null;
+  rgEmissao: string | null;
+  cpfEmissao: string | null;
+  pisEmissao: string | null;
   tituloEleitor: string | null;
   tituloEleitorZona: string | null;
   tituloEleitorSecao: string | null;
   tituloEleitorEmissao: string | null;
+  ctpsSerie: string | null;
+  ctpsUf: string | null;
+  ctpsEmissao: string | null;
   cnhCategoria: string | null;
   cnhValidade: string | null;
   cnhEmissao: string | null;
   reservistaSerie: string | null;
+  reservistaEmissao: string | null;
+  // Deficiência e nacionalidade dos pais
+  deficiente: DeficienteStatus | null;
+  deficienciaTipo: string | null;
+  nacionalidadePai: string | null;
+  nacionalidadeMae: string | null;
+  escolaridade: string | null;
   // Uniforme
   tamanhoCamisa: string | null;
   tamanhoCalca: string | null;
@@ -145,14 +160,27 @@ export interface ColaboradorInput {
   conjugeCpf?: string | null;
   conjugeNascimento?: string | null;
   conjugeSexo?: SexoColaborador | null;
+  rg?: string | null;
+  rgEmissao?: string | null;
+  cpfEmissao?: string | null;
+  pisEmissao?: string | null;
   tituloEleitor?: string | null;
   tituloEleitorZona?: string | null;
   tituloEleitorSecao?: string | null;
   tituloEleitorEmissao?: string | null;
+  ctpsSerie?: string | null;
+  ctpsUf?: string | null;
+  ctpsEmissao?: string | null;
   cnhCategoria?: string | null;
   cnhValidade?: string | null;
   cnhEmissao?: string | null;
   reservistaSerie?: string | null;
+  reservistaEmissao?: string | null;
+  deficiente?: DeficienteStatus | null;
+  deficienciaTipo?: string | null;
+  nacionalidadePai?: string | null;
+  nacionalidadeMae?: string | null;
+  escolaridade?: string | null;
   tamanhoCamisa?: string | null;
   tamanhoCalca?: string | null;
   tamanhoSapato?: string | null;
@@ -215,14 +243,27 @@ interface LinhaColaborador {
   conjuge_cpf: string | null;
   conjuge_nascimento: string | null;
   conjuge_sexo: string | null;
+  rg: string | null;
+  rg_emissao: string | null;
+  cpf_emissao: string | null;
+  pis_emissao: string | null;
   titulo_eleitor: string | null;
   titulo_eleitor_zona: string | null;
   titulo_eleitor_secao: string | null;
   titulo_eleitor_emissao: string | null;
+  ctps_serie: string | null;
+  ctps_uf: string | null;
+  ctps_emissao: string | null;
   cnh_categoria: string | null;
   cnh_validade: string | null;
   cnh_emissao: string | null;
   reservista_serie: string | null;
+  reservista_emissao: string | null;
+  deficiente: string | null;
+  deficiencia_tipo: string | null;
+  nacionalidade_pai: string | null;
+  nacionalidade_mae: string | null;
+  escolaridade: string | null;
   tamanho_camisa: string | null;
   tamanho_calca: string | null;
   tamanho_sapato: string | null;
@@ -278,14 +319,27 @@ function paraColaborador(linha: LinhaColaborador): Colaborador {
     conjugeCpf: linha.conjuge_cpf,
     conjugeNascimento: linha.conjuge_nascimento,
     conjugeSexo: linha.conjuge_sexo as SexoColaborador | null,
+    rg: linha.rg,
+    rgEmissao: linha.rg_emissao,
+    cpfEmissao: linha.cpf_emissao,
+    pisEmissao: linha.pis_emissao,
     tituloEleitor: linha.titulo_eleitor,
     tituloEleitorZona: linha.titulo_eleitor_zona,
     tituloEleitorSecao: linha.titulo_eleitor_secao,
     tituloEleitorEmissao: linha.titulo_eleitor_emissao,
+    ctpsSerie: linha.ctps_serie,
+    ctpsUf: linha.ctps_uf,
+    ctpsEmissao: linha.ctps_emissao,
     cnhCategoria: linha.cnh_categoria,
     cnhValidade: linha.cnh_validade,
     cnhEmissao: linha.cnh_emissao,
     reservistaSerie: linha.reservista_serie,
+    reservistaEmissao: linha.reservista_emissao,
+    deficiente: linha.deficiente as DeficienteStatus | null,
+    deficienciaTipo: linha.deficiencia_tipo,
+    nacionalidadePai: linha.nacionalidade_pai,
+    nacionalidadeMae: linha.nacionalidade_mae,
+    escolaridade: linha.escolaridade,
     tamanhoCamisa: linha.tamanho_camisa,
     tamanhoCalca: linha.tamanho_calca,
     tamanhoSapato: linha.tamanho_sapato,
@@ -331,14 +385,27 @@ export function paraColaboradorProfissional(c: Colaborador): Colaborador {
     conjugeCpf: null,
     conjugeNascimento: null,
     conjugeSexo: null,
+    rg: null,
+    rgEmissao: null,
+    cpfEmissao: null,
+    pisEmissao: null,
     tituloEleitor: null,
     tituloEleitorZona: null,
     tituloEleitorSecao: null,
     tituloEleitorEmissao: null,
+    ctpsSerie: null,
+    ctpsUf: null,
+    ctpsEmissao: null,
     cnhCategoria: null,
     cnhValidade: null,
     cnhEmissao: null,
     reservistaSerie: null,
+    reservistaEmissao: null,
+    deficiente: null,
+    deficienciaTipo: null,
+    nacionalidadePai: null,
+    nacionalidadeMae: null,
+    escolaridade: null,
     tamanhoCamisa: null,
     tamanhoCalca: null,
     tamanhoSapato: null,
@@ -409,9 +476,14 @@ export async function criarColaborador(input: ColaboradorInput): Promise<Colabor
           lider_direto_nome, status, pis, cidade_nascimento, uf_nascimento, nome_pai, nome_mae, telefone, sexo,
           email_pessoal, horario, banco, cep, estado, bairro, rua, numero, conjuge_nome, conjuge_cpf, conjuge_nascimento, conjuge_sexo,
           periculosidade_percentual, insalubridade_percentual, adicional_fixo, adicional_fixo_descricao, rateio_d365,
-          titulo_eleitor, titulo_eleitor_zona, titulo_eleitor_secao, titulo_eleitor_emissao, cnh_categoria, cnh_validade, cnh_emissao,
-          reservista_serie, tamanho_camisa, tamanho_calca, tamanho_sapato)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          rg, rg_emissao, cpf_emissao, pis_emissao,
+          titulo_eleitor, titulo_eleitor_zona, titulo_eleitor_secao, titulo_eleitor_emissao,
+          ctps_serie, ctps_uf, ctps_emissao,
+          cnh_categoria, cnh_validade, cnh_emissao,
+          reservista_serie, reservista_emissao,
+          deficiente, deficiencia_tipo, nacionalidade_pai, nacionalidade_mae, escolaridade,
+          tamanho_camisa, tamanho_calca, tamanho_sapato)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       input.nome,
       input.dataAdmissao,
@@ -460,14 +532,27 @@ export async function criarColaborador(input: ColaboradorInput): Promise<Colabor
       input.adicionalFixo ?? null,
       input.adicionalFixoDescricao ?? null,
       input.rateioD365 ?? null,
+      input.rg ?? null,
+      input.rgEmissao ?? null,
+      input.cpfEmissao ?? null,
+      input.pisEmissao ?? null,
       input.tituloEleitor ?? null,
       input.tituloEleitorZona ?? null,
       input.tituloEleitorSecao ?? null,
       input.tituloEleitorEmissao ?? null,
+      input.ctpsSerie ?? null,
+      input.ctpsUf ?? null,
+      input.ctpsEmissao ?? null,
       input.cnhCategoria ?? null,
       input.cnhValidade ?? null,
       input.cnhEmissao ?? null,
       input.reservistaSerie ?? null,
+      input.reservistaEmissao ?? null,
+      input.deficiente ?? null,
+      input.deficienciaTipo ?? null,
+      input.nacionalidadePai ?? null,
+      input.nacionalidadeMae ?? null,
+      input.escolaridade ?? null,
       input.tamanhoCamisa ?? null,
       input.tamanhoCalca ?? null,
       input.tamanhoSapato ?? null,
@@ -532,15 +617,28 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
     conjugeCpf: input.conjugeCpf !== undefined ? input.conjugeCpf : atual.conjugeCpf,
     conjugeNascimento: input.conjugeNascimento !== undefined ? input.conjugeNascimento : atual.conjugeNascimento,
     conjugeSexo: input.conjugeSexo !== undefined ? input.conjugeSexo : atual.conjugeSexo,
+    rg: input.rg !== undefined ? input.rg : atual.rg,
+    rgEmissao: input.rgEmissao !== undefined ? input.rgEmissao : atual.rgEmissao,
+    cpfEmissao: input.cpfEmissao !== undefined ? input.cpfEmissao : atual.cpfEmissao,
+    pisEmissao: input.pisEmissao !== undefined ? input.pisEmissao : atual.pisEmissao,
     tituloEleitor: input.tituloEleitor !== undefined ? input.tituloEleitor : atual.tituloEleitor,
     tituloEleitorZona: input.tituloEleitorZona !== undefined ? input.tituloEleitorZona : atual.tituloEleitorZona,
     tituloEleitorSecao: input.tituloEleitorSecao !== undefined ? input.tituloEleitorSecao : atual.tituloEleitorSecao,
     tituloEleitorEmissao:
       input.tituloEleitorEmissao !== undefined ? input.tituloEleitorEmissao : atual.tituloEleitorEmissao,
+    ctpsSerie: input.ctpsSerie !== undefined ? input.ctpsSerie : atual.ctpsSerie,
+    ctpsUf: input.ctpsUf !== undefined ? input.ctpsUf : atual.ctpsUf,
+    ctpsEmissao: input.ctpsEmissao !== undefined ? input.ctpsEmissao : atual.ctpsEmissao,
     cnhCategoria: input.cnhCategoria !== undefined ? input.cnhCategoria : atual.cnhCategoria,
     cnhValidade: input.cnhValidade !== undefined ? input.cnhValidade : atual.cnhValidade,
     cnhEmissao: input.cnhEmissao !== undefined ? input.cnhEmissao : atual.cnhEmissao,
     reservistaSerie: input.reservistaSerie !== undefined ? input.reservistaSerie : atual.reservistaSerie,
+    reservistaEmissao: input.reservistaEmissao !== undefined ? input.reservistaEmissao : atual.reservistaEmissao,
+    deficiente: input.deficiente !== undefined ? input.deficiente : atual.deficiente,
+    deficienciaTipo: input.deficienciaTipo !== undefined ? input.deficienciaTipo : atual.deficienciaTipo,
+    nacionalidadePai: input.nacionalidadePai !== undefined ? input.nacionalidadePai : atual.nacionalidadePai,
+    nacionalidadeMae: input.nacionalidadeMae !== undefined ? input.nacionalidadeMae : atual.nacionalidadeMae,
+    escolaridade: input.escolaridade !== undefined ? input.escolaridade : atual.escolaridade,
     tamanhoCamisa: input.tamanhoCamisa !== undefined ? input.tamanhoCamisa : atual.tamanhoCamisa,
     tamanhoCalca: input.tamanhoCalca !== undefined ? input.tamanhoCalca : atual.tamanhoCalca,
     tamanhoSapato: input.tamanhoSapato !== undefined ? input.tamanhoSapato : atual.tamanhoSapato,
@@ -563,8 +661,11 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
            pis = ?, cidade_nascimento = ?, uf_nascimento = ?, nome_pai = ?, nome_mae = ?, telefone = ?, sexo = ?,
            email_pessoal = ?, horario = ?, banco = ?, cep = ?, estado = ?, bairro = ?, rua = ?, numero = ?,
            conjuge_nome = ?, conjuge_cpf = ?, conjuge_nascimento = ?, conjuge_sexo = ?,
+           rg = ?, rg_emissao = ?, cpf_emissao = ?, pis_emissao = ?,
            titulo_eleitor = ?, titulo_eleitor_zona = ?, titulo_eleitor_secao = ?, titulo_eleitor_emissao = ?,
-           cnh_categoria = ?, cnh_validade = ?, cnh_emissao = ?, reservista_serie = ?,
+           ctps_serie = ?, ctps_uf = ?, ctps_emissao = ?,
+           cnh_categoria = ?, cnh_validade = ?, cnh_emissao = ?, reservista_serie = ?, reservista_emissao = ?,
+           deficiente = ?, deficiencia_tipo = ?, nacionalidade_pai = ?, nacionalidade_mae = ?, escolaridade = ?,
            tamanho_camisa = ?, tamanho_calca = ?, tamanho_sapato = ?,
            periculosidade_percentual = ?, insalubridade_percentual = ?, adicional_fixo = ?,
            adicional_fixo_descricao = ?
@@ -617,14 +718,27 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
       mesclado.conjugeCpf ?? null,
       mesclado.conjugeNascimento ?? null,
       mesclado.conjugeSexo ?? null,
+      mesclado.rg ?? null,
+      mesclado.rgEmissao ?? null,
+      mesclado.cpfEmissao ?? null,
+      mesclado.pisEmissao ?? null,
       mesclado.tituloEleitor ?? null,
       mesclado.tituloEleitorZona ?? null,
       mesclado.tituloEleitorSecao ?? null,
       mesclado.tituloEleitorEmissao ?? null,
+      mesclado.ctpsSerie ?? null,
+      mesclado.ctpsUf ?? null,
+      mesclado.ctpsEmissao ?? null,
       mesclado.cnhCategoria ?? null,
       mesclado.cnhValidade ?? null,
       mesclado.cnhEmissao ?? null,
       mesclado.reservistaSerie ?? null,
+      mesclado.reservistaEmissao ?? null,
+      mesclado.deficiente ?? null,
+      mesclado.deficienciaTipo ?? null,
+      mesclado.nacionalidadePai ?? null,
+      mesclado.nacionalidadeMae ?? null,
+      mesclado.escolaridade ?? null,
       mesclado.tamanhoCamisa ?? null,
       mesclado.tamanhoCalca ?? null,
       mesclado.tamanhoSapato ?? null,

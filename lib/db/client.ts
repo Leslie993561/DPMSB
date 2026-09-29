@@ -146,17 +146,33 @@ const MIGRACOES: { tabela: string; coluna: string; definicao: string }[] = [
   { tabela: "colaboradores", coluna: "conjuge_nascimento", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "conjuge_sexo", definicao: "TEXT" },
   // Documentos pessoais e uniforme — mesmo bloco "Dados pessoais" do cadastro.
+  { tabela: "colaboradores", coluna: "rg", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "rg_emissao", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "cpf_emissao", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "pis_emissao", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "titulo_eleitor", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "titulo_eleitor_zona", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "titulo_eleitor_secao", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "titulo_eleitor_emissao", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "ctps_serie", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "ctps_uf", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "ctps_emissao", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "cnh_categoria", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "cnh_validade", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "cnh_emissao", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "reservista_serie", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "reservista_emissao", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "tamanho_camisa", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "tamanho_calca", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "tamanho_sapato", definicao: "TEXT" },
+  // Deficiência (Sim/Não + tipo) e nacionalidade dos pais — mesmo bloco "Dados
+  // pessoais". Escolaridade fica com o mesmo grupo por ser um dado cadastral
+  // simples, sem tabela própria.
+  { tabela: "colaboradores", coluna: "deficiente", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "deficiencia_tipo", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "nacionalidade_pai", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "nacionalidade_mae", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "escolaridade", definicao: "TEXT" },
   // Adicionais de salário. Percentuais e não valores: periculosidade incide
   // sobre o salário base (Art. 193 §1º) e insalubridade sobre o salário mínimo
   // (Art. 192) — guardar o valor calculado congelaria um número que muda com

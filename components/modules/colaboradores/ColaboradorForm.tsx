@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Colaborador, RateioD365, SexoColaborador, TipoTransporte, Vinculo } from "@/lib/db/colaboradores";
+import type { Colaborador, DeficienteStatus, RateioD365, SexoColaborador, TipoTransporte, Vinculo } from "@/lib/db/colaboradores";
 import type { SexoDependente } from "@/lib/db/colaboradorDependentes";
 import { RiskCallout } from "@/components/shared/RiskCallout";
 import { Modal } from "@/components/shared/Modal";
@@ -18,6 +18,21 @@ const INPUT_CLASS =
   "w-full rounded border border-hairline bg-background px-2 py-1 text-[12px] font-light text-foreground placeholder:text-foreground-muted/60 disabled:cursor-not-allowed disabled:border-hairline/70 disabled:bg-surface-page disabled:text-foreground-muted dark:border-brand-neutral/30";
 
 const VINCULOS: Vinculo[] = ["CLT", "CLT-bio", "PJ", "EST", "JÁ"];
+
+const ESCOLARIDADE_OPCOES = [
+  "Ensino Fundamental Incompleto",
+  "Ensino Fundamental Completo",
+  "Ensino Médio Incompleto",
+  "Ensino Médio Completo",
+  "Ensino Médio Técnico Incompleto",
+  "Ensino Médio Técnico Completo",
+  "Ensino Superior Incompleto",
+  "Ensino Superior Completo",
+  "Pós-Graduação / Especialização",
+  "Mestrado",
+  "Doutorado",
+  "Pós-Doutorado",
+];
 
 interface DependenteForm {
   nome: string;
@@ -479,14 +494,27 @@ const ROTULO_CAMPO: Record<string, string> = {
   conjugeCpf: "CPF do cônjuge",
   conjugeNascimento: "Nascimento do cônjuge",
   conjugeSexo: "Sexo do cônjuge",
+  rg: "RG",
+  rgEmissao: "Emissão do RG",
+  cpfEmissao: "Emissão do CPF",
+  pisEmissao: "Emissão do PIS",
   tituloEleitor: "Título de eleitor",
   tituloEleitorZona: "Zona do título",
   tituloEleitorSecao: "Seção do título",
   tituloEleitorEmissao: "Emissão do título",
+  ctpsSerie: "Série da CTPS",
+  ctpsUf: "UF da CTPS",
+  ctpsEmissao: "Emissão da CTPS",
   cnhCategoria: "Categoria da CNH",
   cnhValidade: "Validade da CNH",
   cnhEmissao: "Emissão da CNH",
   reservistaSerie: "Série do reservista",
+  reservistaEmissao: "Emissão do reservista",
+  deficiente: "Deficiente",
+  deficienciaTipo: "Tipo de deficiência",
+  nacionalidadePai: "Nacionalidade do pai",
+  nacionalidadeMae: "Nacionalidade da mãe",
+  escolaridade: "Escolaridade",
   tamanhoCamisa: "Tamanho de camisa",
   tamanhoCalca: "Tamanho de calça",
   tamanhoSapato: "Tamanho de sapato",
@@ -697,23 +725,36 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
   // Dados pessoais
   const [nome, setNome] = useState(editando?.nome ?? "");
   const [cpf, setCpf] = useState(editando?.cpf ?? "");
+  const [cpfEmissao, setCpfEmissao] = useState(editando?.cpfEmissao ?? "");
+  const [rg, setRg] = useState(editando?.rg ?? "");
+  const [rgEmissao, setRgEmissao] = useState(editando?.rgEmissao ?? "");
   const [pis, setPis] = useState(editando?.pis ?? "");
+  const [pisEmissao, setPisEmissao] = useState(editando?.pisEmissao ?? "");
   const [dataNascimento, setDataNascimento] = useState(editando?.dataNascimento ?? "");
   const [cidadeNascimento, setCidadeNascimento] = useState(editando?.cidadeNascimento ?? "");
   const [ufNascimento, setUfNascimento] = useState(editando?.ufNascimento ?? "");
   const [nomePai, setNomePai] = useState(editando?.nomePai ?? "");
   const [nomeMae, setNomeMae] = useState(editando?.nomeMae ?? "");
+  const [nacionalidadePai, setNacionalidadePai] = useState(editando?.nacionalidadePai ?? "");
+  const [nacionalidadeMae, setNacionalidadeMae] = useState(editando?.nacionalidadeMae ?? "");
   const [telefone, setTelefone] = useState(editando?.telefone ?? "");
   const [sexo, setSexo] = useState<SexoColaborador | "">(editando?.sexo ?? "");
   const [emailPessoal, setEmailPessoal] = useState(editando?.emailPessoal ?? "");
+  const [escolaridade, setEscolaridade] = useState(editando?.escolaridade ?? "");
+  const [deficiente, setDeficiente] = useState<DeficienteStatus | "">(editando?.deficiente ?? "");
+  const [deficienciaTipo, setDeficienciaTipo] = useState(editando?.deficienciaTipo ?? "");
   const [tituloEleitor, setTituloEleitor] = useState(editando?.tituloEleitor ?? "");
   const [tituloEleitorZona, setTituloEleitorZona] = useState(editando?.tituloEleitorZona ?? "");
   const [tituloEleitorSecao, setTituloEleitorSecao] = useState(editando?.tituloEleitorSecao ?? "");
   const [tituloEleitorEmissao, setTituloEleitorEmissao] = useState(editando?.tituloEleitorEmissao ?? "");
+  const [ctpsSerie, setCtpsSerie] = useState(editando?.ctpsSerie ?? "");
+  const [ctpsUf, setCtpsUf] = useState(editando?.ctpsUf ?? "");
+  const [ctpsEmissao, setCtpsEmissao] = useState(editando?.ctpsEmissao ?? "");
   const [cnhCategoria, setCnhCategoria] = useState(editando?.cnhCategoria ?? "");
   const [cnhValidade, setCnhValidade] = useState(editando?.cnhValidade ?? "");
   const [cnhEmissao, setCnhEmissao] = useState(editando?.cnhEmissao ?? "");
   const [reservistaSerie, setReservistaSerie] = useState(editando?.reservistaSerie ?? "");
+  const [reservistaEmissao, setReservistaEmissao] = useState(editando?.reservistaEmissao ?? "");
   const [tamanhoCamisa, setTamanhoCamisa] = useState(editando?.tamanhoCamisa ?? "");
   const [tamanhoCalca, setTamanhoCalca] = useState(editando?.tamanhoCalca ?? "");
   const [tamanhoSapato, setTamanhoSapato] = useState(editando?.tamanhoSapato ?? "");
@@ -908,12 +949,24 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
       const payload = {
         nome: paraTitleCase(nome),
         cpf: cpf || null,
+        cpfEmissao: cpfEmissao || null,
+        rg: rg || null,
+        rgEmissao: rgEmissao || null,
         pis: pis || null,
+        pisEmissao: pisEmissao || null,
         dataNascimento: dataNascimento || null,
         cidadeNascimento: cidadeNascimento || null,
         ufNascimento: ufNascimento || null,
         nomePai: nomePai ? paraTitleCase(nomePai) : null,
         nomeMae: nomeMae ? paraTitleCase(nomeMae) : null,
+        nacionalidadePai: nacionalidadePai ? paraTitleCase(nacionalidadePai) : null,
+        nacionalidadeMae: nacionalidadeMae ? paraTitleCase(nacionalidadeMae) : null,
+        escolaridade: escolaridade || null,
+        deficiente: deficiente || null,
+        // Sem status "sim" selecionado, o tipo não faz sentido — evita ficar
+        // um texto órfão salvo se a pessoa preencheu o tipo e depois voltou o
+        // campo pra "Não" sem apagar o texto.
+        deficienciaTipo: deficiente === "sim" ? deficienciaTipo || null : null,
         telefone: telefone || null,
         sexo: sexo || null,
         emailPessoal: emailPessoal || null,
@@ -959,10 +1012,14 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
         tituloEleitorZona: tituloEleitorZona || null,
         tituloEleitorSecao: tituloEleitorSecao || null,
         tituloEleitorEmissao: tituloEleitorEmissao || null,
+        ctpsSerie: ctpsSerie || null,
+        ctpsUf: ctpsUf || null,
+        ctpsEmissao: ctpsEmissao || null,
         cnhCategoria: cnhCategoria || null,
         cnhValidade: cnhValidade || null,
         cnhEmissao: cnhEmissao || null,
         reservistaSerie: reservistaSerie || null,
+        reservistaEmissao: reservistaEmissao || null,
         tamanhoCamisa: tamanhoCamisa || null,
         tamanhoCalca: tamanhoCalca || null,
         tamanhoSapato: tamanhoSapato || null,
@@ -1273,6 +1330,51 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
 
       <div className="grid grid-cols-2 gap-2">
         <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          CPF · emissão
+          <input
+            type="date"
+            value={cpfEmissao}
+            onChange={(e) => setCpfEmissao(e.target.value)}
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          PIS · emissão
+          <input
+            type="date"
+            value={pisEmissao}
+            onChange={(e) => setPisEmissao(e.target.value)}
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          RG
+          <input
+            value={rg}
+            onChange={(e) => setRg(e.target.value)}
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          RG · emissão
+          <input
+            type="date"
+            value={rgEmissao}
+            onChange={(e) => setRgEmissao(e.target.value)}
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
           Nascimento
           <input
             type="date"
@@ -1346,6 +1448,31 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
 
       <div className="grid grid-cols-2 gap-2">
         <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Nacionalidade do pai
+          <input
+            value={nacionalidadePai}
+            onChange={(e) => setNacionalidadePai(e.target.value)}
+            onBlur={(e) => setNacionalidadePai(paraTitleCase(e.target.value))}
+            placeholder="ex.: Brasileira"
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Nacionalidade da mãe
+          <input
+            value={nacionalidadeMae}
+            onChange={(e) => setNacionalidadeMae(e.target.value)}
+            onBlur={(e) => setNacionalidadeMae(paraTitleCase(e.target.value))}
+            placeholder="ex.: Brasileira"
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
           Telefone
           <input
             value={telefone}
@@ -1367,6 +1494,50 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
           />
         </label>
       </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Escolaridade
+          <select
+            value={escolaridade}
+            onChange={(e) => setEscolaridade(e.target.value)}
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          >
+            <option value="">—</option>
+            {ESCOLARIDADE_OPCOES.map((opcao) => (
+              <option key={opcao} value={opcao}>
+                {opcao}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Deficiente
+          <select
+            value={deficiente}
+            onChange={(e) => setDeficiente(e.target.value as DeficienteStatus)}
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          >
+            <option value="">—</option>
+            <option value="nao">Não</option>
+            <option value="sim">Sim</option>
+          </select>
+        </label>
+      </div>
+
+      {deficiente === "sim" && (
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Tipo de deficiência
+          <input
+            value={deficienciaTipo}
+            onChange={(e) => setDeficienciaTipo(e.target.value)}
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+      )}
 
       <div className="grid grid-cols-3 gap-2">
         <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
@@ -1412,6 +1583,39 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
 
       <div className="grid grid-cols-3 gap-2">
         <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          CTPS · série
+          <input
+            value={ctpsSerie}
+            onChange={(e) => setCtpsSerie(e.target.value)}
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          CTPS · UF
+          <input
+            value={ctpsUf}
+            onChange={(e) => setCtpsUf(e.target.value.toUpperCase())}
+            placeholder="BA"
+            maxLength={2}
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          CTPS · emissão
+          <input
+            type="date"
+            value={ctpsEmissao}
+            onChange={(e) => setCtpsEmissao(e.target.value)}
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
           CNH · categoria
           <input
             value={cnhCategoria}
@@ -1449,6 +1653,16 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
           <input
             value={reservistaSerie}
             onChange={(e) => setReservistaSerie(e.target.value)}
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Reservista · emissão
+          <input
+            type="date"
+            value={reservistaEmissao}
+            onChange={(e) => setReservistaEmissao(e.target.value)}
             disabled={bloqueado}
             className={INPUT_CLASS}
           />
