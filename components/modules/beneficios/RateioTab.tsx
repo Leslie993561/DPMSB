@@ -113,6 +113,9 @@ export function RateioTab() {
   const [mesCalendario, setMesCalendario] = useState<number>(Number(competencia.slice(5, 7)));
   const [salvandoFeriado, setSalvandoFeriado] = useState<string | null>(null);
   const [colaboradorHover, setColaboradorHover] = useState<number | null>(null);
+  const [edicaoVtId, setEdicaoVtId] = useState<number | null>(null);
+  const [vtRascunho, setVtRascunho] = useState("");
+  const [salvandoVt, setSalvandoVt] = useState(false);
   const ajustouCompetenciaInicial = useRef(false);
 
   const recarregar = useCallback(async function recarregar() {
@@ -200,6 +203,33 @@ export function RateioTab() {
       await recarregar();
     } finally {
       setSalvandoFeriado(null);
+    }
+  }
+
+  function iniciarEdicaoVt(colaboradorId: number, valorAtual: number) {
+    setEdicaoVtId(colaboradorId);
+    setVtRascunho(String(valorAtual));
+  }
+
+  /** Corrige o VT/VM desta pessoa nesta competência — grava como override (mesma tabela da importação de planilha). */
+  async function salvarVt(colaboradorId: number) {
+    const valor = Number(vtRascunho.replace(",", "."));
+    if (!Number.isFinite(valor) || valor < 0) return;
+    setSalvandoVt(true);
+    try {
+      const r = await fetch("/api/beneficios/rateio", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ colaboradorId, competencia, valeTransporte: valor }),
+      });
+      if (!r.ok) {
+        window.alert((await r.json()).erro ?? "Não foi possível salvar.");
+        return;
+      }
+      setEdicaoVtId(null);
+      await recarregar();
+    } finally {
+      setSalvandoVt(false);
     }
   }
 
@@ -528,7 +558,53 @@ export function RateioTab() {
                     {/* Valor integral do vale: valor do dia × dias úteis do mês.
                         Sem abater os 6% do empregado — é o valor do benefício, e
                         é ele que fecha com a fatura da operadora. */}
-                    <div className="text-foreground">{formatarMoeda(l.valeTransporte)}</div>
+                    {edicaoVtId === l.colaboradorId ? (
+                      <div className="flex items-center justify-end gap-1">
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          value={vtRascunho}
+                          onChange={(e) => setVtRascunho(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && void salvarVt(l.colaboradorId)}
+                          autoFocus
+                          className="w-20 rounded border border-hairline bg-background px-1.5 py-0.5 text-right text-[11.5px] text-foreground outline-none focus:border-brand-primary"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => void salvarVt(l.colaboradorId)}
+                          disabled={salvandoVt}
+                          className="rounded px-1 py-0.5 text-[12px] text-status-success hover:bg-status-success-bg disabled:opacity-50"
+                          aria-label="Confirmar valor"
+                        >
+                          ✓
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEdicaoVtId(null)}
+                          className="rounded px-1 py-0.5 text-[12px] text-foreground-muted hover:bg-surface-page"
+                          aria-label="Cancelar edição"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-end gap-1">
+                        <div className="text-foreground">{formatarMoeda(l.valeTransporte)}</div>
+                        <button
+                          type="button"
+                          onClick={() => iniciarEdicaoVt(l.colaboradorId, l.valeTransporte)}
+                          disabled={mesesFechados.includes(Number(competencia.slice(5, 7)))}
+                          title="Editar valor de VT/VM"
+                          aria-label={`Editar VT de ${l.nome}`}
+                          className="rounded p-0.5 text-foreground-muted/50 hover:bg-surface-page hover:text-foreground disabled:opacity-30"
+                        >
+                          <svg viewBox="0 0 20 20" fill="currentColor" className="h-2.5 w-2.5" aria-hidden>
+                            <path d="M14.85 2.15a1.5 1.5 0 0 1 2.12 0l.88.88a1.5 1.5 0 0 1 0 2.12l-1.1 1.1-3-3 1.1-1.1Zm-2.16 2.16 3 3L6.94 16.06a1 1 0 0 1-.46.26l-3.1.83.83-3.1a1 1 0 0 1 .26-.46L12.7 4.3Z" />
+                          </svg>
+                        </button>
+                      </div>
+                    )}
                     <div className="text-[10.5px] text-foreground-muted">
                       {rotuloVale(l.tipoTransporte)} · {l.cidade ?? "—"}
                     </div>
