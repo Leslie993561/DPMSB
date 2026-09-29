@@ -1,6 +1,7 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
 import { getDb } from "./client";
+import { emailConfigurado, enviarEmail } from "@/lib/email";
 
 const DURACAO_HORAS = 2;
 
@@ -93,4 +94,46 @@ export async function marcarConviteUsado(id: number): Promise<void> {
     sql: "UPDATE convites_cadastro SET usado_em = ? WHERE id = ?",
     args: [new Date().toISOString(), id],
   });
+}
+
+function escaparHtml(texto: string): string {
+  return texto.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+}
+
+function emailConvite(para: string, link: string) {
+  return {
+    para,
+    assunto: "Complete seu cadastro — Portal Recursos Humanos MSB",
+    texto: `Olá!\n\nO RH da MSB gerou um link para você completar seu cadastro no Portal de Recursos Humanos.\n\nAcesse pelo link abaixo — válido por 2 horas e uso único:\n${link}\n\nRH · MSB`,
+    html: `<div style="font-family:Arial,sans-serif;font-size:14px;color:#1f2d3d;max-width:520px">
+  <p>Olá!</p>
+  <p>O RH da MSB gerou um link para você completar seu cadastro no Portal de Recursos Humanos.</p>
+  <p style="margin:24px 0"><a href="${escaparHtml(link)}" style="background:#56a4bb;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:bold">Completar cadastro</a></p>
+  <p style="font-size:12px;color:#6b7c8f">Link válido por 2 horas e uso único. Se o botão não abrir, copie este endereço no navegador:<br>${escaparHtml(link)}</p>
+  <p>RH · MSB</p>
+</div>`,
+  };
+}
+
+/** RH clica em "Enviar" ao lado do link gerado — é aqui que o e-mail de fato sai. */
+export async function enviarEmailConvite(
+  token: string,
+  origem: string,
+): Promise<{ emailEnviadoPara: string | null; erroEmail: string | null }> {
+  const convite = await buscarConvitePorToken(token);
+  if (!convite) return { emailEnviadoPara: null, erroEmail: "Convite não encontrado." };
+  if (!emailConfigurado()) {
+    return { emailEnviadoPara: null, erroEmail: "Envio automático de e-mail ainda não configurado no portal." };
+  }
+
+  const link = `${origem}/convite/${convite.token}`;
+  try {
+    await enviarEmail(emailConvite(convite.email, link));
+    return { emailEnviadoPara: convite.email, erroEmail: null };
+  } catch (erro) {
+    return {
+      emailEnviadoPara: null,
+      erroEmail: `Não foi possível enviar o e-mail (${erro instanceof Error ? erro.message : "erro desconhecido"}).`,
+    };
+  }
 }

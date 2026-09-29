@@ -555,7 +555,10 @@ function EnviarConviteBox({ colaboradorId }: { colaboradorId: number | null }) {
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [link, setLink] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [copiado, setCopiado] = useState(false);
+  const [enviandoEmail, setEnviandoEmail] = useState(false);
+  const [envio, setEnvio] = useState<{ para: string | null; erro: string | null } | null>(null);
 
   async function gerar() {
     setErro(null);
@@ -576,9 +579,26 @@ function EnviarConviteBox({ colaboradorId }: { colaboradorId: number | null }) {
         return;
       }
       setLink(data.link);
+      setToken(data.token);
       setCopiado(false);
+      setEnvio(null);
     } finally {
       setEnviando(false);
+    }
+  }
+
+  async function enviarPorEmail() {
+    if (!token) return;
+    setEnviandoEmail(true);
+    setEnvio(null);
+    try {
+      const res = await fetch(`/api/convites/${token}/enviar-email`, { method: "POST" });
+      const data = await res.json();
+      setEnvio({ para: data.emailEnviadoPara ?? null, erro: data.erroEmail ?? null });
+    } catch {
+      setEnvio({ para: null, erro: "Não foi possível enviar o e-mail agora." });
+    } finally {
+      setEnviandoEmail(false);
     }
   }
 
@@ -611,13 +631,33 @@ function EnviarConviteBox({ colaboradorId }: { colaboradorId: number | null }) {
               {copiado ? "Copiado!" : "Copiar"}
             </button>
           </div>
-          <button
-            type="button"
-            onClick={() => setLink(null)}
-            className="self-start text-[10.5px] text-foreground-muted underline"
-          >
-            Gerar outro link
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void enviarPorEmail()}
+              disabled={enviandoEmail}
+              className="self-start text-[10.5px] font-medium text-brand-primary-800 underline disabled:opacity-50"
+            >
+              {enviandoEmail ? "Enviando..." : "Enviar por e-mail"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setLink(null);
+                setToken(null);
+                setEnvio(null);
+              }}
+              className="self-start text-[10.5px] text-foreground-muted underline"
+            >
+              Gerar outro link
+            </button>
+          </div>
+          {envio?.para && (
+            <p className="text-[10.5px] text-status-success">✓ E-mail enviado para {envio.para}.</p>
+          )}
+          {envio?.erro && (
+            <p className="text-[10.5px] text-status-danger">{envio.erro}</p>
+          )}
         </div>
       ) : (
         <div className="flex items-center gap-1.5">

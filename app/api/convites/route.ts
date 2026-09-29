@@ -37,5 +37,5 @@ export async function POST(request: Request) {
   const url = new URL(request.url);
   const link = `${url.protocol}//${url.host}/convite/${convite.token}`;
 
-  return Response.json({ link, expiraEm: convite.expiraEm }, { status: 201 });
+  return Response.json({ link, token: convite.token, expiraEm: convite.expiraEm }, { status: 201 });
 }
