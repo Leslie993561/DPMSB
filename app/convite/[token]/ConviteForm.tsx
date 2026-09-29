@@ -27,6 +27,22 @@ const DEPENDENTE_VAZIO: DependenteForm = {
   certidaoDataEmissao: "",
 };
 
+/** Duplicado do mesmo array em ColaboradorForm.tsx — lib/db/colaboradores.ts é server-only, então o valor não pode ser importado num client component. */
+const ESCOLARIDADE_OPCOES = [
+  "Ensino Fundamental Incompleto",
+  "Ensino Fundamental Completo",
+  "Ensino Médio Incompleto",
+  "Ensino Médio Completo",
+  "Ensino Médio Técnico Incompleto",
+  "Ensino Médio Técnico Completo",
+  "Ensino Superior Incompleto",
+  "Ensino Superior Completo",
+  "Pós-Graduação / Especialização",
+  "Mestrado",
+  "Doutorado",
+  "Pós-Doutorado",
+];
+
 interface DadosPessoais {
   cpf: string | null;
   pis: string | null;
@@ -51,14 +67,27 @@ interface DadosPessoais {
   conjugeCpf: string | null;
   conjugeNascimento: string | null;
   conjugeSexo: "M" | "F" | null;
+  rg: string | null;
+  rgEmissao: string | null;
+  cpfEmissao: string | null;
+  pisEmissao: string | null;
   tituloEleitor: string | null;
   tituloEleitorZona: string | null;
   tituloEleitorSecao: string | null;
   tituloEleitorEmissao: string | null;
+  ctpsSerie: string | null;
+  ctpsUf: string | null;
+  ctpsEmissao: string | null;
   cnhCategoria: string | null;
   cnhValidade: string | null;
   cnhEmissao: string | null;
   reservistaSerie: string | null;
+  reservistaEmissao: string | null;
+  deficiente: "sim" | "nao" | null;
+  deficienciaTipo: string | null;
+  nacionalidadePai: string | null;
+  nacionalidadeMae: string | null;
+  escolaridade: string | null;
   tamanhoCamisa: string | null;
   tamanhoCalca: string | null;
   tamanhoSapato: string | null;
@@ -123,14 +152,27 @@ export function ConviteForm({ token }: { token: string }) {
   const [conjugeCpf, setConjugeCpf] = useState("");
   const [conjugeNascimento, setConjugeNascimento] = useState("");
   const [conjugeSexo, setConjugeSexo] = useState<"M" | "F" | "">("");
+  const [rg, setRg] = useState("");
+  const [rgEmissao, setRgEmissao] = useState("");
+  const [cpfEmissao, setCpfEmissao] = useState("");
+  const [pisEmissao, setPisEmissao] = useState("");
   const [tituloEleitor, setTituloEleitor] = useState("");
   const [tituloEleitorZona, setTituloEleitorZona] = useState("");
   const [tituloEleitorSecao, setTituloEleitorSecao] = useState("");
   const [tituloEleitorEmissao, setTituloEleitorEmissao] = useState("");
+  const [ctpsSerie, setCtpsSerie] = useState("");
+  const [ctpsUf, setCtpsUf] = useState("");
+  const [ctpsEmissao, setCtpsEmissao] = useState("");
   const [cnhCategoria, setCnhCategoria] = useState("");
   const [cnhValidade, setCnhValidade] = useState("");
   const [cnhEmissao, setCnhEmissao] = useState("");
   const [reservistaSerie, setReservistaSerie] = useState("");
+  const [reservistaEmissao, setReservistaEmissao] = useState("");
+  const [deficiente, setDeficiente] = useState<"sim" | "nao" | "">("");
+  const [deficienciaTipo, setDeficienciaTipo] = useState("");
+  const [nacionalidadePai, setNacionalidadePai] = useState("");
+  const [nacionalidadeMae, setNacionalidadeMae] = useState("");
+  const [escolaridade, setEscolaridade] = useState("");
   const [tamanhoCamisa, setTamanhoCamisa] = useState("");
   const [tamanhoCalca, setTamanhoCalca] = useState("");
   const [tamanhoSapato, setTamanhoSapato] = useState("");
@@ -171,14 +213,27 @@ export function ConviteForm({ token }: { token: string }) {
         setConjugeCpf(d.conjugeCpf ?? "");
         setConjugeNascimento(d.conjugeNascimento ?? "");
         setConjugeSexo(d.conjugeSexo ?? "");
+        setRg(d.rg ?? "");
+        setRgEmissao(d.rgEmissao ?? "");
+        setCpfEmissao(d.cpfEmissao ?? "");
+        setPisEmissao(d.pisEmissao ?? "");
         setTituloEleitor(d.tituloEleitor ?? "");
         setTituloEleitorZona(d.tituloEleitorZona ?? "");
         setTituloEleitorSecao(d.tituloEleitorSecao ?? "");
         setTituloEleitorEmissao(d.tituloEleitorEmissao ?? "");
+        setCtpsSerie(d.ctpsSerie ?? "");
+        setCtpsUf(d.ctpsUf ?? "");
+        setCtpsEmissao(d.ctpsEmissao ?? "");
         setCnhCategoria(d.cnhCategoria ?? "");
         setCnhValidade(d.cnhValidade ?? "");
         setCnhEmissao(d.cnhEmissao ?? "");
         setReservistaSerie(d.reservistaSerie ?? "");
+        setReservistaEmissao(d.reservistaEmissao ?? "");
+        setDeficiente(d.deficiente ?? "");
+        setDeficienciaTipo(d.deficienciaTipo ?? "");
+        setNacionalidadePai(d.nacionalidadePai ?? "");
+        setNacionalidadeMae(d.nacionalidadeMae ?? "");
+        setEscolaridade(d.escolaridade ?? "");
         setTamanhoCamisa(d.tamanhoCamisa ?? "");
         setTamanhoCalca(d.tamanhoCalca ?? "");
         setTamanhoSapato(d.tamanhoSapato ?? "");
@@ -221,14 +276,27 @@ export function ConviteForm({ token }: { token: string }) {
         conjugeCpf: conjugeCpf || null,
         conjugeNascimento: conjugeNascimento || null,
         conjugeSexo: conjugeSexo || null,
+        rg: rg || null,
+        rgEmissao: rgEmissao || null,
+        cpfEmissao: cpfEmissao || null,
+        pisEmissao: pisEmissao || null,
         tituloEleitor: tituloEleitor || null,
         tituloEleitorZona: tituloEleitorZona || null,
         tituloEleitorSecao: tituloEleitorSecao || null,
         tituloEleitorEmissao: tituloEleitorEmissao || null,
+        ctpsSerie: ctpsSerie || null,
+        ctpsUf: ctpsUf || null,
+        ctpsEmissao: ctpsEmissao || null,
         cnhCategoria: cnhCategoria || null,
         cnhValidade: cnhValidade || null,
         cnhEmissao: cnhEmissao || null,
         reservistaSerie: reservistaSerie || null,
+        reservistaEmissao: reservistaEmissao || null,
+        deficiente: deficiente || null,
+        deficienciaTipo: deficiente === "sim" ? deficienciaTipo || null : null,
+        nacionalidadePai: nacionalidadePai || null,
+        nacionalidadeMae: nacionalidadeMae || null,
+        escolaridade: escolaridade || null,
         tamanhoCamisa: tamanhoCamisa || null,
         tamanhoCalca: tamanhoCalca || null,
         tamanhoSapato: tamanhoSapato || null,
@@ -333,11 +401,45 @@ export function ConviteForm({ token }: { token: string }) {
         <Campo label="UF de nascimento" value={ufNascimento} onChange={setUfNascimento} />
         <Campo label="Nome do pai" value={nomePai} onChange={setNomePai} />
         <Campo label="Nome da mãe" value={nomeMae} onChange={setNomeMae} />
+        <Campo label="Nacionalidade do pai" value={nacionalidadePai} onChange={setNacionalidadePai} />
+        <Campo label="Nacionalidade da mãe" value={nacionalidadeMae} onChange={setNacionalidadeMae} />
         <Campo label="Telefone" value={telefone} onChange={setTelefone} />
         <Campo label="E-mail pessoal" value={emailPessoal} onChange={setEmailPessoal} tipo="email" />
+        <label className="flex flex-col gap-1">
+          <span className="text-[10.5px] font-medium text-foreground-muted">Escolaridade</span>
+          <select value={escolaridade} onChange={(e) => setEscolaridade(e.target.value)} className={INPUT_CLASS}>
+            <option value="">—</option>
+            {ESCOLARIDADE_OPCOES.map((opcao) => (
+              <option key={opcao} value={opcao}>
+                {opcao}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-[10.5px] font-medium text-foreground-muted">Deficiente</span>
+          <select
+            value={deficiente}
+            onChange={(e) => setDeficiente(e.target.value as "sim" | "nao" | "")}
+            className={INPUT_CLASS}
+          >
+            <option value="">—</option>
+            <option value="nao">Não</option>
+            <option value="sim">Sim</option>
+          </select>
+        </label>
+        {deficiente === "sim" && (
+          <Campo label="Tipo de deficiência" value={deficienciaTipo} onChange={setDeficienciaTipo} />
+        )}
       </div>
 
       <Secao titulo="Documentos" />
+      <div className="grid grid-cols-2 gap-2.5">
+        <Campo label="RG" value={rg} onChange={setRg} />
+        <Campo label="RG · emissão" value={rgEmissao} onChange={setRgEmissao} tipo="date" />
+        <Campo label="CPF · emissão" value={cpfEmissao} onChange={setCpfEmissao} tipo="date" />
+        <Campo label="PIS · emissão" value={pisEmissao} onChange={setPisEmissao} tipo="date" />
+      </div>
       <div className="grid grid-cols-3 gap-2.5">
         <Campo label="Título de eleitor" value={tituloEleitor} onChange={setTituloEleitor} />
         <Campo label="Zona" value={tituloEleitorZona} onChange={setTituloEleitorZona} />
@@ -347,12 +449,18 @@ export function ConviteForm({ token }: { token: string }) {
         <Campo label="Emissão do título" value={tituloEleitorEmissao} onChange={setTituloEleitorEmissao} tipo="date" />
       </div>
       <div className="grid grid-cols-3 gap-2.5">
+        <Campo label="CTPS · série" value={ctpsSerie} onChange={setCtpsSerie} />
+        <Campo label="CTPS · UF" value={ctpsUf} onChange={(v) => setCtpsUf(v.toUpperCase())} />
+        <Campo label="CTPS · emissão" value={ctpsEmissao} onChange={setCtpsEmissao} tipo="date" />
+      </div>
+      <div className="grid grid-cols-3 gap-2.5">
         <Campo label="CNH · categoria" value={cnhCategoria} onChange={(v) => setCnhCategoria(v.toUpperCase())} />
         <Campo label="CNH · validade" value={cnhValidade} onChange={setCnhValidade} tipo="date" />
         <Campo label="CNH · emissão" value={cnhEmissao} onChange={setCnhEmissao} tipo="date" />
       </div>
       <div className="grid grid-cols-2 gap-2.5">
         <Campo label="Reservista · série" value={reservistaSerie} onChange={setReservistaSerie} />
+        <Campo label="Reservista · emissão" value={reservistaEmissao} onChange={setReservistaEmissao} tipo="date" />
       </div>
 
       <Secao titulo="Uniforme" />
