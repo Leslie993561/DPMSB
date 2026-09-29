@@ -218,6 +218,9 @@ export function EndomarketingDashboardClient({
         : [{ ...ITEM_VAZIO }],
     );
     setErro(null);
+    // Clicou num dia já marcado no Calendário: pula pra aba de Lançamentos,
+    // que é onde mora o formulário, já preenchido com a ação inteira.
+    if (aba !== "lancamentos") router.push("/dho/endomarketing?aba=lancamentos");
   }
 
   function atualizarItem(idx: number, campo: keyof ItemForm, valor: string) {
@@ -432,6 +435,7 @@ export function EndomarketingDashboardClient({
                   datasComemorativasPorDia={datasComemorativasPorDia}
                   diaSelecionado={formData}
                   onSelecionarDia={(dia) => iniciarNovaAcao(dia)}
+                  onEditarAcao={iniciarEdicaoAcao}
                 />
               ))}
             </div>
@@ -667,6 +671,7 @@ function MesCalendario({
   datasComemorativasPorDia,
   diaSelecionado,
   onSelecionarDia,
+  onEditarAcao,
 }: {
   ano: number;
   mes: number;
@@ -676,6 +681,8 @@ function MesCalendario({
   datasComemorativasPorDia: Map<string, DataComemorativa[]>;
   diaSelecionado: string | null;
   onSelecionarDia: (dia: string) => void;
+  /** Dia já tem ação(ões): clicar abre para EDITAR (formulário preenchido) em vez de abrir um lançamento novo em branco. */
+  onEditarAcao: (evento: EventoCalendario) => void;
 }) {
   const semanas = gradeDoMes(ano, mes);
   const hoje = new Date().toISOString().slice(0, 10);
@@ -730,7 +737,7 @@ function MesCalendario({
                 <button
                   key={j}
                   type="button"
-                  onClick={() => onSelecionarDia(dia)}
+                  onClick={() => (acoesDoDia.length > 0 ? onEditarAcao(acoesDoDia[0]) : onSelecionarDia(dia))}
                   className={cn(
                     "group relative flex h-6 items-center justify-center text-[9.5px] transition-colors",
                     radius,
