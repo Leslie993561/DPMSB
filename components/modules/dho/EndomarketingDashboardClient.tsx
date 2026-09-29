@@ -289,6 +289,10 @@ export function EndomarketingDashboardClient({
 
   const totalItensForm = formItens.reduce((s, i) => s + (Number(i.quantidade) || 0) * (Number(i.valorUnitario) || 0), 0);
 
+  const totalAprovado = orcamento.reduce((s, l) => s + l.aprovado, 0);
+  const totalUtilizado = orcamento.reduce((s, l) => s + l.utilizado, 0);
+  const totalGap = totalAprovado - totalUtilizado;
+
   const seletorAno = (
     <div className="flex items-center gap-1.5">
       <button
@@ -459,13 +463,23 @@ export function EndomarketingDashboardClient({
                     <CampoAprovado valor={l.aprovado} onSalvar={(v) => salvarAprovado(l.mes, v)} />
                   </td>
                   <td className="px-3 py-2 text-foreground-muted">{formatarMoeda(l.utilizado)}</td>
-                  <td className={cn("px-3 py-2 font-medium", l.gap < 0 ? "text-status-danger" : "text-foreground-muted")}>
-                    {formatarMoeda(l.gap)}
-                  </td>
-                  <td className="px-3 py-2 text-status-success">{formatarMoeda(l.saving)}</td>
+                  {/* Gap (estourou o aprovado) e Saving (sobrou) nunca coexistem no mesmo
+                      mês — é o mesmo número com sinal trocado, então só uma das duas
+                      colunas mostra valor por vez; a outra fica em traço. */}
+                  <td className="px-3 py-2 font-medium text-status-danger">{l.gap < 0 ? formatarMoeda(l.gap) : "—"}</td>
+                  <td className="px-3 py-2 text-status-success">{l.gap > 0 ? formatarMoeda(l.saving) : "—"}</td>
                 </tr>
               ))}
             </tbody>
+            <tfoot>
+              <tr className="border-t border-hairline bg-surface-page font-semibold">
+                <td className="px-3 py-2 text-foreground">Total</td>
+                <td className="px-3 py-2 text-foreground">{formatarMoeda(totalAprovado)}</td>
+                <td className="px-3 py-2 text-foreground">{formatarMoeda(totalUtilizado)}</td>
+                <td className="px-3 py-2 text-status-danger">{totalGap < 0 ? formatarMoeda(totalGap) : "—"}</td>
+                <td className="px-3 py-2 text-status-success">{totalGap > 0 ? formatarMoeda(totalGap) : "—"}</td>
+              </tr>
+            </tfoot>
           </table>
         </Card>
       )}
