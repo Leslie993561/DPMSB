@@ -161,6 +161,18 @@ export async function criarDataComemorativa(dados: { data: string; nome: string;
   return (resultado.rows as unknown as LinhaDataComemorativa[])[0];
 }
 
+export async function atualizarDataComemorativa(
+  id: number,
+  dados: { data: string; nome: string; categoria: CategoriaDataComemorativa },
+): Promise<DataComemorativa> {
+  const db = await getDb();
+  const resultado = await db.execute({
+    sql: "UPDATE dho_datas_comemorativas SET data = ?, nome = ?, categoria = ? WHERE id = ? RETURNING id, data, nome, categoria",
+    args: [dados.data, dados.nome, dados.categoria, id],
+  });
+  return (resultado.rows as unknown as LinhaDataComemorativa[])[0];
+}
+
 export async function excluirDataComemorativa(id: number): Promise<void> {
   const db = await getDb();
   await db.execute({ sql: "DELETE FROM dho_datas_comemorativas WHERE id = ?", args: [id] });

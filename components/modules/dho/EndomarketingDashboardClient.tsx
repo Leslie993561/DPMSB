@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/shared/Card";
+import { Modal } from "@/components/shared/Modal";
 import { formatarDataBr, formatarMoeda } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import type { CategoriaDataComemorativa, DataComemorativa, EventoCalendario, LinhaOrcamentoMes } from "@/lib/db/dho";
@@ -88,6 +89,14 @@ export function EndomarketingDashboardClient({
   const [novaDataCategoria, setNovaDataCategoria] = useState<CategoriaDataComemorativa>("nacional");
   const [salvandoData, setSalvandoData] = useState(false);
 
+  // Edição rápida a partir do clique no dia do Calendário — não navega de aba,
+  // abre um modal ali mesmo (ação ou data comemorativa, o que estiver marcado).
+  const [modalAcaoAberto, setModalAcaoAberto] = useState(false);
+  const [feriadoEditando, setFeriadoEditando] = useState<DataComemorativa | null>(null);
+  const [feriadoNomeRascunho, setFeriadoNomeRascunho] = useState("");
+  const [feriadoCategoriaRascunho, setFeriadoCategoriaRascunho] = useState<CategoriaDataComemorativa>("nacional");
+  const [salvandoFeriadoModal, setSalvandoFeriadoModal] = useState(false);
+
   const [editandoId, setEditandoId] = useState<number | null>(null);
   const [formData, setFormData] = useState("");
   const [formDataFim, setFormDataFim] = useState("");
@@ -139,11 +148,6 @@ export function EndomarketingDashboardClient({
     }
     return mapa;
   }, [datasComemorativas]);
-
-  const datasComemorativasOrdenadas = useMemo(
-    () => [...datasComemorativas].sort((a, b) => a.data.localeCompare(b.data)),
-    [datasComemorativas],
-  );
 
   async function carregarAno(novoAno: number) {
     setAno(novoAno);
@@ -218,19 +222,73 @@ export function EndomarketingDashboardClient({
         : [{ ...ITEM_VAZIO }],
     );
     setErro(null);
-    // Clicou num dia já marcado no Calendário: pula pra aba de Lançamentos,
-    // que é onde mora o formulário, já preenchido com a ação inteira.
-    if (aba !== "lancamentos") router.push("/dho/endomarketing?aba=lancamentos");
+  }
+
+  /** Clicou num dia do Calendário que já tem ação: abre um modal ali mesmo, já preenchido pra editar — sem trocar de aba. */
+  function abrirModalAcao(evento: EventoCalendario) {
+    iniciarEdicaoAcao(evento);
+    setModalAcaoAberto(true);
+  }
+
+  function fecharModalAcao() {
+    setModalAcaoAberto(false);
+    limparForm();
+  }
+
+  async function excluirAcaoNoModal() {
+    if (editandoId === null) return;
+    await excluirAcao(editandoId);
+    fecharModalAcao();
+  }
+
+  /** Clicou num dia do Calendário que já tem data comemorativa: mesma ideia, num modal simples (só nome e categoria). */
+  function abrirModalFeriado(d: DataComemorativa) {
+    setFeriadoEditando(d);
+    setFeriadoNomeRascunho(d.nome);
+    setFeriadoCategoriaRascunho(d.categoria);
+  }
+
+  function fecharModalFeriado() {
+    setFeriadoEditando(null);
+  }
+
+  async function salvarEdicaoFeriado() {
+    if (!feriadoEditando || !feriadoNomeRascunho.trim()) return;
+    setSalvandoFeriadoModal(true);
+    try {
+      const res = await fetch(`/api/dho/datas-comemorativas/${feriadoEditando.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          data: feriadoEditando.data,
+          nome: feriadoNomeRascunho.trim(),
+          categoria: feriadoCategoriaRascunho,
+        }),
+      });
+      const dados = await res.json();
+      if (res.ok) {
+        setDatasComemorativas((atual) => atual.map((d) => (d.id === feriadoEditando.id ? dados.item : d)));
+        fecharModalFeriado();
+      }
+    } finally {
+      setSalvandoFeriadoModal(false);
+    }
+  }
+
+  async function excluirFeriadoNoModal() {
+    if (!feriadoEditando) return;
+    await excluirDataComemorativa(feriadoEditando.id);
+    fecharModalFeriado();
   }
 
   function atualizarItem(idx: number, campo: keyof ItemForm, valor: string) {
     setFormItens((atual) => atual.map((it, i) => (i === idx ? { ...it, [campo]: valor } : it)));
   }
 
-  async function salvarAcao() {
+  async function salvarAcao(): Promise<boolean> {
     if (!formData || !formTitulo.trim()) {
       setErro("Preencha ao menos a data de início e o título.");
-      return;
+      return false;
     }
     const itensValidos = formItens.filter((i) => i.nome.trim());
     const corpo = {
@@ -266,8 +324,10 @@ export function EndomarketingDashboardClient({
       const resOrcamento = await fetch(`/api/dho/orcamento?ano=${ano}`);
       setOrcamento((await resOrcamento.json()).meses ?? []);
       limparForm();
+      return true;
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Falha ao salvar.");
+      return false;
     } finally {
       setSalvando(false);
     }
@@ -291,6 +351,128 @@ export function EndomarketingDashboardClient({
   }
 
   const totalItensForm = formItens.reduce((s, i) => s + (Number(i.quantidade) || 0) * (Number(i.valorUnitario) || 0), 0);
+
+  // Campos do formulário de ação — usados tanto no card fixo da aba
+  // Lançamentos mensais quanto no modal de edição rápida do Calendário, pra
+  // não duplicar (e não desalinhar) o mesmo formulário em dois lugares.
+  const camposFormularioAcao = (
+    <>
+      {erro && <p className="mb-2 text-[11.5px] text-status-danger">{erro}</p>}
+
+      <div className="grid grid-cols-2 gap-2">
+        <label className="block">
+          <span className="mb-0.5 block text-[10.5px] font-medium text-foreground-muted">Data início</span>
+          <input
+            type="date"
+            value={formData}
+            onChange={(e) => setFormData(e.target.value)}
+            className="w-full rounded-md border border-hairline bg-background px-2 py-1.5 text-[12px] text-foreground"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-0.5 block text-[10.5px] font-medium text-foreground-muted">Data fim</span>
+          <input
+            type="date"
+            value={formDataFim}
+            onChange={(e) => setFormDataFim(e.target.value)}
+            className="w-full rounded-md border border-hairline bg-background px-2 py-1.5 text-[12px] text-foreground"
+          />
+        </label>
+      </div>
+
+      <label className="mt-2 block">
+        <span className="mb-0.5 block text-[10.5px] font-medium text-foreground-muted">Tema / título</span>
+        <input
+          value={formTitulo}
+          onChange={(e) => setFormTitulo(e.target.value)}
+          placeholder="Ex.: Dia das Mães"
+          className="w-full rounded-md border border-hairline bg-background px-2.5 py-1.5 text-[12px] text-foreground"
+        />
+      </label>
+
+      <label className="mt-2 block">
+        <span className="mb-0.5 block text-[10.5px] font-medium text-foreground-muted">Objetivo</span>
+        <input
+          value={formObjetivo}
+          onChange={(e) => setFormObjetivo(e.target.value)}
+          className="w-full rounded-md border border-hairline bg-background px-2.5 py-1.5 text-[12px] text-foreground"
+        />
+      </label>
+
+      <label className="mt-2 block">
+        <span className="mb-0.5 block text-[10.5px] font-medium text-foreground-muted">Público-alvo</span>
+        <input
+          value={formPublicoAlvo}
+          onChange={(e) => setFormPublicoAlvo(e.target.value)}
+          className="w-full rounded-md border border-hairline bg-background px-2.5 py-1.5 text-[12px] text-foreground"
+        />
+      </label>
+
+      <label className="mt-2 block">
+        <span className="mb-0.5 block text-[10.5px] font-medium text-foreground-muted">Descrição</span>
+        <textarea
+          value={formDescricao}
+          onChange={(e) => setFormDescricao(e.target.value)}
+          rows={2}
+          className="w-full rounded-md border border-hairline bg-background px-2.5 py-1.5 text-[12px] text-foreground"
+        />
+      </label>
+
+      <div className="mt-3">
+        <div className="mb-1 grid grid-cols-[1fr_50px_70px_70px] gap-1.5 text-[10px] font-semibold text-foreground-muted uppercase">
+          <span>Item</span>
+          <span>Qtd</span>
+          <span>Val. unid.</span>
+          <span>Total</span>
+        </div>
+        <div className="space-y-1.5">
+          {formItens.map((item, idx) => (
+            <div key={idx} className="grid grid-cols-[1fr_50px_70px_70px_18px] items-center gap-1.5">
+              <input
+                value={item.nome}
+                onChange={(e) => atualizarItem(idx, "nome", e.target.value)}
+                placeholder="Nome"
+                className="rounded border border-hairline bg-background px-1.5 py-1 text-[11.5px] text-foreground"
+              />
+              <input
+                type="number"
+                min={1}
+                value={item.quantidade}
+                onChange={(e) => atualizarItem(idx, "quantidade", e.target.value)}
+                className="rounded border border-hairline bg-background px-1.5 py-1 text-[11.5px] text-foreground"
+              />
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={item.valorUnitario}
+                onChange={(e) => atualizarItem(idx, "valorUnitario", e.target.value)}
+                className="rounded border border-hairline bg-background px-1.5 py-1 text-[11.5px] text-foreground"
+              />
+              <span className="truncate text-[11px] text-foreground-muted">
+                {formatarMoeda((Number(item.quantidade) || 0) * (Number(item.valorUnitario) || 0))}
+              </span>
+              <button
+                type="button"
+                onClick={() => setFormItens((atual) => atual.filter((_, i) => i !== idx))}
+                className="text-[11px] text-status-danger hover:opacity-70"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => setFormItens((atual) => [...atual, { ...ITEM_VAZIO }])}
+          className="mt-1.5 text-[11px] font-medium text-brand-primary hover:text-brand-primary-hover"
+        >
+          + Adicionar item
+        </button>
+        <p className="mt-1.5 text-right text-[11.5px] font-semibold text-foreground">Total: {formatarMoeda(totalItensForm)}</p>
+      </div>
+    </>
+  );
 
   const totalAprovado = orcamento.reduce((s, l) => s + l.aprovado, 0);
   const totalUtilizado = orcamento.reduce((s, l) => s + l.utilizado, 0);
@@ -398,28 +580,6 @@ export function EndomarketingDashboardClient({
               </span>
             </div>
 
-            {datasComemorativasOrdenadas.length > 0 && (
-              <div className="mt-3 flex max-h-40 flex-col divide-y divide-hairline/70 overflow-y-auto rounded-md border border-hairline">
-                {datasComemorativasOrdenadas.map((d) => {
-                  const cor = CATEGORIAS_DATA.find((c) => c.id === d.categoria);
-                  return (
-                    <div key={d.id} className="flex items-center gap-2 px-2.5 py-1.5 text-[11.5px]">
-                      <span aria-hidden className={cn("h-1.5 w-1.5 shrink-0 rounded-full", cor?.dot)} />
-                      <span className="w-20 shrink-0 text-foreground-muted">{formatarDataBr(d.data)}</span>
-                      <span className="min-w-0 flex-1 truncate text-foreground">{d.nome}</span>
-                      <button
-                        type="button"
-                        onClick={() => excluirDataComemorativa(d.id)}
-                        aria-label={`Excluir ${d.nome}`}
-                        className="shrink-0 rounded px-1 text-foreground-muted hover:bg-status-danger-bg hover:text-status-danger"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
           </Card>
 
           <Card className="p-3">
@@ -435,13 +595,112 @@ export function EndomarketingDashboardClient({
                   datasComemorativasPorDia={datasComemorativasPorDia}
                   diaSelecionado={formData}
                   onSelecionarDia={(dia) => iniciarNovaAcao(dia)}
-                  onEditarAcao={iniciarEdicaoAcao}
+                  onEditarAcao={abrirModalAcao}
+                  onEditarFeriado={abrirModalFeriado}
                 />
               ))}
             </div>
           </Card>
         </div>
       )}
+
+      <Modal
+        aberto={modalAcaoAberto}
+        onFechar={fecharModalAcao}
+        titulo="Editar ação"
+        eyebrow="Calendário"
+        rodape={
+          <>
+            <button
+              type="button"
+              onClick={fecharModalAcao}
+              className="rounded-md border border-hairline px-3 py-1.5 text-[12px] font-medium text-foreground hover:bg-surface-page"
+            >
+              Fechar
+            </button>
+            <button
+              type="button"
+              onClick={excluirAcaoNoModal}
+              className="text-[12px] font-medium text-status-danger hover:opacity-70"
+            >
+              Excluir ação
+            </button>
+            <button
+              type="button"
+              disabled={salvando}
+              onClick={async () => {
+                if (await salvarAcao()) setModalAcaoAberto(false);
+              }}
+              className="ml-auto rounded-md bg-brand-primary px-3 py-1.5 text-[12px] font-medium text-brand-white hover:bg-brand-primary-hover disabled:opacity-50"
+            >
+              {salvando ? "Salvando..." : "Salvar alterações"}
+            </button>
+          </>
+        }
+      >
+        {camposFormularioAcao}
+      </Modal>
+
+      <Modal
+        aberto={feriadoEditando !== null}
+        onFechar={fecharModalFeriado}
+        titulo="Editar data comemorativa"
+        eyebrow="Calendário"
+        rodape={
+          <>
+            <button
+              type="button"
+              onClick={fecharModalFeriado}
+              className="rounded-md border border-hairline px-3 py-1.5 text-[12px] font-medium text-foreground hover:bg-surface-page"
+            >
+              Fechar
+            </button>
+            <button
+              type="button"
+              onClick={excluirFeriadoNoModal}
+              className="text-[12px] font-medium text-status-danger hover:opacity-70"
+            >
+              Excluir
+            </button>
+            <button
+              type="button"
+              disabled={salvandoFeriadoModal || !feriadoNomeRascunho.trim()}
+              onClick={salvarEdicaoFeriado}
+              className="ml-auto rounded-md bg-brand-primary px-3 py-1.5 text-[12px] font-medium text-brand-white hover:bg-brand-primary-hover disabled:opacity-50"
+            >
+              {salvandoFeriadoModal ? "Salvando..." : "Salvar alterações"}
+            </button>
+          </>
+        }
+      >
+        {feriadoEditando && (
+          <div className="space-y-2.5">
+            <p className="text-[11.5px] text-foreground-muted">{formatarDataBr(feriadoEditando.data)}</p>
+            <label className="block">
+              <span className="mb-0.5 block text-[10.5px] font-medium text-foreground-muted">Nome do evento</span>
+              <input
+                value={feriadoNomeRascunho}
+                onChange={(e) => setFeriadoNomeRascunho(e.target.value)}
+                className="w-full rounded-md border border-hairline bg-background px-2.5 py-1.5 text-[12px] text-foreground"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-0.5 block text-[10.5px] font-medium text-foreground-muted">Categoria</span>
+              <select
+                value={feriadoCategoriaRascunho}
+                onChange={(e) => setFeriadoCategoriaRascunho(e.target.value as CategoriaDataComemorativa)}
+                className="w-full rounded-md border border-hairline bg-background px-2 py-1.5 text-[12px] text-foreground"
+              >
+                {CATEGORIAS_DATA.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        )}
+      </Modal>
 
       {aba === "orcamento" && (
         <Card className="overflow-hidden">
@@ -502,120 +761,7 @@ export function EndomarketingDashboardClient({
               )}
             </div>
 
-            {erro && <p className="mb-2 text-[11.5px] text-status-danger">{erro}</p>}
-
-            <div className="grid grid-cols-2 gap-2">
-              <label className="block">
-                <span className="mb-0.5 block text-[10.5px] font-medium text-foreground-muted">Data início</span>
-                <input
-                  type="date"
-                  value={formData}
-                  onChange={(e) => setFormData(e.target.value)}
-                  className="w-full rounded-md border border-hairline bg-background px-2 py-1.5 text-[12px] text-foreground"
-                />
-              </label>
-              <label className="block">
-                <span className="mb-0.5 block text-[10.5px] font-medium text-foreground-muted">Data fim</span>
-                <input
-                  type="date"
-                  value={formDataFim}
-                  onChange={(e) => setFormDataFim(e.target.value)}
-                  className="w-full rounded-md border border-hairline bg-background px-2 py-1.5 text-[12px] text-foreground"
-                />
-              </label>
-            </div>
-
-            <label className="mt-2 block">
-              <span className="mb-0.5 block text-[10.5px] font-medium text-foreground-muted">Tema / título</span>
-              <input
-                value={formTitulo}
-                onChange={(e) => setFormTitulo(e.target.value)}
-                placeholder="Ex.: Dia das Mães"
-                className="w-full rounded-md border border-hairline bg-background px-2.5 py-1.5 text-[12px] text-foreground"
-              />
-            </label>
-
-            <label className="mt-2 block">
-              <span className="mb-0.5 block text-[10.5px] font-medium text-foreground-muted">Objetivo</span>
-              <input
-                value={formObjetivo}
-                onChange={(e) => setFormObjetivo(e.target.value)}
-                className="w-full rounded-md border border-hairline bg-background px-2.5 py-1.5 text-[12px] text-foreground"
-              />
-            </label>
-
-            <label className="mt-2 block">
-              <span className="mb-0.5 block text-[10.5px] font-medium text-foreground-muted">Público-alvo</span>
-              <input
-                value={formPublicoAlvo}
-                onChange={(e) => setFormPublicoAlvo(e.target.value)}
-                className="w-full rounded-md border border-hairline bg-background px-2.5 py-1.5 text-[12px] text-foreground"
-              />
-            </label>
-
-            <label className="mt-2 block">
-              <span className="mb-0.5 block text-[10.5px] font-medium text-foreground-muted">Descrição</span>
-              <textarea
-                value={formDescricao}
-                onChange={(e) => setFormDescricao(e.target.value)}
-                rows={2}
-                className="w-full rounded-md border border-hairline bg-background px-2.5 py-1.5 text-[12px] text-foreground"
-              />
-            </label>
-
-            <div className="mt-3">
-              <div className="mb-1 grid grid-cols-[1fr_50px_70px_70px] gap-1.5 text-[10px] font-semibold text-foreground-muted uppercase">
-                <span>Item</span>
-                <span>Qtd</span>
-                <span>Val. unid.</span>
-                <span>Total</span>
-              </div>
-              <div className="space-y-1.5">
-                {formItens.map((item, idx) => (
-                  <div key={idx} className="grid grid-cols-[1fr_50px_70px_70px_18px] items-center gap-1.5">
-                    <input
-                      value={item.nome}
-                      onChange={(e) => atualizarItem(idx, "nome", e.target.value)}
-                      placeholder="Nome"
-                      className="rounded border border-hairline bg-background px-1.5 py-1 text-[11.5px] text-foreground"
-                    />
-                    <input
-                      type="number"
-                      min={1}
-                      value={item.quantidade}
-                      onChange={(e) => atualizarItem(idx, "quantidade", e.target.value)}
-                      className="rounded border border-hairline bg-background px-1.5 py-1 text-[11.5px] text-foreground"
-                    />
-                    <input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={item.valorUnitario}
-                      onChange={(e) => atualizarItem(idx, "valorUnitario", e.target.value)}
-                      className="rounded border border-hairline bg-background px-1.5 py-1 text-[11.5px] text-foreground"
-                    />
-                    <span className="truncate text-[11px] text-foreground-muted">
-                      {formatarMoeda((Number(item.quantidade) || 0) * (Number(item.valorUnitario) || 0))}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setFormItens((atual) => atual.filter((_, i) => i !== idx))}
-                      className="text-[11px] text-status-danger hover:opacity-70"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <button
-                type="button"
-                onClick={() => setFormItens((atual) => [...atual, { ...ITEM_VAZIO }])}
-                className="mt-1.5 text-[11px] font-medium text-brand-primary hover:text-brand-primary-hover"
-              >
-                + Adicionar item
-              </button>
-              <p className="mt-1.5 text-right text-[11.5px] font-semibold text-foreground">Total: {formatarMoeda(totalItensForm)}</p>
-            </div>
+            {camposFormularioAcao}
 
             <button
               type="button"
@@ -672,6 +818,7 @@ function MesCalendario({
   diaSelecionado,
   onSelecionarDia,
   onEditarAcao,
+  onEditarFeriado,
 }: {
   ano: number;
   mes: number;
@@ -683,6 +830,8 @@ function MesCalendario({
   onSelecionarDia: (dia: string) => void;
   /** Dia já tem ação(ões): clicar abre para EDITAR (formulário preenchido) em vez de abrir um lançamento novo em branco. */
   onEditarAcao: (evento: EventoCalendario) => void;
+  /** Dia já tem data comemorativa e nenhuma ação: clicar abre pra ver/editar/excluir ela. */
+  onEditarFeriado: (data: DataComemorativa) => void;
 }) {
   const semanas = gradeDoMes(ano, mes);
   const hoje = new Date().toISOString().slice(0, 10);
@@ -737,7 +886,13 @@ function MesCalendario({
                 <button
                   key={j}
                   type="button"
-                  onClick={() => (acoesDoDia.length > 0 ? onEditarAcao(acoesDoDia[0]) : onSelecionarDia(dia))}
+                  onClick={() =>
+                    acoesDoDia.length > 0
+                      ? onEditarAcao(acoesDoDia[0])
+                      : datasDoDia.length > 0
+                        ? onEditarFeriado(datasDoDia[0])
+                        : onSelecionarDia(dia)
+                  }
                   className={cn(
                     "group relative flex h-6 items-center justify-center text-[9.5px] transition-colors",
                     radius,
