@@ -16,13 +16,15 @@ const ABAS: { id: AbaEndomarketing; label: string }[] = [
   { id: "orcamento", label: "Orçamento" },
 ];
 
-/** Cor de cada categoria de data comemorativa + a cor usada pros dias com ação (Lançamentos mensais). */
-const CATEGORIAS_DATA: { id: CategoriaDataComemorativa; label: string; dot: string }[] = [
-  { id: "nacional", label: "Feriado nacional", dot: "bg-brand-primary" },
-  { id: "regional", label: "Feriado regional/municipal", dot: "bg-status-warning" },
-  { id: "ponte", label: "Ponte de feriado", dot: "bg-status-emcurso" },
+/** Cor de cada categoria de data comemorativa (pílula de fundo + texto) + a cor dos dias com ação (Lançamentos mensais). */
+const CATEGORIAS_DATA: { id: CategoriaDataComemorativa; label: string; dot: string; bg: string; texto: string }[] = [
+  { id: "nacional", label: "Feriado nacional", dot: "bg-blue-500", bg: "bg-blue-100", texto: "text-blue-800" },
+  { id: "regional", label: "Feriado regional/municipal", dot: "bg-gray-400", bg: "bg-gray-200", texto: "text-gray-700" },
+  { id: "ponte", label: "Ponte de feriado", dot: "bg-orange-500", bg: "bg-orange-100", texto: "text-orange-800" },
 ];
 const COR_ACAO_DOT = "bg-brand-accent";
+const COR_ACAO_BG = "bg-brand-accent";
+const COR_ACAO_TEXTO = "text-brand-primary-900";
 
 const MESES_COMPLETOS = [
   "Janeiro",
@@ -108,6 +110,25 @@ export function EndomarketingDashboardClient({
   }, [eventos]);
 
   const eventosOrdenados = useMemo(() => [...eventos].sort((a, b) => a.data.localeCompare(b.data)), [eventos]);
+
+  // Uma ação pode durar vários dias (data → dataFim) — pra desenhar como uma
+  // barra emendada no Calendário (não um ponto solto por dia), cada dia do
+  // intervalo precisa saber se é o início, o fim, ou o meio da barra, pra
+  // arredondar só as pontas.
+  const acaoRangePorDia = useMemo(() => {
+    const mapa = new Map<string, { titulo: string; inicio: boolean; fim: boolean }>();
+    for (const e of eventos) {
+      const fim = e.dataFim ?? e.data;
+      const cursor = new Date(`${e.data}T00:00:00`);
+      const dataFim = new Date(`${fim}T00:00:00`);
+      while (cursor <= dataFim) {
+        const iso = cursor.toISOString().slice(0, 10);
+        if (!mapa.has(iso)) mapa.set(iso, { titulo: e.titulo, inicio: iso === e.data, fim: iso === fim });
+        cursor.setDate(cursor.getDate() + 1);
+      }
+    }
+    return mapa;
+  }, [eventos]);
 
   const datasComemorativasPorDia = useMemo(() => {
     const mapa = new Map<string, DataComemorativa[]>();
@@ -403,6 +424,7 @@ export function EndomarketingDashboardClient({
                   mes={i + 1}
                   nomeMes={nomeMes}
                   eventosPorDia={eventosPorDia}
+                  acaoRangePorDia={acaoRangePorDia}
                   datasComemorativasPorDia={datasComemorativasPorDia}
                   diaSelecionado={formData}
                   onSelecionarDia={(dia) => iniciarNovaAcao(dia)}
@@ -627,6 +649,7 @@ function MesCalendario({
   mes,
   nomeMes,
   eventosPorDia,
+  acaoRangePorDia,
   datasComemorativasPorDia,
   diaSelecionado,
   onSelecionarDia,
@@ -635,6 +658,7 @@ function MesCalendario({
   mes: number;
   nomeMes: string;
   eventosPorDia: Map<string, EventoCalendario[]>;
+  acaoRangePorDia: Map<string, { titulo: string; inicio: boolean; fim: boolean }>;
   datasComemorativasPorDia: Map<string, DataComemorativa[]>;
   diaSelecionado: string | null;
   onSelecionarDia: (dia: string) => void;
@@ -657,32 +681,56 @@ function MesCalendario({
               if (!dia) return <span key={j} className="h-6" />;
               const acoesDoDia = eventosPorDia.get(dia) ?? [];
               const datasDoDia = datasComemorativasPorDia.get(dia) ?? [];
+              const rangeAcao = acaoRangePorDia.get(dia);
               const selecionado = dia === diaSelecionado;
               const titulo = [...datasDoDia.map((d) => d.nome), ...acoesDoDia.map((e) => e.titulo)].join(", ");
+
+              // Feriado é sempre 1 dia (pílula redonda nas duas pontas); ação
+              // pode durar vários dias — arredonda só o início/fim do intervalo,
+              // pra virar uma barra emendada em vez de um marcador por dia.
+              const feriado = datasDoDia[0];
+              const categoriaCor = feriado ? CATEGORIAS_DATA.find((c) => c.id === feriado.categoria) : undefined;
+
+              const radius = selecionado
+                ? "rounded"
+                : categoriaCor
+                  ? "rounded-full"
+                  : rangeAcao
+                    ? cn(
+                        rangeAcao.inicio && rangeAcao.fim && "rounded-full",
+                        rangeAcao.inicio && !rangeAcao.fim && "rounded-l-full",
+                        rangeAcao.fim && !rangeAcao.inicio && "rounded-r-full",
+                        !rangeAcao.inicio && !rangeAcao.fim && "rounded-none",
+                      )
+                    : "rounded";
+
+              const corFundoTexto = selecionado
+                ? "bg-brand-primary-100 text-brand-primary-800"
+                : categoriaCor
+                  ? cn(categoriaCor.bg, categoriaCor.texto, "font-semibold")
+                  : rangeAcao
+                    ? cn(COR_ACAO_BG, COR_ACAO_TEXTO, "font-semibold")
+                    : "text-foreground-muted hover:bg-surface-page";
+
               return (
                 <button
                   key={j}
                   type="button"
                   onClick={() => onSelecionarDia(dia)}
-                  title={titulo || undefined}
                   className={cn(
-                    "flex h-6 flex-col items-center justify-center rounded text-[9.5px]",
-                    dia === hoje && "font-bold text-brand-primary",
-                    !selecionado && "text-foreground-muted hover:bg-surface-page",
-                    selecionado && "bg-brand-primary-100 text-brand-primary-800",
+                    "group relative flex h-6 items-center justify-center text-[9.5px] transition-colors",
+                    radius,
+                    corFundoTexto,
+                    dia === hoje && "ring-2 ring-inset ring-brand-primary",
                   )}
                 >
                   {Number(dia.slice(8, 10))}
-                  {(datasDoDia.length > 0 || acoesDoDia.length > 0) && (
-                    <span className="-mt-0.5 flex gap-0.5">
-                      {datasDoDia.slice(0, 1).map((d) => (
-                        <span
-                          key={d.id}
-                          aria-hidden
-                          className={cn("h-1 w-1 rounded-full", CATEGORIAS_DATA.find((c) => c.id === d.categoria)?.dot)}
-                        />
-                      ))}
-                      {acoesDoDia.length > 0 && <span aria-hidden className={cn("h-1 w-1 rounded-full", COR_ACAO_DOT)} />}
+                  {titulo && (
+                    <span
+                      role="tooltip"
+                      className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1 hidden w-max max-w-40 -translate-x-1/2 rounded-md bg-brand-dark-900 px-2 py-1 text-center text-[10px] font-normal whitespace-normal text-brand-white shadow-drawer group-hover:block"
+                    >
+                      {titulo}
                     </span>
                   )}
                 </button>
