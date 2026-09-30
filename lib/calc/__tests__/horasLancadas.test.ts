@@ -102,4 +102,11 @@ describe("calcularValorDasHoras · DSR conferido com o DP", () => {
     expect(r.noturna).toBeCloseTo(20, 2);
     expect(r.dsr).toBeCloseTo(4, 2);
   });
+
+  it("22h22 a 50% = R$ 335,50, DSR = R$ 67,10, total R$ 402,60", () => {
+    const r = calcularValorDasHoras(2200, { ...NENHUMA, extra50: 22 + 22 / 60 }, 220, CALENDARIO);
+    expect(r.extra50).toBeCloseTo(335.5, 2);
+    expect(r.dsr).toBeCloseTo(67.1, 2);
+    expect(r.liquido).toBeCloseTo(402.6, 2);
+  });
 });
