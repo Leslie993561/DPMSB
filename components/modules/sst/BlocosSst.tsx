@@ -190,17 +190,27 @@ export function BlocoGestaoEpi({
         · realizado {formatarMoeda(custoEpi.realizadoAno)} · {custoEpi.pctAno}% consumido
       </p>
       <div className="grid gap-2 lg:grid-cols-2">
-        <Card className="px-3 py-2.5">
-          <BarrasOrcadoRealizado dados={custoEpi.meses} />
-          <div className="mt-2 flex items-center gap-4 text-[10.5px] text-foreground-muted">
-            <span className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-sm bg-brand-surface" /> Orçado
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-sm bg-brand-primary" /> Realizado
-            </span>
-          </div>
-        </Card>
+        <div className="space-y-2">
+          <Card className="px-3 py-2.5">
+            <BarrasOrcadoRealizado dados={custoEpi.meses} />
+            <div className="mt-2 flex items-center gap-4 text-[10.5px] text-foreground-muted">
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-sm bg-brand-surface" /> Orçado
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-sm bg-brand-primary" /> Realizado
+              </span>
+            </div>
+          </Card>
+          <Card className="overflow-hidden">
+            <p className="border-b border-hairline px-3 py-1.5 text-[11px] font-semibold text-foreground">Por departamento</p>
+            <TabelaRanking linhas={custoEpi.porDepartamento} mostrarMedia />
+          </Card>
+          <Card className="overflow-hidden">
+            <p className="border-b border-hairline px-3 py-1.5 text-[11px] font-semibold text-foreground">Por colaborador</p>
+            <TabelaRanking linhas={custoEpi.porColaborador} />
+          </Card>
+        </div>
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-[10.5px]">
@@ -232,16 +242,6 @@ export function BlocoGestaoEpi({
               </tbody>
             </table>
           </div>
-        </Card>
-      </div>
-      <div className="grid gap-2 lg:grid-cols-2">
-        <Card className="overflow-hidden">
-          <p className="border-b border-hairline px-3 py-1.5 text-[11px] font-semibold text-foreground">Por departamento</p>
-          <TabelaRanking linhas={custoEpi.porDepartamento} mostrarMedia />
-        </Card>
-        <Card className="overflow-hidden">
-          <p className="border-b border-hairline px-3 py-1.5 text-[11px] font-semibold text-foreground">Por colaborador</p>
-          <TabelaRanking linhas={custoEpi.porColaborador} />
         </Card>
       </div>
     </section>
