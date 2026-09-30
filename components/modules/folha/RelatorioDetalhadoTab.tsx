@@ -989,8 +989,236 @@ function ImportarPopover({
             >
               {enviando ? "Lendo..." : `✓ Ler planilha e aplicar em ${competenciaLonga(mesReferencia)}`}
             </button>
+
+            <ImportarSalariosSecao onAplicado={onImportado} />
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * "Opção 3" do popover de importar: lê o Recibo de Pagamento + o Relatório de
+ * Líquidos (os dois PDFs que a folha mensal já gera) e atualiza o Salário
+ * Base do cadastro de quem mudou. Só o salário é gravado — INSS, FGTS e IRRF
+ * continuam saindo do cálculo automático (gerarBreakdown), então corrigir o
+ * salário aqui já corrige o Breakdown inteiro sozinho.
+ */
+function ImportarSalariosSecao({ onAplicado }: { onAplicado: () => void }) {
+  const [reciboArquivo, setReciboArquivo] = useState<File | null>(null);
+  const [liquidosArquivo, setLiquidosArquivo] = useState<File | null>(null);
+  const [lendo, setLendo] = useState(false);
+  const [aplicando, setAplicando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{
+    linhas: { colaboradorId: number; nome: string; salarioAtual: number; salarioNovo: number; mudou: boolean }[];
+    descartados: { codigo: string; nome: string; motivo: string }[];
+  } | null>(null);
+  const [selecionados, setSelecionados] = useState<Set<number>>(new Set());
+  const [aplicadas, setAplicadas] = useState<number | null>(null);
+
+  async function ler() {
+    if (!reciboArquivo || !liquidosArquivo) {
+      setErro("Anexe os dois arquivos: Recibo de Pagamento e Relatório de Líquidos.");
+      return;
+    }
+    setErro(null);
+    setAplicadas(null);
+    setLendo(true);
+    try {
+      const formData = new FormData();
+      formData.append("recibo", reciboArquivo);
+      formData.append("liquidos", liquidosArquivo);
+      const res = await fetch("/api/colaboradores/atualizar-salarios", { method: "POST", body: formData });
+      const data = await res.json();
+      if (!res.ok) {
+        setErro(data.erro ?? "Erro ao ler os arquivos.");
+        return;
+      }
+      setPreview(data);
+      setSelecionados(
+        new Set(
+          (data.linhas as { colaboradorId: number; mudou: boolean }[])
+            .filter((l) => l.mudou)
+            .map((l) => l.colaboradorId),
+        ),
+      );
+    } catch {
+      setErro("Falha de comunicação com o servidor.");
+    } finally {
+      setLendo(false);
+    }
+  }
+
+  async function aplicar() {
+    if (!preview) return;
+    const atualizacoes = preview.linhas
+      .filter((l) => selecionados.has(l.colaboradorId))
+      .map((l) => ({ colaboradorId: l.colaboradorId, salarioBase: l.salarioNovo }));
+    if (atualizacoes.length === 0) return;
+    setErro(null);
+    setAplicando(true);
+    try {
+      const res = await fetch("/api/colaboradores/atualizar-salarios", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ atualizacoes }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setErro(data.erro ?? "Erro ao aplicar as atualizações.");
+        return;
+      }
+      setAplicadas(data.aplicadas);
+      setPreview(null);
+      setReciboArquivo(null);
+      setLiquidosArquivo(null);
+      onAplicado();
+    } catch {
+      setErro("Falha de comunicação com o servidor.");
+    } finally {
+      setAplicando(false);
+    }
+  }
+
+  const linhasComMudanca = preview?.linhas.filter((l) => l.mudou) ?? [];
+
+  return (
+    <div className="mt-5 border-t border-hairline pt-4">
+      <p className="text-[12.5px] font-bold text-foreground">Opção 3 · Atualizar salários (Recibo de Pagamento)</p>
+      <p className="mt-2 text-[11px] leading-relaxed text-foreground-muted">
+        Lê o Recibo de Pagamento e o Relatório de Líquidos do mesmo mês (os dois PDFs que a folha já gera), casa cada
+        pessoa pelo CPF (pelo nome, se faltar CPF) e mostra quem mudou de Salário Base antes de gravar. INSS, FGTS e
+        IRRF não são importados — continuam calculados a partir do salário.
+      </p>
+
+      <label className="mt-3 flex cursor-pointer items-center justify-center gap-1.5 rounded-md border-2 border-dashed border-hairline px-3 py-2.5 text-center text-[11.5px] font-medium text-foreground hover:border-brand-primary">
+        {reciboArquivo ? reciboArquivo.name : "📄 Recibo de Pagamento (PDF)"}
+        <input
+          type="file"
+          accept=".pdf"
+          className="hidden"
+          onChange={(e) => {
+            setPreview(null);
+            setErro(null);
+            setAplicadas(null);
+            setReciboArquivo(e.target.files?.[0] ?? null);
+          }}
+        />
+      </label>
+      <label className="mt-2 flex cursor-pointer items-center justify-center gap-1.5 rounded-md border-2 border-dashed border-hairline px-3 py-2.5 text-center text-[11.5px] font-medium text-foreground hover:border-brand-primary">
+        {liquidosArquivo ? liquidosArquivo.name : "📄 Relatório de Líquidos (PDF)"}
+        <input
+          type="file"
+          accept=".pdf"
+          className="hidden"
+          onChange={(e) => {
+            setPreview(null);
+            setErro(null);
+            setAplicadas(null);
+            setLiquidosArquivo(e.target.files?.[0] ?? null);
+          }}
+        />
+      </label>
+
+      {erro && (
+        <div className="mt-2.5">
+          <RiskCallout nivel="critico">{erro}</RiskCallout>
+        </div>
+      )}
+
+      {aplicadas !== null && (
+        <div className="mt-2.5">
+          <RiskCallout nivel="sucesso">
+            <strong>{aplicadas} colaborador(es) com o Salário Base atualizado.</strong>
+          </RiskCallout>
+        </div>
+      )}
+
+      {!preview && (
+        <button
+          type="button"
+          onClick={ler}
+          disabled={lendo || !reciboArquivo || !liquidosArquivo}
+          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-md border border-hairline px-3 py-2 text-[12.5px] font-semibold text-foreground transition-colors hover:border-brand-primary hover:text-brand-primary-800 disabled:opacity-50"
+        >
+          {lendo ? "Lendo..." : "Ler arquivos e comparar"}
+        </button>
+      )}
+
+      {preview && (
+        <div className="mt-3 space-y-2">
+          <p className="text-[11px] text-foreground-muted">
+            {linhasComMudanca.length} de {preview.linhas.length} vieram com salário diferente do cadastro.
+          </p>
+
+          {linhasComMudanca.length > 0 && (
+            <div className="max-h-52 overflow-y-auto rounded-md border border-hairline">
+              <table className="w-full text-[11px]">
+                <thead className="bg-surface-page text-left text-[9.5px] font-semibold tracking-wide text-foreground-muted uppercase">
+                  <tr>
+                    <th className="px-2 py-1"></th>
+                    <th className="px-2 py-1">Nome</th>
+                    <th className="px-2 py-1 text-right">Atual</th>
+                    <th className="px-2 py-1 text-right">Novo</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-hairline">
+                  {linhasComMudanca.map((l) => (
+                    <tr key={l.colaboradorId}>
+                      <td className="px-2 py-1">
+                        <input
+                          type="checkbox"
+                          checked={selecionados.has(l.colaboradorId)}
+                          onChange={(e) =>
+                            setSelecionados((atual) => {
+                              const novo = new Set(atual);
+                              if (e.target.checked) novo.add(l.colaboradorId);
+                              else novo.delete(l.colaboradorId);
+                              return novo;
+                            })
+                          }
+                        />
+                      </td>
+                      <td className="max-w-[110px] truncate px-2 py-1 text-foreground" title={l.nome}>
+                        {l.nome}
+                      </td>
+                      <td className="px-2 py-1 text-right text-foreground-muted">{formatarMoeda(l.salarioAtual)}</td>
+                      <td className="px-2 py-1 text-right font-semibold text-brand-primary-800">
+                        {formatarMoeda(l.salarioNovo)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {preview.descartados.length > 0 && (
+            <details>
+              <summary className="cursor-pointer text-[11px] text-foreground-muted">
+                {preview.descartados.length} não encontrado(s) no cadastro
+              </summary>
+              <ul className="mt-1 list-inside list-disc text-[10.5px] text-foreground-muted">
+                {preview.descartados.map((d, i) => (
+                  <li key={i}>
+                    {d.nome}: {d.motivo}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+
+          <button
+            type="button"
+            onClick={aplicar}
+            disabled={aplicando || selecionados.size === 0}
+            className="flex w-full items-center justify-center gap-1.5 rounded-md bg-brand-primary px-3 py-2 text-[12.5px] font-semibold text-brand-white transition-colors hover:bg-brand-primary-700 disabled:opacity-50"
+          >
+            {aplicando ? "Aplicando..." : `✓ Atualizar ${selecionados.size} colaborador(es)`}
+          </button>
+        </div>
       )}
     </div>
   );
