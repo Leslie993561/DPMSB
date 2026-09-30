@@ -1,4 +1,5 @@
 import ExcelJS from "exceljs";
+import { listarColaboradores } from "@/lib/db/colaboradores";
 
 export const runtime = "nodejs";
 
@@ -81,6 +82,10 @@ function cabecalho(coluna: ColunaModelo): string {
 
 /** Modelo baixável para a importação de verbas do Relatório detalhado (Breakdown de Folha). */
 export async function GET() {
+  const colaboradores = (await listarColaboradores())
+    .filter((c) => c.status !== "desligado")
+    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Verbas do mês");
 
@@ -103,16 +108,16 @@ export async function GET() {
     celula.alignment = { wrapText: true, vertical: "middle" };
   });
 
-  const exemplos: Record<string, string | number>[] = [
-    { codigo: "63", nome: "Alice Coutinho da Cruz", odontologico: 65, horaExtra50: "08:01" },
-    { codigo: "64", nome: "Ana Beatriz Souza Figueiredo", vm: 166.74, odontologico: 65, solides: 60, horaNoturna: "02:30" },
-  ];
-  for (const exemplo of exemplos) {
-    const linha: Record<string, string | number> = {};
-    for (const coluna of COLUNAS) {
-      if (coluna.origem === "calculada") continue;
-      linha[coluna.key] = exemplo[coluna.key] ?? (coluna.key === "codigo" || coluna.key === "nome" ? "" : 0);
-    }
+  // Uma linha por colaborador ativo, já com Código e Nome — quem preenche só
+  // digita as verbas do mês, sem precisar copiar o cadastro inteiro à mão.
+  // As demais colunas "importada" ficam em BRANCO, não 0: célula vazia não
+  // apaga o que já existe (COALESCE na gravação), e 0 zeraria de propósito.
+  // Odontológico é exceção — pré-preenche com o valor fixo do cadastro (o
+  // mesmo que o Breakdown já usa como padrão) só pra poupar digitação de quem
+  // não muda o plano naquele mês.
+  for (const colaborador of colaboradores) {
+    const linha: Record<string, string | number> = { codigo: String(colaborador.id), nome: colaborador.nome };
+    if (colaborador.odontologicoValor) linha.odontologico = colaborador.odontologicoValor;
     sheet.addRow(linha);
   }
 
