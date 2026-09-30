@@ -812,10 +812,15 @@ export function EndomarketingDashboardClient({
             </div>
             <GraficoBarrasMensal
               series={[
-                { label: "Aprovado", cor: "bg-brand-surface" },
-                { label: "Realizado", cor: "bg-brand-primary" },
+                { label: "Gap", cor: "bg-status-danger" },
+                { label: "Saving", cor: "bg-status-success" },
               ]}
-              dados={orcamento.map((l) => ({ mesLabel: MESES_ABREV[l.mes - 1], valores: [l.aprovado, l.utilizado] }))}
+              dados={orcamento.map((l) => ({
+                mesLabel: MESES_ABREV[l.mes - 1],
+                // Mesma exclusão mútua da tabela abaixo: gap (estourou) e saving (sobrou)
+                // nunca coexistem no mesmo mês, é o mesmo número com sinal trocado.
+                valores: [l.gap < 0 ? Math.abs(l.gap) : 0, l.gap > 0 ? l.saving : 0],
+              }))}
             />
           </Card>
 
