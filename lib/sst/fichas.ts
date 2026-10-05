@@ -518,6 +518,16 @@ export async function obterResumoFichas(): Promise<{ enviadas: number; assinadas
   return r ?? { enviadas: 0, assinadas: 0 };
 }
 
+/** Reativa o link de uma ficha ainda sem assinatura: o mesmo token volta a valer por mais VALIDADE_DIAS. */
+export async function reativarFicha(fichaId: string): Promise<boolean> {
+  const atualizadas = await sstQuery<{ id: string }>(
+    `UPDATE sst_fichas_epi SET expira_em = now() + ($2 || ' days')::interval
+      WHERE id = $1 AND status = 'aguardando' RETURNING id`,
+    [fichaId, String(VALIDADE_DIAS)],
+  );
+  return atualizadas.length > 0;
+}
+
 /** Exclui a ficha e as entregas dela, de EPI e de fardamento (Custo e Valores deixa de contá-las). */
 export async function excluirFicha(fichaId: string): Promise<boolean> {
   return sstTransacao(async (q) => {

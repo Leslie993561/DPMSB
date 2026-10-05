@@ -80,6 +80,16 @@ export function FichaEpiDrawer({
     router.refresh();
   }
 
+  async function reativar(f: FichaResumo) {
+    const r = await fetch(`/api/sst/epi/fichas/${f.id}/reativar`, { method: "POST" });
+    if (!r.ok) {
+      window.alert((await r.json()).erro ?? "Não foi possível reativar o link.");
+      return;
+    }
+    carregar();
+    router.refresh();
+  }
+
   async function dispensarTroca(epi: string, dataTroca: string) {
     if (!colaborador) return;
     await fetch("/api/sst/epi/trocas-dispensadas", {
@@ -236,7 +246,17 @@ export function FichaEpiDrawer({
                         📎
                       </button>
                     ) : f.expirada ? (
-                      <span className="text-[11px] text-status-danger">Link expirado · sem assinatura</span>
+                      <span className="flex items-center gap-2 text-[11px] text-status-danger">
+                        Link expirado · sem assinatura
+                        <button
+                          type="button"
+                          onClick={() => void reativar(f)}
+                          title="Reativar o link por mais 7 dias"
+                          className="font-medium text-brand-primary hover:text-brand-primary-hover"
+                        >
+                          reativar link
+                        </button>
+                      </span>
                     ) : (
                       <span className="flex items-center gap-2 text-[11px] text-status-warning">
                         Aguardando assinatura
