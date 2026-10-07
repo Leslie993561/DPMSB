@@ -1,3 +1,4 @@
+import { carregarPdfParse } from "@/lib/parsing/carregarPdfParse";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
 import { interpretarFaturaExames } from "@/lib/sst/faturaExames";
 import { listarFaturasExame, salvarFaturaExame } from "@/lib/sst/faturasExame";
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
   if (arquivo.size > TAMANHO_MAX) return Response.json({ erro: "O PDF não pode passar de 10MB." }, { status: 400 });
 
   try {
-    const { PDFParse } = await import("pdf-parse");
+    const { PDFParse } = await carregarPdfParse();
     const texto = (await new PDFParse({ data: new Uint8Array(await arquivo.arrayBuffer()) }).getText()).text;
     const fatura = interpretarFaturaExames(texto);
     const soma = Math.round(fatura.asos.reduce((s, a) => s + a.valor, 0) * 100) / 100;

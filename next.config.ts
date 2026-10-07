@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
    * encontrado ("Setting up fake worker failed"). Mantê-los externos faz o Node
    * resolvê-los direto de node_modules.
    */
-  serverExternalPackages: ["pdf-parse", "pdfjs-dist"],
+  serverExternalPackages: ["pdf-parse", "pdfjs-dist", "@napi-rs/canvas"],
 };
 
 export default nextConfig;

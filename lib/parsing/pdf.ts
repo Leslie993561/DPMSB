@@ -1,3 +1,4 @@
+import { carregarPdfParse } from "./carregarPdfParse";
 import "server-only";
 
 /** Campos que tentamos reconhecer heuristicamente em um holerite. */
@@ -58,7 +59,7 @@ function parseNumeroBR(texto: string): number | null {
  *   confirmados pelo usuário antes de alimentarem qualquer cálculo.
  */
 export async function parsearHoleritePdf(buffer: ArrayBuffer): Promise<HoleritePdfParseado> {
-  const { PDFParse } = await import("pdf-parse");
+  const { PDFParse } = await carregarPdfParse();
 
   const parser = new PDFParse({ data: new Uint8Array(buffer) });
   try {

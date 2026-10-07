@@ -1,3 +1,4 @@
+import { carregarPdfParse } from "./carregarPdfParse";
 import "server-only";
 import type { LinhaPlanilha } from "./spreadsheet";
 
@@ -42,7 +43,7 @@ function dividirColunas(linha: string): string[] {
  * forma confiável — prefira XLSX/CSV quando possível e revise o resultado.
  */
 export async function parsearFolhaExtrasPdf(buffer: ArrayBuffer): Promise<TabelaPdfParseada> {
-  const { PDFParse } = await import("pdf-parse");
+  const { PDFParse } = await carregarPdfParse();
   const parser = new PDFParse({ data: new Uint8Array(buffer) });
   let texto: string;
   try {

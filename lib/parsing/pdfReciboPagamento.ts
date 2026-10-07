@@ -1,3 +1,4 @@
+import { carregarPdfParse } from "./carregarPdfParse";
 import "server-only";
 
 export interface FuncionarioRecibo {
@@ -23,7 +24,7 @@ function paraNumeroBR(texto: string | undefined): number | null {
 }
 
 async function extrairTexto(buffer: ArrayBuffer): Promise<string> {
-  const { PDFParse } = await import("pdf-parse");
+  const { PDFParse } = await carregarPdfParse();
   const parser = new PDFParse({ data: new Uint8Array(buffer) });
   try {
     const resultado = await parser.getText();
