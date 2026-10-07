@@ -473,6 +473,30 @@ export async function obterAnexoFichaExame(fichaId: string): Promise<{ url: stri
   return { url: f.anexo_url, nome: f.anexo_nome };
 }
 
+/** RH corrige uma ficha: tipo do ASO e os exames (com data própria). Datas em DD/MM/AAAA; a data prevista é recalculada. */
+export async function atualizarFichaExame(
+  fichaId: string,
+  dados: { tipoAso: string; exames: { exame: string; dataRealizacao: string }[] },
+): Promise<boolean> {
+  if (dados.exames.length === 0) throw new Error("Selecione ao menos um exame.");
+  return sstTransacao(async (q) => {
+    const atualizadas = await q<{ colab_id: number }>(
+      "UPDATE sst_fichas_exame SET tipo_aso = $2 WHERE id = $1 RETURNING colab_id",
+      [fichaId, dados.tipoAso],
+    );
+    if (atualizadas.length === 0) return false;
+    await q("DELETE FROM sst_exames_realizados WHERE ficha_id = $1", [fichaId]);
+    for (const item of dados.exames) {
+      await q(
+        `INSERT INTO sst_exames_realizados (id, ficha_id, colab_id, exame, data_realizacao, data_prevista)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [randomUUID(), fichaId, atualizadas[0].colab_id, item.exame, item.dataRealizacao, calcularDataPrevista(item.exame, item.dataRealizacao)],
+      );
+    }
+    return true;
+  });
+}
+
 export async function excluirFichaExame(fichaId: string): Promise<boolean> {
   const apagadas = await sstQuery<{ id: string }>("DELETE FROM sst_fichas_exame WHERE id = $1 RETURNING id", [fichaId]);
   return apagadas.length > 0;

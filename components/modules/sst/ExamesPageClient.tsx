@@ -253,6 +253,7 @@ function ExameColaboradorDrawer({
   const [erroCarga, setErroCarga] = useState<string | null>(null);
   const [anexando, setAnexando] = useState(false);
   const [documento, setDocumento] = useState<{ ficha: FichaExameResumo } | null>(null);
+  const [editando, setEditando] = useState<FichaExameResumo | null>(null);
 
   const carregar = useCallback(() => {
     const qs = new URLSearchParams({ colaboradorId: String(colaborador.id) });
@@ -359,6 +360,15 @@ function ExameColaboradorDrawer({
                     </button>
                     <button
                       type="button"
+                      onClick={() => setEditando(f)}
+                      title="Editar registro"
+                      aria-label={`Editar registro de ${f.dataRealizacao}`}
+                      className="rounded px-1.5 py-0.5 text-[13px] text-foreground-muted hover:bg-brand-primary-100 hover:text-brand-primary"
+                    >
+                      ✎
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => void excluir(f)}
                       title="Excluir registro"
                       aria-label={`Excluir registro de ${f.dataRealizacao}`}
@@ -388,6 +398,19 @@ function ExameColaboradorDrawer({
         />
       )}
 
+      {editando && (
+        <EditarFichaExameModal
+          ficha={editando}
+          colaborador={colaborador}
+          onFechar={() => setEditando(null)}
+          onSalvo={() => {
+            setEditando(null);
+            carregar();
+            router.refresh();
+          }}
+        />
+      )}
+
       {documento && (
         <Modal
           aberto
@@ -405,6 +428,127 @@ function ExameColaboradorDrawer({
         </Modal>
       )}
     </>
+  );
+}
+
+const brParaIso = (br: string) => (/^\d{2}\/\d{2}\/\d{4}$/.test(br) ? br.split("/").reverse().join("-") : "");
+
+function EditarFichaExameModal({
+  ficha,
+  colaborador,
+  onFechar,
+  onSalvo,
+}: {
+  ficha: FichaExameResumo;
+  colaborador: ColaboradorExame;
+  onFechar: () => void;
+  onSalvo: () => void;
+}) {
+  const [tipoAso, setTipoAso] = useState(ficha.tipoAso);
+  const [datas, setDatas] = useState<Record<string, string>>(
+    Object.fromEntries(ficha.itens.map((i) => [i.exame, brParaIso(i.dataRealizacao)])),
+  );
+  const [marcados, setMarcados] = useState<Set<string>>(new Set(ficha.itens.map((i) => i.exame)));
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const opcoes = [...new Set([...colaborador.examesObrigatorios, ...ficha.itens.map((i) => i.exame)])];
+  const dataPadrao = brParaIso(ficha.dataRealizacao) || new Date().toISOString().slice(0, 10);
+
+  function alternar(exame: string) {
+    setMarcados((s) => {
+      const novo = new Set(s);
+      if (novo.has(exame)) novo.delete(exame);
+      else novo.add(exame);
+      return novo;
+    });
+  }
+
+  async function salvar() {
+    const exames = opcoes.filter((e) => marcados.has(e)).map((exame) => ({ exame, dataRealizacao: datas[exame] || dataPadrao }));
+    if (exames.length === 0) {
+      setErro("Selecione ao menos um exame.");
+      return;
+    }
+    setSalvando(true);
+    setErro(null);
+    try {
+      const r = await fetch(`/api/sst/exames/fichas/${ficha.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tipoAso, exames }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.erro ?? "Falha ao salvar.");
+      onSalvo();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Falha ao salvar.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <Modal
+      aberto
+      onFechar={onFechar}
+      eyebrow="Exames Ocupacionais"
+      titulo="Editar registro de exame"
+      subtitulo={colaborador.nome}
+      largura="34rem"
+      rodape={
+        <div className="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onFechar}
+            className="rounded border border-hairline px-3 py-1.5 text-[12px] font-medium text-foreground hover:bg-surface-page"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={() => void salvar()}
+            disabled={salvando}
+            className="rounded bg-brand-primary px-3 py-1.5 text-[12px] font-medium text-brand-white hover:bg-brand-primary-hover disabled:opacity-50"
+          >
+            {salvando ? "Salvando..." : "Salvar"}
+          </button>
+        </div>
+      }
+    >
+      <div className="flex flex-col gap-3">
+        <label className="block text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">
+          Tipo de ASO
+          <select value={tipoAso} onChange={(e) => setTipoAso(e.target.value)} className="mt-1 w-full rounded border border-hairline bg-background px-2.5 py-1.5 text-[12px] font-normal normal-case text-foreground outline-none focus:border-brand-primary">
+            {TIPOS_ASO.map((t) => (
+              <option key={t.valor} value={t.valor}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div>
+          <p className="text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">Exames realizados</p>
+          <div className="mt-1.5 flex flex-col divide-y divide-hairline/70 rounded-md border border-hairline">
+            {opcoes.map((exame) => (
+              <div key={exame} className="flex items-center gap-2 px-2.5 py-1.5 text-[12px] text-foreground">
+                <label className="flex flex-1 items-center gap-2">
+                  <input type="checkbox" checked={marcados.has(exame)} onChange={() => alternar(exame)} className="accent-brand-primary" />
+                  {exame}
+                </label>
+                <input
+                  type="date"
+                  value={datas[exame] ?? dataPadrao}
+                  disabled={!marcados.has(exame)}
+                  onChange={(e) => setDatas((d) => ({ ...d, [exame]: e.target.value }))}
+                  className="rounded border border-hairline bg-background px-2 py-1 text-[11.5px] outline-none focus:border-brand-primary disabled:opacity-40"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+        {erro && <p className="text-[11.5px] text-status-danger">{erro}</p>}
+      </div>
+    </Modal>
   );
 }
 
