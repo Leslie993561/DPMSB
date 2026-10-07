@@ -1,13 +1,14 @@
 import { z } from "zod";
 import { bloquearSeFechada } from "@/lib/db/fechamento";
-import { listarFeriadosEmpresa, alternarFeriadoEmpresa } from "@/lib/db/beneficiosFeriados";
+import { listarFeriadosEmpresa, listarFeriadosNacionaisEndo, alternarFeriadoEmpresa } from "@/lib/db/beneficiosFeriados";
 
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const ano = Number(searchParams.get("ano")) || new Date().getFullYear();
-  return Response.json({ ano, feriados: await listarFeriadosEmpresa(ano) });
+  const [feriados, nacionais] = await Promise.all([listarFeriadosEmpresa(ano), listarFeriadosNacionaisEndo(ano)]);
+  return Response.json({ ano, feriados, nacionais });
 }
 
 const schemaPost = z.object({

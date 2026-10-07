@@ -187,6 +187,8 @@ export function RateioTab() {
   const [avisosAbertos, setAvisosAbertos] = useState(false);
   const avisosRef = useRef<HTMLDivElement>(null);
   const [feriados, setFeriados] = useState<Set<string>>(new Set());
+  /** Feriados nacionais lançados no Calendário do Portal ENDO (data → nome) — só leitura aqui. */
+  const [nacionaisEndo, setNacionaisEndo] = useState<Map<string, string>>(new Map());
   const [feriadosAbertos, setFeriadosAbertos] = useState(false);
   const feriadosRef = useRef<HTMLDivElement>(null);
   const [mesCalendario, setMesCalendario] = useState<number>(Number(competencia.slice(5, 7)));
@@ -240,10 +242,15 @@ export function RateioTab() {
 
   const ano = competencia.slice(0, 4);
 
+  const diasSemExpediente = new Set([...feriados, ...nacionaisEndo.keys()]).size;
+
   const carregarFeriados = useCallback(() => {
     fetch(`/api/beneficios/feriados?ano=${ano}`)
       .then((r) => r.json())
-      .then((d: { feriados?: string[] }) => setFeriados(new Set(d.feriados ?? [])))
+      .then((d: { feriados?: string[]; nacionais?: { data: string; nome: string }[] }) => {
+        setFeriados(new Set(d.feriados ?? []));
+        setNacionaisEndo(new Map((d.nacionais ?? []).map((n) => [n.data, n.nome])));
+      })
       .catch(() => {});
   }, [ano]);
 
@@ -481,10 +488,10 @@ export function RateioTab() {
               setFeriadosAbertos((v) => !v);
             }}
             aria-expanded={feriadosAbertos}
-            aria-label={`${feriados.size} dia(s) sem expediente marcado(s) em ${ano}`}
+            aria-label={`${diasSemExpediente} dia(s) sem expediente marcado(s) em ${ano}`}
             className={cn(
               "flex items-center gap-2 rounded-full border py-1.5 pr-3 pl-2 text-[12px] font-semibold transition-colors",
-              feriados.size > 0
+              diasSemExpediente > 0
                 ? "border-brand-primary/40 bg-brand-primary-050 text-brand-primary-800 hover:brightness-95"
                 : "border-hairline bg-background text-foreground-muted hover:border-brand-primary",
             )}
@@ -493,7 +500,7 @@ export function RateioTab() {
               aria-hidden
               className={cn(
                 "inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold text-brand-white",
-                feriados.size > 0 ? "bg-brand-primary" : "bg-brand-neutral",
+                diasSemExpediente > 0 ? "bg-brand-primary" : "bg-brand-neutral",
               )}
             >
               📅
@@ -505,7 +512,8 @@ export function RateioTab() {
             <div className="absolute top-full left-0 z-50 mt-1.5 w-64 rounded-xl border border-hairline bg-background p-3 shadow-lg dark:border-brand-neutral/30">
               <p className="text-[11px] text-foreground-muted">
                 Marque os dias em que a empresa não vai funcionar (feriado local, ponto facultativo, recesso). Só
-                abate do <strong>Vale-Transporte</strong> — Mobilidade e Alimentação não mudam.
+                abate do <strong>Vale-Transporte</strong> — Mobilidade e Alimentação não mudam. Os feriados nacionais
+                lançados no Portal ENDO entram sozinhos (em azul) e só reduzem se caírem em dia útil.
               </p>
               <div className="mt-2 flex items-center justify-between">
                 <button
@@ -540,18 +548,27 @@ export function RateioTab() {
                       if (!dataIso) return <span key={j} />;
                       const fimDeSemana = ehFimDeSemana(dataIso);
                       const marcado = feriados.has(dataIso);
+                      const nomeNacional = nacionaisEndo.get(dataIso);
                       return (
                         <button
                           key={dataIso}
                           type="button"
-                          disabled={fimDeSemana || salvandoFeriado === dataIso}
+                          disabled={fimDeSemana || Boolean(nomeNacional) || salvandoFeriado === dataIso}
                           onClick={() => void alternarFeriado(dataIso)}
-                          title={fimDeSemana ? "Fim de semana — não conta como dia útil" : dataIso}
+                          title={
+                            nomeNacional
+                              ? `${nomeNacional} — feriado nacional lançado no Portal ENDO`
+                              : fimDeSemana
+                                ? "Fim de semana — não conta como dia útil"
+                                : dataIso
+                          }
                           className={cn(
                             "flex h-6 items-center justify-center rounded text-[11px] transition-colors",
                             fimDeSemana
                               ? "text-foreground-muted/40"
-                              : marcado
+                              : nomeNacional
+                                ? "bg-blue-100 font-bold text-blue-800"
+                                : marcado
                                 ? "bg-brand-primary font-bold text-brand-white"
                                 : "text-foreground hover:bg-surface-page",
                           )}

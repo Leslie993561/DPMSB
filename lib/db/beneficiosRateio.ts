@@ -8,7 +8,7 @@ import { diasUteisDeFeriasNoMes, proporcionalAosDiasTrabalhados, type JanelaDeFe
 import { diasUteisFeriadosNoMes } from "@/lib/folha/feriadosEmpresa";
 import { listarProgramacaoFerias } from "./programacaoFerias";
 import { obterDiasUteis } from "./beneficiosDiasUteis";
-import { listarFeriadosEmpresa } from "./beneficiosFeriados";
+import { listarDiasSemExpediente } from "./beneficiosFeriados";
 import { obterExtras, listarCompetenciasFechadas } from "./folhaBreakdown";
 import { obterVariaveis, type ItemVariavel } from "./beneficiosVariaveis";
 import { detalharTransporteDoMes, arredondar, VT_DIARIO_IMPLAUSIVEL, type OrigemTransporte } from "@/lib/calc";
@@ -74,10 +74,11 @@ export async function gerarRateio(competencia: string): Promise<{ linhas: LinhaR
   const { ano, mes } = competenciaParaAnoMes(competencia);
   const diasUteis = await obterDiasUteis(ano, mes);
   const extras = await obterOverridesRateio(competencia);
-  // Feriados marcados no calendário do Rateio — só abatem o Vale-Transporte
+  // Feriados marcados no calendário do Rateio + feriados nacionais lançados no
+  // Calendário do Portal ENDO (só se caem em dia útil) — só abatem o Vale-Transporte
   // (tipoTransporte diferente de vm_fixo); Mobilidade e Alimentação seguem os
   // dias úteis normais, por pedido do DP.
-  const diasFeriadosEmpresa = diasUteisFeriadosNoMes(competencia, await listarFeriadosEmpresa(ano));
+  const diasFeriadosEmpresa = diasUteisFeriadosNoMes(competencia, await listarDiasSemExpediente(ano));
 
   // Janelas de gozo vindas da Programação/Controle de Férias — a mesma fonte
   // que as duas telas usam. Cancelada não conta: as férias não vão acontecer.
