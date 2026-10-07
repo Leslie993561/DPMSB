@@ -226,6 +226,9 @@ const ESQUEMA_EXTRA = `
     created_at timestamptz NOT NULL DEFAULT now()
   );
 
+  ALTER TABLE sst_fichas_exame ADD COLUMN IF NOT EXISTS novo_cargo text;
+  ALTER TABLE sst_fichas_exame ADD COLUMN IF NOT EXISTS data_promocao text;
+
   -- Um exame feito, dentro de uma ficha. data_prevista já vem calculada
   -- (data_realizacao + periodicidade do catálogo, domain.ts) — não é campo
   -- que o RH preenche na tela.

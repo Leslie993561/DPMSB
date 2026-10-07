@@ -33,6 +33,8 @@ const schema = z.object({
   colaboradorId: z.number().int().positive(),
   tipoAso: z.enum(["admissional", "periodico", "retorno", "demissional", "alteracao_cargo"]),
   exames: z.array(z.object({ exame: z.string().trim().min(1), dataRealizacao: dataIso })).min(1, "Selecione ao menos um exame."),
+  novoCargo: z.string().trim().min(1).nullable().optional(),
+  dataPromocao: dataIso.nullable().optional(),
   anexoUrl: z.string().trim().min(1).nullable().optional(),
   anexoNome: z.string().trim().min(1).nullable().optional(),
 });
@@ -55,6 +57,10 @@ export async function POST(request: Request) {
           exame: e.exame,
           dataRealizacao: `${e.dataRealizacao.slice(8, 10)}/${e.dataRealizacao.slice(5, 7)}/${e.dataRealizacao.slice(0, 4)}`,
         })),
+        novoCargo: parsed.data.novoCargo,
+        dataPromocao: parsed.data.dataPromocao
+          ? `${parsed.data.dataPromocao.slice(8, 10)}/${parsed.data.dataPromocao.slice(5, 7)}/${parsed.data.dataPromocao.slice(0, 4)}`
+          : null,
         anexoUrl: parsed.data.anexoUrl,
         anexoNome: parsed.data.anexoNome,
       },

@@ -362,6 +362,9 @@ export interface NovaFichaExame {
   tipoAso: string;
   /** Um item por exame marcado — todos com a MESMA data de realização (mesmo atendimento). */
   exames: { exame: string; dataRealizacao: string }[];
+  /** Só em "Alteração de Cargo": cargo para o qual o colaborador foi promovido e a data (DD/MM/AAAA). */
+  novoCargo?: string | null;
+  dataPromocao?: string | null;
   anexoUrl?: string | null;
   anexoNome?: string | null;
 }
@@ -393,9 +396,9 @@ export async function criarFichaExame(nova: NovaFichaExame, responsavel: string)
   const fichaId = randomUUID();
   await sstTransacao(async (q) => {
     await q(
-      `INSERT INTO sst_fichas_exame (id, colab_id, tipo_aso, anexo_url, anexo_nome, responsavel)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [fichaId, colaborador.id, nova.tipoAso, nova.anexoUrl ?? null, nova.anexoNome ?? null, responsavel],
+      `INSERT INTO sst_fichas_exame (id, colab_id, tipo_aso, novo_cargo, data_promocao, anexo_url, anexo_nome, responsavel)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [fichaId, colaborador.id, nova.tipoAso, nova.novoCargo ?? null, nova.dataPromocao ?? null, nova.anexoUrl ?? null, nova.anexoNome ?? null, responsavel],
     );
     for (const item of nova.exames) {
       const dataPrevista = calcularDataPrevista(item.exame, item.dataRealizacao);

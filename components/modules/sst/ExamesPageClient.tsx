@@ -113,7 +113,7 @@ export function ExamesPageClient({
         ))}
       </div>
 
-      {aba === "colaboradores" && <ColaboradoresTab colaboradores={colaboradores} busca={busca} onBusca={setBusca} />}
+      {aba === "colaboradores" && <ColaboradoresTab colaboradores={colaboradores} matriz={matrizExames} busca={busca} onBusca={setBusca} />}
       {aba === "matriz" && <MatrizExamesTab matriz={matrizExames} catalogoExames={catalogoExames.map((c) => c.nome)} />}
       {aba === "ocupacional" && <MatrizOcupacionalTab setores={setoresOcupacionais} catalogoExames={catalogoExames} />}
       {aba === "custos" && <CustosTab custos={custos} />}
@@ -123,10 +123,12 @@ export function ExamesPageClient({
 
 function ColaboradoresTab({
   colaboradores,
+  matriz,
   busca,
   onBusca,
 }: {
   colaboradores: ColaboradorExame[];
+  matriz: FuncaoExames[];
   busca: string;
   onBusca: (v: string) => void;
 }) {
@@ -231,12 +233,20 @@ function ColaboradoresTab({
         </table>
       </div>
 
-      {colaboradorAberto && <ExameColaboradorDrawer colaborador={colaboradorAberto} onFechar={() => setColaboradorAberto(null)} />}
+      {colaboradorAberto && <ExameColaboradorDrawer colaborador={colaboradorAberto} matriz={matriz} onFechar={() => setColaboradorAberto(null)} />}
     </Card>
   );
 }
 
-function ExameColaboradorDrawer({ colaborador, onFechar }: { colaborador: ColaboradorExame; onFechar: () => void }) {
+function ExameColaboradorDrawer({
+  colaborador,
+  matriz,
+  onFechar,
+}: {
+  colaborador: ColaboradorExame;
+  matriz: FuncaoExames[];
+  onFechar: () => void;
+}) {
   const router = useRouter();
   const [fichas, setFichas] = useState<FichaExameResumo[] | null>(null);
   const [vencidos, setVencidos] = useState<ExameVencido[]>([]);
@@ -367,6 +377,7 @@ function ExameColaboradorDrawer({ colaborador, onFechar }: { colaborador: Colabo
       {anexando && (
         <AnexarExameModal
           colaborador={colaborador}
+          matriz={matriz}
           vencidos={vencidos}
           onFechar={() => setAnexando(false)}
           onCriado={() => {
@@ -399,22 +410,39 @@ function ExameColaboradorDrawer({ colaborador, onFechar }: { colaborador: Colabo
 
 function AnexarExameModal({
   colaborador,
+  matriz,
   vencidos,
   onFechar,
   onCriado,
 }: {
   colaborador: ColaboradorExame;
+  matriz: FuncaoExames[];
   vencidos: ExameVencido[];
   onFechar: () => void;
   onCriado: () => void;
 }) {
   const [tipoAso, setTipoAso] = useState("periodico");
   const [dataRealizacao, setDataRealizacao] = useState(() => new Date().toISOString().slice(0, 10));
+  const [novoCargo, setNovoCargo] = useState("");
+  const [dataPromocao, setDataPromocao] = useState("");
   const [marcados, setMarcados] = useState<Set<string>>(new Set(vencidos.map((v) => v.exame)));
   const [anexo, setAnexo] = useState<{ url: string; nome: string } | null>(null);
   const [enviandoAnexo, setEnviandoAnexo] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+
+  const alteracaoCargo = tipoAso === "alteracao_cargo";
+  const examesDoNovoCargo = matriz.find((f) => f.funcao === novoCargo)?.exames ?? [];
+
+  function trocarTipo(tipo: string) {
+    setTipoAso(tipo);
+    setMarcados(new Set(tipo === "alteracao_cargo" ? examesDoNovoCargo : vencidos.map((v) => v.exame)));
+  }
+
+  function trocarCargo(cargo: string) {
+    setNovoCargo(cargo);
+    setMarcados(new Set(matriz.find((f) => f.funcao === cargo)?.exames ?? []));
+  }
 
   function alternar(exame: string) {
     setMarcados((s) => {
@@ -447,6 +475,10 @@ function AnexarExameModal({
   }
 
   async function salvar() {
+    if (alteracaoCargo && (!novoCargo || !dataPromocao)) {
+      setErro("Informe o novo cargo e a data da promoção.");
+      return;
+    }
     if (marcados.size === 0) {
       setErro("Selecione ao menos um exame.");
       return;
@@ -460,6 +492,8 @@ function AnexarExameModal({
         body: JSON.stringify({
           colaboradorId: colaborador.id,
           tipoAso,
+          novoCargo: alteracaoCargo ? novoCargo : null,
+          dataPromocao: alteracaoCargo ? dataPromocao : null,
           exames: [...marcados].map((exame) => ({ exame, dataRealizacao })),
           anexoUrl: anexo?.url ?? null,
           anexoNome: anexo?.nome ?? null,
@@ -515,7 +549,7 @@ function AnexarExameModal({
           Tipo de ASO
           <select
             value={tipoAso}
-            onChange={(e) => setTipoAso(e.target.value)}
+            onChange={(e) => trocarTipo(e.target.value)}
             className="mt-1 w-full rounded border border-hairline bg-background px-2.5 py-1.5 text-[12px] font-normal normal-case text-foreground outline-none focus:border-brand-primary"
           >
             {TIPOS_ASO.map((t) => (
@@ -525,6 +559,35 @@ function AnexarExameModal({
             ))}
           </select>
         </label>
+
+        {alteracaoCargo && (
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">
+              Novo cargo
+              <select
+                value={novoCargo}
+                onChange={(e) => trocarCargo(e.target.value)}
+                className="mt-1 w-full rounded border border-hairline bg-background px-2.5 py-1.5 text-[12px] font-normal normal-case text-foreground outline-none focus:border-brand-primary"
+              >
+                <option value="">Selecione...</option>
+                {matriz.map((f) => (
+                  <option key={f.funcao} value={f.funcao}>
+                    {f.funcao}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">
+              Data da promoção
+              <input
+                type="date"
+                value={dataPromocao}
+                onChange={(e) => setDataPromocao(e.target.value)}
+                className="mt-1 w-full rounded border border-hairline bg-background px-2.5 py-1.5 text-[12px] font-normal normal-case text-foreground outline-none focus:border-brand-primary"
+              />
+            </label>
+          </div>
+        )}
 
         <div className="flex items-center gap-2 text-[11px]">
           <label className="cursor-pointer font-medium text-brand-primary hover:text-brand-primary-hover">
@@ -552,14 +615,24 @@ function AnexarExameModal({
         </div>
 
         <div>
-          <p className="text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">Exames vencidos</p>
-          {vencidos.length === 0 ? (
+          <p className="text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">
+            {alteracaoCargo ? "Exames do novo cargo" : "Exames vencidos"}
+          </p>
+          {alteracaoCargo ? (
+            <p className="mt-1 text-[11.5px] text-foreground-muted">
+              {novoCargo
+                ? examesDoNovoCargo.length === 0
+                  ? "Este cargo não tem exames na Matriz por Função."
+                  : "Exames exigidos para o novo cargo — desmarque o que não for realizado."
+                : "Selecione o novo cargo para ver os exames."}
+            </p>
+          ) : vencidos.length === 0 ? (
             <p className="mt-1 text-[11.5px] text-foreground-muted">
               Nenhum exame vencido pra esta função no momento — marque abaixo se quiser registrar mesmo assim.
             </p>
           ) : null}
           <div className="mt-1.5 flex flex-col divide-y divide-hairline/70 rounded-md border border-hairline">
-            {(vencidos.length > 0 ? vencidos.map((v) => v.exame) : colaborador.examesObrigatorios).map((exame) => (
+            {(alteracaoCargo ? examesDoNovoCargo : vencidos.length > 0 ? vencidos.map((v) => v.exame) : colaborador.examesObrigatorios).map((exame) => (
               <label key={exame} className="flex items-center gap-2 px-2.5 py-1.5 text-[12px] text-foreground">
                 <input type="checkbox" checked={marcados.has(exame)} onChange={() => alternar(exame)} className="accent-brand-primary" />
                 {exame}
