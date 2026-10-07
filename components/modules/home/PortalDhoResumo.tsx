@@ -76,7 +76,7 @@ export function PortalDhoResumo() {
     <section className="w-full rounded-xl border border-brand-surface bg-background p-5 dark:border-brand-neutral/30">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="font-medium text-foreground">Portal DHO</h2>
+          <h2 className="font-medium text-foreground">Portal ENDO</h2>
           <p className="mt-0.5 text-sm text-foreground-muted">Desenvolvimento Humano e Organizacional.</p>
         </div>
         <div className="flex items-center gap-4">

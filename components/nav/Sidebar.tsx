@@ -194,7 +194,7 @@ function montarGrupos(counts?: NavCounts): GrupoItem[] {
 const FRENTES = [
   { id: "dp", label: "Portal DP", href: "/dashboard" },
   { id: "sst", label: "Portal SST", href: "/sst" },
-  { id: "dho", label: "Portal DHO", href: "/dho" },
+  { id: "dho", label: "Portal ENDO", href: "/dho" },
 ] as const;
 
 const MODULOS_SST = [

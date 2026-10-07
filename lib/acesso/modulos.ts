@@ -74,7 +74,7 @@ const MODULOS_DHO: ModuloAcesso[] = [
 export const PORTAIS_ACESSO: PortalAcesso[] = [
   { chave: "dp", label: "Portal DP", modulos: MODULOS_DP },
   { chave: "sst", label: "Portal SST", modulos: MODULOS_SST },
-  { chave: "dho", label: "Portal DHO", modulos: MODULOS_DHO },
+  { chave: "dho", label: "Portal ENDO", modulos: MODULOS_DHO },
 ];
 
 /** Mantido pelo nome antigo — só o Portal DP, pra quem já importava a lista solta. */
