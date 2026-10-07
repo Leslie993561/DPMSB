@@ -616,7 +616,7 @@ function AnexarExameModal({
 
         <div>
           <p className="text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">
-            {alteracaoCargo ? "Exames do novo cargo" : "Exames vencidos"}
+            {alteracaoCargo ? "Exames do novo cargo" : "Exames da função"}
           </p>
           {alteracaoCargo ? (
             <p className="mt-1 text-[11.5px] text-foreground-muted">
@@ -626,16 +626,21 @@ function AnexarExameModal({
                   : "Exames exigidos para o novo cargo — desmarque o que não for realizado."
                 : "Selecione o novo cargo para ver os exames."}
             </p>
-          ) : vencidos.length === 0 ? (
+          ) : (
             <p className="mt-1 text-[11.5px] text-foreground-muted">
-              Nenhum exame vencido pra esta função no momento — marque abaixo se quiser registrar mesmo assim.
+              {vencidos.length === 0
+                ? "Nenhum exame vencido pra esta função no momento — marque abaixo se quiser registrar mesmo assim."
+                : "Os vencidos já vêm marcados; os demais exames da função também podem ser registrados."}
             </p>
-          ) : null}
+          )}
           <div className="mt-1.5 flex flex-col divide-y divide-hairline/70 rounded-md border border-hairline">
-            {(alteracaoCargo ? examesDoNovoCargo : vencidos.length > 0 ? vencidos.map((v) => v.exame) : colaborador.examesObrigatorios).map((exame) => (
+            {(alteracaoCargo ? examesDoNovoCargo : colaborador.examesObrigatorios).map((exame) => (
               <label key={exame} className="flex items-center gap-2 px-2.5 py-1.5 text-[12px] text-foreground">
                 <input type="checkbox" checked={marcados.has(exame)} onChange={() => alternar(exame)} className="accent-brand-primary" />
                 {exame}
+                {!alteracaoCargo && !vencidos.some((v) => v.exame === exame) && (
+                  <span className="text-[10.5px] text-foreground-muted">· em dia</span>
+                )}
               </label>
             ))}
           </div>
