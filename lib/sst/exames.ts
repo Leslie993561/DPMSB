@@ -234,10 +234,65 @@ function somarMeses(dataBr: string, meses: number): string | null {
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
 }
 
+/**
+ * ECG — periodicidade por idade (ambos os sexos): 40 anos completos ou mais na
+ * data de referência → a cada 12 meses. Abaixo de 40 não se aplica
+ * automaticamente (nem exige, nem vence). Sem data de nascimento não dá pra
+ * saber a idade, então a regra também não se aplica.
+ */
+const EXAME_ECG = "ECG";
+const IDADE_MINIMA_ECG = 40;
+const MESES_ECG = 12;
+
+/** Data de nascimento do cadastro (ISO "aaaa-mm-dd" ou "DD/MM/AAAA") → Date local, ou null. */
+function parseNascimento(valor: string | null | undefined): Date | null {
+  const s = (valor ?? "").trim();
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  const br = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s);
+  const [a, m, d] = iso ? [iso[1], iso[2], iso[3]] : br ? [br[3], br[2], br[1]] : [];
+  if (!a) return null;
+  const data = new Date(Number(a), Number(m) - 1, Number(d));
+  return Number.isNaN(data.getTime()) ? null : data;
+}
+
+/** Idade completa em anos na data de referência; null se não há data de nascimento válida. */
+function idadeEm(nascimento: string | null | undefined, referencia: Date): number | null {
+  const n = parseNascimento(nascimento);
+  if (!n) return null;
+  let idade = referencia.getFullYear() - n.getFullYear();
+  if (referencia.getMonth() < n.getMonth() || (referencia.getMonth() === n.getMonth() && referencia.getDate() < n.getDate())) idade--;
+  return idade;
+}
+
+function ecgSeAplica(nascimento: string | null | undefined, referencia: Date): boolean {
+  const idade = idadeEm(nascimento, referencia);
+  return idade !== null && idade >= IDADE_MINIMA_ECG;
+}
+
+function dataBrParaDate(dataBr: string): Date | null {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dataBr.trim());
+  return m ? new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1])) : null;
+}
+
 /** Próxima data prevista pra um exame, a partir de quando foi feito — null se o exame não repete ("Sem periódico"). */
-function calcularDataPrevista(exame: string, dataRealizacaoBr: string): string | null {
+function calcularDataPrevista(exame: string, dataRealizacaoBr: string, nascimento?: string | null): string | null {
+  if (exame === EXAME_ECG) {
+    const feitoEm = dataBrParaDate(dataRealizacaoBr);
+    return feitoEm && ecgSeAplica(nascimento, feitoEm) ? somarMeses(dataRealizacaoBr, MESES_ECG) : null;
+  }
   const meses = mesesDaPeriodicidade(exame);
   return meses ? somarMeses(dataRealizacaoBr, meses) : null;
+}
+
+/** Datas de nascimento (como no cadastro) dos colaboradores — a idade decide a regra do ECG. */
+async function obterNascimentos(ids?: number[]): Promise<Map<number, string | null>> {
+  const linhas = ids
+    ? await sstQuery<{ id: number; data_nascimento: string | null }>(
+        "SELECT id, data_nascimento FROM colaboradores WHERE id = ANY($1)",
+        [ids],
+      )
+    : await sstQuery<{ id: number; data_nascimento: string | null }>("SELECT id, data_nascimento FROM colaboradores");
+  return new Map(linhas.map((l) => [Number(l.id), l.data_nascimento]));
 }
 
 /** "DD/MM/AAAA" já passou da data de hoje? */
@@ -278,15 +333,23 @@ export interface ExameVencido {
 /** Exames obrigatórios da função que estão vencidos (nunca feitos ou fora da periodicidade) — o que entra no checklist de "Anexar exame". */
 function calcularVencidos(
   examesObrigatorios: string[],
-  realizados: Map<string, { dataPrevista: string | null }>,
+  realizados: Map<string, { dataRealizacao?: string; dataPrevista: string | null }>,
   hoje = new Date(),
+  nascimento?: string | null,
 ): ExameVencido[] {
+  /** Data prevista efetiva: o ECG recalcula pela idade de hoje (quem fez antes dos 40 e já completou 40 passa a ter 12 meses). */
+  const previstaDe = (exame: string): string | null => {
+    const info = realizados.get(exame);
+    if (exame === EXAME_ECG && info?.dataRealizacao && ecgSeAplica(nascimento, hoje)) return somarMeses(info.dataRealizacao, MESES_ECG);
+    return info?.dataPrevista ?? null;
+  };
   return examesObrigatorios
     .filter((exame) => {
-      const info = realizados.get(exame);
-      return exameVencido(info?.dataPrevista, Boolean(info), hoje);
+      // ECG abaixo de 40 anos: regra não se aplica automaticamente, não entra como vencido.
+      if (exame === EXAME_ECG && !ecgSeAplica(nascimento, hoje)) return false;
+      return exameVencido(previstaDe(exame), realizados.has(exame), hoje);
     })
-    .map((exame) => ({ exame, dataVencimento: realizados.get(exame)?.dataPrevista ?? null }));
+    .map((exame) => ({ exame, dataVencimento: previstaDe(exame) }));
 }
 
 // ---------- Colaboradores (mesmo cadastro do Quadro, igual Gestão de EPI) ----------
@@ -310,19 +373,20 @@ export interface ColaboradorExame {
  * exame, ver mais abaixo) — igual à situação de EPI.
  */
 export async function listarColaboradoresParaExames(): Promise<ColaboradorExame[]> {
-  const [todos, mapaExames, ultimasRealizacoes] = await Promise.all([
+  const [todos, mapaExames, nascimentos, ultimasRealizacoes] = await Promise.all([
     listarColaboradores(),
     obterExamesPorFuncao(),
-    sstQuery<{ colab_id: string; exame: string; data_prevista: string | null }>(
-      `SELECT DISTINCT ON (colab_id, exame) colab_id, exame, data_prevista FROM sst_exames_realizados
+    obterNascimentos(),
+    sstQuery<{ colab_id: string; exame: string; data_realizacao: string; data_prevista: string | null }>(
+      `SELECT DISTINCT ON (colab_id, exame) colab_id, exame, data_realizacao, data_prevista FROM sst_exames_realizados
          ORDER BY colab_id, exame, to_date(NULLIF(data_realizacao, ''), 'DD/MM/YYYY') DESC NULLS LAST, created_at DESC`,
     ),
   ]);
-  const realizadosPorColaborador = new Map<number, Map<string, { dataPrevista: string | null }>>();
+  const realizadosPorColaborador = new Map<number, Map<string, { dataRealizacao: string; dataPrevista: string | null }>>();
   for (const r of ultimasRealizacoes) {
     const id = Number(r.colab_id);
-    const mapa = realizadosPorColaborador.get(id) ?? new Map<string, { dataPrevista: string | null }>();
-    mapa.set(r.exame, { dataPrevista: r.data_prevista });
+    const mapa = realizadosPorColaborador.get(id) ?? new Map<string, { dataRealizacao: string; dataPrevista: string | null }>();
+    mapa.set(r.exame, { dataRealizacao: r.data_realizacao, dataPrevista: r.data_prevista });
     realizadosPorColaborador.set(id, mapa);
   }
 
@@ -332,7 +396,7 @@ export async function listarColaboradoresParaExames(): Promise<ColaboradorExame[
     .map((c) => {
       const funcao = funcaoCorrespondente(c.cargo, c.departamento, FUNCOES_MATRIZ_EXAMES);
       const examesObrigatorios = funcao ? (mapaExames.get(funcao) ?? []) : [];
-      const vencidos = calcularVencidos(examesObrigatorios, realizadosPorColaborador.get(c.id) ?? new Map(), hoje);
+      const vencidos = calcularVencidos(examesObrigatorios, realizadosPorColaborador.get(c.id) ?? new Map(), hoje, nascimentos.get(c.id));
       return {
         id: c.id,
         nome: c.nome,
@@ -394,6 +458,7 @@ export async function criarFichaExame(nova: NovaFichaExame, responsavel: string)
   if (nova.exames.length === 0) throw new Error("Selecione ao menos um exame.");
 
   const fichaId = randomUUID();
+  const nascimento = (await obterNascimentos([colaborador.id])).get(colaborador.id);
   await sstTransacao(async (q) => {
     await q(
       `INSERT INTO sst_fichas_exame (id, colab_id, tipo_aso, novo_cargo, data_promocao, anexo_url, anexo_nome, responsavel)
@@ -401,7 +466,7 @@ export async function criarFichaExame(nova: NovaFichaExame, responsavel: string)
       [fichaId, colaborador.id, nova.tipoAso, nova.novoCargo ?? null, nova.dataPromocao ?? null, nova.anexoUrl ?? null, nova.anexoNome ?? null, responsavel],
     );
     for (const item of nova.exames) {
-      const dataPrevista = calcularDataPrevista(item.exame, item.dataRealizacao);
+      const dataPrevista = calcularDataPrevista(item.exame, item.dataRealizacao, nascimento);
       await q(
         `INSERT INTO sst_exames_realizados (id, ficha_id, colab_id, exame, data_realizacao, data_prevista)
          VALUES ($1, $2, $3, $4, $5, $6)`,
@@ -460,8 +525,8 @@ export async function listarFichasExameDoColaborador(colaboradorId: number): Pro
 
 /** Exames obrigatórios da função que ainda estão vencidos — é o checklist de "Anexar exame ocupacional" (só o que falta, não a lista toda). */
 export async function obterExamesVencidosDoColaborador(colaboradorId: number, examesObrigatorios: string[]): Promise<ExameVencido[]> {
-  const realizados = await obterUltimasRealizacoes(colaboradorId);
-  return calcularVencidos(examesObrigatorios, realizados);
+  const [realizados, nascimentos] = await Promise.all([obterUltimasRealizacoes(colaboradorId), obterNascimentos([colaboradorId])]);
+  return calcularVencidos(examesObrigatorios, realizados, new Date(), nascimentos.get(colaboradorId));
 }
 
 export async function obterAnexoFichaExame(fichaId: string): Promise<{ url: string; nome: string | null } | null> {
@@ -486,11 +551,15 @@ export async function atualizarFichaExame(
     );
     if (atualizadas.length === 0) return false;
     await q("DELETE FROM sst_exames_realizados WHERE ficha_id = $1", [fichaId]);
+    const [{ data_nascimento: nascimento } = { data_nascimento: null }] = await q<{ data_nascimento: string | null }>(
+      "SELECT data_nascimento FROM colaboradores WHERE id = $1",
+      [atualizadas[0].colab_id],
+    );
     for (const item of dados.exames) {
       await q(
         `INSERT INTO sst_exames_realizados (id, ficha_id, colab_id, exame, data_realizacao, data_prevista)
          VALUES ($1, $2, $3, $4, $5, $6)`,
-        [randomUUID(), fichaId, atualizadas[0].colab_id, item.exame, item.dataRealizacao, calcularDataPrevista(item.exame, item.dataRealizacao)],
+        [randomUUID(), fichaId, atualizadas[0].colab_id, item.exame, item.dataRealizacao, calcularDataPrevista(item.exame, item.dataRealizacao, nascimento)],
       );
     }
     return true;
