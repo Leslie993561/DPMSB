@@ -878,6 +878,9 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
   const [temDependente, setTemDependente] = useState(false);
   const [dependentesForm, setDependentesForm] = useState<DependenteForm[]>([]);
 
+  const [fezExameDemissional, setFezExameDemissional] = useState(false);
+  const [dataExameDemissional, setDataExameDemissional] = useState("");
+  const [anexoExameDemissional, setAnexoExameDemissional] = useState<File | null>(null);
   /** Colaborador existente abre travado — só fica editável depois de clicar no lápis. Cadastro novo já nasce editável. */
   const [modoEdicao, setModoEdicao] = useState(false);
   const bloqueado = Boolean(editando) && !modoEdicao;
@@ -1069,8 +1072,29 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           status: "desligado",
+    if (fezExameDemissional && !anexoExameDemissional) {
+      setErro("Anexe o PDF do exame demissional ou marque \"Não\".");
+      return;
+    }
+    if (fezExameDemissional && anexoExameDemissional?.type !== "application/pdf") {
+      setErro("O exame demissional deve ser um PDF.");
+      return;
+    }
           dataDesligamento,
           motivoDesligamento: motivoDesligamento || null,
+      // Sobe o PDF antes de desligar: se falhar, nada foi alterado.
+      let anexo: { url: string; nome: string } | null = null;
+      if (fezExameDemissional && anexoExameDemissional) {
+        const form = new FormData();
+        form.append("arquivo", anexoExameDemissional);
+        const up = await fetch("/api/sst/exames/anexo", { method: "POST", body: form });
+        const upDados = await up.json();
+        if (!up.ok) {
+          setErro(upDados.erro ?? "Falha ao anexar o exame demissional.");
+          return;
+        }
+        anexo = { url: upDados.url, nome: upDados.nome };
+      }
           valorRescisao: valorRescisao ? Number(valorRescisao) : null,
           valorFgts: valorFgts ? Number(valorFgts) : null,
         }),
@@ -1087,6 +1111,25 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
       setSalvando(false);
     }
   }
+      if (anexo) {
+        const ficha = await fetch("/api/sst/exames/fichas", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            colaboradorId: editando.id,
+            tipoAso: "demissional",
+            exames: [{ exame: "AVALIAÇÃO CLINICA OCUPACIONAL", dataRealizacao: dataExameDemissional || dataDesligamento }],
+            anexoUrl: anexo.url,
+            anexoNome: anexo.nome,
+          }),
+        });
+        if (!ficha.ok) {
+          setErro(
+            `Colaborador desligado, mas o exame demissional não foi registrado (${(await ficha.json()).erro ?? "erro"}). Anexe em Exames Ocupacionais.`,
+          );
+          return;
+        }
+      }
 
   async function handleReativar() {
     if (!editando) return;
@@ -1178,6 +1221,64 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
             type="button"
             onClick={() => setDesligando(false)}
             className="rounded border border-hairline px-3 py-1.5 text-[12px] font-medium text-foreground-muted transition-colors hover:bg-surface-page dark:border-brand-neutral/30"
+        <fieldset className="flex flex-col gap-1 text-[10px] font-normal text-foreground-muted">
+          <legend>Fez o exame demissional?</legend>
+          <div className="flex items-center gap-4 text-[12px] text-foreground">
+            <label className="flex items-center gap-1.5">
+              <input
+                type="radio"
+                name="exame-demissional"
+                checked={fezExameDemissional}
+                onChange={() => setFezExameDemissional(true)}
+                className="accent-brand-primary"
+              />
+              Sim
+            </label>
+            <label className="flex items-center gap-1.5">
+              <input
+                type="radio"
+                name="exame-demissional"
+                checked={!fezExameDemissional}
+                onChange={() => {
+                  setFezExameDemissional(false);
+                  setAnexoExameDemissional(null);
+                }}
+                className="accent-brand-primary"
+              />
+              Não
+            </label>
+          </div>
+        </fieldset>
+
+        {fezExameDemissional && (
+          <div className="flex flex-col gap-2 rounded border border-hairline bg-surface-page p-2">
+            <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+              Data do exame
+              <input
+                type="date"
+                value={dataExameDemissional || dataDesligamento}
+                onChange={(e) => setDataExameDemissional(e.target.value)}
+                className={INPUT_CLASS}
+              />
+            </label>
+            <div className="flex items-center gap-2 text-[11px]">
+              <label className="cursor-pointer font-medium text-brand-primary hover:text-brand-primary-hover">
+                {anexoExameDemissional ? "Trocar PDF" : "📎 Anexar exame demissional (PDF)"}
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  className="hidden"
+                  onChange={(e) => {
+                    setAnexoExameDemissional(e.target.files?.[0] ?? null);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              {anexoExameDemissional && <span className="truncate text-foreground-muted">{anexoExameDemissional.name}</span>}
+            </div>
+          </div>
+        )}
+
           >
             Voltar
           </button>
