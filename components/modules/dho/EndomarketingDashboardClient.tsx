@@ -8,6 +8,7 @@ import { GraficoBarrasMensal } from "@/components/shared/GraficoBarrasMensal";
 import { Modal } from "@/components/shared/Modal";
 import { formatarDataBr, formatarMoeda } from "@/lib/format";
 import { cn } from "@/lib/cn";
+import { exportarCalendarioPdf } from "@/lib/dho/exportarCalendarioPdf";
 import type { CategoriaDataComemorativa, DataComemorativa, EventoCalendario, ItemEvento, LinhaOrcamentoMes } from "@/lib/db/dho";
 
 export type AbaEndomarketing = "calendario" | "lancamentos" | "orcamento";
@@ -579,6 +580,22 @@ export function EndomarketingDashboardClient({
   const totalUtilizado = orcamento.reduce((s, l) => s + l.utilizado, 0);
   const totalGap = totalAprovado - totalUtilizado;
 
+  const [exportando, setExportando] = useState(false);
+  async function exportarCalendario() {
+    setExportando(true);
+    try {
+      await exportarCalendarioPdf(
+        ano,
+        datasComemorativas.map((d) => ({ data: d.data, nome: d.nome, categoria: d.categoria })),
+        eventos.map((e) => ({ data: e.data, dataFim: e.dataFim, titulo: e.titulo })),
+      );
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Não foi possível exportar o calendário.");
+    } finally {
+      setExportando(false);
+    }
+  }
+
   const seletorAno = (
     <div className="flex items-center gap-1.5">
       <button
@@ -621,7 +638,17 @@ export function EndomarketingDashboardClient({
         <div className="space-y-3">
           <Card className="flex items-center justify-between p-3">
             <p className="text-[12px] font-semibold text-foreground">{ano}</p>
-            {seletorAno}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void exportarCalendario()}
+                disabled={exportando}
+                className="rounded border border-hairline px-2.5 py-1 text-[11px] font-medium text-brand-primary hover:bg-brand-primary-050 disabled:opacity-50"
+              >
+                {exportando ? "Gerando PDF..." : "Exportar calendário (PDF)"}
+              </button>
+              {seletorAno}
+            </div>
           </Card>
 
           <Card className="p-4">
