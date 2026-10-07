@@ -242,6 +242,29 @@ const ESQUEMA_EXTRA = `
     created_at timestamptz NOT NULL DEFAULT now()
   );
 
+  -- Fatura mensal da clínica de exames (importada do PDF). Uma por fechamento;
+  -- reimportar o mesmo mês substitui. itens = ASOs com seus exames e valores.
+  CREATE TABLE IF NOT EXISTS sst_faturas_exame (
+    id text PRIMARY KEY,
+    fechamento text NOT NULL,
+    competencia text NOT NULL UNIQUE,
+    total numeric NOT NULL,
+    arquivo_nome text NOT NULL DEFAULT '',
+    itens jsonb NOT NULL DEFAULT '[]',
+    created_at timestamptz NOT NULL DEFAULT now()
+  );
+
+  -- Documentos do mês da clínica de exames: fatura, nota fiscal e boleto.
+  -- Um por tipo em cada competência (aaaa-mm); anexar de novo substitui.
+  CREATE TABLE IF NOT EXISTS sst_faturas_anexos (
+    competencia text NOT NULL,
+    tipo text NOT NULL,
+    url text NOT NULL,
+    nome text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (competencia, tipo)
+  );
+
   -- Programas de saúde ocupacional (PCMSO, LTCAT, PGR): uma linha por versão
   -- carregada, nunca sobrescrita — histórico fica intacto e o "vigente" é
   -- sempre a versão de maior ts (ver versoesMaisRecentes, domain.ts).

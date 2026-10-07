@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/cn";
@@ -1282,6 +1282,7 @@ function CustosTab({ custos }: { custos: LinhaCustoExame[] }) {
     <div className="space-y-4">
       <Card className="overflow-x-auto p-0">
         <table className="w-full text-[12px]">
+      <FaturasMensais />
           <thead>
             <tr className="border-b border-hairline bg-background text-left font-bold tracking-wide text-foreground-muted uppercase">
               <th className="px-3 py-2 text-[10.5px]">Código</th>
@@ -1331,5 +1332,369 @@ function CustosTab({ custos }: { custos: LinhaCustoExame[] }) {
         realização) — ainda 0 em todo lugar até existir esse registro no módulo.
       </p>
     </div>
+  );
+}
+
+interface FaturaResumo {
+  id: string;
+  fechamento: string;
+  competencia: string;
+  total: number;
+  arquivoNome: string;
+  asos: { tipo: string; colaborador: string; data: string; valor: number; exames: { codigo: string; nome: string; valor: number }[] }[];
+}
+
+type TipoAnexoFatura = "fatura" | "nf" | "boleto";
+const ROTULO_ANEXO_FATURA: Record<TipoAnexoFatura, string> = { fatura: "Fatura", nf: "NF", boleto: "Boleto" };
+interface AnexoFaturaResumo {
+  competencia: string;
+  tipo: TipoAnexoFatura;
+  nome: string;
+}
+
+/** "2026-09" → "09/2026". */
+const formatarCompetencia = (c: string) => `${c.slice(5, 7)}/${c.slice(0, 4)}`;
+
+/** Adivinha o tipo pelo nome do arquivo (ex.: "NF 1234.pdf", "boleto_set.pdf"). */
+function tipoPeloNome(nome: string): TipoAnexoFatura | null {
+  const n = nome.toLowerCase();
+  if (/boleto/.test(n)) return "boleto";
+  if (/(^|[^a-z])(nf|nfe|nfs|nota)/.test(n)) return "nf";
+  if (/fatura/.test(n)) return "fatura";
+  return null;
+}
+
+/** Escolhe o mês e anexa fatura, NF e boleto de uma vez (seleção múltipla) ou um a um. */
+function AnexarDocumentosFaturaModal({ onFechar, onSalvo }: { onFechar: () => void; onSalvo: () => void }) {
+  const [competencia, setCompetencia] = useState(() => new Date().toISOString().slice(0, 7));
+  const [arquivos, setArquivos] = useState<Partial<Record<TipoAnexoFatura, File>>>({});
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  function distribuir(lista: File[]) {
+    setArquivos((atual) => {
+      const novo = { ...atual };
+      const sobras: File[] = [];
+      const usados = new Set<TipoAnexoFatura>();
+      for (const f of lista) {
+        const tipo = tipoPeloNome(f.name);
+        if (tipo && !usados.has(tipo)) {
+          novo[tipo] = f;
+          usados.add(tipo);
+        }
+        else sobras.push(f);
+      }
+      for (const f of sobras) {
+        const livre = (["fatura", "nf", "boleto"] as const).find((t) => !novo[t]);
+        if (livre) novo[livre] = f;
+      }
+      return novo;
+    });
+  }
+
+  async function salvar() {
+    const enviar = Object.entries(arquivos) as [TipoAnexoFatura, File][];
+    if (enviar.length === 0) {
+      setErro("Anexe ao menos um arquivo.");
+      return;
+    }
+    setEnviando(true);
+    setErro(null);
+    try {
+      const form = new FormData();
+      form.append("competencia", competencia);
+      for (const [tipo, arquivo] of enviar) form.append(tipo, arquivo);
+      const r = await fetch("/api/sst/exames/faturas/anexos", { method: "POST", body: form });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.erro ?? "Falha ao anexar.");
+      onSalvo();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Falha ao anexar.");
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <Modal
+      aberto
+      onFechar={onFechar}
+      eyebrow="Exames Ocupacionais"
+      titulo="Anexar documentos do mês"
+      subtitulo="Fatura, nota fiscal e boleto da clínica"
+      largura="32rem"
+      rodape={
+        <div className="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onFechar}
+            className="rounded border border-hairline px-3 py-1.5 text-[12px] font-medium text-foreground hover:bg-surface-page"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={() => void salvar()}
+            disabled={enviando}
+            className="rounded bg-brand-primary px-3 py-1.5 text-[12px] font-medium text-brand-white hover:bg-brand-primary-hover disabled:opacity-50"
+          >
+            {enviando ? "Enviando..." : "Salvar"}
+          </button>
+        </div>
+      }
+    >
+      <div className="flex flex-col gap-3">
+        <label className="block text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">
+          Mês
+          <input type="month" value={competencia} onChange={(e) => setCompetencia(e.target.value)} className="mt-1 w-full rounded border border-hairline bg-background px-2.5 py-1.5 text-[12px] font-normal normal-case text-foreground outline-none focus:border-brand-primary" />
+        </label>
+
+        <label className="flex cursor-pointer items-center justify-center rounded-md border border-dashed border-brand-primary/50 px-3 py-3 text-[12px] font-medium text-brand-primary hover:bg-brand-primary-050">
+          📎 Selecionar os 3 arquivos de uma vez
+          <input
+            type="file"
+            multiple
+            accept="application/pdf,image/png,image/jpeg"
+            className="hidden"
+            onChange={(e) => {
+              distribuir(Array.from(e.target.files ?? []));
+              e.target.value = "";
+            }}
+          />
+        </label>
+
+        <div className="flex flex-col divide-y divide-hairline/70 rounded-md border border-hairline">
+          {(["fatura", "nf", "boleto"] as const).map((tipo) => (
+            <div key={tipo} className="flex items-center gap-2 px-2.5 py-1.5 text-[12px]">
+              <span className="w-14 font-semibold text-foreground">{ROTULO_ANEXO_FATURA[tipo]}</span>
+              <span className="min-w-0 flex-1 truncate text-foreground-muted">{arquivos[tipo]?.name ?? "—"}</span>
+              <label className="cursor-pointer text-[11px] font-medium text-brand-primary hover:underline">
+                {arquivos[tipo] ? "Trocar" : "Escolher"}
+                <input
+                  type="file"
+                  accept="application/pdf,image/png,image/jpeg"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) setArquivos((a) => ({ ...a, [tipo]: f }));
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              {arquivos[tipo] && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setArquivos((a) => {
+                      const { [tipo]: _removido, ...resto } = a;
+                      return resto;
+                    })
+                  }
+                  aria-label={`Remover ${ROTULO_ANEXO_FATURA[tipo]}`}
+                  className="text-foreground-muted hover:text-status-danger"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+        <p className="text-[11px] text-foreground-muted">
+          PDF, PNG ou JPG, até 10MB cada. Os arquivos são encaixados pelo nome (fatura, nf/nota, boleto); ajuste abaixo se precisar. Anexar de novo substitui o do mesmo tipo.
+        </p>
+        {erro && <p className="text-[11.5px] text-status-danger">{erro}</p>}
+      </div>
+    </Modal>
+  );
+}
+
+/** Importação da fatura mensal da clínica (PDF) e histórico do que foi gasto por mês. */
+function FaturasMensais() {
+  const router = useRouter();
+  const [faturas, setFaturas] = useState<FaturaResumo[]>([]);
+  const [enviando, setEnviando] = useState(false);
+  const [aviso, setAviso] = useState<{ tipo: "ok" | "erro"; texto: string } | null>(null);
+  const [aberta, setAberta] = useState<string | null>(null);
+  const [anexos, setAnexos] = useState<AnexoFaturaResumo[]>([]);
+  const [anexando, setAnexando] = useState(false);
+
+  const carregar = useCallback(async () => {
+    const [resp, respAnexos] = await Promise.all([fetch("/api/sst/exames/faturas"), fetch("/api/sst/exames/faturas/anexos")]);
+    if (resp.ok) setFaturas(((await resp.json()) as { faturas: FaturaResumo[] }).faturas);
+    if (respAnexos.ok) setAnexos(((await respAnexos.json()) as { anexos: AnexoFaturaResumo[] }).anexos);
+  }, []);
+  useEffect(() => {
+    void carregar();
+  }, [carregar]);
+
+  async function importar(arquivo: File) {
+    setEnviando(true);
+    setAviso(null);
+    const form = new FormData();
+    form.append("arquivo", arquivo);
+    const resp = await fetch("/api/sst/exames/faturas", { method: "POST", body: form });
+    const dados = (await resp.json().catch(() => ({}))) as {
+      erro?: string;
+      fechamento?: string;
+      total?: number;
+      asos?: number;
+      substituiu?: boolean;
+      divergeDaSoma?: boolean;
+    };
+    setEnviando(false);
+    if (!resp.ok) {
+      setAviso({ tipo: "erro", texto: dados.erro ?? "Não foi possível importar a fatura." });
+      return;
+    }
+    setAviso({
+      tipo: "ok",
+      texto: `Fatura de ${dados.fechamento} ${dados.substituiu ? "substituída" : "importada"}: ${dados.asos} ASO(s), total ${formatarMoeda(dados.total ?? 0)}.${dados.divergeDaSoma ? " Atenção: a soma dos ASOs difere do total impresso na fatura." : ""}`,
+    });
+    await carregar();
+    router.refresh();
+  }
+
+  async function excluirAnexo(a: AnexoFaturaResumo) {
+    if (!window.confirm(`Remover ${ROTULO_ANEXO_FATURA[a.tipo]} de ${formatarCompetencia(a.competencia)}?`)) return;
+    await fetch(`/api/sst/exames/faturas/anexos/${a.competencia}/${a.tipo}`, { method: "DELETE" });
+    await carregar();
+  }
+
+  async function excluir(id: string) {
+    if (!window.confirm("Excluir esta fatura importada?")) return;
+    await fetch(`/api/sst/exames/faturas/${id}`, { method: "DELETE" });
+    await carregar();
+    router.refresh();
+  }
+
+  return (
+    <Card className="space-y-3 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-[13px] font-semibold text-foreground">Faturas mensais da clínica</p>
+          <p className="text-[11px] text-foreground-muted">Importe o PDF da fatura de cada mês. Reimportar o mesmo mês substitui a anterior.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setAnexando(true)}
+          title="Anexar fatura, NF e boleto do mês"
+          aria-label="Anexar documentos do mês"
+          className="ml-auto rounded-md border border-hairline px-2.5 py-1.5 text-[14px] text-brand-primary hover:bg-brand-primary-100"
+        >
+          📎
+        </button>
+        <label
+          className={cn(
+            "cursor-pointer rounded-md bg-brand-primary px-3 py-1.5 text-[12px] font-semibold text-brand-white hover:bg-brand-primary-hover",
+            enviando && "pointer-events-none opacity-60",
+          )}
+        >
+          {enviando ? "Importando…" : "Importar fatura (PDF)"}
+          <input
+            type="file"
+            accept="application/pdf"
+            className="hidden"
+            onChange={(e) => {
+              const arquivo = e.target.files?.[0];
+              e.target.value = "";
+              if (arquivo) void importar(arquivo);
+            }}
+          />
+        </label>
+      </div>
+
+      {aviso && (
+        <p className={cn("rounded-md px-3 py-2 text-[12px]", aviso.tipo === "ok" ? "bg-status-success-bg text-status-success" : "bg-status-danger-bg text-status-danger")}>
+          {aviso.texto}
+        </p>
+      )}
+
+      {anexos.length > 0 && (
+        <div className="flex flex-col divide-y divide-hairline/60 rounded-md border border-hairline text-[12px]">
+          {[...new Set(anexos.map((a) => a.competencia))].map((competencia) => (
+            <div key={competencia} className="flex flex-wrap items-center gap-2 px-3 py-1.5">
+              <span className="w-20 font-semibold text-foreground">{formatarCompetencia(competencia)}</span>
+              {anexos
+                .filter((a) => a.competencia === competencia)
+                .map((a) => (
+                  <span key={a.tipo} className="flex items-center gap-1 rounded-full border border-hairline bg-surface-page px-2 py-0.5 text-[11px]">
+                    <a
+                      href={`/api/sst/exames/faturas/anexos/${competencia}/${a.tipo}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      title={a.nome}
+                      className="font-medium text-brand-primary hover:underline"
+                    >
+                      📎 {ROTULO_ANEXO_FATURA[a.tipo]}
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => void excluirAnexo(a)}
+                      aria-label={`Remover ${ROTULO_ANEXO_FATURA[a.tipo]} de ${formatarCompetencia(competencia)}`}
+                      className="text-foreground-muted hover:text-status-danger"
+                    >
+                      ✕
+                    </button>
+                  </span>
+                ))}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {anexando && (
+        <AnexarDocumentosFaturaModal
+          onFechar={() => setAnexando(false)}
+          onSalvo={() => {
+            setAnexando(false);
+            void carregar();
+          }}
+        />
+      )}
+
+      {faturas.length > 0 && (
+        <div className="overflow-hidden rounded-md border border-hairline">
+          <table className="w-full text-[12px]">
+            <thead>
+              <tr className="border-b border-hairline bg-surface-page text-left text-[10.5px] font-bold tracking-wide text-foreground-muted uppercase">
+                <th className="px-3 py-1.5">Fechamento</th>
+                <th className="px-3 py-1.5 text-right">ASOs</th>
+                <th className="px-3 py-1.5 text-right">Total</th>
+                <th className="px-3 py-1.5" />
+              </tr>
+            </thead>
+            <tbody>
+              {faturas.map((f) => (
+                <Fragment key={f.id}>
+                  <tr className="border-t border-hairline/60">
+                    <td className="px-3 py-1.5 font-semibold text-foreground">{f.fechamento}</td>
+                    <td className="px-3 py-1.5 text-right text-foreground-muted">{f.asos.length}</td>
+                    <td className="px-3 py-1.5 text-right font-semibold text-brand-primary-800">{formatarMoeda(f.total)}</td>
+                    <td className="space-x-3 px-3 py-1.5 text-right">
+                      <button type="button" onClick={() => setAberta(aberta === f.id ? null : f.id)} className="text-[11px] font-medium text-brand-primary hover:underline">
+                        {aberta === f.id ? "Ocultar" : "Detalhar"}
+                      </button>
+                      <button type="button" onClick={() => void excluir(f.id)} className="text-[11px] font-medium text-status-danger hover:underline">
+                        Excluir
+                      </button>
+                    </td>
+                  </tr>
+                  {aberta === f.id &&
+                    f.asos.map((a, i) => (
+                      <tr key={i} className="border-t border-hairline/40 bg-surface-page/60 text-[11.5px]">
+                        <td className="px-3 py-1 text-foreground-muted">{a.data}</td>
+                        <td className="px-3 py-1 text-foreground" colSpan={2}>
+                          {a.colaborador.toUpperCase()} <span className="text-foreground-muted">· {a.tipo} · {a.exames.length} exame(s)</span>
+                        </td>
+                        <td className="px-3 py-1 text-right text-foreground">{formatarMoeda(a.valor)}</td>
+                      </tr>
+                    ))}
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
   );
 }
