@@ -1372,6 +1372,21 @@ function AnexarDocumentosFaturaModal({ onFechar, onSalvo }: { onFechar: () => vo
   const [erro, setErro] = useState<string | null>(null);
 
   function distribuir(lista: File[]) {
+  const [anexados, setAnexados] = useState<AnexoFaturaResumo[]>([]);
+
+  const carregarAnexados = useCallback(async () => {
+    const r = await fetch("/api/sst/exames/faturas/anexos");
+    if (r.ok) setAnexados(((await r.json()) as { anexos: AnexoFaturaResumo[] }).anexos);
+  }, []);
+  useEffect(() => {
+    void carregarAnexados();
+  }, [carregarAnexados]);
+
+  async function removerAnexado(a: AnexoFaturaResumo) {
+    if (!window.confirm(`Remover ${ROTULO_ANEXO_FATURA[a.tipo]} de ${formatarCompetencia(a.competencia)}?`)) return;
+    await fetch(`/api/sst/exames/faturas/anexos/${a.competencia}/${a.tipo}`, { method: "DELETE" });
+    await carregarAnexados();
+  }
     setArquivos((atual) => {
       const novo = { ...atual };
       const sobras: File[] = [];
@@ -1409,6 +1424,8 @@ function AnexarDocumentosFaturaModal({ onFechar, onSalvo }: { onFechar: () => vo
       if (!r.ok) throw new Error(d.erro ?? "Falha ao anexar.");
       onSalvo();
     } catch (e) {
+      setArquivos({});
+      await carregarAnexados();
       setErro(e instanceof Error ? e.message : "Falha ao anexar.");
     } finally {
       setEnviando(false);
@@ -1501,6 +1518,34 @@ function AnexarDocumentosFaturaModal({ onFechar, onSalvo }: { onFechar: () => vo
         </div>
         <p className="text-[11px] text-foreground-muted">
           PDF, PNG ou JPG, até 10MB cada. Os arquivos são encaixados pelo nome (fatura, nf/nota, boleto); ajuste abaixo se precisar. Anexar de novo substitui o do mesmo tipo.
+        {anexados.some((a) => a.competencia === competencia) && (
+          <div className="flex flex-wrap items-center gap-2 text-[11px]">
+            <span className="font-semibold text-foreground-muted uppercase">Já anexados em {formatarCompetencia(competencia)}:</span>
+            {anexados
+              .filter((a) => a.competencia === competencia)
+              .map((a) => (
+                <span key={a.tipo} className="flex items-center gap-1 rounded-full border border-hairline bg-surface-page px-2 py-0.5">
+                  <a
+                    href={`/api/sst/exames/faturas/anexos/${a.competencia}/${a.tipo}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    title={a.nome}
+                    className="font-medium text-brand-primary hover:underline"
+                  >
+                    📎 {ROTULO_ANEXO_FATURA[a.tipo]}
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => void removerAnexado(a)}
+                    aria-label={`Remover ${ROTULO_ANEXO_FATURA[a.tipo]}`}
+                    className="text-foreground-muted hover:text-status-danger"
+                  >
+                    ✕
+                  </button>
+                </span>
+              ))}
+          </div>
+        )}
         </p>
         {erro && <p className="text-[11.5px] text-status-danger">{erro}</p>}
       </div>
@@ -1515,13 +1560,11 @@ function FaturasMensais() {
   const [enviando, setEnviando] = useState(false);
   const [aviso, setAviso] = useState<{ tipo: "ok" | "erro"; texto: string } | null>(null);
   const [aberta, setAberta] = useState<string | null>(null);
-  const [anexos, setAnexos] = useState<AnexoFaturaResumo[]>([]);
-  const [anexando, setAnexando] = useState(false);
+  const [anexandoDocs, setAnexandoDocs] = useState(false);
 
   const carregar = useCallback(async () => {
-    const [resp, respAnexos] = await Promise.all([fetch("/api/sst/exames/faturas"), fetch("/api/sst/exames/faturas/anexos")]);
+    const resp = await fetch("/api/sst/exames/faturas");
     if (resp.ok) setFaturas(((await resp.json()) as { faturas: FaturaResumo[] }).faturas);
-    if (respAnexos.ok) setAnexos(((await respAnexos.json()) as { anexos: AnexoFaturaResumo[] }).anexos);
   }, []);
   useEffect(() => {
     void carregar();
@@ -1554,12 +1597,6 @@ function FaturasMensais() {
     router.refresh();
   }
 
-  async function excluirAnexo(a: AnexoFaturaResumo) {
-    if (!window.confirm(`Remover ${ROTULO_ANEXO_FATURA[a.tipo]} de ${formatarCompetencia(a.competencia)}?`)) return;
-    await fetch(`/api/sst/exames/faturas/anexos/${a.competencia}/${a.tipo}`, { method: "DELETE" });
-    await carregar();
-  }
-
   async function excluir(id: string) {
     if (!window.confirm("Excluir esta fatura importada?")) return;
     await fetch(`/api/sst/exames/faturas/${id}`, { method: "DELETE" });
@@ -1576,7 +1613,7 @@ function FaturasMensais() {
         </div>
         <button
           type="button"
-          onClick={() => setAnexando(true)}
+          onClick={() => setAnexandoDocs(true)}
           title="Anexar fatura, NF e boleto do mês"
           aria-label="Anexar documentos do mês"
           className="ml-auto rounded-md border border-hairline px-2.5 py-1.5 text-[14px] text-brand-primary hover:bg-brand-primary-100"
@@ -1609,48 +1646,7 @@ function FaturasMensais() {
         </p>
       )}
 
-      {anexos.length > 0 && (
-        <div className="flex flex-col divide-y divide-hairline/60 rounded-md border border-hairline text-[12px]">
-          {[...new Set(anexos.map((a) => a.competencia))].map((competencia) => (
-            <div key={competencia} className="flex flex-wrap items-center gap-2 px-3 py-1.5">
-              <span className="w-20 font-semibold text-foreground">{formatarCompetencia(competencia)}</span>
-              {anexos
-                .filter((a) => a.competencia === competencia)
-                .map((a) => (
-                  <span key={a.tipo} className="flex items-center gap-1 rounded-full border border-hairline bg-surface-page px-2 py-0.5 text-[11px]">
-                    <a
-                      href={`/api/sst/exames/faturas/anexos/${competencia}/${a.tipo}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      title={a.nome}
-                      className="font-medium text-brand-primary hover:underline"
-                    >
-                      📎 {ROTULO_ANEXO_FATURA[a.tipo]}
-                    </a>
-                    <button
-                      type="button"
-                      onClick={() => void excluirAnexo(a)}
-                      aria-label={`Remover ${ROTULO_ANEXO_FATURA[a.tipo]} de ${formatarCompetencia(competencia)}`}
-                      className="text-foreground-muted hover:text-status-danger"
-                    >
-                      ✕
-                    </button>
-                  </span>
-                ))}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {anexando && (
-        <AnexarDocumentosFaturaModal
-          onFechar={() => setAnexando(false)}
-          onSalvo={() => {
-            setAnexando(false);
-            void carregar();
-          }}
-        />
-      )}
+      {anexandoDocs && <AnexarDocumentosFaturaModal onFechar={() => setAnexandoDocs(false)} onSalvo={() => setAnexandoDocs(false)} />}
 
       {faturas.length > 0 && (
         <div className="overflow-hidden rounded-md border border-hairline">
