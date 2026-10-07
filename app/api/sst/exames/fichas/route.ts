@@ -31,7 +31,7 @@ const dataIso = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 const schema = z.object({
   colaboradorId: z.number().int().positive(),
-  tipoAso: z.enum(["admissional", "periodico", "retorno", "demissional"]),
+  tipoAso: z.enum(["admissional", "periodico", "retorno", "demissional", "alteracao_cargo"]),
   exames: z.array(z.object({ exame: z.string().trim().min(1), dataRealizacao: dataIso })).min(1, "Selecione ao menos um exame."),
   anexoUrl: z.string().trim().min(1).nullable().optional(),
   anexoNome: z.string().trim().min(1).nullable().optional(),

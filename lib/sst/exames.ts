@@ -354,6 +354,7 @@ export const TIPOS_ASO = [
   { valor: "periodico", label: "Periódico" },
   { valor: "retorno", label: "Retorno ao Trabalho" },
   { valor: "demissional", label: "Demissional" },
+  { valor: "alteracao_cargo", label: "Alteração de Cargo" },
 ];
 
 export interface NovaFichaExame {

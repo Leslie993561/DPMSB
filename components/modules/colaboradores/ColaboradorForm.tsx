@@ -284,6 +284,7 @@ const LABEL_TIPO_ASO: Record<string, string> = {
   periodico: "Periódico",
   retorno: "Retorno ao Trabalho",
   demissional: "Demissional",
+  alteracao_cargo: "Alteração de Cargo",
 };
 
 /**

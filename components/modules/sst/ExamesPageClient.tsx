@@ -19,6 +19,7 @@ const TIPOS_ASO = [
   { valor: "periodico", label: "Periódico" },
   { valor: "retorno", label: "Retorno ao Trabalho" },
   { valor: "demissional", label: "Demissional" },
+  { valor: "alteracao_cargo", label: "Alteração de Cargo" },
 ];
 const LABEL_TIPO_ASO = new Map(TIPOS_ASO.map((t) => [t.valor, t.label]));
 
