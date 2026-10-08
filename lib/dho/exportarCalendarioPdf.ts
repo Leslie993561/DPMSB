@@ -31,7 +31,7 @@ const COR_NUMERO = "#2b3f47";
 const COR_MARCA_FORTE = "#79b1c0";
 const COR_MARCA_SUAVE = "#c3e1ee";
 const COR_MARCA_ACAO = "#4a8fa3";
-const COR_MARCA_D = "#e2edf2";
+const COR_MARCA_D = "#dfeef2";
 const COR_NOTA = "#6b7a82";
 
 const ROTULO_CATEGORIA: Record<DataParaPdf["categoria"], string> = {
@@ -65,7 +65,7 @@ function carregarImagem(src: string): Promise<HTMLImageElement | null> {
   });
 }
 
-async function desenharCalendario(ano: number, datas: DataParaPdf[], acoes: AcaoParaPdf[]): Promise<HTMLCanvasElement> {
+export async function renderizarCalendario(ano: number, datas: DataParaPdf[], acoes: AcaoParaPdf[]): Promise<HTMLCanvasElement> {
   const familia = getComputedStyle(document.body).fontFamily || "sans-serif";
   try {
     await Promise.all(["400", "500", "600", "700"].map((p) => document.fonts.load(`${p} 20px ${familia}`)));
@@ -102,11 +102,11 @@ async function desenharCalendario(ano: number, datas: DataParaPdf[], acoes: Acao
   const anoTxt = String(ano);
   ctx.fillStyle = COR_MARCA_D;
   ctx.textBaseline = "alphabetic";
-  ctx.font = fonte(700, 270);
+  ctx.font = fonte(700, 232);
   ctx.textAlign = "left";
-  ctx.fillText(anoTxt.slice(0, 2), -14, 204);
+  ctx.fillText(anoTxt.slice(0, 2), -22, 204);
   ctx.textAlign = "right";
-  ctx.fillText(anoTxt.slice(2), 642, 842);
+  ctx.fillText(anoTxt.slice(2), 655, 812);
 
   // Marcas por dia + lista de legendas por mês.
   const marcas = new Map<string, Marca>();
@@ -128,22 +128,23 @@ async function desenharCalendario(ano: number, datas: DataParaPdf[], acoes: Acao
     notasPorMes[Number(a.data.slice(5, 7)) - 1].push({ dia: a.data, rotulo: intervalo, texto: a.titulo });
   }
 
-  const centrosX = [126, 312, 498];
-  const topoTitulo = [38, 228, 420, 612];
+  // Centros e alturas medidos no modelo (a grade dele não é perfeitamente regular).
+  const centrosX = [127, 310, 490, 117, 297, 479, 125, 307, 487, 127, 307, 488];
+  const topoTitulo = [43, 237, 437, 620];
   const passoDia = 21.5;
 
   for (let m = 0; m < 12; m++) {
-    const cx = centrosX[m % 3];
+    const cx = centrosX[m];
     const ty = topoTitulo[Math.floor(m / 3)];
 
     ctx.fillStyle = COR_MES;
     ctx.textAlign = "center";
-    ctx.font = fonte(700, 13.5);
-    ctx.letterSpacing = "1.2px";
+    ctx.font = fonte(700, 16);
+    ctx.letterSpacing = "2.6px";
     ctx.fillText(MESES[m], cx, ty);
     ctx.letterSpacing = "0px";
 
-    ctx.font = fonte(700, 8);
+    ctx.font = fonte(700, 10);
     ctx.fillStyle = COR_MES;
     DIAS_SEMANA.forEach((d, i) => ctx.fillText(d, cx + (i - 3) * passoDia, ty + 32));
 
@@ -152,11 +153,11 @@ async function desenharCalendario(ano: number, datas: DataParaPdf[], acoes: Acao
     for (let dia = 1; dia <= ultimo; dia++) {
       const posicao = primeiro + dia - 1;
       const x = cx + ((posicao % 7) - 3) * passoDia;
-      const y = ty + 52 + Math.floor(posicao / 7) * 17;
+      const y = ty + 50.5 + Math.floor(posicao / 7) * 17.3;
       const marca = marcas.get(iso(ano, m + 1, dia));
       if (marca) {
         ctx.beginPath();
-        ctx.arc(x, y - 3, 8, 0, Math.PI * 2);
+        ctx.arc(x, y - 3.8, 7, 0, Math.PI * 2);
         if (marca === "acao") {
           ctx.lineWidth = 1.2;
           ctx.strokeStyle = COR_MARCA_ACAO;
@@ -167,18 +168,18 @@ async function desenharCalendario(ano: number, datas: DataParaPdf[], acoes: Acao
         }
       }
       ctx.fillStyle = COR_NUMERO;
-      ctx.font = fonte(marca ? 600 : 500, 8.2);
+      ctx.font = fonte(400, 10.5);
       ctx.fillText(String(dia), x, y);
     }
 
     // Legendas do mês: "DD/MM - Nome ( Categoria )"; ação entra só com o título.
     const notas = notasPorMes[m].sort((a, b) => a.dia.localeCompare(b.dia));
-    const passoNota = Math.min(7.8, 40 / Math.max(notas.length, 1));
-    const tamanhoNota = Math.min(6, passoNota * 0.78);
+    const passoNota = Math.min(7.9, 36 / Math.max(notas.length, 1));
+    const tamanhoNota = Math.min(6.2, passoNota * 0.8);
     ctx.textAlign = "left";
     const xNota = cx - 3.5 * passoDia + 2;
     notas.forEach((n, i) => {
-      const y = ty + 152 + i * passoNota;
+      const y = ty + 147 + i * passoNota;
       ctx.font = fonte(700, tamanhoNota);
       ctx.fillStyle = COR_MES;
       ctx.fillText(n.rotulo, xNota, y);
@@ -189,7 +190,15 @@ async function desenharCalendario(ano: number, datas: DataParaPdf[], acoes: Acao
     });
   }
 
-  if (logo) ctx.drawImage(logo, 506, 733, 98, (98 * logo.naturalHeight) / logo.naturalWidth);
+  if (logo) {
+    // Marca "msb" (parte de cima do arquivo) + legenda ao lado, como no modelo.
+    const alturaMarca = logo.naturalHeight * 0.72;
+    ctx.drawImage(logo, 0, 0, logo.naturalWidth, alturaMarca, 497, 752, 76, (76 * alturaMarca) / logo.naturalWidth);
+    ctx.fillStyle = COR_MES;
+    ctx.textAlign = "left";
+    ctx.font = fonte(500, 6.2);
+    ["Medical", "System", "do Brasil"].forEach((linha, i) => ctx.fillText(linha, 578, 763 + i * 8));
+  }
   return canvas;
 }
 
@@ -241,8 +250,7 @@ function montarPdf(jpeg: Uint8Array, larguraPx: number, alturaPx: number): Uint8
   return saida;
 }
 
-export async function exportarCalendarioPdf(ano: number, datas: DataParaPdf[], acoes: AcaoParaPdf[]): Promise<void> {
-  const canvas = await desenharCalendario(ano, datas, acoes);
+export async function baixarCalendarioPdf(canvas: HTMLCanvasElement, ano: number): Promise<void> {
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.93));
   if (!blob) throw new Error("Não foi possível gerar a imagem do calendário.");
   const pdf = montarPdf(new Uint8Array(await blob.arrayBuffer()), canvas.width, canvas.height);
@@ -254,4 +262,8 @@ export async function exportarCalendarioPdf(ano: number, datas: DataParaPdf[], a
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
+export async function exportarCalendarioPdf(ano: number, datas: DataParaPdf[], acoes: AcaoParaPdf[]): Promise<void> {
+  await baixarCalendarioPdf(await renderizarCalendario(ano, datas, acoes), ano);
 }

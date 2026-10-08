@@ -8,7 +8,7 @@ import { GraficoBarrasMensal } from "@/components/shared/GraficoBarrasMensal";
 import { Modal } from "@/components/shared/Modal";
 import { formatarDataBr, formatarMoeda } from "@/lib/format";
 import { cn } from "@/lib/cn";
-import { exportarCalendarioPdf } from "@/lib/dho/exportarCalendarioPdf";
+import { ExportarCalendarioModal } from "./ExportarCalendarioModal";
 import type { CategoriaDataComemorativa, DataComemorativa, EventoCalendario, ItemEvento, LinhaOrcamentoMes } from "@/lib/db/dho";
 
 export type AbaEndomarketing = "calendario" | "lancamentos" | "orcamento";
@@ -580,21 +580,7 @@ export function EndomarketingDashboardClient({
   const totalUtilizado = orcamento.reduce((s, l) => s + l.utilizado, 0);
   const totalGap = totalAprovado - totalUtilizado;
 
-  const [exportando, setExportando] = useState(false);
-  async function exportarCalendario() {
-    setExportando(true);
-    try {
-      await exportarCalendarioPdf(
-        ano,
-        datasComemorativas.map((d) => ({ data: d.data, nome: d.nome, categoria: d.categoria })),
-        eventos.map((e) => ({ data: e.data, dataFim: e.dataFim, titulo: e.titulo })),
-      );
-    } catch (e) {
-      window.alert(e instanceof Error ? e.message : "Não foi possível exportar o calendário.");
-    } finally {
-      setExportando(false);
-    }
-  }
+  const [exportarAberto, setExportarAberto] = useState(false);
 
   const seletorAno = (
     <div className="flex items-center gap-1.5">
@@ -641,11 +627,10 @@ export function EndomarketingDashboardClient({
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => void exportarCalendario()}
-                disabled={exportando}
-                className="rounded border border-hairline px-2.5 py-1 text-[11px] font-medium text-brand-primary hover:bg-brand-primary-050 disabled:opacity-50"
+onClick={() => setExportarAberto(true)}
+                className="rounded border border-hairline px-2.5 py-1 text-[11px] font-medium text-brand-primary hover:bg-brand-primary-050"
               >
-                {exportando ? "Gerando PDF..." : "Exportar calendário (PDF)"}
+                Exportar calendário
               </button>
               {seletorAno}
             </div>
@@ -730,6 +715,15 @@ export function EndomarketingDashboardClient({
             </div>
           </Card>
         </div>
+      )}
+
+      {exportarAberto && (
+        <ExportarCalendarioModal
+          anoInicial={ano}
+          datasIniciais={datasComemorativas}
+          acoesIniciais={eventos}
+          onFechar={() => setExportarAberto(false)}
+        />
       )}
 
       <Modal
