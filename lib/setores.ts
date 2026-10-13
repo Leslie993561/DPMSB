@@ -20,9 +20,21 @@ const SIGLA_POR_SETOR: Record<string, string> = {
   "Tecnologia da Informação": "TI",
 };
 
+/** Chave de comparação: sem acento, caixa ou espaços extras (o setor vem de texto livre/importação). */
+function chaveSetor(setor: string): string {
+  return setor
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+const SIGLA_POR_CHAVE = new Map(Object.entries(SIGLA_POR_SETOR).map(([nome, sigla]) => [chaveSetor(nome), sigla]));
+
 /** Retorna a sigla do setor se conhecida, senão o próprio nome (nunca esconde um setor não mapeado). */
 export function siglaSetor(setor: string): string {
-  return SIGLA_POR_SETOR[setor] ?? setor;
+  return SIGLA_POR_SETOR[setor] ?? SIGLA_POR_CHAVE.get(chaveSetor(setor)) ?? setor;
 }
 
 /**
