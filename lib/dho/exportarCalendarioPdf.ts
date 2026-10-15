@@ -37,7 +37,7 @@ const COR_NOTA = "#6b7a82";
 const ROTULO_CATEGORIA: Record<DataParaPdf["categoria"], string> = {
   nacional: "Nacional",
   regional: "Regional",
-  ponte: "Facultativo",
+  ponte: "",
 };
 
 type Marca = "forte" | "suave" | "acao";
@@ -119,7 +119,7 @@ export async function renderizarCalendario(ano: number, datas: DataParaPdf[], ac
   for (const d of datas) {
     if (!d.data.startsWith(`${ano}-`)) continue;
     marcar(d.data, d.categoria === "ponte" ? "suave" : "forte");
-    notasPorMes[Number(d.data.slice(5, 7)) - 1].push({ dia: d.data, rotulo: ddmm(d.data), texto: `${d.nome} ( ${ROTULO_CATEGORIA[d.categoria]} )` });
+    notasPorMes[Number(d.data.slice(5, 7)) - 1].push({ dia: d.data, rotulo: ddmm(d.data), texto: d.categoria === "ponte" ? d.nome : `${d.nome} ( ${ROTULO_CATEGORIA[d.categoria]} )` });
   }
   for (const a of acoes) {
     for (const dia of diasDoIntervalo(a.data, a.dataFim)) if (dia.startsWith(`${ano}-`)) marcar(dia, "acao");
