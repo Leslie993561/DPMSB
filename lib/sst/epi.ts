@@ -373,7 +373,7 @@ export interface FuncaoEpi {
 export const MATRIZ_EPI: FuncaoEpi[] = [
   {
     funcao: "Assistente Logístico",
-    epis: ["Calçado Antiderrapante", "Sandália", "Abafador 3M Muffler", "Protetor Auricular Interno"],
+    epis: ["Calçado Antiderrapante", "Abafador 3M Muffler", "Protetor Auricular Interno"],
   },
   {
     funcao: "Auxiliar De Produção",
@@ -384,7 +384,6 @@ export const MATRIZ_EPI: FuncaoEpi[] = [
       "Máscara Semifacial",
       "Protetor Auricular Interno",
       "Calçado Antiderrapante",
-      "Sandália",
     ],
   },
   {
@@ -396,7 +395,6 @@ export const MATRIZ_EPI: FuncaoEpi[] = [
       "Máscara Semifacial",
       "Protetor Auricular Interno",
       "Calçado Antiderrapante",
-      "Sandália",
     ],
   },
   {
@@ -408,7 +406,6 @@ export const MATRIZ_EPI: FuncaoEpi[] = [
       "Máscara Semifacial",
       "Protetor Auricular Interno",
       "Calçado Antiderrapante",
-      "Sandália",
     ],
   },
   {
@@ -420,11 +417,10 @@ export const MATRIZ_EPI: FuncaoEpi[] = [
       "Máscara Semifacial",
       "Protetor Auricular Interno",
       "Calçado Antiderrapante",
-      "Sandália",
     ],
   },
-  { funcao: "Auxiliar De Serviços Gerais", epis: ["Calçado Antiderrapante", "Sandália"] },
-  { funcao: "Inspetora Da Qualidade", epis: ["Calçado Antiderrapante", "Sandália"] },
+  { funcao: "Auxiliar De Serviços Gerais", epis: ["Calçado Antiderrapante"] },
+  { funcao: "Inspetora Da Qualidade", epis: ["Calçado Antiderrapante"] },
   {
     funcao: "Líder De Manutenção",
     epis: [
@@ -434,7 +430,6 @@ export const MATRIZ_EPI: FuncaoEpi[] = [
       "Máscara Semifacial",
       "Protetor Auricular Interno",
       "Calçado Antiderrapante",
-      "Sandália",
     ],
   },
   {
@@ -446,7 +441,6 @@ export const MATRIZ_EPI: FuncaoEpi[] = [
       "Máscara Semifacial",
       "Protetor Auricular Interno",
       "Calçado Antiderrapante",
-      "Sandália",
     ],
   },
   {
@@ -459,7 +453,6 @@ export const MATRIZ_EPI: FuncaoEpi[] = [
       "Protetor Auricular Interno",
       "Calçado Antiderrapante",
       "Bota-biqueira de PVC",
-      "Sandália",
     ],
   },
 ];
@@ -471,7 +464,6 @@ export const MATRIZ_EPI: FuncaoEpi[] = [
  */
 export const EPI_CATALOGO: { equip: string; valor: number; ca: string }[] = [
   { equip: "Calçado Antiderrapante", valor: 80, ca: "27.921" },
-  { equip: "Sandália", valor: 35, ca: "" },
   { equip: "Abafador 3M Muffler", valor: 80, ca: "14.235" },
   { equip: "Protetor Auricular Interno", valor: 1, ca: "15.485" },
   { equip: "Máscara Semifacial", valor: 70, ca: "7072" },
@@ -626,6 +618,7 @@ export const FARDAMENTO_CATALOGO: { tipo: string; valor: number }[] = [
   { tipo: "Calça Oxford", valor: 93 },
   { tipo: "Jaleco Antiestático", valor: 50 },
   { tipo: "Macacão Antiestático", valor: 100 },
+  { tipo: "Sandália", valor: 35 },
 ];
 
 /** Preço vigente de cada item de fardamento: catálogo, sobrescrito por sst_fardamento_precos. */

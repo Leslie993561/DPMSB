@@ -59,9 +59,24 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(destino);
   }
 
-  const liberados = new Set(sessao.liberados);
+  // Gestor só enxerga o módulo de Férias — qualquer outra permissão gravada
+  // (colaboradores, folha, benefícios...) é ignorada aqui.
+  const liberados = new Set(sessao.liberados.filter((c) => c === "ferias" || c.startsWith("ferias.")));
+  const temFerias = liberados.size > 0;
+
+  if (!ehApi && pathname === "/") {
+    const destino = request.nextUrl.clone();
+    destino.pathname = temFerias ? "/dashboard" : "/sem-acesso";
+    destino.search = "";
+    return NextResponse.redirect(destino);
+  }
 
   if (ehApi) {
+    // Telas de Férias leem a lista de colaboradores (somente leitura, já
+    // filtrada pela equipe do gestor).
+    if (temFerias && request.method === "GET" && pathname === "/api/colaboradores") {
+      return NextResponse.next();
+    }
     const regra = ROTAS_API.find((r) => pathname === r.prefixo || pathname.startsWith(`${r.prefixo}/`));
     if (regra && !permiteAcesso(regra.modulo, liberados)) {
       return NextResponse.json({ erro: "Sem permissão para este módulo." }, { status: 403 });

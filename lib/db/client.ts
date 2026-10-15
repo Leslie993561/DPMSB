@@ -269,6 +269,11 @@ CREATE TABLE IF NOT EXISTS beneficios_variaveis (
   criado_em TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')
 );
 
+-- Setores criados pelo RH no "+" do Quadro de Colaboradores (além da lista fixa de lib/setores.ts).
+CREATE TABLE IF NOT EXISTS setores_extras (
+  nome TEXT PRIMARY KEY
+);
+
 CREATE TABLE IF NOT EXISTS beneficios_dias_uteis (
   ano INTEGER NOT NULL,
   mes INTEGER NOT NULL,

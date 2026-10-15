@@ -721,6 +721,13 @@ interface Props {
 }
 
 export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, onCancelar }: Props) {
+  const [setoresExtras, setSetoresExtras] = useState<string[]>([]);
+  useEffect(() => {
+    void fetch("/api/setores")
+      .then((r) => r.json())
+      .then((d: { extras?: string[] }) => setSetoresExtras(d.extras ?? []))
+      .catch(() => {});
+  }, []);
   const editando = colaboradorEditando;
 
   // Dados pessoais
@@ -871,6 +878,9 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
   const [valorFgts, setValorFgts] = useState(editando?.valorFgts ? String(editando.valorFgts) : "");
   const [rateioD365, setRateioD365] = useState<RateioD365 | "">(editando?.rateioD365 ?? "");
   const [motivoDesligamento, setMotivoDesligamento] = useState(editando?.motivoDesligamento ?? "");
+  const [fezExameDemissional, setFezExameDemissional] = useState(false);
+  const [dataExameDemissional, setDataExameDemissional] = useState("");
+  const [anexoExameDemissional, setAnexoExameDemissional] = useState<File | null>(null);
 
   const [excluindo, setExcluindo] = useState(false);
   const [erroExcluir, setErroExcluir] = useState<string | null>(null);
@@ -878,9 +888,6 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
   const [temDependente, setTemDependente] = useState(false);
   const [dependentesForm, setDependentesForm] = useState<DependenteForm[]>([]);
 
-  const [fezExameDemissional, setFezExameDemissional] = useState(false);
-  const [dataExameDemissional, setDataExameDemissional] = useState("");
-  const [anexoExameDemissional, setAnexoExameDemissional] = useState<File | null>(null);
   /** Colaborador existente abre travado — só fica editável depois de clicar no lápis. Cadastro novo já nasce editável. */
   const [modoEdicao, setModoEdicao] = useState(false);
   const bloqueado = Boolean(editando) && !modoEdicao;
@@ -1065,13 +1072,6 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
     e.preventDefault();
     if (!editando) return;
     setErro(null);
-    setSalvando(true);
-    try {
-      const res = await fetch(`/api/colaboradores/${editando.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          status: "desligado",
     if (fezExameDemissional && !anexoExameDemissional) {
       setErro("Anexe o PDF do exame demissional ou marque \"Não\".");
       return;
@@ -1080,8 +1080,8 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
       setErro("O exame demissional deve ser um PDF.");
       return;
     }
-          dataDesligamento,
-          motivoDesligamento: motivoDesligamento || null,
+    setSalvando(true);
+    try {
       // Sobe o PDF antes de desligar: se falhar, nada foi alterado.
       let anexo: { url: string; nome: string } | null = null;
       if (fezExameDemissional && anexoExameDemissional) {
@@ -1095,6 +1095,13 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
         }
         anexo = { url: upDados.url, nome: upDados.nome };
       }
+      const res = await fetch(`/api/colaboradores/${editando.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "desligado",
+          dataDesligamento,
+          motivoDesligamento: motivoDesligamento || null,
           valorRescisao: valorRescisao ? Number(valorRescisao) : null,
           valorFgts: valorFgts ? Number(valorFgts) : null,
         }),
@@ -1104,13 +1111,6 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
         setErro(data.erro ?? "Erro ao desligar colaborador.");
         return;
       }
-      onSalvo();
-    } catch {
-      setErro("Falha de comunicação com o servidor.");
-    } finally {
-      setSalvando(false);
-    }
-  }
       if (anexo) {
         const ficha = await fetch("/api/sst/exames/fichas", {
           method: "POST",
@@ -1130,6 +1130,13 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
           return;
         }
       }
+      onSalvo();
+    } catch {
+      setErro("Falha de comunicação com o servidor.");
+    } finally {
+      setSalvando(false);
+    }
+  }
 
   async function handleReativar() {
     if (!editando) return;
@@ -1214,13 +1221,6 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
           />
         </label>
 
-        {erro && <RiskCallout nivel="critico">{erro}</RiskCallout>}
-
-        <div className="mt-0.5 flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setDesligando(false)}
-            className="rounded border border-hairline px-3 py-1.5 text-[12px] font-medium text-foreground-muted transition-colors hover:bg-surface-page dark:border-brand-neutral/30"
         <fieldset className="flex flex-col gap-1 text-[10px] font-normal text-foreground-muted">
           <legend>Fez o exame demissional?</legend>
           <div className="flex items-center gap-4 text-[12px] text-foreground">
@@ -1279,6 +1279,13 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
           </div>
         )}
 
+        {erro && <RiskCallout nivel="critico">{erro}</RiskCallout>}
+
+        <div className="mt-0.5 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setDesligando(false)}
+            className="rounded border border-hairline px-3 py-1.5 text-[12px] font-medium text-foreground-muted transition-colors hover:bg-surface-page dark:border-brand-neutral/30"
           >
             Voltar
           </button>
@@ -1853,8 +1860,10 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
             <option value="">—</option>
             {/* Setor já cadastrado que não está na lista fechada (dado legado) continua
                 aparecendo, pra abrir o formulário não trocar o valor por engano. */}
-            {departamento && !SETORES.includes(departamento) && <option value={departamento}>{departamento}</option>}
-            {SETORES.map((setor) => (
+            {departamento && ![...SETORES, ...setoresExtras].includes(departamento) && (
+              <option value={departamento}>{departamento}</option>
+            )}
+            {[...SETORES, ...setoresExtras].map((setor) => (
               <option key={setor} value={setor}>
                 {setor}
               </option>

@@ -530,6 +530,10 @@ export async function obterDashboardSst(): Promise<DashboardSst> {
     examesValorByMes[mes] = (examesValorByMes[mes] ?? 0) + valorExame(codigoPorExame.get(r.exame) ?? "");
   });
 
+  // Mês com fatura importada da clínica: vale o total faturado (gasto real), não a estimativa pelas fichas.
+  const faturas = await sstQuery<{ competencia: string; total: number }>("SELECT competencia, total::float8 AS total FROM sst_faturas_exame");
+  for (const fat of faturas) examesValorByMes[fat.competencia] = fat.total;
+
   const custoMensalEpiExames: CustoMensalEpiExames[] = mesesDoAno(anoAtual).map(({ mes, mesLabel }) => ({
     mes,
     mesLabel,

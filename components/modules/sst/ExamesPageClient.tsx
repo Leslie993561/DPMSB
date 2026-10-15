@@ -1207,47 +1207,49 @@ function MatrizOcupacionalTab({
                 Este cargo ainda não tem risco, EPI ou exame levantado na planilha de SST.
               </div>
             )}
-            <div>
-              <p className="text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">Riscos ocupacionais</p>
+            <section className="rounded-lg border border-hairline p-3">
+              <p className="flex items-center justify-between text-[10.5px] font-bold tracking-wide text-foreground-muted uppercase">Riscos ocupacionais<span className="rounded-full bg-surface-page px-1.5 py-px text-[10px] text-foreground-muted">{cargoAberto.riscos.length}</span></p>
               {cargoAberto.riscos.length === 0 ? (
                 <p className="mt-1 text-[12px] text-foreground-muted">Sem risco inventariado.</p>
               ) : (
-                <div className="mt-1.5 flex flex-col gap-1.5">
+                <div className="mt-2 flex flex-col divide-y divide-hairline/70">
                   {cargoAberto.riscos.map((r, i) => (
-                    <div key={i} className="flex items-start gap-1.5">
-                      <span className={`mt-0.5 shrink-0 rounded-full border px-1.5 py-px text-[9.5px] font-semibold whitespace-nowrap ${corRisco(r.tipo)}`}>
+                    <div key={i} className="grid grid-cols-[6.5rem_1fr] items-start gap-3 py-2 first:pt-0 last:pb-0">
+                      <span className={`rounded-full border px-2 py-0.5 text-center text-[9.5px] font-semibold uppercase ${corRisco(r.tipo)}`}>
                         {r.tipo}
                       </span>
-                      <span className="text-[12px] text-foreground">
-                        {r.descricao} <span className="text-foreground-muted">· {r.frequencia}</span>
-                      </span>
+                      <div className="min-w-0">
+                        <p className="text-[12px] leading-snug text-foreground">{r.descricao}</p>
+                        <p className="mt-0.5 text-[10.5px] text-foreground-muted">Exposição: {r.frequencia}</p>
+                      </div>
                     </div>
                   ))}
                 </div>
               )}
-            </div>
+            </section>
 
-            <div>
-              <p className="text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">EPIs aplicáveis</p>
+            <section className="rounded-lg border border-hairline p-3">
+              <p className="flex items-center justify-between text-[10.5px] font-bold tracking-wide text-foreground-muted uppercase">EPIs aplicáveis<span className="rounded-full bg-surface-page px-1.5 py-px text-[10px] text-foreground-muted">{cargoAberto.epis.length}</span></p>
               {cargoAberto.epis.length === 0 ? (
                 <p className="mt-1 text-[12px] text-foreground-muted">Não aplicável a este cargo.</p>
               ) : (
-                <div className="mt-1.5 flex flex-wrap gap-1">
+                <div className="mt-2 flex flex-wrap gap-1.5">
                   {cargoAberto.epis.map((epi) => (
-                    <span key={epi} className="rounded-full border border-hairline bg-surface-page px-2 py-0.5 text-[10.5px] text-foreground">
-                      {epi}
+                    <span key={epi} className="inline-flex items-center gap-1.5 rounded-md border border-hairline bg-surface-page px-2 py-1 text-[11px] font-medium text-foreground">
+                      <span className="h-1.5 w-1.5 rounded-full bg-brand-primary" />
+                      {epi.toLowerCase().replace(/(^|s)S/g, (c) => c.toUpperCase())}
                     </span>
                   ))}
                 </div>
               )}
-            </div>
+            </section>
 
-            <div>
-              <p className="text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">Exames obrigatórios</p>
+            <section className="rounded-lg border border-hairline p-3">
+              <p className="flex items-center justify-between text-[10.5px] font-bold tracking-wide text-foreground-muted uppercase">Exames obrigatórios<span className="rounded-full bg-surface-page px-1.5 py-px text-[10px] text-foreground-muted">{cargoAberto.exames.length}</span></p>
               {cargoAberto.exames.length === 0 ? (
                 <p className="mt-1 text-[12px] text-foreground-muted">Nenhum exame levantado para este cargo.</p>
               ) : (
-                <div className="mt-1.5 overflow-hidden rounded-md border border-hairline">
+                <div className="mt-2 overflow-hidden rounded-md border border-hairline">
                   <table className="w-full text-[11.5px]">
                     <thead>
                       <tr className="border-b border-hairline bg-surface-page text-left text-[9.5px] font-semibold tracking-wide text-foreground-muted uppercase">
@@ -1266,7 +1268,7 @@ function MatrizOcupacionalTab({
                   </table>
                 </div>
               )}
-            </div>
+            </section>
           </div>
         </Modal>
       )}
@@ -1370,8 +1372,6 @@ function AnexarDocumentosFaturaModal({ onFechar, onSalvo }: { onFechar: () => vo
   const [arquivos, setArquivos] = useState<Partial<Record<TipoAnexoFatura, File>>>({});
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-
-  function distribuir(lista: File[]) {
   const [anexados, setAnexados] = useState<AnexoFaturaResumo[]>([]);
 
   const carregarAnexados = useCallback(async () => {
@@ -1387,6 +1387,8 @@ function AnexarDocumentosFaturaModal({ onFechar, onSalvo }: { onFechar: () => vo
     await fetch(`/api/sst/exames/faturas/anexos/${a.competencia}/${a.tipo}`, { method: "DELETE" });
     await carregarAnexados();
   }
+
+  function distribuir(lista: File[]) {
     setArquivos((atual) => {
       const novo = { ...atual };
       const sobras: File[] = [];
@@ -1422,10 +1424,10 @@ function AnexarDocumentosFaturaModal({ onFechar, onSalvo }: { onFechar: () => vo
       const r = await fetch("/api/sst/exames/faturas/anexos", { method: "POST", body: form });
       const d = await r.json();
       if (!r.ok) throw new Error(d.erro ?? "Falha ao anexar.");
-      onSalvo();
-    } catch (e) {
       setArquivos({});
       await carregarAnexados();
+      onSalvo();
+    } catch (e) {
       setErro(e instanceof Error ? e.message : "Falha ao anexar.");
     } finally {
       setEnviando(false);
@@ -1516,8 +1518,6 @@ function AnexarDocumentosFaturaModal({ onFechar, onSalvo }: { onFechar: () => vo
             </div>
           ))}
         </div>
-        <p className="text-[11px] text-foreground-muted">
-          PDF, PNG ou JPG, até 10MB cada. Os arquivos são encaixados pelo nome (fatura, nf/nota, boleto); ajuste abaixo se precisar. Anexar de novo substitui o do mesmo tipo.
         {anexados.some((a) => a.competencia === competencia) && (
           <div className="flex flex-wrap items-center gap-2 text-[11px]">
             <span className="font-semibold text-foreground-muted uppercase">Já anexados em {formatarCompetencia(competencia)}:</span>
@@ -1546,6 +1546,8 @@ function AnexarDocumentosFaturaModal({ onFechar, onSalvo }: { onFechar: () => vo
               ))}
           </div>
         )}
+        <p className="text-[11px] text-foreground-muted">
+          PDF, PNG ou JPG, até 10MB cada. Os arquivos são encaixados pelo nome (fatura, nf/nota, boleto); ajuste abaixo se precisar. Anexar de novo substitui o do mesmo tipo.
         </p>
         {erro && <p className="text-[11.5px] text-status-danger">{erro}</p>}
       </div>

@@ -272,7 +272,7 @@ interface LinhaColaborador {
 function paraColaborador(linha: LinhaColaborador): Colaborador {
   return {
     id: linha.id,
-    nome: linha.nome,
+    nome: (linha.nome ?? "").toUpperCase(),
     dataAdmissao: linha.data_admissao,
     salarioBase: linha.salario_base,
     dependentes: linha.dependentes,
@@ -293,7 +293,7 @@ function paraColaborador(linha: LinhaColaborador): Colaborador {
     tipoTransporte: linha.tipo_transporte,
     valorTransporteFixo: linha.valor_transporte_fixo,
     valorTransporteDia: linha.valor_transporte_dia,
-    liderDiretoNome: linha.lider_direto_nome,
+    liderDiretoNome: linha.lider_direto_nome ? linha.lider_direto_nome.toUpperCase() : linha.lider_direto_nome,
     status: linha.status,
     dataDesligamento: linha.data_desligamento,
     motivoDesligamento: linha.motivo_desligamento,

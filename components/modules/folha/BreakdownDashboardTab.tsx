@@ -386,7 +386,7 @@ export function BreakdownDashboardTab() {
               <span className="text-[13px] font-medium text-foreground">Todos</span>
 
               <p className="mt-3 text-[11px] font-medium tracking-wide text-foreground-muted uppercase">
-                Custo total Caixa
+                Custo total
               </p>
               <p className="text-[28px] leading-tight font-bold text-foreground">{formatarMoeda(totais.custoTotal)}</p>
               <p className="text-[11.5px] text-foreground-muted">

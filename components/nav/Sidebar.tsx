@@ -221,7 +221,8 @@ export function Sidebar({ counts, sessao }: { counts?: NavCounts; sessao: Sessao
   // por cima do conteúdo depois de tocar num link.
   useEffect(() => setAbertoMobile(false), [pathname]);
   const ehAdmin = sessao.tipo === "administrador";
-  const liberados = new Set(sessao.liberados);
+  // Gestor só vê Férias: demais permissões e os outros portais ficam ocultos.
+  const liberados = new Set(sessao.liberados.filter((c) => c === "ferias" || c.startsWith("ferias.")));
   const frenteAtual = pathname?.startsWith("/sst") ? "sst" : pathname?.startsWith("/dho") ? "dho" : "dp";
   const frenteSelecionada = FRENTES.find((f) => f.id === frenteAtual) ?? FRENTES[0];
   const [frenteMenuAberto, setFrenteMenuAberto] = useState(false);
@@ -233,7 +234,7 @@ export function Sidebar({ counts, sessao }: { counts?: NavCounts; sessao: Sessao
       ...grupo,
       itens: ehAdmin ? grupo.itens : grupo.itens.filter((item) => permiteAcesso(item.modulo, liberados)),
     }))
-    .filter((grupo) => grupo.itens.length > 0);
+    .filter((grupo) => grupo.itens.length > 0 && (ehAdmin || grupo.id === "ferias"));
 
   const [aberto, setAberto] = useState<string | null>(
     grupos.find((g) => pathname === g.base || pathname?.startsWith(`${g.base}/`))?.id ?? null,
@@ -271,17 +272,17 @@ export function Sidebar({ counts, sessao }: { counts?: NavCounts; sessao: Sessao
       <div className="relative px-3 pt-1 pb-1">
         <button
           type="button"
-          onClick={() => setFrenteMenuAberto((v) => !v)}
+          onClick={() => ehAdmin && setFrenteMenuAberto((v) => !v)}
           className="flex w-full items-center gap-2.5 rounded-lg bg-brand-primary-100 px-3 py-2 text-[13px] font-semibold text-brand-primary-800 transition-colors"
         >
           <span className="text-brand-primary">
             <IconePortal />
           </span>
           <span className="flex-1 text-left">{frenteSelecionada.label}</span>
-          <span className="text-[10px] text-brand-primary">{frenteMenuAberto ? "▲" : "▼"}</span>
+          {ehAdmin && <span className="text-[10px] text-brand-primary">{frenteMenuAberto ? "▲" : "▼"}</span>}
         </button>
 
-        {frenteMenuAberto && (
+        {ehAdmin && frenteMenuAberto && (
           <>
             <div className="fixed inset-0 z-20" onClick={() => setFrenteMenuAberto(false)} />
             <div className="relative z-30 mt-0.5 mb-1 ml-[21px] flex flex-col gap-0.5 border-l border-hairline pl-3">

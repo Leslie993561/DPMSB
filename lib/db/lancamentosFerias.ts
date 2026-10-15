@@ -444,7 +444,7 @@ export async function listarLancamentosAtivosComContexto(): Promise<LancamentoCo
 
   return linhas.map((linha) => ({
     lancamento: paraLancamento(linha),
-    colaboradorNome: linha.colaborador_nome,
+    colaboradorNome: String(linha.colaborador_nome ?? "").toUpperCase(),
     colaboradorDepartamento: linha.colaborador_departamento,
   }));
 }

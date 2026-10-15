@@ -27,19 +27,19 @@ export async function GET() {
   sheet.getRow(1).font = { bold: true };
 
   for (const c of colaboradores) {
-    const lider = c.gestorId ? colaboradoresPorId.get(c.gestorId)?.nome : c.liderDiretoNome;
+    const lider = nomeParaPlanilha(c.gestorId ? colaboradoresPorId.get(c.gestorId)?.nome : c.liderDiretoNome);
     const dependentes = dependentesPorColaborador.get(c.id) ?? [];
     const colunasDep: Record<string, string> = {};
     dependentes.forEach((d, i) => {
       const n = i + 1;
-      colunasDep[`dep${n}Nome`] = d.nome;
+      colunasDep[`dep${n}Nome`] = nomeParaPlanilha(d.nome);
       colunasDep[`dep${n}Nascimento`] = d.dataNascimento ?? "";
       colunasDep[`dep${n}Cpf`] = d.cpf ?? "";
     });
 
     sheet.addRow({
       nome: nomeParaPlanilha(c.nome),
-      nomeAbreviado: abreviarNome(c.nome),
+      nomeAbreviado: nomeParaPlanilha(abreviarNome(c.nome)),
       cpf: c.cpf ?? "",
       pis: c.pis ?? "",
       dataNascimento: c.dataNascimento ?? "",

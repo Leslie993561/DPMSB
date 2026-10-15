@@ -25,6 +25,31 @@ export function ColaboradoresPageClient() {
   const [filtroPrincipal, setFiltroPrincipal] = useState("");
   const [drawer, setDrawer] = useState<"fechado" | "novo" | Colaborador>("fechado");
   const [importarAberto, setImportarAberto] = useState(false);
+  const [setoresExtras, setSetoresExtras] = useState<string[]>([]);
+  useEffect(() => {
+    void fetch("/api/setores")
+      .then((r) => r.json())
+      .then((d: { extras?: string[] }) => setSetoresExtras(d.extras ?? []))
+      .catch(() => {});
+  }, []);
+
+  async function adicionarSetor() {
+    const nome = window.prompt("Nome do novo setor:")?.trim();
+    if (!nome) return;
+    const resp = await fetch("/api/setores", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nome }),
+    });
+    const dados = (await resp.json().catch(() => ({}))) as { nome?: string; erro?: string };
+    if (!resp.ok) {
+      window.alert(dados.erro ?? "Não foi possível adicionar o setor.");
+      return;
+    }
+    setSetoresExtras((atual) => [...atual, dados.nome ?? nome]);
+    // Já abre o cadastro de colaborador: o setor só aparece nos filtros quando alguém é cadastrado nele.
+    setDrawer("novo");
+  }
   // Gestor só visualiza a própria equipe (dados profissionais, sem os
   // pessoais — LGPD); quem cadastra, edita e importa/exporta é sempre o RH.
   const [tipoSessao, setTipoSessao] = useState<"administrador" | "gestor" | null>(null);
@@ -60,8 +85,9 @@ export function ColaboradoresPageClient() {
   const desligados = useMemo(() => colaboradores.filter((c) => c.status === "desligado"), [colaboradores]);
 
   const setores = useMemo(
-    () => Array.from(new Set(ativos.map((c) => c.departamento).filter((d): d is string => Boolean(d)))).sort(),
-    [ativos],
+    () =>
+      Array.from(new Set([...ativos.map((c) => c.departamento), ...setoresExtras].filter((d): d is string => Boolean(d)))).sort(),
+    [ativos, setoresExtras],
   );
 
   const filtrados = useMemo(() => {
@@ -153,6 +179,17 @@ export function ColaboradoresPageClient() {
                 >
                   Desl
                 </button>
+                {!somenteLeitura && (
+                  <button
+                    type="button"
+                    onClick={() => void adicionarSetor()}
+                    title="Adicionar novo setor"
+                    aria-label="Adicionar novo setor"
+                    className="flex h-6 w-6 items-center justify-center rounded-full border border-hairline bg-background text-[14px] leading-none font-semibold text-brand-primary transition-colors hover:bg-brand-primary-100"
+                  >
+                    +
+                  </button>
+                )}
               </div>
             )}
           </div>

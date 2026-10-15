@@ -326,7 +326,7 @@ export async function obterKit(kitId: number): Promise<DetalheKit | null> {
     ).map((e) => ({
       id: e.id,
       colaboradorId: e.colaborador_id,
-      colaboradorNome: e.colaborador_nome,
+      colaboradorNome: String(e.colaborador_nome ?? "").toUpperCase(),
       colaboradorCargo: e.colaborador_cargo,
       colaboradorDepartamento: e.colaborador_departamento,
       materiais: JSON.parse(e.materiais) as string[],
