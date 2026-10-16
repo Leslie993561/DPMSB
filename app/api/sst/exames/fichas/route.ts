@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
+import { atualizarColaborador, buscarColaborador } from "@/lib/db/colaboradores";
 import { criarFichaExame, listarFichasExameDoColaborador, obterExamesVencidosDoColaborador } from "@/lib/sst/exames";
 
 export const runtime = "nodejs";
@@ -66,6 +67,19 @@ export async function POST(request: Request) {
       },
       sessao.email,
     );
+    // ASO demissional lançado = a pessoa saiu: sai do SST (a lista de exames ignora desligados)
+    // e vai para "Desl" no Quadro de Colaboradores. A data do último exame vira a data de desligamento
+    // só quando o cadastro ainda não tem uma.
+    if (parsed.data.tipoAso === "demissional") {
+      const colaborador = await buscarColaborador(parsed.data.colaboradorId);
+      if (colaborador && colaborador.status !== "desligado") {
+        const dataUltimoExame = parsed.data.exames.map((e) => e.dataRealizacao).sort().at(-1) ?? null;
+        await atualizarColaborador(colaborador.id, {
+          status: "desligado",
+          dataDesligamento: colaborador.dataDesligamento ?? dataUltimoExame,
+        });
+      }
+    }
     return Response.json({ fichaId }, { status: 201 });
   } catch (erro) {
     return Response.json({ erro: erro instanceof Error ? erro.message : "Falha ao registrar o exame." }, { status: 400 });
