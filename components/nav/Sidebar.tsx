@@ -226,6 +226,7 @@ export function Sidebar({ counts, sessao }: { counts?: NavCounts; sessao: Sessao
   if (sessao.editorColaboradores) {
     liberados.add("colaboradores.quadro");
     liberados.add("colaboradores.organograma");
+    for (const chave of sessao.liberados) liberados.add(chave);
   }
   const frenteAtual = pathname?.startsWith("/sst") ? "sst" : pathname?.startsWith("/dho") ? "dho" : "dp";
   const frenteSelecionada = FRENTES.find((f) => f.id === frenteAtual) ?? FRENTES[0];
@@ -238,7 +239,7 @@ export function Sidebar({ counts, sessao }: { counts?: NavCounts; sessao: Sessao
       ...grupo,
       itens: ehAdmin ? grupo.itens : grupo.itens.filter((item) => permiteAcesso(item.modulo, liberados)),
     }))
-    .filter((grupo) => grupo.itens.length > 0 && (ehAdmin || grupo.id === "ferias" || (sessao.editorColaboradores && grupo.id === "colaboradores")));
+    .filter((grupo) => grupo.itens.length > 0 && (ehAdmin || grupo.id === "ferias" || sessao.editorColaboradores));
 
   const [aberto, setAberto] = useState<string | null>(
     grupos.find((g) => pathname === g.base || pathname?.startsWith(`${g.base}/`))?.id ?? null,

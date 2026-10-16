@@ -64,9 +64,11 @@ export async function proxy(request: NextRequest) {
   const liberados = new Set(sessao.liberados.filter((c) => c === "ferias" || c.startsWith("ferias.")));
   const temFerias = liberados.size > 0;
   // Gestor-editor do RH (EDITORES_COLABORADORES_EMAILS) também entra no módulo Colaboradores.
+  // Ela também respeita TODAS as chaves do Portal DP ligadas na tela de permissões (folha, benefícios...).
   if (sessao.editorColaboradores) {
     liberados.add("colaboradores.quadro");
     liberados.add("colaboradores.organograma");
+    for (const chave of sessao.liberados) liberados.add(chave);
   }
 
   if (!ehApi && pathname === "/") {
