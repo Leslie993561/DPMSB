@@ -720,6 +720,9 @@ interface Props {
   onCancelar: () => void;
 }
 
+const DOCS_RESCISAO = ["TRCT", "FGTS", "RSD"] as const;
+type DocRescisao = (typeof DOCS_RESCISAO)[number];
+
 export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, onCancelar }: Props) {
   const [setoresExtras, setSetoresExtras] = useState<string[]>([]);
   useEffect(() => {
@@ -881,6 +884,8 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
   const [fezExameDemissional, setFezExameDemissional] = useState(false);
   const [dataExameDemissional, setDataExameDemissional] = useState("");
   const [anexoExameDemissional, setAnexoExameDemissional] = useState<File | null>(null);
+  // Documentos da rescisão (opcionais) — vão para Documentos DP do colaborador.
+  const [docsRescisao, setDocsRescisao] = useState<Record<DocRescisao, File | null>>({ TRCT: null, FGTS: null, RSD: null });
 
   const [excluindo, setExcluindo] = useState(false);
   const [erroExcluir, setErroExcluir] = useState<string | null>(null);
@@ -1058,6 +1063,20 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
       const data = await res.json();
       if (!res.ok) {
         setErro(descreverErro(data));
+        return;
+      }
+      const falhas: string[] = [];
+      for (const tipo of DOCS_RESCISAO) {
+        const arquivo = docsRescisao[tipo];
+        if (!arquivo) continue;
+        const envio = new FormData();
+        envio.append("arquivo", new File([arquivo], `${tipo} - ${arquivo.name}`, { type: arquivo.type }));
+        envio.append("origem", "dp");
+        const r = await fetch(`/api/colaboradores/${editando?.id}/documentos`, { method: "POST", body: envio });
+        if (!r.ok) falhas.push(`${tipo} (${(await r.json().catch(() => ({}))).erro ?? "erro"})`);
+      }
+      if (falhas.length > 0) {
+        setErro(`Colaborador desligado, mas não foi possível anexar: ${falhas.join("; ")}. Anexe em Documentos DP.`);
         return;
       }
       onSalvo();
@@ -1278,6 +1297,28 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
             </div>
           </div>
         )}
+
+        <div className="flex flex-col gap-1.5 rounded border border-hairline bg-surface-page p-2 text-[11px]">
+          <span className="text-[10px] text-foreground-muted">Documentos da rescisão (opcional — PDF, JPG ou PNG)</span>
+          {DOCS_RESCISAO.map((tipo) => (
+            <div key={tipo} className="flex items-center gap-2">
+              <label className="cursor-pointer font-medium text-brand-primary hover:text-brand-primary-hover">
+                {docsRescisao[tipo] ? `Trocar ${tipo}` : `📎 Anexar ${tipo}`}
+                <input
+                  type="file"
+                  accept="application/pdf,image/jpeg,image/png"
+                  className="hidden"
+                  onChange={(e) => {
+                    const arquivo = e.target.files?.[0] ?? null;
+                    setDocsRescisao((atual) => ({ ...atual, [tipo]: arquivo }));
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              {docsRescisao[tipo] && <span className="truncate text-foreground-muted">{docsRescisao[tipo]?.name}</span>}
+            </div>
+          ))}
+        </div>
 
         {erro && <RiskCallout nivel="critico">{erro}</RiskCallout>}
 
