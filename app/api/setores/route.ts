@@ -1,4 +1,5 @@
 import { obterSessaoAtual } from "@/lib/auth/sessao";
+import { editaColaboradores } from "@/lib/auth/perfil";
 import { SETORES } from "@/lib/setores";
 import { adicionarSetorExtra, listarSetoresExtras } from "@/lib/db/setoresExtras";
 
@@ -11,7 +12,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const sessao = await obterSessaoAtual();
-  if (!sessao || sessao.tipo !== "administrador") return Response.json({ erro: "Sem permissão." }, { status: 403 });
+  if (!sessao || !editaColaboradores(sessao)) return Response.json({ erro: "Sem permissão." }, { status: 403 });
 
   const corpo = (await request.json().catch(() => ({}))) as { nome?: unknown };
   const nome = typeof corpo.nome === "string" ? corpo.nome.trim().replace(/\s+/g, " ") : "";

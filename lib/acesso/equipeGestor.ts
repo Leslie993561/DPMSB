@@ -1,6 +1,7 @@
 import "server-only";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
 import { listarColaboradores } from "@/lib/db/colaboradores";
+import { editaColaboradores } from "@/lib/auth/perfil";
 import { idsDaEquipe } from "@/lib/db/acessoGestores";
 
 /**
@@ -12,7 +13,7 @@ import { idsDaEquipe } from "@/lib/db/acessoGestores";
 export async function escopoColaboradoresDoGestor(): Promise<Set<number> | null> {
   const sessao = await obterSessaoAtual();
   if (!sessao) return new Set();
-  if (sessao.tipo === "administrador") return null;
+  if (editaColaboradores(sessao)) return null;
   if (!sessao.colaboradorId) return new Set();
 
   const todos = await listarColaboradores();

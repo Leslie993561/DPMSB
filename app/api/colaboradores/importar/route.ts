@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { editaColaboradores } from "@/lib/auth/perfil";
+import { obterSessaoAtual } from "@/lib/auth/sessao";
 import { parsearPlanilha } from "@/lib/parsing/spreadsheet";
 import {
   CAMPOS_COLABORADOR,
@@ -39,6 +41,8 @@ const schemaConfirmacao = z.object({
  *   usuário): grava o lote no cadastro (segundo passo).
  */
 export async function POST(request: Request) {
+  const sessaoRh = await obterSessaoAtual();
+  if (!editaColaboradores(sessaoRh)) return Response.json({ erro: "Sem permissão." }, { status: 403 });
   const contentType = request.headers.get("content-type") ?? "";
 
   if (contentType.includes("multipart/form-data")) {

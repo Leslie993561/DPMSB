@@ -2,6 +2,7 @@ import { z } from "zod";
 import { atualizarColaborador, buscarColaborador, paraColaboradorProfissional } from "@/lib/db/colaboradores";
 import { substituirDependentes } from "@/lib/db/colaboradorDependentes";
 import { dentroDoEscopo } from "@/lib/acesso/equipeGestor";
+import { editaColaboradores } from "@/lib/auth/perfil";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
 
 export const runtime = "nodejs";
@@ -109,13 +110,13 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/colaborador
   }
   const sessao = await obterSessaoAtual();
   return Response.json({
-    colaborador: sessao?.tipo === "gestor" ? paraColaboradorProfissional(colaborador) : colaborador,
+    colaborador: sessao?.tipo === "gestor" && !editaColaboradores(sessao) ? paraColaboradorProfissional(colaborador) : colaborador,
   });
 }
 
 export async function PATCH(request: Request, ctx: RouteContext<"/api/colaboradores/[id]">) {
   const sessao = await obterSessaoAtual();
-  if (sessao?.tipo !== "administrador") {
+  if (!editaColaboradores(sessao)) {
     return Response.json({ erro: "Só o RH pode editar o cadastro de colaboradores." }, { status: 403 });
   }
 

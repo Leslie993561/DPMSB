@@ -1,5 +1,6 @@
 import { listarDependentes } from "@/lib/db/colaboradorDependentes";
 import { dentroDoEscopo } from "@/lib/acesso/equipeGestor";
+import { editaColaboradores } from "@/lib/auth/perfil";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
 
 export const runtime = "nodejs";
@@ -7,7 +8,7 @@ export const runtime = "nodejs";
 /** Dependente é dado pessoal (LGPD) — só RH, nunca gestor, mesmo de quem ele lidera. */
 export async function GET(_request: Request, ctx: RouteContext<"/api/colaboradores/[id]/dependentes">) {
   const sessao = await obterSessaoAtual();
-  if (sessao?.tipo !== "administrador") {
+  if (!editaColaboradores(sessao)) {
     return Response.json({ erro: "Só o RH vê dependentes." }, { status: 403 });
   }
 

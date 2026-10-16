@@ -53,12 +53,16 @@ export function ColaboradoresPageClient() {
   // Gestor só visualiza a própria equipe (dados profissionais, sem os
   // pessoais — LGPD); quem cadastra, edita e importa/exporta é sempre o RH.
   const [tipoSessao, setTipoSessao] = useState<"administrador" | "gestor" | null>(null);
-  const somenteLeitura = tipoSessao === "gestor";
+  const [editorRh, setEditorRh] = useState(false);
+  const somenteLeitura = tipoSessao === "gestor" && !editorRh;
 
   useEffect(() => {
     fetch("/api/auth/sessao")
       .then((r) => r.json())
-      .then((d) => setTipoSessao(d.tipo ?? null))
+      .then((d) => {
+        setTipoSessao(d.tipo ?? null);
+        setEditorRh(d.editorColaboradores === true);
+      })
       .catch(() => setTipoSessao(null));
   }, []);
 

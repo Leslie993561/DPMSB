@@ -23,6 +23,8 @@ export interface SessaoPayload {
   colaboradorId: number | null;
   /** Chaves de módulo liberadas (vazio para administrador, que não precisa). */
   liberados: string[];
+  /** Gestor do RH que vê e edita todos os colaboradores (ver `ehEmailEditorColaboradores`). */
+  editorColaboradores?: boolean;
   /** Expiração, em segundos desde epoch. */
   exp: number;
 }

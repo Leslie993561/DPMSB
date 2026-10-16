@@ -60,9 +60,14 @@ export async function proxy(request: NextRequest) {
   }
 
   // Gestor só enxerga o módulo de Férias — qualquer outra permissão gravada
-  // (colaboradores, folha, benefícios...) é ignorada aqui.
+  // (colaboradores, folha, benefícios...) é ignorada aqui. Exceção: o editor do RH acima.
   const liberados = new Set(sessao.liberados.filter((c) => c === "ferias" || c.startsWith("ferias.")));
   const temFerias = liberados.size > 0;
+  // Gestor-editor do RH (EDITORES_COLABORADORES_EMAILS) também entra no módulo Colaboradores.
+  if (sessao.editorColaboradores) {
+    liberados.add("colaboradores.quadro");
+    liberados.add("colaboradores.organograma");
+  }
 
   if (!ehApi && pathname === "/") {
     const destino = request.nextUrl.clone();

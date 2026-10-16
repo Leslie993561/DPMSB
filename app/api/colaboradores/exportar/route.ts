@@ -1,4 +1,6 @@
 import ExcelJS from "exceljs";
+import { editaColaboradores } from "@/lib/auth/perfil";
+import { obterSessaoAtual } from "@/lib/auth/sessao";
 import { listarColaboradores } from "@/lib/db/colaboradores";
 import { listarDependentesPorColaborador } from "@/lib/db/colaboradorDependentes";
 import { COLUNAS_COLABORADOR, colunasDependentes } from "@/lib/planilhas/colunasColaborador";
@@ -11,6 +13,8 @@ const ROTULO_SEXO: Record<string, string> = { M: "Masculino", F: "Feminino" };
 
 /** Exporta o quadro completo de colaboradores — todos os campos da ficha, na mesma ordem dos blocos. */
 export async function GET() {
+  const sessaoRh = await obterSessaoAtual();
+  if (!editaColaboradores(sessaoRh)) return Response.json({ erro: "Sem permissão." }, { status: 403 });
   const [colaboradores, dependentesPorColaborador] = await Promise.all([
     listarColaboradores(),
     listarDependentesPorColaborador(),

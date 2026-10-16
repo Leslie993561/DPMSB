@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { buscarColaboradorPorEmail } from "@/lib/db/colaboradores";
 import { buscarGestorAcessoPorEmail, listarPermissoesGestor } from "@/lib/db/acessoGestores";
-import { ehEmailAdmin } from "@/lib/auth/admins";
+import { ehEmailAdmin, ehEmailEditorColaboradores } from "@/lib/auth/admins";
 import { criarTokenSessao, definirCookieSessao } from "@/lib/auth/sessao";
 
 export const runtime = "nodejs";
@@ -41,6 +41,7 @@ export async function POST(request: Request) {
 
   const colaborador = gestor.colaboradorId ? await buscarColaboradorPorEmail(gestor.email) : null;
   const liberados = await listarPermissoesGestor(gestor.id);
+  const editorColaboradores = ehEmailEditorColaboradores(gestor.email);
 
   const { token, duracaoSegundos } = await criarTokenSessao({
     email: gestor.email,
@@ -50,6 +51,7 @@ export async function POST(request: Request) {
     gestorId: gestor.id,
     colaboradorId: gestor.colaboradorId,
     liberados,
+    editorColaboradores,
   });
   await definirCookieSessao(token, duracaoSegundos);
   return Response.json({ ok: true, tipo: "gestor" });

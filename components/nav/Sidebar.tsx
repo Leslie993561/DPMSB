@@ -223,6 +223,10 @@ export function Sidebar({ counts, sessao }: { counts?: NavCounts; sessao: Sessao
   const ehAdmin = sessao.tipo === "administrador";
   // Gestor só vê Férias: demais permissões e os outros portais ficam ocultos.
   const liberados = new Set(sessao.liberados.filter((c) => c === "ferias" || c.startsWith("ferias.")));
+  if (sessao.editorColaboradores) {
+    liberados.add("colaboradores.quadro");
+    liberados.add("colaboradores.organograma");
+  }
   const frenteAtual = pathname?.startsWith("/sst") ? "sst" : pathname?.startsWith("/dho") ? "dho" : "dp";
   const frenteSelecionada = FRENTES.find((f) => f.id === frenteAtual) ?? FRENTES[0];
   const [frenteMenuAberto, setFrenteMenuAberto] = useState(false);
@@ -234,7 +238,7 @@ export function Sidebar({ counts, sessao }: { counts?: NavCounts; sessao: Sessao
       ...grupo,
       itens: ehAdmin ? grupo.itens : grupo.itens.filter((item) => permiteAcesso(item.modulo, liberados)),
     }))
-    .filter((grupo) => grupo.itens.length > 0 && (ehAdmin || grupo.id === "ferias"));
+    .filter((grupo) => grupo.itens.length > 0 && (ehAdmin || grupo.id === "ferias" || (sessao.editorColaboradores && grupo.id === "colaboradores")));
 
   const [aberto, setAberto] = useState<string | null>(
     grupos.find((g) => pathname === g.base || pathname?.startsWith(`${g.base}/`))?.id ?? null,

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { atualizarColaborador, criarColaborador, listarColaboradores, paraColaboradorProfissional } from "@/lib/db/colaboradores";
 import { substituirDependentes } from "@/lib/db/colaboradorDependentes";
 import { escopoColaboradoresDoGestor } from "@/lib/acesso/equipeGestor";
+import { editaColaboradores } from "@/lib/auth/perfil";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
 
 export const runtime = "nodejs";
@@ -105,14 +106,14 @@ export async function GET() {
   const sessao = await obterSessaoAtual();
   const escopo = await escopoColaboradoresDoGestor();
   const visiveis = escopo ? colaboradores.filter((c) => escopo.has(c.id)) : colaboradores;
-  const resultado = sessao?.tipo === "gestor" ? visiveis.map(paraColaboradorProfissional) : visiveis;
+  const resultado = sessao?.tipo === "gestor" && !editaColaboradores(sessao) ? visiveis.map(paraColaboradorProfissional) : visiveis;
 
   return Response.json({ colaboradores: resultado });
 }
 
 export async function POST(request: Request) {
   const sessao = await obterSessaoAtual();
-  if (sessao?.tipo !== "administrador") {
+  if (!editaColaboradores(sessao)) {
     return Response.json({ erro: "Só o RH pode cadastrar colaboradores." }, { status: 403 });
   }
 

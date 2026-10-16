@@ -6,5 +6,5 @@ export const runtime = "nodejs";
 export async function GET() {
   const sessao = await obterSessaoAtual();
   if (!sessao) return Response.json({ tipo: null }, { status: 401 });
-  return Response.json({ tipo: sessao.tipo, nome: sessao.nome, cargo: sessao.cargo });
+  return Response.json({ tipo: sessao.tipo, nome: sessao.nome, cargo: sessao.cargo, editorColaboradores: sessao.editorColaboradores === true });
 }
