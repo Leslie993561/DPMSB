@@ -1,8 +1,8 @@
 import "server-only";
 import { getDb } from "./client";
 
-/** "dp" = aba Documentos DP (RG, CNH, comprovante...); "sst" = aba Documentos SST (anexos manuais do SST, além das fichas de EPI/fardamento). */
-export type OrigemDocumento = "dp" | "sst";
+/** "dp" = aba Documentos DP (RG, CNH, comprovante...); "desl" = aba Documentos DESL (TRCT, FGTS, RSD — só de desligado); "sst" = aba Documentos SST (anexos manuais do SST, além das fichas de EPI/fardamento). */
+export type OrigemDocumento = "dp" | "sst" | "desl";
 
 export interface ColaboradorDocumento {
   id: number;

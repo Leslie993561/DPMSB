@@ -395,7 +395,9 @@ function DocumentosColaboradorPanel({
   nome,
   cargo,
   departamento,
+  desligado,
 }: {
+  desligado: boolean;
   colaboradorId: number;
   nome: string;
   cargo: string | null;
@@ -410,6 +412,7 @@ function DocumentosColaboradorPanel({
           [
             { id: "dp" as const, label: "Documentos DP" },
             { id: "sst" as const, label: "Documentos SST" },
+            ...(desligado ? [{ id: "desl" as const, label: "Documentos DESL" }] : []),
           ]
         ).map((a) => (
           <button
@@ -430,6 +433,12 @@ function DocumentosColaboradorPanel({
 
       {aba === "dp" ? (
         <ListaDocumentosManual colaboradorId={colaboradorId} origem="dp" vazio="Nenhum documento anexado ainda." />
+      ) : aba === "desl" ? (
+        <ListaDocumentosManual
+          colaboradorId={colaboradorId}
+          origem="desl"
+          vazio="Nenhum documento de desligamento anexado ainda (TRCT, FGTS, RSD)."
+        />
       ) : (
         <>
           <FichasEpiDaAba colaboradorId={colaboradorId} />
@@ -1071,12 +1080,12 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
         if (!arquivo) continue;
         const envio = new FormData();
         envio.append("arquivo", new File([arquivo], `${tipo} - ${arquivo.name}`, { type: arquivo.type }));
-        envio.append("origem", "dp");
+        envio.append("origem", "desl");
         const r = await fetch(`/api/colaboradores/${editando?.id}/documentos`, { method: "POST", body: envio });
         if (!r.ok) falhas.push(`${tipo} (${(await r.json().catch(() => ({}))).erro ?? "erro"})`);
       }
       if (falhas.length > 0) {
-        setErro(`Colaborador desligado, mas não foi possível anexar: ${falhas.join("; ")}. Anexe em Documentos DP.`);
+        setErro(`Colaborador desligado, mas não foi possível anexar: ${falhas.join("; ")}. Anexe em Documentos DESL.`);
         return;
       }
       onSalvo();
@@ -1380,6 +1389,7 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
           nome={editando.nome}
           cargo={editando.cargo}
           departamento={editando.departamento}
+          desligado={desligado}
         />
       )}
 

@@ -357,10 +357,12 @@ CREATE TABLE IF NOT EXISTS colaborador_documentos (
   nome TEXT NOT NULL,
   url TEXT NOT NULL,
   enviado_por TEXT NOT NULL,
-  origem TEXT NOT NULL DEFAULT 'dp' CHECK (origem IN ('dp', 'sst')),
+  origem TEXT NOT NULL DEFAULT 'dp' CHECK (origem IN ('dp', 'sst', 'desl')),
   criado_em TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')
 );
 ALTER TABLE colaborador_documentos ADD COLUMN IF NOT EXISTS origem TEXT NOT NULL DEFAULT 'dp';
+ALTER TABLE colaborador_documentos DROP CONSTRAINT IF EXISTS colaborador_documentos_origem_check;
+ALTER TABLE colaborador_documentos ADD CONSTRAINT colaborador_documentos_origem_check CHECK (origem IN ('dp', 'sst', 'desl'));
 
 -- Link de auto-cadastro: o colaborador preenche os PRÓPRIOS dados pessoais
 -- (endereço, banco, cônjuge, dependentes...) sem precisar de login no portal.

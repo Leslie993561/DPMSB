@@ -19,7 +19,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const id = Number((await params).id);
   if (!Number.isInteger(id) || id <= 0) return Response.json({ erro: "Colaborador inválido." }, { status: 400 });
   const origemParam = new URL(request.url).searchParams.get("origem");
-  const origem = origemParam === "dp" || origemParam === "sst" ? origemParam : undefined;
+  const origem = origemParam === "dp" || origemParam === "sst" || origemParam === "desl" ? origemParam : undefined;
   return Response.json({ documentos: await listarDocumentos(id, origem) });
 }
 
@@ -44,8 +44,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
   if (arquivo.size > TAMANHO_MAX) return Response.json({ erro: "O arquivo não pode passar de 10MB." }, { status: 400 });
   const origem = form.get("origem");
-  if (origem !== "dp" && origem !== "sst") {
-    return Response.json({ erro: "Informe a aba (Documentos DP ou Documentos SST)." }, { status: 400 });
+  if (origem !== "dp" && origem !== "sst" && origem !== "desl") {
+    return Response.json({ erro: "Informe a aba (Documentos DP, SST ou DESL)." }, { status: 400 });
   }
 
   const { url, nome } = await subirArquivoPrivado("colaboradores/documentos", arquivo.name || "documento", arquivo);
