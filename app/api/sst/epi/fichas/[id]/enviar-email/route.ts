@@ -1,4 +1,5 @@
 import { obterSessaoAtual } from "@/lib/auth/sessao";
+import { acessaSst } from "@/lib/auth/perfil";
 import { enviarEmailDaFicha } from "@/lib/sst/fichas";
 
 export const runtime = "nodejs";
@@ -6,7 +7,7 @@ export const runtime = "nodejs";
 /** RH clica em "Concluir" na tela de Registrar entrega — é aqui que o e-mail de fato sai. Admin-only. */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const sessao = await obterSessaoAtual();
-  if (!sessao || sessao.tipo !== "administrador") {
+  if (!acessaSst(sessao)) {
     return Response.json({ erro: "Sem permissão." }, { status: 403 });
   }
 

@@ -1,4 +1,5 @@
 import { obterSessaoAtual } from "@/lib/auth/sessao";
+import { acessaSst } from "@/lib/auth/perfil";
 import { listarHistoricoPrograma } from "@/lib/sst/programas";
 import { PROGRAMAS_SAUDE } from "@/lib/sst/domain";
 
@@ -6,7 +7,7 @@ export const runtime = "nodejs";
 
 export async function GET(request: Request) {
   const sessao = await obterSessaoAtual();
-  if (!sessao || sessao.tipo !== "administrador") return Response.json({ erro: "Sem permissão." }, { status: 403 });
+  if (!acessaSst(sessao)) return Response.json({ erro: "Sem permissão." }, { status: 403 });
 
   const { searchParams } = new URL(request.url);
   const programa = searchParams.get("programa");

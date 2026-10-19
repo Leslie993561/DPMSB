@@ -1,4 +1,5 @@
 import { obterSessaoAtual } from "@/lib/auth/sessao";
+import { acessaSst } from "@/lib/auth/perfil";
 import { blobConfigurado, subirArquivoPrivado } from "@/lib/storage";
 
 export const runtime = "nodejs";
@@ -8,7 +9,7 @@ const TAMANHO_MAX = 10 * 1024 * 1024; // 10MB
 /** Sobe o comprovante/ASO que o RH anexa ao registrar exames feitos — salvo antes da ficha existir, a ficha guarda só a URL. */
 export async function POST(request: Request) {
   const sessao = await obterSessaoAtual();
-  if (!sessao || sessao.tipo !== "administrador") return Response.json({ erro: "Sem permissão." }, { status: 403 });
+  if (!acessaSst(sessao)) return Response.json({ erro: "Sem permissão." }, { status: 403 });
 
   if (!blobConfigurado()) {
     return Response.json({ erro: "Armazenamento de arquivos ainda não configurado no portal." }, { status: 400 });

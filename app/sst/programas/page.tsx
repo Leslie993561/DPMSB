@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
+import { acessaSst } from "@/lib/auth/perfil";
 import { listarProgramasSaude } from "@/lib/sst/programas";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { ProgramasSaudeClient } from "@/components/modules/sst/ProgramasSaudeClient";
@@ -10,7 +11,7 @@ export default async function SstProgramasPage() {
   // proxy.ts já bloqueia /sst/* pra quem não é administrador; checagem extra
   // aqui só por segurança (mesmo padrão da Gestão de EPI e de Exames).
   const sessao = await obterSessaoAtual();
-  if (!sessao || sessao.tipo !== "administrador") {
+  if (!acessaSst(sessao)) {
     redirect("/sem-acesso");
   }
 

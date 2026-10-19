@@ -40,6 +40,13 @@ export const ROTAS_PAGINA: RegraPagina[] = [
   },
   { caminho: "/rescisao", modulo: "rescisao" },
   { caminho: "/chat", modulo: "chat" },
+  { caminho: "/sst", modulo: "sst.dashboard" },
+  { caminho: "/sst/epi", modulo: "sst.epi" },
+  { caminho: "/sst/exames", modulo: "sst.exames" },
+  { caminho: "/sst/programas", modulo: "sst.programas" },
+  { caminho: "/dho", modulo: "dho.dashboard" },
+  { caminho: "/dho/endomarketing", modulo: "dho.dashboard" },
+  { caminho: "/dho/endomarketing/kits", modulo: "dho.kits" },
 ];
 
 export interface RegraApi {
@@ -71,6 +78,12 @@ export const ROTAS_API: RegraApi[] = [
   { prefixo: "/api/upload", modulo: "folha" },
   { prefixo: "/api/ai", modulo: "folha" },
   { prefixo: "/api/chat", modulo: "chat" },
+  { prefixo: "/api/sst/dashboard", modulo: "sst.dashboard" },
+  { prefixo: "/api/sst/epi", modulo: "sst.epi" },
+  { prefixo: "/api/sst/exames", modulo: "sst.exames" },
+  { prefixo: "/api/sst/programas", modulo: "sst.programas" },
+  { prefixo: "/api/dho/kits", modulo: "dho.kits" },
+  { prefixo: "/api/dho", modulo: "dho.dashboard" },
 ];
 
 /**

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
+import { acessaSst } from "@/lib/auth/perfil";
 import { obterDashboardSst } from "@/lib/sst/dashboard";
 import { formatarMoeda } from "@/lib/format";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -37,7 +38,7 @@ function TabelaMensal({ titulo, meses }: { titulo: string; meses: { mesLabel: st
 export default async function SstDashboardPage() {
   // Defesa extra além do bloqueio já feito em proxy.ts.
   const sessao = await obterSessaoAtual();
-  if (!sessao || sessao.tipo !== "administrador") {
+  if (!acessaSst(sessao)) {
     redirect("/sem-acesso");
   }
 

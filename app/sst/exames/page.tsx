@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
+import { acessaSst } from "@/lib/auth/perfil";
 import { CATALOGO_EXAMES_OCUPACIONAIS } from "@/lib/sst/domain";
 import { listarColaboradoresParaExames, obterCargosOcupacionais, obterCustosExames, obterMatrizExames } from "@/lib/sst/exames";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -17,7 +18,7 @@ export default async function SstExamesPage({
   // proxy.ts já bloqueia /sst/* pra quem não é administrador; checagem extra
   // aqui só por segurança (mesmo padrão da Gestão de EPI).
   const sessao = await obterSessaoAtual();
-  if (!sessao || sessao.tipo !== "administrador") {
+  if (!acessaSst(sessao)) {
     redirect("/sem-acesso");
   }
 

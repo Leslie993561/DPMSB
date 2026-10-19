@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
+import { acessaSst } from "@/lib/auth/perfil";
 import {
   EPI_CATALOGO,
   listarColaboradoresParaEpi,
@@ -24,7 +25,7 @@ export default async function SstEpiPage({
   // proxy.ts já bloqueia /sst/* pra quem não é administrador; checagem extra
   // aqui só por segurança (mesmo padrão do Dashboard SST).
   const sessao = await obterSessaoAtual();
-  if (!sessao || sessao.tipo !== "administrador") {
+  if (!acessaSst(sessao)) {
     redirect("/sem-acesso");
   }
 

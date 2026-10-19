@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
+import { acessaDho } from "@/lib/auth/perfil";
 import { listarKits } from "@/lib/db/dho";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { EstoqueKitsClient } from "@/components/modules/dho/EstoqueKitsClient";
@@ -8,7 +9,7 @@ export const metadata = { title: "Estoque de Kits — Portal Recursos Humanos" }
 
 export default async function EstoqueKitsPage() {
   const sessao = await obterSessaoAtual();
-  if (!sessao || sessao.tipo !== "administrador") redirect("/sem-acesso");
+  if (!acessaDho(sessao)) redirect("/sem-acesso");
 
   const kits = await listarKits();
 

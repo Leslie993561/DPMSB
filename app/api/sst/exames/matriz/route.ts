@@ -1,12 +1,13 @@
 import { z } from "zod";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
+import { acessaSst } from "@/lib/auth/perfil";
 import { atualizarExamesDaFuncao, removerFuncaoDaMatriz } from "@/lib/sst/exames";
 
 export const runtime = "nodejs";
 
 async function exigirAdmin() {
   const sessao = await obterSessaoAtual();
-  return sessao?.tipo === "administrador" ? sessao : null;
+  return acessaSst(sessao) ? sessao : null;
 }
 
 const schema = z.object({
@@ -35,7 +36,7 @@ const schemaRemover = z.object({ funcao: z.string().trim().min(1) });
 
 /** RH remove um cargo/função inteiro da matriz. Admin-only. */
 export async function DELETE(request: Request) {
-  if (!(await exigirAdmin())) return Response.json({ erro: "Sem permissão." }, { status: 403 });
+  if ((await obterSessaoAtual())?.tipo !== "administrador") return Response.json({ erro: "Sem permissão." }, { status: 403 });
 
   const parsed = schemaRemover.safeParse(await request.json());
   if (!parsed.success) {

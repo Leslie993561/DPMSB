@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
+import { acessaSst } from "@/lib/auth/perfil";
 import { dispensarTrocaVencida } from "@/lib/sst/fichas";
 
 export const runtime = "nodejs";
@@ -13,7 +14,7 @@ const schema = z.object({
 /** RH dispensa o aviso de "troca vencida" de um EPI específico (ex.: já foi trocado por fora, ou descartado). Admin-only. */
 export async function POST(request: Request) {
   const sessao = await obterSessaoAtual();
-  if (!sessao || sessao.tipo !== "administrador") {
+  if (!acessaSst(sessao)) {
     return Response.json({ erro: "Sem permissão." }, { status: 403 });
   }
 

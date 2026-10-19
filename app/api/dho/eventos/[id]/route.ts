@@ -1,4 +1,5 @@
 import { obterSessaoAtual } from "@/lib/auth/sessao";
+import { acessaDho } from "@/lib/auth/perfil";
 import { atualizarEventoCalendario, excluirEventoCalendario } from "@/lib/db/dho";
 import { schemaEvento } from "../route";
 
@@ -15,7 +16,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const sessao = await obterSessaoAtual();
-  if (!sessao || sessao.tipo !== "administrador") return Response.json({ erro: "Sem permissão." }, { status: 403 });
+  if (!acessaDho(sessao)) return Response.json({ erro: "Sem permissão." }, { status: 403 });
 
   const parsed = schemaEvento.safeParse(await request.json());
   if (!parsed.success) {

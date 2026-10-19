@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
+import { acessaSst } from "@/lib/auth/perfil";
 import { dispensarDivergenciaEpi } from "@/lib/sst/fichas";
 
 export const runtime = "nodejs";
@@ -12,7 +13,7 @@ const schema = z.object({
 /** RH dispensa a divergência de um EPI obrigatório sem entrega registrada. Admin-only. */
 export async function POST(request: Request) {
   const sessao = await obterSessaoAtual();
-  if (!sessao || sessao.tipo !== "administrador") {
+  if (!acessaSst(sessao)) {
     return Response.json({ erro: "Sem permissão." }, { status: 403 });
   }
 

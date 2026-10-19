@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
+import { acessaDho } from "@/lib/auth/perfil";
 import { listarDatasComemorativas, listarEventosCalendario, obterOrcamentoAnual } from "@/lib/db/dho";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { EndomarketingDashboardClient, type AbaEndomarketing } from "@/components/modules/dho/EndomarketingDashboardClient";
@@ -15,7 +16,7 @@ export default async function EndomarketingPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const sessao = await obterSessaoAtual();
-  if (!sessao || sessao.tipo !== "administrador") redirect("/sem-acesso");
+  if (!acessaDho(sessao)) redirect("/sem-acesso");
 
   const abaParam = (await searchParams).aba;
   const aba: AbaEndomarketing = ABAS_VALIDAS.includes(abaParam as AbaEndomarketing) ? (abaParam as AbaEndomarketing) : "calendario";

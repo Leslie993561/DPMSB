@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 import { z } from "zod";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
+import { acessaSst } from "@/lib/auth/perfil";
 import { listarProjecaoVencimentosEpi } from "@/lib/sst/epi";
 
 export const runtime = "nodejs";
@@ -38,7 +39,7 @@ function anoMes(dataBr: string): { ano: number; mes: number } | null {
  */
 export async function GET(request: Request) {
   const sessao = await obterSessaoAtual();
-  if (!sessao || sessao.tipo !== "administrador") {
+  if (!acessaSst(sessao)) {
     return Response.json({ erro: "Sem permissão." }, { status: 403 });
   }
 

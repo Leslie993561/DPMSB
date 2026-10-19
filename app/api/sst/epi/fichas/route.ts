@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
+import { acessaSst } from "@/lib/auth/perfil";
 import { criarFicha, listarFichasDoColaborador } from "@/lib/sst/fichas";
 
 export const runtime = "nodejs";
@@ -8,7 +9,7 @@ export const runtime = "nodejs";
 // como API comum — por isso a checagem de administrador fica aqui.
 async function exigirAdmin() {
   const sessao = await obterSessaoAtual();
-  return sessao?.tipo === "administrador" ? sessao : null;
+  return acessaSst(sessao) ? sessao : null;
 }
 
 export async function GET(request: Request) {

@@ -1,4 +1,5 @@
 import { obterSessaoAtual } from "@/lib/auth/sessao";
+import { acessaSst } from "@/lib/auth/perfil";
 import { baixarArquivoPrivado } from "@/lib/storage";
 import { excluirAnexoFatura, obterAnexoFatura } from "@/lib/sst/faturasAnexos";
 
@@ -7,7 +8,7 @@ export const runtime = "nodejs";
 type Ctx = { params: Promise<{ competencia: string; tipo: string }> };
 
 async function soAdmin() {
-  return (await obterSessaoAtual())?.tipo === "administrador";
+  return acessaSst(await obterSessaoAtual());
 }
 
 export async function GET(_request: Request, { params }: Ctx) {
@@ -26,7 +27,7 @@ export async function GET(_request: Request, { params }: Ctx) {
 }
 
 export async function DELETE(_request: Request, { params }: Ctx) {
-  if (!(await soAdmin())) return Response.json({ erro: "Sem permissão." }, { status: 403 });
+  if ((await obterSessaoAtual())?.tipo !== "administrador") return Response.json({ erro: "Sem permissão." }, { status: 403 });
   const { competencia, tipo } = await params;
   return (await excluirAnexoFatura(competencia, tipo))
     ? Response.json({ ok: true })

@@ -1,4 +1,5 @@
 import { obterSessaoAtual } from "@/lib/auth/sessao";
+import { acessaSst } from "@/lib/auth/perfil";
 import { baixarArquivoPrivado } from "@/lib/storage";
 import { obterAnexoFichaExame } from "@/lib/sst/exames";
 
@@ -7,7 +8,7 @@ export const runtime = "nodejs";
 /** RH baixa o comprovante anexado a uma ficha de exame. Admin-only. */
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const sessao = await obterSessaoAtual();
-  if (!sessao || sessao.tipo !== "administrador") return Response.json({ erro: "Sem permissão." }, { status: 403 });
+  if (!acessaSst(sessao)) return Response.json({ erro: "Sem permissão." }, { status: 403 });
 
   const { id } = await params;
   const anexo = await obterAnexoFichaExame(id);

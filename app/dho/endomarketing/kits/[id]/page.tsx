@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
+import { acessaDho } from "@/lib/auth/perfil";
 import { obterKit } from "@/lib/db/dho";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { KitDetalheClient } from "@/components/modules/dho/KitDetalheClient";
@@ -8,7 +9,7 @@ export const metadata = { title: "Kit — Portal Recursos Humanos" };
 
 export default async function KitDetalhePage({ params }: { params: Promise<{ id: string }> }) {
   const sessao = await obterSessaoAtual();
-  if (!sessao || sessao.tipo !== "administrador") redirect("/sem-acesso");
+  if (!acessaDho(sessao)) redirect("/sem-acesso");
 
   const { id } = await params;
   const kit = await obterKit(Number(id));

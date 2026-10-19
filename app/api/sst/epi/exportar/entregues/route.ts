@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
+import { acessaSst } from "@/lib/auth/perfil";
 import { listarEntregasConfirmadasParaExportacao } from "@/lib/sst/epi";
 
 export const runtime = "nodejs";
@@ -7,7 +8,7 @@ export const runtime = "nodejs";
 /** Exporta todas as entregas de EPI e fardamento já confirmadas — "Opção 1" do popover de exportar. */
 export async function GET() {
   const sessao = await obterSessaoAtual();
-  if (!sessao || sessao.tipo !== "administrador") {
+  if (!acessaSst(sessao)) {
     return Response.json({ erro: "Sem permissão." }, { status: 403 });
   }
 

@@ -1,4 +1,5 @@
 import { obterSessaoAtual } from "@/lib/auth/sessao";
+import { acessaSst } from "@/lib/auth/perfil";
 import { baixarArquivoPrivado } from "@/lib/storage";
 import { obterDocumentoFicha } from "@/lib/sst/fichas";
 
@@ -7,7 +8,7 @@ export const runtime = "nodejs";
 /** RH baixa o PDF anexado a uma ficha (visão do histórico do colaborador). Admin-only. */
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const sessao = await obterSessaoAtual();
-  if (!sessao || sessao.tipo !== "administrador") return Response.json({ erro: "Sem permissão." }, { status: 403 });
+  if (!acessaSst(sessao)) return Response.json({ erro: "Sem permissão." }, { status: 403 });
 
   const { id } = await params;
   const documento = await obterDocumentoFicha(id);

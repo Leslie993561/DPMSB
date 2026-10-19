@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
+import { acessaSst } from "@/lib/auth/perfil";
 import { atualizarColaborador, buscarColaborador } from "@/lib/db/colaboradores";
 import { criarFichaExame, listarFichasExameDoColaborador, obterExamesVencidosDoColaborador } from "@/lib/sst/exames";
 
@@ -7,7 +8,7 @@ export const runtime = "nodejs";
 
 async function exigirAdmin() {
   const sessao = await obterSessaoAtual();
-  return sessao?.tipo === "administrador" ? sessao : null;
+  return acessaSst(sessao) ? sessao : null;
 }
 
 /**

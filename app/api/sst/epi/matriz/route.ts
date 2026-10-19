@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
+import { acessaSst } from "@/lib/auth/perfil";
 import { atualizarEpisExtrasDaFuncao } from "@/lib/sst/epi";
 
 export const runtime = "nodejs";
@@ -12,7 +13,7 @@ const schema = z.object({
 /** RH adiciona EPI(s) extra(s) a uma função da matriz (além dos fixos). Admin-only, mesmo padrão de /api/sst/epi/fichas. */
 export async function PUT(request: Request) {
   const sessao = await obterSessaoAtual();
-  if (!sessao || sessao.tipo !== "administrador") {
+  if (!acessaSst(sessao)) {
     return Response.json({ erro: "Sem permissão." }, { status: 403 });
   }
 

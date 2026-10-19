@@ -1,11 +1,12 @@
 import { obterSessaoAtual } from "@/lib/auth/sessao";
+import { acessaSst } from "@/lib/auth/perfil";
 import { reativarFicha } from "@/lib/sst/fichas";
 
 export const runtime = "nodejs";
 
 /** RH reativa o link de assinatura expirado (mesmo link, nova validade). Admin-only. */
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if ((await obterSessaoAtual())?.tipo !== "administrador") {
+  if (!acessaSst(await obterSessaoAtual())) {
     return Response.json({ erro: "Sem permissão." }, { status: 403 });
   }
   const ok = await reativarFicha((await params).id);

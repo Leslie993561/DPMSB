@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { verificarSessao } from "@/lib/auth/token";
+import { acessaDho, acessaSst } from "@/lib/auth/perfil";
 import { ROTAS_API, ROTAS_PAGINA, PREFIXO_ADMIN, permiteAcesso, moduloDaPagina } from "@/lib/acesso/rotas";
 
 const NOME_COOKIE = "portaldp_sessao";
@@ -50,19 +51,12 @@ export async function proxy(request: NextRequest) {
     return NextResponse.json({ erro: "Só administradores gerenciam acesso." }, { status: 403 });
   }
 
-  // SST e DHO são restritos ao RH (administrador) — gestor não tem módulo
-  // liberado em nenhum dos dois, então o portal já barra antes de servir o app.
-  if (pathname === "/sst" || pathname.startsWith("/sst/") || pathname === "/dho" || pathname.startsWith("/dho/")) {
-    const destino = request.nextUrl.clone();
-    destino.pathname = "/sem-acesso";
-    destino.search = "";
-    return NextResponse.redirect(destino);
-  }
-
-  // Gestor só enxerga o módulo de Férias — qualquer outra permissão gravada
-  // (colaboradores, folha, benefícios...) é ignorada aqui. Exceção: o editor do RH acima.
-  const liberados = new Set(sessao.liberados.filter((c) => c === "ferias" || c.startsWith("ferias.")));
-  const temFerias = liberados.size > 0;
+  // Gestor só enxerga Férias e os portais SST/ENDO liberados — qualquer outra permissão gravada
+  // (colaboradores, folha, benefícios...) é ignorada aqui. Exceção: o editor do RH abaixo.
+  const liberados = new Set(
+    sessao.liberados.filter((c) => c === "ferias" || c.startsWith("ferias.") || c.startsWith("sst.") || c.startsWith("dho.")),
+  );
+  const temFerias = [...liberados].some((c) => c === "ferias" || c.startsWith("ferias."));
   // Gestor-editor do RH (EDITORES_COLABORADORES_EMAILS) também entra no módulo Colaboradores.
   // Ela também respeita TODAS as chaves do Portal DP ligadas na tela de permissões (folha, benefícios...).
   if (sessao.editorColaboradores) {
@@ -73,7 +67,7 @@ export async function proxy(request: NextRequest) {
 
   if (!ehApi && pathname === "/") {
     const destino = request.nextUrl.clone();
-    destino.pathname = temFerias ? "/dashboard" : "/sem-acesso";
+    destino.pathname = temFerias ? "/dashboard" : acessaSst(sessao) ? "/sst" : acessaDho(sessao) ? "/dho" : "/sem-acesso";
     destino.search = "";
     return NextResponse.redirect(destino);
   }

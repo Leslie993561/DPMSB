@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
+import { acessaSst } from "@/lib/auth/perfil";
 import { definirCaEpi } from "@/lib/sst/epi";
 
 export const runtime = "nodejs";
@@ -12,7 +13,7 @@ const schema = z.object({
 /** RH informa o CA de um EPI extra (o catálogo estático já tem CA fixo pros seus itens). Admin-only. */
 export async function PUT(request: Request) {
   const sessao = await obterSessaoAtual();
-  if (!sessao || sessao.tipo !== "administrador") {
+  if (!acessaSst(sessao)) {
     return Response.json({ erro: "Sem permissão." }, { status: 403 });
   }
 

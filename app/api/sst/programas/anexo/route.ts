@@ -1,4 +1,5 @@
 import { obterSessaoAtual } from "@/lib/auth/sessao";
+import { acessaSst } from "@/lib/auth/perfil";
 import { blobConfigurado, subirArquivoPrivado } from "@/lib/storage";
 
 export const runtime = "nodejs";
@@ -11,7 +12,7 @@ const TAMANHO_MAX = 4 * 1024 * 1024; // 4MB
 /** Sobe o PDF do programa (PCMSO/LTCAT/PGR) antes de registrar a nova versão. */
 export async function POST(request: Request) {
   const sessao = await obterSessaoAtual();
-  if (!sessao || sessao.tipo !== "administrador") return Response.json({ erro: "Sem permissão." }, { status: 403 });
+  if (!acessaSst(sessao)) return Response.json({ erro: "Sem permissão." }, { status: 403 });
 
   if (!blobConfigurado()) {
     return Response.json({ erro: "Armazenamento de arquivos ainda não configurado no portal." }, { status: 400 });

@@ -1,4 +1,5 @@
 import { obterSessaoAtual } from "@/lib/auth/sessao";
+import { acessaSst } from "@/lib/auth/perfil";
 import { blobConfigurado, subirArquivoPrivado } from "@/lib/storage";
 import { listarAnexosFatura, salvarAnexoFatura, TIPOS_ANEXO_FATURA } from "@/lib/sst/faturasAnexos";
 
@@ -8,7 +9,7 @@ const TAMANHO_MAX = 10 * 1024 * 1024;
 const TIPOS_ARQUIVO = ["application/pdf", "image/png", "image/jpeg"];
 
 async function soAdmin() {
-  return (await obterSessaoAtual())?.tipo === "administrador";
+  return acessaSst(await obterSessaoAtual());
 }
 
 export async function GET() {

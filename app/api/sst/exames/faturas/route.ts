@@ -1,5 +1,6 @@
 import { carregarPdfParse } from "@/lib/parsing/carregarPdfParse";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
+import { acessaSst } from "@/lib/auth/perfil";
 import { interpretarFaturaExames } from "@/lib/sst/faturaExames";
 import { listarFaturasExame, salvarFaturaExame } from "@/lib/sst/faturasExame";
 
@@ -9,7 +10,7 @@ const TAMANHO_MAX = 10 * 1024 * 1024;
 
 async function soAdmin() {
   const sessao = await obterSessaoAtual();
-  return sessao?.tipo === "administrador";
+  return acessaSst(sessao);
 }
 
 export async function GET() {

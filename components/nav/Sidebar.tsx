@@ -7,6 +7,7 @@ import { cn } from "@/lib/cn";
 import type { NavCounts } from "@/lib/db/navCounts";
 import type { SessaoPayload } from "@/lib/auth/token";
 import { permiteAcesso } from "@/lib/acesso/rotas";
+import { acessaDho, acessaSst } from "@/lib/auth/perfil";
 import { iniciais } from "@/lib/format";
 import { Logo } from "./Logo";
 import { GerenciarAcessoModal } from "@/components/modules/acesso/GerenciarAcessoModal";
@@ -198,15 +199,15 @@ const FRENTES = [
 ] as const;
 
 const MODULOS_SST = [
-  { id: "sst-dashboard", label: "Dashboard", href: "/sst", Icone: IconeBreakdown },
-  { id: "sst-epi", label: "Gestão de EPI", href: "/sst/epi", Icone: IconeEpi },
-  { id: "sst-exames", label: "Exames Ocupacionais", href: "/sst/exames", Icone: IconeExames },
-  { id: "sst-programas", label: "Programas SST", href: "/sst/programas", Icone: IconeProgramas },
+  { id: "sst-dashboard", label: "Dashboard", href: "/sst", modulo: "sst.dashboard", Icone: IconeBreakdown },
+  { id: "sst-epi", label: "Gestão de EPI", href: "/sst/epi", modulo: "sst.epi", Icone: IconeEpi },
+  { id: "sst-exames", label: "Exames Ocupacionais", href: "/sst/exames", modulo: "sst.exames", Icone: IconeExames },
+  { id: "sst-programas", label: "Programas SST", href: "/sst/programas", modulo: "sst.programas", Icone: IconeProgramas },
 ] as const;
 
 const MODULOS_DHO = [
-  { id: "dho-endo-dashboard", label: "Endomarketing", href: "/dho/endomarketing", Icone: IconeEndomarketing },
-  { id: "dho-endo-kits", label: "Estoque de Kits", href: "/dho/endomarketing/kits", Icone: IconeKit },
+  { id: "dho-endo-dashboard", label: "Endomarketing", href: "/dho/endomarketing", modulo: "dho.dashboard", Icone: IconeEndomarketing },
+  { id: "dho-endo-kits", label: "Estoque de Kits", href: "/dho/endomarketing/kits", modulo: "dho.kits", Icone: IconeKit },
 ] as const;
 
 export function Sidebar({ counts, sessao }: { counts?: NavCounts; sessao: SessaoPayload }) {
@@ -221,13 +222,20 @@ export function Sidebar({ counts, sessao }: { counts?: NavCounts; sessao: Sessao
   // por cima do conteúdo depois de tocar num link.
   useEffect(() => setAbertoMobile(false), [pathname]);
   const ehAdmin = sessao.tipo === "administrador";
-  // Gestor só vê Férias: demais permissões e os outros portais ficam ocultos.
-  const liberados = new Set(sessao.liberados.filter((c) => c === "ferias" || c.startsWith("ferias.")));
+  // Gestor só vê Férias e os portais SST/ENDO liberados: demais permissões ficam ocultas.
+  const liberados = new Set(
+    sessao.liberados.filter((c) => c === "ferias" || c.startsWith("ferias.") || c.startsWith("sst.") || c.startsWith("dho.")),
+  );
   if (sessao.editorColaboradores) {
     liberados.add("colaboradores.quadro");
     liberados.add("colaboradores.organograma");
     for (const chave of sessao.liberados) liberados.add(chave);
   }
+  const temDp = ehAdmin || sessao.editorColaboradores === true || [...liberados].some((c) => c === "ferias" || c.startsWith("ferias."));
+  const frentesDisponiveis = FRENTES.filter(
+    (f) => ehAdmin || (f.id === "dp" ? temDp : f.id === "sst" ? acessaSst(sessao) : acessaDho(sessao)),
+  );
+  const podeTrocarFrente = frentesDisponiveis.length > 1;
   const frenteAtual = pathname?.startsWith("/sst") ? "sst" : pathname?.startsWith("/dho") ? "dho" : "dp";
   const frenteSelecionada = FRENTES.find((f) => f.id === frenteAtual) ?? FRENTES[0];
   const [frenteMenuAberto, setFrenteMenuAberto] = useState(false);
@@ -277,21 +285,21 @@ export function Sidebar({ counts, sessao }: { counts?: NavCounts; sessao: Sessao
       <div className="relative px-3 pt-1 pb-1">
         <button
           type="button"
-          onClick={() => ehAdmin && setFrenteMenuAberto((v) => !v)}
+          onClick={() => podeTrocarFrente && setFrenteMenuAberto((v) => !v)}
           className="flex w-full items-center gap-2.5 rounded-lg bg-brand-primary-100 px-3 py-2 text-[13px] font-semibold text-brand-primary-800 transition-colors"
         >
           <span className="text-brand-primary">
             <IconePortal />
           </span>
           <span className="flex-1 text-left">{frenteSelecionada.label}</span>
-          {ehAdmin && <span className="text-[10px] text-brand-primary">{frenteMenuAberto ? "▲" : "▼"}</span>}
+          {podeTrocarFrente && <span className="text-[10px] text-brand-primary">{frenteMenuAberto ? "▲" : "▼"}</span>}
         </button>
 
-        {ehAdmin && frenteMenuAberto && (
+        {podeTrocarFrente && frenteMenuAberto && (
           <>
             <div className="fixed inset-0 z-20" onClick={() => setFrenteMenuAberto(false)} />
             <div className="relative z-30 mt-0.5 mb-1 ml-[21px] flex flex-col gap-0.5 border-l border-hairline pl-3">
-              {FRENTES.map((f) => (
+              {frentesDisponiveis.map((f) => (
                 <Link
                   key={f.id}
                   href={f.href}
@@ -318,7 +326,9 @@ export function Sidebar({ counts, sessao }: { counts?: NavCounts; sessao: Sessao
       </div>
 
       <nav className="flex flex-1 flex-col gap-1 px-3 pb-2">
-        {(frenteAtual === "sst" ? MODULOS_SST : frenteAtual === "dho" ? MODULOS_DHO : []).map((m) => {
+        {(frenteAtual === "sst" ? MODULOS_SST : frenteAtual === "dho" ? MODULOS_DHO : [])
+          .filter((m) => ehAdmin || permiteAcesso(m.modulo, liberados))
+          .map((m) => {
             // Dashboards que são prefixo de outro item (/sst e a raiz do Endomarketing)
             // precisam de match exato — com startsWith os dois acendiam juntos ao
             // entrar em /sst/epi ou em /dho/endomarketing/kits.

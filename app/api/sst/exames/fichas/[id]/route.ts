@@ -1,11 +1,12 @@
 import { obterSessaoAtual } from "@/lib/auth/sessao";
+import { acessaSst } from "@/lib/auth/perfil";
 import { z } from "zod";
 import { atualizarFichaExame, excluirFichaExame, TIPOS_ASO } from "@/lib/sst/exames";
 
 export const runtime = "nodejs";
 
 async function ehAdmin() {
-  return (await obterSessaoAtual())?.tipo === "administrador";
+  return acessaSst(await obterSessaoAtual());
 }
 
 const dataIso = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -38,7 +39,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await ehAdmin())) return Response.json({ erro: "Sem permissão." }, { status: 403 });
+  if ((await obterSessaoAtual())?.tipo !== "administrador") return Response.json({ erro: "Sem permissão." }, { status: 403 });
   const apagada = await excluirFichaExame((await params).id);
   if (!apagada) return Response.json({ erro: "Ficha não encontrada." }, { status: 404 });
   return Response.json({ ok: true });

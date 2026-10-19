@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
+import { acessaDho } from "@/lib/auth/perfil";
 import { atualizarMaterialKit } from "@/lib/db/dho";
 
 export const runtime = "nodejs";
@@ -11,7 +12,7 @@ const schema = z.object({
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ materialId: string }> }) {
   const sessao = await obterSessaoAtual();
-  if (!sessao || sessao.tipo !== "administrador") return Response.json({ erro: "Sem permissão." }, { status: 403 });
+  if (!acessaDho(sessao)) return Response.json({ erro: "Sem permissão." }, { status: 403 });
 
   const parsed = schema.safeParse(await request.json());
   if (!parsed.success) {
