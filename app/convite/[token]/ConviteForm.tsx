@@ -102,6 +102,44 @@ function Secao({ titulo }: { titulo: string }) {
   );
 }
 
+/** Exemplo de preenchimento mostrado no campo vazio (datas já mostram dd/mm/aaaa pelo navegador). */
+const EXEMPLO_CAMPO: Record<string, string> = {
+  CPF: "000.000.000-00",
+  PIS: "000.00000.00-0",
+  "CPF do cônjuge": "000.000.000-00",
+  Nome: "Nome do dependente",
+  "Nome do pai": "Nome completo",
+  "Nome da mãe": "Nome completo",
+  "Nome do cônjuge": "Nome completo",
+  "Cidade de nascimento": "ex.: Salvador",
+  "UF de nascimento": "BA",
+  "Nacionalidade do pai": "ex.: Brasileira",
+  "Nacionalidade da mãe": "ex.: Brasileira",
+  Telefone: "(00) 00000-0000",
+  "E-mail pessoal": "pessoal@exemplo.com",
+  "Tipo de deficiência": "ex.: Auditiva",
+  RG: "ex.: 00.000.000-00",
+  "Título de eleitor": "0000 0000 0000",
+  Zona: "ex.: 001",
+  Seção: "ex.: 0001",
+  "CTPS · série": "ex.: 0000",
+  "CTPS · UF": "BA",
+  "CNH · categoria": "ex.: AB",
+  "Reservista · série": "ex.: 0000",
+  "Tamanho de camisa": "ex.: M",
+  "Tamanho de calça": "ex.: 42",
+  "Tamanho de sapato": "ex.: 40",
+  Banco: "ex.: Itaú",
+  Agência: "0000-0",
+  Conta: "00000-0",
+  CEP: "00000-000",
+  Estado: "BA",
+  Cidade: "ex.: Salvador",
+  Bairro: "ex.: Pituba",
+  Rua: "ex.: Av. Tancredo Neves",
+  Número: "ex.: 123",
+};
+
 function Campo({
   label,
   value,
@@ -116,7 +154,13 @@ function Campo({
   return (
     <label className="flex flex-col gap-1">
       <span className="text-[10.5px] font-medium text-foreground-muted">{label}</span>
-      <input type={tipo} value={value} onChange={(e) => onChange(e.target.value)} className={INPUT_CLASS} />
+      <input
+        type={tipo}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={tipo === "date" ? undefined : EXEMPLO_CAMPO[label]}
+        className={INPUT_CLASS}
+      />
     </label>
   );
 }
