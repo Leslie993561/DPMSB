@@ -319,6 +319,37 @@ export async function listarProjecaoVencimentosEpi(): Promise<ProjecaoVencimento
     .sort((a, b) => chaveOrdenacaoData(a.dataTroca).localeCompare(chaveOrdenacaoData(b.dataTroca)) || a.nome.localeCompare(b.nome, "pt-BR"));
 }
 
+export interface EpiParaComprar {
+  epi: string;
+  /** Colaboradores com esse EPI vencido (a quem a nova entrega será feita), em ordem alfabética. */
+  colaboradores: string[];
+}
+
+/** "DD/MM/AAAA" → true se a data já passou (troca vencida); vazia/inválida não vence. */
+function jaVenceu(dataBr: string): boolean {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dataBr.trim());
+  if (!m) return false;
+  const hoje = new Date();
+  return Date.UTC(Number(m[3]), Number(m[2]) - 1, Number(m[1])) < Date.UTC(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+}
+
+/**
+ * EPIs com a troca já vencida (última entrega confirmada, sem aviso dispensado),
+ * agrupados por EPI com os colaboradores que vão receber — é a lista de compra.
+ * Maior quantidade primeiro.
+ */
+export async function listarEpisParaComprar(): Promise<EpiParaComprar[]> {
+  const linhas = (await listarProjecaoVencimentosEpi()).filter((l) => jaVenceu(l.dataTroca));
+  const porEpi = new Map<string, Set<string>>();
+  for (const l of linhas) {
+    if (!porEpi.has(l.epi)) porEpi.set(l.epi, new Set());
+    porEpi.get(l.epi)!.add(l.nome);
+  }
+  return [...porEpi.entries()]
+    .map(([epi, nomes]) => ({ epi, colaboradores: [...nomes].sort((a, b) => a.localeCompare(b, "pt-BR")) }))
+    .sort((a, b) => b.colaboradores.length - a.colaboradores.length || a.epi.localeCompare(b.epi, "pt-BR"));
+}
+
 export interface SituacaoEpi {
   vencidos: number;
   vencendo: number;

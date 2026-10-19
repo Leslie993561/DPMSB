@@ -185,6 +185,10 @@ export interface CustoMensalEpiExames {
   mesLabel: string;
   epi: number;
   exames: number;
+  /** Itens de EPI entregues no mês (soma das quantidades). */
+  epiQtd: number;
+  /** Exames ocupacionais realizados no mês (contagem de exames lançados). */
+  examesQtd: number;
 }
 
 export interface DashboardSst {
@@ -403,9 +407,11 @@ export async function obterDashboardSst(): Promise<DashboardSst> {
   const entregasEpiConfirmadas = entregasEpiRows.filter((e) => confirmada(e.ficha_id));
 
   const realizadoByMes: Record<string, number> = {};
+  const epiQtdByMes: Record<string, number> = {};
   entregasEpiConfirmadas.forEach((e) => {
     const mes = mesISOfromBR(e.data_entrega);
     if (!mes) return;
+    epiQtdByMes[mes] = (epiQtdByMes[mes] ?? 0) + Number(e.qtd);
     realizadoByMes[mes] = (realizadoByMes[mes] ?? 0) + Number(e.valor_unit) * Number(e.qtd);
   });
 
@@ -524,9 +530,11 @@ export async function obterDashboardSst(): Promise<DashboardSst> {
   const difExamesSST = realizadoExamesTotal - previstoExamesAno;
 
   const examesValorByMes: Record<string, number> = {};
+  const examesQtdByMes: Record<string, number> = {};
   examesRealizadosRows.forEach((r) => {
     const mes = mesISOfromBR(r.data_realizacao);
     if (!mes) return;
+    examesQtdByMes[mes] = (examesQtdByMes[mes] ?? 0) + 1;
     examesValorByMes[mes] = (examesValorByMes[mes] ?? 0) + valorExame(codigoPorExame.get(r.exame) ?? "");
   });
 
@@ -539,6 +547,8 @@ export async function obterDashboardSst(): Promise<DashboardSst> {
     mesLabel,
     epi: realizadoByMes[mes] ?? 0,
     exames: examesValorByMes[mes] ?? 0,
+    epiQtd: epiQtdByMes[mes] ?? 0,
+    examesQtd: examesQtdByMes[mes] ?? 0,
   }));
 
   // ---------- fichas de EPI pendentes de assinatura ----------
