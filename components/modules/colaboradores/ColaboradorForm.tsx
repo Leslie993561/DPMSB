@@ -13,6 +13,7 @@ import { abreviarNome } from "@/lib/format";
 import { SETORES } from "@/lib/setores";
 import type { DocumentoFicha, FichaResumo } from "@/lib/sst/fichas";
 import type { OrigemDocumento } from "@/lib/db/colaboradorDocumentos";
+import { descreverErro } from "@/lib/validacao/erroCampos";
 
 const INPUT_CLASS =
   "w-full rounded border border-hairline bg-background px-2 py-1 text-[12px] font-light text-foreground placeholder:text-foreground-muted/60 disabled:cursor-not-allowed disabled:border-hairline/70 disabled:bg-surface-page disabled:text-foreground-muted dark:border-brand-neutral/30";
@@ -452,122 +453,12 @@ function DocumentosColaboradorPanel({
 }
 
 /** Divisor com rótulo em versalete, usado para separar o formulário em blocos temáticos. */
-/**
- * Nome de cada campo como ele aparece na tela.
- *
- * Serve para traduzir o erro de validação da rota, que chega como caminho
- * técnico ("conjugeNascimento"), no rótulo que a pessoa acabou de preencher.
- * Sem isto o formulário mostrava só "Dados inválidos" e não havia como saber
- * qual dos setenta campos recusou o valor.
- */
-const ROTULO_CAMPO: Record<string, string> = {
-  nome: "Nome",
-  cpf: "CPF",
-  pis: "PIS",
-  dataNascimento: "Nascimento",
-  dataAdmissao: "Admissão",
-  dataDesligamento: "Desligamento",
-  salarioBase: "Salário base",
-  email: "E-mail",
-  emailPessoal: "E-mail pessoal",
-  telefone: "Telefone",
-  cargo: "Cargo",
-  departamento: "Setor",
-  vinculo: "Vínculo",
-  cbo: "CBO",
-  horario: "Horário",
-  banco: "Banco",
-  agencia: "Agência",
-  conta: "Conta",
-  cep: "CEP",
-  estado: "Estado",
-  cidade: "Cidade",
-  bairro: "Bairro",
-  rua: "Rua",
-  numero: "Número",
-  sexo: "Sexo",
-  cidadeNascimento: "Cidade de nascimento",
-  ufNascimento: "UF de nascimento",
-  nomePai: "Nome do pai",
-  nomeMae: "Nome da mãe",
-  alimentacaoValor: "Alimentação",
-  odontologicoValor: "Odontológico",
-  auxilioEducacaoValor: "Auxílio educação",
-  tipoTransporte: "Transporte",
-  valorTransporteDia: "Valor do VT (por dia útil)",
-  valorTransporteFixo: "Valor do VM (fixo mensal)",
-  periculosidadePercentual: "Periculosidade",
-  insalubridadePercentual: "Insalubridade",
-  adicionalFixo: "Adicional fixo",
-  adicionalFixoDescricao: "Descrição do adicional fixo",
-  conjugeNome: "Nome do cônjuge",
-  conjugeCpf: "CPF do cônjuge",
-  conjugeNascimento: "Nascimento do cônjuge",
-  conjugeSexo: "Sexo do cônjuge",
-  rg: "RG",
-  rgEmissao: "Emissão do RG",
-  cpfEmissao: "Emissão do CPF",
-  pisEmissao: "Emissão do PIS",
-  tituloEleitor: "Título de eleitor",
-  tituloEleitorZona: "Zona do título",
-  tituloEleitorSecao: "Seção do título",
-  tituloEleitorEmissao: "Emissão do título",
-  ctpsSerie: "Série da CTPS",
-  ctpsUf: "UF da CTPS",
-  ctpsEmissao: "Emissão da CTPS",
-  cnhCategoria: "Categoria da CNH",
-  cnhValidade: "Validade da CNH",
-  cnhEmissao: "Emissão da CNH",
-  reservistaSerie: "Série do reservista",
-  reservistaEmissao: "Emissão do reservista",
-  deficiente: "Deficiente",
-  deficienciaTipo: "Tipo de deficiência",
-  nacionalidadePai: "Nacionalidade do pai",
-  nacionalidadeMae: "Nacionalidade da mãe",
-  escolaridade: "Escolaridade",
-  tamanhoCamisa: "Tamanho de camisa",
-  tamanhoCalca: "Tamanho de calça",
-  tamanhoSapato: "Tamanho de sapato",
-  valorRescisao: "Valor da rescisão",
-  valorFgts: "Valor do FGTS",
-  rateioD365: "Rateio D365",
-  motivoDesligamento: "Motivo do desligamento",
-  dependentes: "Dependentes",
-  dependentesLista: "Dependente",
-};
 
 /** Texto de campo numérico: vazio vira null, "0" vira 0. */
 function numeroOuNulo(texto: string): number | null {
   if (texto.trim() === "") return null;
   const n = Number(texto.replace(",", "."));
   return Number.isFinite(n) ? n : null;
-}
-
-interface DetalheValidacao {
-  path?: (string | number)[];
-  message?: string;
-}
-
-/** Monta a mensagem de erro nomeando os campos que a validação recusou. */
-function descreverErro(data: { erro?: string; detalhes?: DetalheValidacao[] }): string {
-  const detalhes = data.detalhes ?? [];
-  if (detalhes.length === 0) return data.erro ?? "Erro ao salvar colaborador.";
-
-  const campos = detalhes.map((d) => {
-    const caminho = (d.path ?? []).filter((p): p is string => typeof p === "string");
-    const raiz = caminho[0];
-    const rotulo = raiz ? (ROTULO_CAMPO[raiz] ?? raiz) : "campo desconhecido";
-    // Caminho de dependente vem como ["dependentesLista", 1, "dataNascimento"] —
-    // vira "Dependente 2 · Nascimento", que é o que se vê na tela.
-    const indice = (d.path ?? []).find((p) => typeof p === "number");
-    const sub = caminho[1];
-    const prefixo = typeof indice === "number" ? `${rotulo} ${indice + 1}` : rotulo;
-    const alvo = sub ? `${prefixo} · ${ROTULO_CAMPO[sub] ?? sub}` : prefixo;
-    return d.message ? `${alvo} (${d.message})` : alvo;
-  });
-
-  const unicos = Array.from(new Set(campos));
-  return `Confira ${unicos.length === 1 ? "o campo" : "os campos"}: ${unicos.join("; ")}.`;
 }
 
 function Secao({ titulo }: { titulo: string }) {
@@ -1071,7 +962,7 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
       });
       const data = await res.json();
       if (!res.ok) {
-        setErro(descreverErro(data));
+        setErro(descreverErro(data, "Erro ao salvar colaborador."));
         return;
       }
       const falhas: string[] = [];

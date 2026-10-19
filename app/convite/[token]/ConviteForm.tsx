@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { descreverErro } from "@/lib/validacao/erroCampos";
 
 const INPUT_CLASS =
   "w-full rounded border border-hairline bg-background px-2.5 py-1.5 text-[13px] text-foreground placeholder:text-foreground-muted/60";
@@ -249,6 +250,11 @@ export function ConviteForm({ token }: { token: string }) {
       setErro("Informe seu nome completo.");
       return;
     }
+    const semNome = temDependente ? dependentes.findIndex((d) => !d.nome.trim()) : -1;
+    if (semNome >= 0) {
+      setErro(`Dependente ${semNome + 1} · Nome (informe o nome do dependente ou remova esse dependente).`);
+      return;
+    }
     setSalvando(true);
     try {
       const payload = {
@@ -320,7 +326,7 @@ export function ConviteForm({ token }: { token: string }) {
       });
       if (!res.ok) {
         const data = await res.json();
-        setErro(data.erro ?? "Não foi possível salvar.");
+        setErro(descreverErro(data, "Não foi possível salvar."));
         return;
       }
       setEstadoTela("enviado");
