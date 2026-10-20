@@ -32,7 +32,7 @@ export interface HistoricoMovimentacoes {
   meses: MesMovimentacao[];
   /** Colaboradores ativos hoje no Quadro (o número principal da tela). */
   ativosAtuais: number;
-  /** Só administrador e gestor-editor do RH classificam as movimentações. */
+  /** Só quem está em ehEmailEditorMovimentacoes classifica as movimentações. */
   podeEditar: boolean;
 }
 
