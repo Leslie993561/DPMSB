@@ -92,9 +92,10 @@ export function LancarManualmenteModal({
   const periodo = periodos.find((p) => String(p.periodoId) === periodoId) ?? null;
 
   const diasNum = Number(dias);
-  const dataRetorno = periodo ? calcularRetorno(dataInicio, diasNum) : null;
-  // 1/3 do saldo do período, não do direito cheio: 30 restantes → 10, 15 → 5.
-  const diasAbonoPrevisto = periodo ? tetoAbono(periodo.diasRestantes) : 0;
+  // 1/3 dos dias digitados em "Dias de férias": 30 → vende 10, 15 → vende 5.
+  const diasAbonoPrevisto = abono && Number.isFinite(diasNum) && diasNum > 0 ? tetoAbono(diasNum) : 0;
+  const diasGozoPrevisto = diasNum - diasAbonoPrevisto;
+  const dataRetorno = periodo ? calcularRetorno(dataInicio, diasGozoPrevisto) : null;
 
   /**
    * Mesma função que a API usa para decidir (lib/ferias-gestao/validacoes) —
@@ -262,7 +263,7 @@ export function LancarManualmenteModal({
                 </p>
               )}
 
-              {!periodo.abonoUtilizado && diasAbonoPrevisto > 0 && (
+              {!periodo.abonoUtilizado && tetoAbono(periodo.diasRestantes) > 0 && (
                 <div>
                   <label className="flex items-center gap-2 text-[11.5px] text-foreground">
                     <input
@@ -271,13 +272,14 @@ export function LancarManualmenteModal({
                       onChange={(e) => setAbono(e.target.checked)}
                       className="accent-brand-primary"
                     />
-                    Vender abono pecuniário ({diasAbonoPrevisto} dias)
+                    Vender abono pecuniário (1/3 dos dias de férias)
                   </label>
-                  {abono && (
+                  {abono && diasAbonoPrevisto > 0 && (
                     <p className="mt-1 rounded border border-brand-primary/40 bg-brand-primary-100/50 px-2 py-1.5 text-[11px] text-brand-primary-800">
-                      Vendendo <strong>{diasAbonoPrevisto} dias</strong> — 1/3 dos{" "}
-                      <strong>{periodo.diasRestantes} dias</strong> que restam a tirar. Sobram{" "}
-                      <strong>{periodo.diasRestantes - diasAbonoPrevisto} dias</strong> de férias para gozar neste
+                      Dos <strong>{diasNum} dias</strong> solicitados, você vai gozar{" "}
+                      <strong>{diasGozoPrevisto} dias</strong> e vender{" "}
+                      <strong>{diasAbonoPrevisto} dias</strong> (1/3). Sobram{" "}
+                      <strong>{Math.max(0, periodo.diasRestantes - diasNum)} dias</strong> de férias para gozar neste
                       período.
                     </p>
                   )}

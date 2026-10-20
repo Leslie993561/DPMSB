@@ -97,20 +97,24 @@ describe("validarNovoLancamentoCalculado", () => {
     });
   });
 
-  describe("abono sobre o saldo do período", () => {
-    it("com 15 dias restantes, o abono é 5 e o gozo cabe em 10", () => {
+  describe("abono sobre os dias solicitados", () => {
+    it("com 15 dias restantes, pedir 15 vende 5 e goza 10", () => {
       const estado = calcularEstadoPeriodo(periodoNovo, [{ dias: 15 }]);
       expect(estado.diasATirar).toBe(15);
-      // 15 gozados + 5 de abono + 10 agora = 30
-      expect(validarNovoLancamentoCalculado(periodoNovo, estado, 10, true).ok).toBe(true);
-      // 11 não cabe: passaria dos 30
-      expect(validarNovoLancamentoCalculado(periodoNovo, estado, 11, true).ok).toBe(false);
+      expect(validarNovoLancamentoCalculado(periodoNovo, estado, 15, true).ok).toBe(true);
+      // 16 não cabe: passaria dos 30
+      expect(validarNovoLancamentoCalculado(periodoNovo, estado, 16, true).ok).toBe(false);
     });
 
-    it("com o período inteiro livre, o abono é 10 e o gozo cabe em 20", () => {
+    it("pedir 30 dias com o período livre vende 10 e goza 20", () => {
       const estado = calcularEstadoPeriodo(periodoNovo, []);
-      expect(validarNovoLancamentoCalculado(periodoNovo, estado, 20, true).ok).toBe(true);
-      expect(validarNovoLancamentoCalculado(periodoNovo, estado, 21, true).ok).toBe(false);
+      expect(validarNovoLancamentoCalculado(periodoNovo, estado, 30, true).ok).toBe(true);
+      expect(validarNovoLancamentoCalculado(periodoNovo, estado, 31, true).ok).toBe(false);
+    });
+
+    it("pedir 15 dias com período livre vende 5 e goza 10", () => {
+      const estado = calcularEstadoPeriodo(periodoNovo, []);
+      expect(validarNovoLancamentoCalculado(periodoNovo, estado, 15, true).ok).toBe(true);
     });
   });
 
@@ -136,20 +140,19 @@ describe("validarNovoLancamentoCalculado", () => {
   });
 
   it("aceita abono na primeira solicitação e ele conta no teto de dias", () => {
-    // 30 dias de direito, abono (10) + 20 de gozo = exatamente o limite.
+    // 30 dias pedidos: abono (10) + 20 de gozo = exatamente o limite.
     const estado = calcularEstadoPeriodo(periodoNovo, []);
-    const r = validarNovoLancamentoCalculado(periodoNovo, estado, 20, true);
+    const r = validarNovoLancamentoCalculado(periodoNovo, estado, 30, true);
     expect(r.ok).toBe(true);
   });
 
-  it("rejeita quando gozo + abono ultrapassam os dias de direito na mesma solicitação", () => {
-    // 21 de gozo + 10 de abono = 31 > 30.
-    const estado = calcularEstadoPeriodo(periodoNovo, []);
-    const r = validarNovoLancamentoCalculado(periodoNovo, estado, 21, true);
+  it("rejeita quando o pedido com abono ultrapassa os dias de direito", () => {
+    const estado = calcularEstadoPeriodo(periodoNovo, [{ dias: 14 }]);
+    const r = validarNovoLancamentoCalculado(periodoNovo, estado, 20, true); // restam 16
     expect(r.ok).toBe(false);
     // A mensagem diz o saldo, o pedido e quantos dias tirar.
-    if (!r.ok) expect(r.erro).toContain("Restam 20 dia(s)");
-    if (!r.ok) expect(r.erro).toContain("Retire 1 dia(s)");
+    if (!r.ok) expect(r.erro).toContain("Restam 16 dia(s)");
+    if (!r.ok) expect(r.erro).toContain("Retire 4 dia(s)");
   });
 
   it("rejeita quando a soma com lançamentos anteriores ultrapassa os dias de direito", () => {

@@ -135,8 +135,24 @@ export function validarNovoLancamentoCalculado(
     };
   }
 
-  const diasAbono = tetoAbono(estado.diasATirar);
-  const teto = verificarTeto(periodo, estado, diasSolicitados, abonoSolicitado, diasAbono);
+  // Com abono, `diasSolicitados` é o total consumido do período: 1/3 é vendido
+  // e o restante é gozado (15 pedidos → 5 vendidos + 10 gozados).
+  const diasAbono = abonoSolicitado ? tetoAbono(diasSolicitados) : 0;
+  const diasGozo = diasSolicitados - diasAbono;
+
+  if (abonoSolicitado) {
+    if (diasAbono <= 0) {
+      return { ok: false, erro: "Para vender abono, peça ao menos 3 dias (1/3 deles é vendido)." };
+    }
+    if (diasSolicitados > estado.diasATirar) {
+      return {
+        ok: false,
+        erro: `Restam ${estado.diasATirar} dia(s) neste período e o pedido é de ${diasSolicitados}. Retire ${diasSolicitados - estado.diasATirar} dia(s).`,
+      };
+    }
+  }
+
+  const teto = verificarTeto(periodo, estado, diasGozo, abonoSolicitado, diasAbono);
   if (!teto.ok) return teto;
 
   // Saldo total do período depois de descontar o abono desta solicitação.
@@ -146,14 +162,14 @@ export function validarNovoLancamentoCalculado(
   // Nenhum período pode ficar abaixo de 5 dias — vale para qualquer posição.
   // Só não se aplica quando o próprio saldo do período já é menor que isso,
   // caso em que nenhum lançamento seria possível.
-  if (limite >= MIN_DIAS_DEMAIS_PERIODOS && diasSolicitados < MIN_DIAS_DEMAIS_PERIODOS) {
+  if (limite >= MIN_DIAS_DEMAIS_PERIODOS && diasGozo < MIN_DIAS_DEMAIS_PERIODOS) {
     return {
       ok: false,
       erro: `Nenhum período pode ter menos de ${MIN_DIAS_DEMAIS_PERIODOS} dias (Art. 134, §1º CLT).`,
     };
   }
 
-  const partesDepois = [...estado.partes, diasSolicitados];
+  const partesDepois = [...estado.partes, diasGozo];
   const jaTemPeriodoLongo = partesDepois.some((d) => d >= MIN_DIAS_PRIMEIRO_PERIODO);
 
   // Só cobra o período de 14+ dias se o saldo do período permitir um.
@@ -166,7 +182,7 @@ export function validarNovoLancamentoCalculado(
       // Quanto encurtar este pedido para ainda caber um período de 14+ dias.
       const aCortar = MIN_DIAS_PRIMEIRO_PERIODO - saldoRestante;
       const comoResolver =
-        vagasRestantes >= 1 && aCortar > 0 && diasSolicitados - aCortar >= MIN_DIAS_DEMAIS_PERIODOS
+        vagasRestantes >= 1 && aCortar > 0 && diasGozo - aCortar >= MIN_DIAS_DEMAIS_PERIODOS
           ? ` Retire ${aCortar} dia(s).`
           : ` Peça ${MIN_DIAS_PRIMEIRO_PERIODO} dias ou mais neste lançamento.`;
       return {

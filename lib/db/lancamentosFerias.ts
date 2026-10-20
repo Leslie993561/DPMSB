@@ -210,13 +210,13 @@ export async function criarLancamentoCalculado(input: CriarLancamentoCalculadoIn
   );
   if (!resultado.ok) throw new ErroValidacaoFerias(resultado.erro);
 
-  // 1/3 do que ainda há para tirar, não do direito cheio — ver `tetoAbono`.
-  const diasAbono = input.abonoSolicitado ? tetoAbono(estado.diasATirar) : 0;
+  // 1/3 dos dias solicitados são vendidos; o restante é gozado (`dias`).
+  const diasAbono = input.abonoSolicitado ? tetoAbono(input.diasSolicitados) : 0;
   const lancamento = await inserirLancamento({
     periodoAquisitivoId: periodo.id,
     origem: "calculado",
     status: "programada",
-    dias: input.diasSolicitados,
+    dias: input.diasSolicitados - diasAbono,
     dataInicioPrevista: input.dataInicioPrevista,
     dataInicioGozo: null,
     dataFimGozo: null,
