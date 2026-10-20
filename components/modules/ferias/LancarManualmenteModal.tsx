@@ -258,7 +258,7 @@ export function LancarManualmenteModal({
 
               {dataRetorno && validacao?.ok && (
                 <p className="text-[11.5px] text-foreground-muted">
-                  Último dia de férias em <strong>{formatarDataBr(calcularRetorno(dataInicio, diasNum - 1)!)}</strong> ·
+                  Último dia de férias em <strong>{formatarDataBr(calcularRetorno(dataInicio, diasGozoPrevisto - 1)!)}</strong> ·
                   retorno ao trabalho em <strong>{formatarDataBr(dataRetorno)}</strong>.
                 </p>
               )}
