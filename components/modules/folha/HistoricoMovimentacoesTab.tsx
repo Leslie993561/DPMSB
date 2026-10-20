@@ -64,7 +64,7 @@ function LinhaMovimento({ l, podeEditar }: { l: MovimentoColaborador; podeEditar
         <p className="text-[11.5px] leading-tight font-medium text-foreground" title={l.nome}>
           {abreviarNome(l.nome)}
         </p>
-        <p className="text-[10px] leading-tight font-light text-foreground-muted">{l.cargo ?? "—"}</p>
+        <p className="text-[10px] leading-tight font-light text-foreground-muted">{l.cargo ?? "—"} · {l.departamento ?? "—"}</p>
       </td>
       <td className="w-[150px] px-2.5 py-1">
         <select
