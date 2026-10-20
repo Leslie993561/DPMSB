@@ -66,7 +66,7 @@ function LinhaMovimento({ l, podeEditar }: { l: MovimentoColaborador; podeEditar
         </p>
         <p className="text-[10px] leading-tight font-light text-foreground-muted">{l.cargo ?? "—"}</p>
       </td>
-      <td className="w-[190px] px-2.5 py-1">
+      <td className="w-[150px] px-2.5 py-1">
         <select
           value={tipo}
           disabled={!podeEditar}
@@ -221,7 +221,7 @@ export function HistoricoMovimentacoesTab() {
               <span className="text-status-danger">{m.saidas.length} saída(s)</span>
             </p>
           </div>
-          <div className="divide-y divide-hairline/60">
+          <div className="grid divide-hairline/60 lg:grid-cols-2 lg:divide-x">
             <div>
               <p className="border-b border-hairline/50 px-2.5 py-1 text-[9px] font-semibold tracking-wide text-status-success uppercase">
                 Entradas
