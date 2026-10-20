@@ -26,7 +26,7 @@ const schemaSalvar = z.object({
   justificativa: z.string().trim().max(500, "A justificativa aceita até 500 caracteres.").nullable(),
 });
 
-/** Classifica uma entrada ou saída (tipo + justificativa) — só Leslie e Carolina (ver ehEmailEditorMovimentacoes). */
+/** Classifica uma entrada ou saída (tipo + justificativa) — só Leslie, Carolina e Yuri (ver ehEmailEditorMovimentacoes). */
 export async function PATCH(request: Request) {
   const sessao = await obterSessaoAtual();
   if (!sessao || !ehEmailEditorMovimentacoes(sessao.email)) return Response.json({ erro: "Sem permissão." }, { status: 403 });

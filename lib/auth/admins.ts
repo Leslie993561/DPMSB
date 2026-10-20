@@ -19,8 +19,9 @@ export function ehEmailEditorColaboradores(email: string): boolean {
   return lista.includes(email.trim().toLowerCase());
 }
 
-/** Quem classifica entradas e saídas (tipo e justificativa) no Histórico de movimentações: só estas duas pessoas do RH. */
-const EDITORES_MOVIMENTACOES_PADRAO = "leslie.souza@msbbrasil.com,carolina.cruz@msbbrasil.com";
+/** Quem classifica entradas e saídas (tipo e justificativa) no Histórico de movimentações: só estas pessoas do RH. */
+const EDITORES_MOVIMENTACOES_PADRAO =
+  "leslie.souza@msbbrasil.com,carolina.cruz@msbbrasil.com,yuri.crispim@msbbrasil.com";
 
 export function ehEmailEditorMovimentacoes(email: string): boolean {
   const lista = (process.env.EDITORES_MOVIMENTACOES_EMAILS ?? EDITORES_MOVIMENTACOES_PADRAO)
