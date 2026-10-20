@@ -26,6 +26,7 @@ export const COLUNAS_COLABORADOR = [
   { header: "Título — seção", key: "tituloEleitorSecao", width: 14 },
   { header: "Título — emissão", key: "tituloEleitorEmissao", width: 16 },
   { header: "CNH — categoria", key: "cnhCategoria", width: 16 },
+  { header: "CNH — número", key: "cnhNumero", width: 18 },
   { header: "CNH — validade", key: "cnhValidade", width: 16 },
   { header: "CNH — emissão", key: "cnhEmissao", width: 16 },
   { header: "Reservista — série", key: "reservistaSerie", width: 18 },

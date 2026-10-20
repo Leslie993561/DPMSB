@@ -59,6 +59,7 @@ export async function GET() {
       tituloEleitorSecao: c.tituloEleitorSecao ?? "",
       tituloEleitorEmissao: c.tituloEleitorEmissao ?? "",
       cnhCategoria: c.cnhCategoria ?? "",
+      cnhNumero: c.cnhNumero ?? "",
       cnhValidade: c.cnhValidade ?? "",
       cnhEmissao: c.cnhEmissao ?? "",
       reservistaSerie: c.reservistaSerie ?? "",

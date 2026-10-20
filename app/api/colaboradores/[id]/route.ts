@@ -79,6 +79,7 @@ const schema = z.object({
   ctpsUf: z.string().nullable().optional(),
   ctpsEmissao: z.iso.date().nullable().optional(),
   cnhCategoria: z.string().nullable().optional(),
+  cnhNumero: z.string().nullable().optional(),
   cnhValidade: z.iso.date().nullable().optional(),
   cnhEmissao: z.iso.date().nullable().optional(),
   reservistaSerie: z.string().nullable().optional(),

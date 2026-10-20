@@ -60,6 +60,7 @@ export const ROTULO_CAMPO: Record<string, string> = {
   ctpsUf: "UF da CTPS",
   ctpsEmissao: "Emissão da CTPS",
   cnhCategoria: "Categoria da CNH",
+  cnhNumero: "Número da CNH",
   cnhValidade: "Validade da CNH",
   cnhEmissao: "Emissão da CNH",
   reservistaSerie: "Série do reservista",

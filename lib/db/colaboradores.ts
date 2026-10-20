@@ -86,6 +86,7 @@ export interface Colaborador {
   ctpsUf: string | null;
   ctpsEmissao: string | null;
   cnhCategoria: string | null;
+  cnhNumero: string | null;
   cnhValidade: string | null;
   cnhEmissao: string | null;
   reservistaSerie: string | null;
@@ -174,6 +175,7 @@ export interface ColaboradorInput {
   ctpsUf?: string | null;
   ctpsEmissao?: string | null;
   cnhCategoria?: string | null;
+  cnhNumero?: string | null;
   cnhValidade?: string | null;
   cnhEmissao?: string | null;
   reservistaSerie?: string | null;
@@ -258,6 +260,7 @@ interface LinhaColaborador {
   ctps_uf: string | null;
   ctps_emissao: string | null;
   cnh_categoria: string | null;
+  cnh_numero: string | null;
   cnh_validade: string | null;
   cnh_emissao: string | null;
   reservista_serie: string | null;
@@ -335,6 +338,7 @@ function paraColaborador(linha: LinhaColaborador): Colaborador {
     ctpsUf: linha.ctps_uf,
     ctpsEmissao: linha.ctps_emissao,
     cnhCategoria: linha.cnh_categoria,
+    cnhNumero: linha.cnh_numero ?? null,
     cnhValidade: linha.cnh_validade,
     cnhEmissao: linha.cnh_emissao,
     reservistaSerie: linha.reservista_serie,
@@ -401,6 +405,7 @@ export function paraColaboradorProfissional(c: Colaborador): Colaborador {
     ctpsUf: null,
     ctpsEmissao: null,
     cnhCategoria: null,
+    cnhNumero: null,
     cnhValidade: null,
     cnhEmissao: null,
     reservistaSerie: null,
@@ -484,11 +489,11 @@ export async function criarColaborador(input: ColaboradorInput): Promise<Colabor
           rg, rg_emissao, cpf_emissao, pis_emissao,
           titulo_eleitor, titulo_eleitor_zona, titulo_eleitor_secao, titulo_eleitor_emissao,
           ctps_serie, ctps_uf, ctps_emissao,
-          cnh_categoria, cnh_validade, cnh_emissao,
+          cnh_categoria, cnh_numero, cnh_validade, cnh_emissao,
           reservista_serie, reservista_emissao,
           deficiente, deficiencia_tipo, nacionalidade_pai, nacionalidade_mae, escolaridade,
           tamanho_camisa, tamanho_calca, tamanho_sapato)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       input.nome,
       input.dataAdmissao,
@@ -549,6 +554,7 @@ export async function criarColaborador(input: ColaboradorInput): Promise<Colabor
       input.ctpsUf ?? null,
       input.ctpsEmissao ?? null,
       input.cnhCategoria ?? null,
+      input.cnhNumero ?? null,
       input.cnhValidade ?? null,
       input.cnhEmissao ?? null,
       input.reservistaSerie ?? null,
@@ -636,6 +642,7 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
     ctpsUf: input.ctpsUf !== undefined ? input.ctpsUf : atual.ctpsUf,
     ctpsEmissao: input.ctpsEmissao !== undefined ? input.ctpsEmissao : atual.ctpsEmissao,
     cnhCategoria: input.cnhCategoria !== undefined ? input.cnhCategoria : atual.cnhCategoria,
+    cnhNumero: input.cnhNumero !== undefined ? input.cnhNumero : atual.cnhNumero,
     cnhValidade: input.cnhValidade !== undefined ? input.cnhValidade : atual.cnhValidade,
     cnhEmissao: input.cnhEmissao !== undefined ? input.cnhEmissao : atual.cnhEmissao,
     reservistaSerie: input.reservistaSerie !== undefined ? input.reservistaSerie : atual.reservistaSerie,
@@ -670,7 +677,7 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
            rg = ?, rg_emissao = ?, cpf_emissao = ?, pis_emissao = ?,
            titulo_eleitor = ?, titulo_eleitor_zona = ?, titulo_eleitor_secao = ?, titulo_eleitor_emissao = ?,
            ctps_serie = ?, ctps_uf = ?, ctps_emissao = ?,
-           cnh_categoria = ?, cnh_validade = ?, cnh_emissao = ?, reservista_serie = ?, reservista_emissao = ?,
+           cnh_categoria = ?, cnh_numero = ?, cnh_validade = ?, cnh_emissao = ?, reservista_serie = ?, reservista_emissao = ?,
            deficiente = ?, deficiencia_tipo = ?, nacionalidade_pai = ?, nacionalidade_mae = ?, escolaridade = ?,
            tamanho_camisa = ?, tamanho_calca = ?, tamanho_sapato = ?,
            periculosidade_percentual = ?, insalubridade_percentual = ?, adicional_fixo = ?,
@@ -737,6 +744,7 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
       mesclado.ctpsUf ?? null,
       mesclado.ctpsEmissao ?? null,
       mesclado.cnhCategoria ?? null,
+      mesclado.cnhNumero ?? null,
       mesclado.cnhValidade ?? null,
       mesclado.cnhEmissao ?? null,
       mesclado.reservistaSerie ?? null,

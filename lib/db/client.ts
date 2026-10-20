@@ -160,6 +160,7 @@ const MIGRACOES: { tabela: string; coluna: string; definicao: string }[] = [
   { tabela: "colaboradores", coluna: "ctps_uf", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "ctps_emissao", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "cnh_categoria", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "cnh_numero", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "cnh_validade", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "cnh_emissao", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "reservista_serie", definicao: "TEXT" },

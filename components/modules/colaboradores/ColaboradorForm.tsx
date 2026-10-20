@@ -663,6 +663,7 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
   const [ctpsUf, setCtpsUf] = useState(editando?.ctpsUf ?? "");
   const [ctpsEmissao, setCtpsEmissao] = useState(editando?.ctpsEmissao ?? "");
   const [cnhCategoria, setCnhCategoria] = useState(editando?.cnhCategoria ?? "");
+  const [cnhNumero, setCnhNumero] = useState(editando?.cnhNumero ?? "");
   const [cnhValidade, setCnhValidade] = useState(editando?.cnhValidade ?? "");
   const [cnhEmissao, setCnhEmissao] = useState(editando?.cnhEmissao ?? "");
   const [reservistaSerie, setReservistaSerie] = useState(editando?.reservistaSerie ?? "");
@@ -934,6 +935,7 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
         ctpsUf: ctpsUf || null,
         ctpsEmissao: ctpsEmissao || null,
         cnhCategoria: cnhCategoria || null,
+        cnhNumero: cnhNumero || null,
         cnhValidade: cnhValidade || null,
         cnhEmissao: cnhEmissao || null,
         reservistaSerie: reservistaSerie || null,
@@ -1405,34 +1407,11 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
           />
         </label>
         <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
-          PIS
-          <input
-            value={pis}
-            onChange={(e) => setPis(e.target.value)}
-            placeholder="000.00000.00-0"
-            disabled={bloqueado}
-            className={INPUT_CLASS}
-          />
-        </label>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2">
-        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
           CPF · emissão
           <input
             type="date"
             value={cpfEmissao}
             onChange={(e) => setCpfEmissao(e.target.value)}
-            disabled={bloqueado}
-            className={INPUT_CLASS}
-          />
-        </label>
-        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
-          PIS · emissão
-          <input
-            type="date"
-            value={pisEmissao}
-            onChange={(e) => setPisEmissao(e.target.value)}
             disabled={bloqueado}
             className={INPUT_CLASS}
           />
@@ -1669,6 +1648,29 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
         </label>
       </div>
 
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          PIS
+          <input
+            value={pis}
+            onChange={(e) => setPis(e.target.value)}
+            placeholder="000.00000.00-0"
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          PIS · emissão
+          <input
+            type="date"
+            value={pisEmissao}
+            onChange={(e) => setPisEmissao(e.target.value)}
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+      </div>
+
       <div className="grid grid-cols-3 gap-2">
         <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
           CTPS · série
@@ -1702,7 +1704,17 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
         </label>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          CNH · número
+          <input
+            value={cnhNumero}
+            onChange={(e) => setCnhNumero(e.target.value)}
+            placeholder="00000000000"
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
         <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
           CNH · categoria
           <input

@@ -80,6 +80,7 @@ interface DadosPessoais {
   ctpsUf: string | null;
   ctpsEmissao: string | null;
   cnhCategoria: string | null;
+  cnhNumero: string | null;
   cnhValidade: string | null;
   cnhEmissao: string | null;
   reservistaSerie: string | null;
@@ -129,6 +130,7 @@ const EXEMPLO_CAMPO: Record<string, string> = {
   "Tamanho de camisa": "ex.: M",
   "Tamanho de calça": "ex.: 42",
   "Tamanho de sapato": "ex.: 40",
+  "CNH · número": "00000000000",
   Banco: "ex.: Itaú",
   Agência: "0000-0",
   Conta: "00000-0",
@@ -209,6 +211,7 @@ export function ConviteForm({ token }: { token: string }) {
   const [ctpsUf, setCtpsUf] = useState("");
   const [ctpsEmissao, setCtpsEmissao] = useState("");
   const [cnhCategoria, setCnhCategoria] = useState("");
+  const [cnhNumero, setCnhNumero] = useState("");
   const [cnhValidade, setCnhValidade] = useState("");
   const [cnhEmissao, setCnhEmissao] = useState("");
   const [reservistaSerie, setReservistaSerie] = useState("");
@@ -270,6 +273,7 @@ export function ConviteForm({ token }: { token: string }) {
         setCtpsUf(d.ctpsUf ?? "");
         setCtpsEmissao(d.ctpsEmissao ?? "");
         setCnhCategoria(d.cnhCategoria ?? "");
+        setCnhNumero(d.cnhNumero ?? "");
         setCnhValidade(d.cnhValidade ?? "");
         setCnhEmissao(d.cnhEmissao ?? "");
         setReservistaSerie(d.reservistaSerie ?? "");
@@ -338,6 +342,7 @@ export function ConviteForm({ token }: { token: string }) {
         ctpsUf: ctpsUf || null,
         ctpsEmissao: ctpsEmissao || null,
         cnhCategoria: cnhCategoria || null,
+        cnhNumero: cnhNumero || null,
         cnhValidade: cnhValidade || null,
         cnhEmissao: cnhEmissao || null,
         reservistaSerie: reservistaSerie || null,
@@ -437,7 +442,6 @@ export function ConviteForm({ token }: { token: string }) {
           </label>
         )}
         <Campo label="CPF" value={cpf} onChange={setCpf} />
-        <Campo label="PIS" value={pis} onChange={setPis} />
         <Campo label="Data de nascimento" value={dataNascimento} onChange={setDataNascimento} tipo="date" />
         <label className="flex flex-col gap-1">
           <span className="text-[10.5px] font-medium text-foreground-muted">Sexo</span>
@@ -488,6 +492,9 @@ export function ConviteForm({ token }: { token: string }) {
         <Campo label="RG" value={rg} onChange={setRg} />
         <Campo label="RG · emissão" value={rgEmissao} onChange={setRgEmissao} tipo="date" />
         <Campo label="CPF · emissão" value={cpfEmissao} onChange={setCpfEmissao} tipo="date" />
+      </div>
+      <div className="grid grid-cols-2 gap-2.5">
+        <Campo label="PIS" value={pis} onChange={setPis} />
         <Campo label="PIS · emissão" value={pisEmissao} onChange={setPisEmissao} tipo="date" />
       </div>
       <div className="grid grid-cols-3 gap-2.5">
@@ -503,7 +510,8 @@ export function ConviteForm({ token }: { token: string }) {
         <Campo label="CTPS · UF" value={ctpsUf} onChange={(v) => setCtpsUf(v.toUpperCase())} />
         <Campo label="CTPS · emissão" value={ctpsEmissao} onChange={setCtpsEmissao} tipo="date" />
       </div>
-      <div className="grid grid-cols-3 gap-2.5">
+      <div className="grid grid-cols-2 gap-2.5">
+        <Campo label="CNH · número" value={cnhNumero} onChange={setCnhNumero} />
         <Campo label="CNH · categoria" value={cnhCategoria} onChange={(v) => setCnhCategoria(v.toUpperCase())} />
         <Campo label="CNH · validade" value={cnhValidade} onChange={setCnhValidade} tipo="date" />
         <Campo label="CNH · emissão" value={cnhEmissao} onChange={setCnhEmissao} tipo="date" />
