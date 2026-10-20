@@ -11,6 +11,9 @@ export interface LinhaTrimestre {
   aquisitivo: string;
   concessivo: string;
   dias: number;
+  /** Primeiro e último dia de gozo (AAAA-MM-DD). */
+  dataInicio: string;
+  dataFim: string;
   /** Férias + 1/3 (+ abono e dobra quando houver) — a remuneração das férias. */
   valorFerias: number;
   /** FGTS 8% + INSS patronal 20%. */
@@ -127,6 +130,13 @@ export interface DashboardFerias {
   controle: ResumoControle;
 }
 
+/** Último dia de gozo = início + dias - 1 (dias corridos). */
+function ultimoDiaDeGozo(inicio: string, dias: number): string {
+  const d = new Date(`${inicio.slice(0, 10)}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + Math.max(dias, 1) - 1);
+  return d.toISOString().slice(0, 10);
+}
+
 /** Encargos de um item: o que sobra do custo previsto depois da remuneração das férias. */
 function encargosDoItem(item: ItemProgramacaoFerias): number {
   return arredondar(item.detalhe.fgts + item.detalhe.inssPatronal);
@@ -208,6 +218,8 @@ export async function obterDashboardFerias(
       aquisitivo: `${item.aquisitivoInicio} – ${item.aquisitivoFim}`,
       concessivo: `${item.concessivoInicio} – ${item.concessivoFim}`,
       dias: item.dias,
+      dataInicio: item.dataInicio,
+      dataFim: ultimoDiaDeGozo(item.dataInicio, item.dias),
       valorFerias: ferias,
       encargos,
       total: item.custoPrevisto,

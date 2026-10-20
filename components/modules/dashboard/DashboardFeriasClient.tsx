@@ -95,11 +95,18 @@ export function DashboardFeriasClient() {
   // lote e planejamento por trimestre mexem com a empresa inteira, ficam só com o RH.
   const [tipoSessao, setTipoSessao] = useState<"administrador" | "gestor" | null>(null);
   const somenteManual = tipoSessao === "gestor";
+  // Gestor comum vê, por trimestre, quem sai de férias e quando — sem valores.
+  // O gestor-editor do RH (Carolina, Yuri) mantém a visão completa.
+  const [editorRh, setEditorRh] = useState(false);
+  const semValoresNoTrimestre = tipoSessao === "gestor" && !editorRh;
 
   useEffect(() => {
     fetch("/api/auth/sessao")
       .then((r) => r.json())
-      .then((d) => setTipoSessao(d.tipo ?? null))
+      .then((d) => {
+        setTipoSessao(d.tipo ?? null);
+        setEditorRh(d.editorColaboradores === true);
+      })
       .catch(() => setTipoSessao(null));
   }, []);
 
@@ -261,8 +268,14 @@ export function DashboardFeriasClient() {
           <h2 className="text-[10px] font-bold tracking-[0.16em] text-foreground-muted uppercase">Por trimestre · {ano}</h2>
           <div className="h-px flex-1 bg-hairline" />
           <span className="text-[11px] text-brand-primary-800">
-            {dados.totalAno.colaboradores} colaboradores · {formatarMoeda(dados.totalAno.valorPago)} ao colaborador ·{" "}
-            {formatarMoeda(dados.totalAno.encargos)} de encargos
+            {semValoresNoTrimestre ? (
+              `${dados.totalAno.colaboradores} colaboradores`
+            ) : (
+              <>
+                {dados.totalAno.colaboradores} colaboradores · {formatarMoeda(dados.totalAno.valorPago)} ao colaborador ·{" "}
+                {formatarMoeda(dados.totalAno.encargos)} de encargos
+              </>
+            )}
           </span>
         </div>
 
@@ -271,6 +284,37 @@ export function DashboardFeriasClient() {
             const aberto = trimestreAberto === t.trimestre;
             const vazio = t.colaboradores === 0;
             const larguraBarra = vazio ? 0 : Math.max(6, (t.colaboradores / maxColaboradoresTrimestre) * 100);
+            if (semValoresNoTrimestre) {
+              return (
+                <Card key={t.trimestre} className="p-4">
+                  <div className="flex flex-col items-start gap-1.5">
+                    <span className="text-[13px]">
+                      <span className="font-bold text-foreground">Q{t.trimestre}</span>{" "}
+                      <span className="text-foreground-muted">{FAIXA_TRIMESTRE[t.trimestre]}</span>
+                    </span>
+                    <span className={cn("text-2xl font-semibold tracking-tight", vazio ? "text-foreground-muted/50" : "text-brand-primary-800")}>
+                      {t.colaboradores}
+                    </span>
+                    <span className="-mt-1 text-[10.5px] text-foreground-muted">colaboradores</span>
+                    <div className="h-1 w-full overflow-hidden rounded-full bg-hairline">
+                      <div className="h-full rounded-full bg-brand-primary transition-all" style={{ width: `${larguraBarra}%` }} />
+                    </div>
+                  </div>
+                  {t.linhas.length > 0 && (
+                    <ul className="mt-3 max-h-56 space-y-2 overflow-y-auto">
+                      {t.linhas.map((l, i) => (
+                        <li key={i}>
+                          <span className="block text-[12px] font-semibold text-foreground">{l.colaboradorNome}</span>
+                          <span className="block text-[10.5px] text-foreground-muted/80">
+                            {formatarDataBr(l.dataInicio)} a {formatarDataBr(l.dataFim)} · {l.dias} dia(s)
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </Card>
+              );
+            }
             return (
               <Card key={t.trimestre} className="overflow-hidden">
                 <button
