@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { formatarDataBr } from "@/lib/format";
+import { abreviarNome, formatarDataBr } from "@/lib/format";
 import { Card } from "@/components/shared/Card";
 import { tiposDoMovimento } from "@/lib/folha/movimentacoesTipos";
 import type { HistoricoMovimentacoes, MovimentoColaborador } from "@/lib/db/movimentacoes";
@@ -61,7 +61,9 @@ function LinhaMovimento({ l, podeEditar }: { l: MovimentoColaborador; podeEditar
     <tr className="border-t border-hairline/50 align-middle">
       <td className="w-[78px] px-2.5 py-1 text-[11px] whitespace-nowrap text-foreground-muted">{formatarDataBr(l.data)}</td>
       <td className="px-2.5 py-1">
-        <p className="text-[11.5px] leading-tight font-medium text-foreground">{l.nome}</p>
+        <p className="text-[11.5px] leading-tight font-medium text-foreground" title={l.nome}>
+          {abreviarNome(l.nome)}
+        </p>
         <p className="text-[10px] leading-tight font-light text-foreground-muted">{l.cargo ?? "—"}</p>
       </td>
       <td className="w-[190px] px-2.5 py-1">
