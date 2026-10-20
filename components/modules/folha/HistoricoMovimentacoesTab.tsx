@@ -22,7 +22,7 @@ const MESES = [
 ];
 
 const INPUT_CLASS =
-  "w-full rounded border border-hairline bg-background px-2 py-1 text-[12px] text-foreground placeholder:text-foreground-muted/60 disabled:border-transparent disabled:bg-transparent disabled:px-0";
+  "h-6 w-full rounded border border-hairline/70 bg-background px-1.5 text-[11px] font-light text-foreground placeholder:text-foreground-muted/50 disabled:border-transparent disabled:bg-transparent disabled:px-0";
 
 /** Uma linha da planilha: tipo e justificativa gravam sozinhos (ao escolher / ao sair do campo). */
 function LinhaMovimento({ l, podeEditar }: { l: MovimentoColaborador; podeEditar: boolean }) {
@@ -58,13 +58,13 @@ function LinhaMovimento({ l, podeEditar }: { l: MovimentoColaborador; podeEditar
 
   const opcoes = tiposDoMovimento(l.movimento);
   return (
-    <tr className="border-t border-hairline/60 align-top">
-      <td className="px-3 py-1.5 whitespace-nowrap text-foreground-muted">{formatarDataBr(l.data)}</td>
-      <td className="px-3 py-1.5">
-        <p className="font-semibold text-foreground">{l.nome}</p>
-        <p className="text-[11px] text-foreground-muted">{l.cargo ?? "—"}</p>
+    <tr className="border-t border-hairline/50 align-middle">
+      <td className="w-[78px] px-2.5 py-1 text-[11px] whitespace-nowrap text-foreground-muted">{formatarDataBr(l.data)}</td>
+      <td className="px-2.5 py-1">
+        <p className="text-[11.5px] leading-tight font-medium text-foreground">{l.nome}</p>
+        <p className="text-[10px] leading-tight font-light text-foreground-muted">{l.cargo ?? "—"}</p>
       </td>
-      <td className="px-3 py-1.5">
+      <td className="w-[190px] px-2.5 py-1">
         <select
           value={tipo}
           disabled={!podeEditar}
@@ -82,7 +82,7 @@ function LinhaMovimento({ l, podeEditar }: { l: MovimentoColaborador; podeEditar
           ))}
         </select>
       </td>
-      <td className="px-3 py-1.5">
+      <td className="px-2.5 py-1">
         <input
           value={justificativa}
           disabled={!podeEditar}
@@ -92,9 +92,15 @@ function LinhaMovimento({ l, podeEditar }: { l: MovimentoColaborador; podeEditar
           onBlur={() => void salvar(tipo, justificativa.trim())}
           className={INPUT_CLASS}
         />
-        {estado === "salvando" && <p className="mt-0.5 text-[10px] text-foreground-muted">Salvando…</p>}
-        {estado === "salvo" && <p className="mt-0.5 text-[10px] text-status-success">Salvo</p>}
-        {estado === "erro" && <p className="mt-0.5 text-[10px] text-status-danger">{msgErro}</p>}
+        {estado === "erro" && <p className="text-[10px] leading-tight text-status-danger">{msgErro}</p>}
+      </td>
+      <td className="w-5 pr-2 text-center text-[11px] leading-none">
+        {estado === "salvando" && <span className="text-foreground-muted">…</span>}
+        {estado === "salvo" && (
+          <span title="Salvo" className="text-status-success">
+            ✓
+          </span>
+        )}
       </td>
     </tr>
   );
@@ -112,17 +118,18 @@ function TabelaMovimento({
   podeEditar: boolean;
 }) {
   if (linhas.length === 0) {
-    return <p className="px-3 py-3 text-[12px] text-foreground-muted">{vazio}</p>;
+    return <p className="px-2.5 py-1.5 text-[11px] font-light text-foreground-muted">{vazio}</p>;
   }
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-[12px]">
+      <table className="w-full text-[11px]">
         <thead>
-          <tr className="border-b border-hairline text-left text-[10px] font-bold tracking-wide text-foreground-muted uppercase">
-            <th className="px-3 py-1.5">{rotuloData}</th>
-            <th className="px-3 py-1.5">Colaborador</th>
-            <th className="px-3 py-1.5">Tipo</th>
-            <th className="px-3 py-1.5">Justificativa</th>
+          <tr className="border-b border-hairline/70 text-left text-[9px] font-semibold tracking-wide text-foreground-muted uppercase">
+            <th className="px-2.5 py-1">{rotuloData}</th>
+            <th className="px-2.5 py-1">Colaborador</th>
+            <th className="px-2.5 py-1">Tipo</th>
+            <th className="px-2.5 py-1">Justificativa</th>
+            <th className="w-5" />
           </tr>
         </thead>
         <tbody>
@@ -174,14 +181,14 @@ export function HistoricoMovimentacoesTab() {
   const totalSaidas = dados.meses.reduce((acc, m) => acc + m.saidas.length, 0);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2.5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Card className="px-5 py-3">
-          <p className="text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">
+        <Card className="px-4 py-2">
+          <p className="text-[9px] font-semibold tracking-wide text-foreground-muted uppercase">
             Colaboradores atuais
           </p>
-          <p className="text-[32px] leading-tight font-bold text-brand-primary-800">{dados.ativosAtuais}</p>
-          <p className="text-[11px] text-foreground-muted">
+          <p className="text-[24px] leading-tight font-bold text-brand-primary-800">{dados.ativosAtuais}</p>
+          <p className="text-[10px] font-light text-foreground-muted">
             Em {dados.ano}: {totalEntradas} entrada(s) · {totalSaidas} saída(s)
           </p>
         </Card>
@@ -203,18 +210,18 @@ export function HistoricoMovimentacoesTab() {
 
       {dados.meses.map((m) => (
         <Card key={m.mes} className="overflow-hidden p-0">
-          <div className="flex items-center justify-between border-b border-hairline bg-surface-page px-3 py-2">
-            <p className="text-[13px] font-bold text-brand-primary-800">
+          <div className="flex items-center justify-between border-b border-hairline/70 bg-surface-page px-2.5 py-1">
+            <p className="text-[12px] font-semibold text-brand-primary-800">
               {MESES[m.mes - 1]} <span className="font-normal text-foreground-muted">/ {dados.ano}</span>
             </p>
-            <p className="text-[11px] text-foreground-muted">
-              <span className="font-semibold text-status-success">{m.entradas.length} entrada(s)</span> ·{" "}
-              <span className="font-semibold text-status-danger">{m.saidas.length} saída(s)</span>
+            <p className="text-[10px] text-foreground-muted">
+              <span className="text-status-success">{m.entradas.length} entrada(s)</span> ·{" "}
+              <span className="text-status-danger">{m.saidas.length} saída(s)</span>
             </p>
           </div>
-          <div className="grid divide-hairline lg:grid-cols-2 lg:divide-x">
+          <div className="divide-y divide-hairline/60">
             <div>
-              <p className="border-b border-hairline/60 px-3 py-1.5 text-[10px] font-bold tracking-wide text-status-success uppercase">
+              <p className="border-b border-hairline/50 px-2.5 py-1 text-[9px] font-semibold tracking-wide text-status-success uppercase">
                 Entradas
               </p>
               <TabelaMovimento
@@ -225,7 +232,7 @@ export function HistoricoMovimentacoesTab() {
               />
             </div>
             <div>
-              <p className="border-b border-hairline/60 px-3 py-1.5 text-[10px] font-bold tracking-wide text-status-danger uppercase">
+              <p className="border-b border-hairline/50 px-2.5 py-1 text-[9px] font-semibold tracking-wide text-status-danger uppercase">
                 Saídas
               </p>
               <TabelaMovimento
