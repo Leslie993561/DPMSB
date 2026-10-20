@@ -88,6 +88,11 @@ export async function proxy(request: NextRequest) {
     if (temFerias && request.method === "GET" && pathname === "/api/colaboradores") {
       return NextResponse.next();
     }
+    // O modal "Lançar programação manualmente" lê os períodos do colaborador;
+    // sem isto o gestor só de Férias recebia 403 e via "Nada a programar".
+    if (temFerias && request.method === "GET" && /^\/api\/colaboradores\/\d+\/historico-ferias$/.test(pathname)) {
+      return NextResponse.next();
+    }
     // Fora Férias e Colaboradores (que têm as próprias regras por rota), gestor comum só CONSULTA:
     // importar, fechar mês, editar rateio etc. ficam com o administrador e o editor do RH.
     const leitura = request.method === "GET" || request.method === "HEAD";

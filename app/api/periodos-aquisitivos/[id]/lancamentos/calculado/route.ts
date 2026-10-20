@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { dentroDoEscopo } from "@/lib/acesso/equipeGestor";
+import { buscarPeriodo } from "@/lib/db/periodosAquisitivos";
 import { ErroValidacaoFerias, criarLancamentoCalculado } from "@/lib/db/lancamentosFerias";
 
 export const runtime = "nodejs";
@@ -19,6 +21,12 @@ export async function POST(
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
     return Response.json({ erro: "Dados inválidos", detalhes: parsed.error.issues }, { status: 400 });
+  }
+
+  // Gestor só programa a própria equipe.
+  const periodo = await buscarPeriodo(Number(id));
+  if (periodo && !(await dentroDoEscopo(periodo.colaboradorId))) {
+    return Response.json({ erro: "Colaborador fora da sua equipe." }, { status: 403 });
   }
 
   try {

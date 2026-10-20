@@ -1,4 +1,5 @@
 import { buscarColaborador } from "@/lib/db/colaboradores";
+import { dentroDoEscopo } from "@/lib/acesso/equipeGestor";
 import { listarHistoricoFerias } from "@/lib/db/historicoFerias";
 
 export const runtime = "nodejs";
@@ -11,6 +12,10 @@ export async function GET(
   const { id } = await ctx.params;
   const colaborador = await buscarColaborador(Number(id));
   if (!colaborador) return Response.json({ erro: "Colaborador não encontrado." }, { status: 404 });
+
+  if (!(await dentroDoEscopo(colaborador.id))) {
+    return Response.json({ erro: "Colaborador fora da sua equipe." }, { status: 403 });
+  }
 
   return Response.json({ periodos: await listarHistoricoFerias(colaborador.id) });
 }
