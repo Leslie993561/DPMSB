@@ -172,27 +172,19 @@ export function HistoricoMovimentacoesTab() {
 
   const totalEntradas = dados.meses.reduce((acc, m) => acc + m.entradas.length, 0);
   const totalSaidas = dados.meses.reduce((acc, m) => acc + m.saidas.length, 0);
-  const saldo = totalEntradas - totalSaidas;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="grid grid-cols-3 gap-3">
-          <Card className="px-4 py-2.5">
-            <p className="text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">Entradas</p>
-            <p className="text-[22px] leading-tight font-bold text-status-success">{totalEntradas}</p>
-          </Card>
-          <Card className="px-4 py-2.5">
-            <p className="text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">Saídas</p>
-            <p className="text-[22px] leading-tight font-bold text-status-danger">{totalSaidas}</p>
-          </Card>
-          <Card className="px-4 py-2.5">
-            <p className="text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">Saldo</p>
-            <p className="text-[22px] leading-tight font-bold text-brand-primary-800">
-              {saldo > 0 ? `+${saldo}` : saldo}
-            </p>
-          </Card>
-        </div>
+        <Card className="px-5 py-3">
+          <p className="text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">
+            Colaboradores atuais
+          </p>
+          <p className="text-[32px] leading-tight font-bold text-brand-primary-800">{dados.ativosAtuais}</p>
+          <p className="text-[11px] text-foreground-muted">
+            Em {dados.ano}: {totalEntradas} entrada(s) · {totalSaidas} saída(s)
+          </p>
+        </Card>
         <label className="flex items-center gap-2 text-[12px] text-foreground-muted">
           Ano
           <select

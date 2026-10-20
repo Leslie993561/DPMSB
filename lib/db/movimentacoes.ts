@@ -30,6 +30,8 @@ export interface HistoricoMovimentacoes {
   /** Anos com ao menos uma admissão ou desligamento, para o seletor da tela. */
   anos: number[];
   meses: MesMovimentacao[];
+  /** Colaboradores ativos hoje no Quadro (o número principal da tela). */
+  ativosAtuais: number;
   /** Só administrador e gestor-editor do RH classificam as movimentações. */
   podeEditar: boolean;
 }
@@ -66,8 +68,9 @@ export async function obterHistoricoMovimentacoes(ano: number, podeEditar: boole
       vinculo: c.vinculo,
       data,
       movimento,
-      tipo: info?.tipo ?? null,
-      justificativa: info?.justificativa ?? (movimento === "saida" ? (c.motivoDesligamento ?? null) : null),
+      // Saída: tipo e motivo vêm do desligamento feito no Quadro de Colaboradores.
+      tipo: movimento === "saida" ? c.tipoDesligamento : (info?.tipo ?? null),
+      justificativa: movimento === "saida" ? c.motivoDesligamento : (info?.justificativa ?? null),
     };
   };
 
@@ -91,10 +94,14 @@ export async function obterHistoricoMovimentacoes(ano: number, podeEditar: boole
     m.saidas.sort(porDataENome);
   }
 
-  return { ano, anos: [...anos].sort((a, b) => b - a), meses, podeEditar };
+  const ativosAtuais = colaboradores.filter((c) => c.status === "ativo").length;
+  return { ano, anos: [...anos].sort((a, b) => b - a), meses, ativosAtuais, podeEditar };
 }
 
-/** Grava (ou atualiza) o tipo e a justificativa de uma entrada ou saída. Vazio vira null. */
+/**
+ * Grava o tipo e a justificativa de uma entrada (tabela própria) ou de uma saída
+ * (colunas do desligamento no colaborador — mesma fonte do Quadro). Vazio vira null.
+ */
 export async function salvarInfoMovimentacao(dados: {
   colaboradorId: number;
   movimento: TipoMovimento;
@@ -102,6 +109,13 @@ export async function salvarInfoMovimentacao(dados: {
   justificativa: string | null;
 }): Promise<void> {
   const db = await getDb();
+  if (dados.movimento === "saida") {
+    await db.execute({
+      sql: "UPDATE colaboradores SET tipo_desligamento = ?, motivo_desligamento = ? WHERE id = ?",
+      args: [dados.tipo, dados.justificativa, dados.colaboradorId],
+    });
+    return;
+  }
   await db.execute({
     sql: `INSERT INTO movimentacoes_info (colaborador_id, movimento, tipo, justificativa) VALUES (?, ?, ?, ?)
          ON CONFLICT (colaborador_id, movimento) DO UPDATE SET tipo = EXCLUDED.tipo, justificativa = EXCLUDED.justificativa`,

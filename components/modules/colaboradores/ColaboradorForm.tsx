@@ -14,6 +14,7 @@ import { SETORES } from "@/lib/setores";
 import type { DocumentoFicha, FichaResumo } from "@/lib/sst/fichas";
 import type { OrigemDocumento } from "@/lib/db/colaboradorDocumentos";
 import { descreverErro } from "@/lib/validacao/erroCampos";
+import { TIPOS_SAIDA } from "@/lib/folha/movimentacoesTipos";
 
 const INPUT_CLASS =
   "w-full rounded border border-hairline bg-background px-2 py-1 text-[12px] font-light text-foreground placeholder:text-foreground-muted/60 disabled:cursor-not-allowed disabled:border-hairline/70 disabled:bg-surface-page disabled:text-foreground-muted dark:border-brand-neutral/30";
@@ -781,6 +782,7 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
   const [valorFgts, setValorFgts] = useState(editando?.valorFgts ? String(editando.valorFgts) : "");
   const [rateioD365, setRateioD365] = useState<RateioD365 | "">(editando?.rateioD365 ?? "");
   const [motivoDesligamento, setMotivoDesligamento] = useState(editando?.motivoDesligamento ?? "");
+  const [tipoDesligamento, setTipoDesligamento] = useState(editando?.tipoDesligamento ?? "");
   const [fezExameDemissional, setFezExameDemissional] = useState(false);
   const [dataExameDemissional, setDataExameDemissional] = useState("");
   const [anexoExameDemissional, setAnexoExameDemissional] = useState<File | null>(null);
@@ -950,6 +952,7 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
               status: "desligado" as const,
               dataDesligamento: dataDesligamento || null,
               motivoDesligamento: motivoDesligamento || null,
+              tipoDesligamento: tipoDesligamento || null,
               valorRescisao: valorRescisao ? Number(valorRescisao) : null,
               valorFgts: valorFgts ? Number(valorFgts) : null,
             }
@@ -1021,6 +1024,7 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
           status: "desligado",
           dataDesligamento,
           motivoDesligamento: motivoDesligamento || null,
+          tipoDesligamento: tipoDesligamento || null,
           valorRescisao: valorRescisao ? Number(valorRescisao) : null,
           valorFgts: valorFgts ? Number(valorFgts) : null,
         }),
@@ -1130,11 +1134,28 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
         </label>
 
         <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
-          Motivo
+          Tipo de desligamento
+          <select
+            value={tipoDesligamento}
+            onChange={(e) => setTipoDesligamento(e.target.value)}
+            required
+            className={INPUT_CLASS}
+          >
+            <option value="">Selecione…</option>
+            {TIPOS_SAIDA.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Justificativa
           <textarea
             value={motivoDesligamento}
             onChange={(e) => setMotivoDesligamento(e.target.value)}
-            placeholder="Descreva o motivo do desligamento"
+            placeholder="Descreva a justificativa do desligamento"
             rows={3}
             className={`${INPUT_CLASS} resize-none`}
           />
@@ -1328,11 +1349,27 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
             </label>
           </div>
           <label className="flex flex-col gap-0 text-[10px] font-normal text-status-danger">
-            Motivo
+            Tipo de desligamento
+            <select
+              value={tipoDesligamento}
+              onChange={(e) => setTipoDesligamento(e.target.value)}
+              disabled={bloqueado}
+              className={INPUT_CLASS}
+            >
+              <option value="">Selecione…</option>
+              {TIPOS_SAIDA.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-0 text-[10px] font-normal text-status-danger">
+            Justificativa
             <textarea
               value={motivoDesligamento}
               onChange={(e) => setMotivoDesligamento(e.target.value)}
-              placeholder="Descreva o motivo do desligamento"
+              placeholder="Descreva a justificativa do desligamento"
               rows={2}
               disabled={bloqueado}
               className={`${INPUT_CLASS} resize-none`}

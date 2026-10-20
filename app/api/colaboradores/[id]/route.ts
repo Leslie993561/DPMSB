@@ -4,6 +4,7 @@ import { substituirDependentes } from "@/lib/db/colaboradorDependentes";
 import { dentroDoEscopo } from "@/lib/acesso/equipeGestor";
 import { editaColaboradores } from "@/lib/auth/perfil";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
+import { TIPOS_SAIDA } from "@/lib/folha/movimentacoesTipos";
 
 export const runtime = "nodejs";
 
@@ -44,6 +45,7 @@ const schema = z.object({
   status: z.enum(["ativo", "desligado"]).optional(),
   dataDesligamento: z.iso.date().nullable().optional(),
   motivoDesligamento: z.string().nullable().optional(),
+  tipoDesligamento: z.enum(TIPOS_SAIDA).nullable().optional(),
   valorRescisao: z.coerce.number().min(0).nullable().optional(),
   valorFgts: z.coerce.number().min(0).nullable().optional(),
   pis: z.string().nullable().optional(),

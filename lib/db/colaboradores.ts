@@ -43,6 +43,7 @@ export interface Colaborador {
   status: StatusColaborador;
   dataDesligamento: string | null;
   motivoDesligamento: string | null;
+  tipoDesligamento: string | null;
   valorRescisao: number | null;
   /** Saldo de FGTS na rescisão, conforme extrato — informado, nunca estimado. */
   valorFgts: number | null;
@@ -138,6 +139,7 @@ export interface ColaboradorInput {
   status?: StatusColaborador;
   dataDesligamento?: string | null;
   motivoDesligamento?: string | null;
+  tipoDesligamento?: string | null;
   valorRescisao?: number | null;
   valorFgts?: number | null;
   rateioD365?: RateioD365 | null;
@@ -217,6 +219,7 @@ interface LinhaColaborador {
   status: StatusColaborador;
   data_desligamento: string | null;
   motivo_desligamento: string | null;
+  tipo_desligamento: string | null;
   valor_rescisao: number | null;
   valor_fgts: number | null;
   rateio_d365: string | null;
@@ -297,6 +300,7 @@ function paraColaborador(linha: LinhaColaborador): Colaborador {
     status: linha.status,
     dataDesligamento: linha.data_desligamento,
     motivoDesligamento: linha.motivo_desligamento,
+    tipoDesligamento: linha.tipo_desligamento ?? null,
     valorRescisao: linha.valor_rescisao,
     valorFgts: linha.valor_fgts,
     rateioD365: linha.rateio_d365 as RateioD365 | null,
@@ -423,6 +427,7 @@ export function paraColaboradorProfissional(c: Colaborador): Colaborador {
     valorRescisao: null,
     valorFgts: null,
     motivoDesligamento: null,
+    tipoDesligamento: null,
     rateioD365: null,
   };
 }
@@ -595,6 +600,7 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
     dataDesligamento: input.dataDesligamento !== undefined ? input.dataDesligamento : atual.dataDesligamento,
     motivoDesligamento:
       input.motivoDesligamento !== undefined ? input.motivoDesligamento : atual.motivoDesligamento,
+    tipoDesligamento: input.tipoDesligamento !== undefined ? input.tipoDesligamento : atual.tipoDesligamento,
     valorRescisao: input.valorRescisao !== undefined ? input.valorRescisao : atual.valorRescisao,
     valorFgts: input.valorFgts !== undefined ? input.valorFgts : atual.valorFgts,
     rateioD365: input.rateioD365 !== undefined ? input.rateioD365 : atual.rateioD365,
@@ -657,7 +663,7 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
        SET nome = ?, data_admissao = ?, salario_base = ?, dependentes = ?, cpf = ?, email = ?, cargo = ?,
            departamento = ?, gestor_id = ?, cidade = ?, vinculo = ?, alimentacao_valor = ?, odontologico_valor = ?, auxilio_educacao_valor = ?, data_nascimento = ?,
            cbo = ?, agencia = ?, conta = ?, tipo_transporte = ?, valor_transporte_fixo = ?, valor_transporte_dia = ?, lider_direto_nome = ?,
-           status = ?, data_desligamento = ?, motivo_desligamento = ?, valor_rescisao = ?, valor_fgts = ?, rateio_d365 = ?,
+           status = ?, data_desligamento = ?, motivo_desligamento = ?, tipo_desligamento = ?, valor_rescisao = ?, valor_fgts = ?, rateio_d365 = ?,
            pis = ?, cidade_nascimento = ?, uf_nascimento = ?, nome_pai = ?, nome_mae = ?, telefone = ?, sexo = ?,
            email_pessoal = ?, horario = ?, banco = ?, cep = ?, estado = ?, bairro = ?, rua = ?, numero = ?,
            conjuge_nome = ?, conjuge_cpf = ?, conjuge_nascimento = ?, conjuge_sexo = ?,
@@ -696,6 +702,7 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
       mesclado.status,
       mesclado.dataDesligamento ?? null,
       mesclado.motivoDesligamento ?? null,
+      mesclado.tipoDesligamento ?? null,
       mesclado.valorRescisao ?? null,
       mesclado.valorFgts ?? null,
       mesclado.rateioD365 ?? null,
