@@ -46,6 +46,8 @@ export interface ItemProgramacaoFerias {
   /** Dias deste lançamento que caem fora do concessivo e entram em dobro. */
   diasEmDobro: number;
   diasDireito: number;
+  /** Dias dos OUTROS lançamentos ativos do mesmo período aquisitivo (já gozados ou programados). */
+  diasOutrosLancamentos: number;
   status: StatusLancamento;
   dias: number;
   abono: boolean;
@@ -114,6 +116,10 @@ export async function listarProgramacaoFerias(): Promise<ItemProgramacaoFerias[]
   const linhas = resultado.rows as unknown as LinhaProgramacao[];
 
   const itens: ItemProgramacaoFerias[] = [];
+  const diasPorPeriodo = new Map<number, number>();
+  for (const l of linhas) {
+    diasPorPeriodo.set(l.periodo_aquisitivo_id, (diasPorPeriodo.get(l.periodo_aquisitivo_id) ?? 0) + l.dias);
+  }
 
   for (const linha of linhas) {
     const colaborador = colaboradoresPorId.get(linha.colaborador_id);
@@ -211,6 +217,7 @@ export async function listarProgramacaoFerias(): Promise<ItemProgramacaoFerias[]
       limiteGozo: prazo.limiteInicio,
       diasEmDobro: prazo.diasEmDobro,
       diasDireito: linha.dias_direito,
+      diasOutrosLancamentos: (diasPorPeriodo.get(linha.periodo_aquisitivo_id) ?? 0) - linha.dias,
       status: linha.status,
       dias: linha.dias,
       abono: Boolean(linha.abono),
