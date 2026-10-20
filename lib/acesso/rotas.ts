@@ -30,7 +30,7 @@ export const ROTAS_PAGINA: RegraPagina[] = [
   },
   {
     caminho: "/folha",
-    porAba: { dashboard: "folha.dashboard", relatorio: "folha.relatorio" },
+    porAba: { dashboard: "folha.dashboard", relatorio: "folha.relatorio", movimentacoes: "folha.movimentacoes" },
     abaPadrao: "dashboard",
   },
   {
@@ -73,6 +73,7 @@ export const ROTAS_API: RegraApi[] = [
   { prefixo: "/api/lancamentos-ferias", modulo: "ferias" },
   { prefixo: "/api/programacao-ferias", modulo: "ferias" },
   { prefixo: "/api/colaboradores", modulo: "colaboradores" },
+  { prefixo: "/api/folha-breakdown/movimentacoes", modulo: "folha.movimentacoes" },
   { prefixo: "/api/folha-breakdown", modulo: "folha" },
   { prefixo: "/api/beneficios", modulo: "beneficios" },
   { prefixo: "/api/upload", modulo: "folha" },

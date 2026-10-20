@@ -45,6 +45,7 @@ const MODULOS_DP: ModuloAcesso[] = [
     filhos: [
       { chave: "folha.dashboard", label: "Dashboard" },
       { chave: "folha.relatorio", label: "Relatório detalhado" },
+      { chave: "folha.movimentacoes", label: "Histórico de movimentações" },
     ],
   },
   {

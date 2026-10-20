@@ -112,6 +112,14 @@ CREATE TABLE IF NOT EXISTS beneficios_variaveis (
   criado_em TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')
 );
 
+CREATE TABLE IF NOT EXISTS movimentacoes_info (
+  colaborador_id INTEGER NOT NULL REFERENCES colaboradores(id),
+  movimento TEXT NOT NULL CHECK (movimento IN ('entrada','saida')),
+  tipo TEXT,
+  justificativa TEXT,
+  PRIMARY KEY (colaborador_id, movimento)
+);
+
 CREATE TABLE IF NOT EXISTS beneficios_dias_uteis (
   ano INTEGER NOT NULL,
   mes INTEGER NOT NULL,
