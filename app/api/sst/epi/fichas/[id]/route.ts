@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
 import { acessaSst } from "@/lib/auth/perfil";
-import { atualizarFicha, excluirFicha, obterDocumentoFicha } from "@/lib/sst/fichas";
+import { dentroDoEscopo } from "@/lib/acesso/equipeGestor";
+import { atualizarFicha, excluirFicha, obterColaboradorIdDaFicha, obterDocumentoFicha } from "@/lib/sst/fichas";
 
 export const runtime = "nodejs";
 
@@ -12,7 +13,11 @@ async function ehAdmin() {
 /** Documento da ficha com o comprovante de assinatura — só o RH vê. */
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!(await ehAdmin())) return Response.json({ erro: "Sem permissão." }, { status: 403 });
-  const documento = await obterDocumentoFicha((await params).id);
+  const id = (await params).id;
+  // Ficha de quem não é da equipe do gestor: 404, sem revelar que existe.
+  const dono = await obterColaboradorIdDaFicha(id);
+  if (dono !== null && !(await dentroDoEscopo(dono))) return Response.json({ erro: "Ficha não encontrada." }, { status: 404 });
+  const documento = await obterDocumentoFicha(id);
   if (!documento) return Response.json({ erro: "Ficha não encontrada." }, { status: 404 });
   return Response.json({ documento });
 }

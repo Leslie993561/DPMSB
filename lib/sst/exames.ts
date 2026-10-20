@@ -2,6 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { buscarColaborador, listarColaboradores, type Vinculo } from "@/lib/db/colaboradores";
 import { sstQuery, sstTransacao } from "./db";
+import { emEscopo, type EscopoColaboradores } from "./escopo";
 import { CATALOGO_EXAMES_OCUPACIONAIS } from "./domain";
 
 /**
@@ -372,7 +373,7 @@ export interface ColaboradorExame {
  * "Vencidos" já considera o histórico real de sst_exames_realizados (ficha de
  * exame, ver mais abaixo) — igual à situação de EPI.
  */
-export async function listarColaboradoresParaExames(): Promise<ColaboradorExame[]> {
+export async function listarColaboradoresParaExames(escopo: EscopoColaboradores = null): Promise<ColaboradorExame[]> {
   const [todos, mapaExames, nascimentos, ultimasRealizacoes] = await Promise.all([
     listarColaboradores(),
     obterExamesPorFuncao(),
@@ -392,7 +393,7 @@ export async function listarColaboradoresParaExames(): Promise<ColaboradorExame[
 
   const hoje = new Date();
   return todos
-    .filter((c) => c.status !== "desligado")
+    .filter((c) => c.status !== "desligado" && emEscopo(escopo, c.id))
     .map((c) => {
       const funcao = funcaoCorrespondente(c.cargo, c.departamento, FUNCOES_MATRIZ_EXAMES);
       const examesObrigatorios = funcao ? (mapaExames.get(funcao) ?? []) : [];
@@ -529,6 +530,12 @@ export async function obterExamesVencidosDoColaborador(colaboradorId: number, ex
   return calcularVencidos(examesObrigatorios, realizados, new Date(), nascimentos.get(colaboradorId));
 }
 
+/** Dono (colaboradores.id) de uma ficha de exame — as rotas por id de ficha checam o escopo da equipe com isso. */
+export async function obterColaboradorIdDaFichaExame(fichaId: string): Promise<number | null> {
+  const [f] = await sstQuery<{ colab_id: number }>("SELECT colab_id FROM sst_fichas_exame WHERE id = $1", [fichaId]);
+  return f ? Number(f.colab_id) : null;
+}
+
 export async function obterAnexoFichaExame(fichaId: string): Promise<{ url: string; nome: string | null } | null> {
   const [f] = await sstQuery<{ anexo_url: string | null; anexo_nome: string | null }>(
     "SELECT anexo_url, anexo_nome FROM sst_fichas_exame WHERE id = $1",
@@ -594,14 +601,15 @@ export async function obterPrecosExames(): Promise<Map<string, number>> {
 }
 
 /** Estimativa pro ano corrente (até 31/12): preço × quantos cargos precisam dele. Realizado = exames de fato registrados este ano (sst_exames_realizados), no preço vigente. */
-export async function obterCustosExames(): Promise<LinhaCustoExame[]> {
+export async function obterCustosExames(escopo: EscopoColaboradores = null): Promise<LinhaCustoExame[]> {
   const anoAtual = new Date().getFullYear();
   const [precos, realizados] = await Promise.all([
     obterPrecosExames(),
-    sstQuery<{ exame: string; data_realizacao: string }>("SELECT exame, data_realizacao FROM sst_exames_realizados"),
+    sstQuery<{ colab_id: number; exame: string; data_realizacao: string }>("SELECT colab_id, exame, data_realizacao FROM sst_exames_realizados"),
   ]);
   const qtdRealizadaPorExame = new Map<string, number>();
   for (const r of realizados) {
+    if (!emEscopo(escopo, r.colab_id)) continue;
     const ano = Number(r.data_realizacao.slice(6, 10));
     if (ano !== anoAtual) continue;
     qtdRealizadaPorExame.set(r.exame, (qtdRealizadaPorExame.get(r.exame) ?? 0) + 1);

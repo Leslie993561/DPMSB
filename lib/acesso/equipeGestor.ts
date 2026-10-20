@@ -25,3 +25,18 @@ export async function dentroDoEscopo(colaboradorId: number): Promise<boolean> {
   const escopo = await escopoColaboradoresDoGestor();
   return escopo === null || escopo.has(colaboradorId);
 }
+
+/**
+ * Mantém só os itens de colaboradores da equipe do gestor logado. Administrador
+ * e gestor-editor do RH (escopo `null`) veem tudo; gestor comum só a própria
+ * liderança.
+ */
+export async function filtrarPorEquipe<T>(itens: T[], idDe: (item: T) => number): Promise<T[]> {
+  const escopo = await escopoColaboradoresDoGestor();
+  return escopo === null ? itens : itens.filter((i) => escopo.has(idDe(i)));
+}
+
+/** true = vê a empresa inteira (administrador ou gestor-editor do RH); false = só a própria equipe. */
+export async function veEmpresaInteira(): Promise<boolean> {
+  return (await escopoColaboradoresDoGestor()) === null;
+}

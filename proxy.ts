@@ -5,6 +5,7 @@ import { ROTAS_API, ROTAS_PAGINA, PREFIXO_ADMIN, permiteAcesso, moduloDaPagina }
 
 const NOME_COOKIE = "portaldp_sessao";
 const CAMINHOS_PUBLICOS = new Set(["/login"]);
+const PREFIXOS_SOMENTE_LEITURA = ["/api/folha-breakdown", "/api/beneficios", "/api/upload", "/api/sst", "/api/dho"];
 
 /**
  * Gate de autenticação e permissão de TODAS as páginas e rotas de API do
@@ -51,23 +52,32 @@ export async function proxy(request: NextRequest) {
     return NextResponse.json({ erro: "Só administradores gerenciam acesso." }, { status: 403 });
   }
 
-  // Gestor só enxerga Férias e os portais SST/ENDO liberados — qualquer outra permissão gravada
-  // (colaboradores, folha, benefícios...) é ignorada aqui. Exceção: o editor do RH abaixo.
-  const liberados = new Set(
-    sessao.liberados.filter((c) => c === "ferias" || c.startsWith("ferias.") || c.startsWith("sst.") || c.startsWith("dho.")),
-  );
+  // Gestor entra só no que o administrador liberou na tela de permissões, e
+  // cada tela mostra apenas a equipe dele (ver lib/acesso/equipeGestor.ts).
+  const liberados = new Set(sessao.liberados);
   const temFerias = [...liberados].some((c) => c === "ferias" || c.startsWith("ferias."));
-  // Gestor-editor do RH (EDITORES_COLABORADORES_EMAILS) também entra no módulo Colaboradores.
-  // Ela também respeita TODAS as chaves do Portal DP ligadas na tela de permissões (folha, benefícios...).
+  // Gestor-editor do RH (EDITORES_COLABORADORES_EMAILS) também entra no módulo Colaboradores
+  // e vê a empresa inteira.
   if (sessao.editorColaboradores) {
     liberados.add("colaboradores.quadro");
     liberados.add("colaboradores.organograma");
-    for (const chave of sessao.liberados) liberados.add(chave);
   }
 
   if (!ehApi && pathname === "/") {
     const destino = request.nextUrl.clone();
-    destino.pathname = temFerias ? "/dashboard" : acessaSst(sessao) ? "/sst" : acessaDho(sessao) ? "/dho" : "/sem-acesso";
+    destino.pathname = temFerias
+      ? "/dashboard"
+      : permiteAcesso("colaboradores", liberados)
+        ? "/colaboradores"
+        : permiteAcesso("folha", liberados)
+          ? "/folha"
+          : permiteAcesso("beneficios", liberados)
+            ? "/beneficios"
+            : acessaSst(sessao)
+              ? "/sst"
+              : acessaDho(sessao)
+                ? "/dho"
+                : "/sem-acesso";
     destino.search = "";
     return NextResponse.redirect(destino);
   }
@@ -77,6 +87,12 @@ export async function proxy(request: NextRequest) {
     // filtrada pela equipe do gestor).
     if (temFerias && request.method === "GET" && pathname === "/api/colaboradores") {
       return NextResponse.next();
+    }
+    // Fora Férias e Colaboradores (que têm as próprias regras por rota), gestor comum só CONSULTA:
+    // importar, fechar mês, editar rateio etc. ficam com o administrador e o editor do RH.
+    const leitura = request.method === "GET" || request.method === "HEAD";
+    if (!leitura && !sessao.editorColaboradores && PREFIXOS_SOMENTE_LEITURA.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
+      return NextResponse.json({ erro: "Seu perfil só consulta este módulo." }, { status: 403 });
     }
     const regra = ROTAS_API.find((r) => pathname === r.prefixo || pathname.startsWith(`${r.prefixo}/`));
     if (regra && !permiteAcesso(regra.modulo, liberados)) {

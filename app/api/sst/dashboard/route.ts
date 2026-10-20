@@ -1,5 +1,6 @@
 import { obterSessaoAtual } from "@/lib/auth/sessao";
 import { acessaSst } from "@/lib/auth/perfil";
+import { escopoColaboradoresDoGestor } from "@/lib/acesso/equipeGestor";
 import { obterDashboardSst } from "@/lib/sst/dashboard";
 
 export const runtime = "nodejs";
@@ -9,7 +10,7 @@ export async function GET() {
   const sessao = await obterSessaoAtual();
   if (!acessaSst(sessao)) return Response.json({ erro: "Sem permissão." }, { status: 403 });
 
-  const dados = await obterDashboardSst();
+  const dados = await obterDashboardSst(await escopoColaboradoresDoGestor());
   return Response.json({
     kpi: dados.kpi,
     pctEmDia: dados.pctEmDia,

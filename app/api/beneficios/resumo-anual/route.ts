@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { obterResumoAnualBeneficios } from "@/lib/db/beneficiosRateio";
+import { escopoColaboradoresDoGestor } from "@/lib/acesso/equipeGestor";
 
 export const runtime = "nodejs";
 
@@ -13,6 +14,6 @@ export async function GET(request: Request) {
     return Response.json({ erro: "Informe ?ano=AAAA." }, { status: 400 });
   }
 
-  const meses = await obterResumoAnualBeneficios(parsed.data.ano);
+  const meses = await obterResumoAnualBeneficios(parsed.data.ano, await escopoColaboradoresDoGestor());
   return Response.json({ meses });
 }

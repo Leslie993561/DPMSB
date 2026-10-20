@@ -223,16 +223,13 @@ export function Sidebar({ counts, sessao }: { counts?: NavCounts; sessao: Sessao
   // por cima do conteúdo depois de tocar num link.
   useEffect(() => setAbertoMobile(false), [pathname]);
   const ehAdmin = sessao.tipo === "administrador";
-  // Gestor só vê Férias e os portais SST/ENDO liberados: demais permissões ficam ocultas.
-  const liberados = new Set(
-    sessao.liberados.filter((c) => c === "ferias" || c.startsWith("ferias.") || c.startsWith("sst.") || c.startsWith("dho.")),
-  );
+  // Gestor vê só o que o administrador liberou na tela de permissões.
+  const liberados = new Set(sessao.liberados);
   if (sessao.editorColaboradores) {
     liberados.add("colaboradores.quadro");
     liberados.add("colaboradores.organograma");
-    for (const chave of sessao.liberados) liberados.add(chave);
   }
-  const temDp = ehAdmin || sessao.editorColaboradores === true || [...liberados].some((c) => c === "ferias" || c.startsWith("ferias."));
+  const temDp = ehAdmin || [...liberados].some((c) => !c.startsWith("sst.") && !c.startsWith("dho."));
   const frentesDisponiveis = FRENTES.filter(
     (f) => ehAdmin || (f.id === "dp" ? temDp : f.id === "sst" ? acessaSst(sessao) : acessaDho(sessao)),
   );
@@ -248,7 +245,7 @@ export function Sidebar({ counts, sessao }: { counts?: NavCounts; sessao: Sessao
       ...grupo,
       itens: ehAdmin ? grupo.itens : grupo.itens.filter((item) => permiteAcesso(item.modulo, liberados)),
     }))
-    .filter((grupo) => grupo.itens.length > 0 && (ehAdmin || grupo.id === "ferias" || sessao.editorColaboradores));
+    .filter((grupo) => grupo.itens.length > 0);
 
   const [aberto, setAberto] = useState<string | null>(
     grupos.find((g) => pathname === g.base || pathname?.startsWith(`${g.base}/`))?.id ?? null,

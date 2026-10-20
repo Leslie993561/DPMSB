@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
+import { editaColaboradores } from "@/lib/auth/perfil";
 import { bloquearSeFechada } from "@/lib/db/fechamento";
 import { parsearPlanilha } from "@/lib/parsing/spreadsheet";
 import { parsearFolhaExtrasPdf } from "@/lib/parsing/pdfFolhaExtras";
@@ -17,7 +18,7 @@ const schema = z.object({ competencia: z.string().regex(/^\d{4}-\d{2}$/) });
  */
 export async function POST(request: Request) {
   const sessao = await obterSessaoAtual();
-  if (!sessao || sessao.tipo !== "administrador") {
+  if (!editaColaboradores(sessao)) {
     return Response.json({ erro: "Sem permissão." }, { status: 403 });
   }
 

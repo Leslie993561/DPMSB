@@ -1,6 +1,7 @@
 import { carregarPdfParse } from "@/lib/parsing/carregarPdfParse";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
 import { acessaSst } from "@/lib/auth/perfil";
+import { veEmpresaInteira } from "@/lib/acesso/equipeGestor";
 import { interpretarFaturaExames } from "@/lib/sst/faturaExames";
 import { listarFaturasExame, salvarFaturaExame } from "@/lib/sst/faturasExame";
 
@@ -15,6 +16,8 @@ async function soAdmin() {
 
 export async function GET() {
   if (!(await soAdmin())) return Response.json({ erro: "Sem permissão." }, { status: 403 });
+  // Fatura da clínica é da empresa inteira: gestor comum não vê (lista vazia).
+  if (!(await veEmpresaInteira())) return Response.json({ faturas: [] });
   return Response.json({ faturas: await listarFaturasExame() });
 }
 

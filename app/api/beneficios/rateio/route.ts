@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { gerarRateio, upsertOverrideRateio } from "@/lib/db/beneficiosRateio";
 import { bloquearSeFechada } from "@/lib/db/fechamento";
+import { filtrarPorEquipe } from "@/lib/acesso/equipeGestor";
 
 export const runtime = "nodejs";
 
@@ -14,7 +15,7 @@ export async function GET(request: Request) {
   }
 
   const { linhas, diasUteis } = await gerarRateio(parsed.data.competencia);
-  return Response.json({ diasUteis, linhas });
+  return Response.json({ diasUteis, linhas: await filtrarPorEquipe(linhas, (l) => l.colaboradorId) });
 }
 
 const schemaEditar = z

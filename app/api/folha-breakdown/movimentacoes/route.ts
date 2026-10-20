@@ -3,6 +3,7 @@ import { obterHistoricoMovimentacoes, salvarInfoMovimentacao } from "@/lib/db/mo
 import { obterSessaoAtual } from "@/lib/auth/sessao";
 import { ehEmailEditorMovimentacoes } from "@/lib/auth/admins";
 import { tiposDoMovimento } from "@/lib/folha/movimentacoesTipos";
+import { escopoColaboradoresDoGestor } from "@/lib/acesso/equipeGestor";
 
 export const runtime = "nodejs";
 
@@ -15,7 +16,7 @@ export async function GET(request: Request) {
     return Response.json({ erro: "Informe ?ano=AAAA." }, { status: 400 });
   }
   const sessao = await obterSessaoAtual();
-  return Response.json(await obterHistoricoMovimentacoes(parsed.data.ano, !!sessao && ehEmailEditorMovimentacoes(sessao.email)));
+  return Response.json(await obterHistoricoMovimentacoes(parsed.data.ano, !!sessao && ehEmailEditorMovimentacoes(sessao.email), await escopoColaboradoresDoGestor()));
 }
 
 const schemaSalvar = z.object({

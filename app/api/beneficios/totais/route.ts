@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { bloquearSeFechada, competenciaDeAnoMes } from "@/lib/db/fechamento";
 import { listarTotaisAno, definirTotaisDoMes } from "@/lib/db/beneficiosTotais";
+import { veEmpresaInteira } from "@/lib/acesso/equipeGestor";
 
 export const runtime = "nodejs";
 
@@ -22,7 +23,8 @@ const schemaPatch = z.object({
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const ano = Number(searchParams.get("ano")) || new Date().getFullYear();
-  return Response.json({ ano, meses: await listarTotaisAno(ano) });
+  // Totais informados pelo DP são da empresa inteira: gestor comum não os vê.
+  return Response.json({ ano, meses: (await veEmpresaInteira()) ? await listarTotaisAno(ano) : [] });
 }
 
 export async function PATCH(request: Request) {

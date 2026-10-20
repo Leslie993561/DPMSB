@@ -3,6 +3,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { buscarColaborador } from "@/lib/db/colaboradores";
 import { emailConfigurado, enviarEmail } from "@/lib/email";
 import { sstQuery, sstTransacao } from "./db";
+import { type EscopoColaboradores } from "./escopo";
 import { obterPrecosEpi, obterPrecosFardamento } from "./epi";
 
 /** Validade do link de assinatura. */
@@ -454,6 +455,12 @@ async function montarDocumento(f: LinhaFicha): Promise<DocumentoFicha> {
 
 const COLUNAS_FICHA = "id, numero, colab_id, status, token, gerada_em, expira_em, assinatura, anexo_url, anexo_nome";
 
+/** Dono (colaboradores.id) de uma ficha — as rotas por id de ficha checam o escopo da equipe com isso. */
+export async function obterColaboradorIdDaFicha(fichaId: string): Promise<number | null> {
+  const [f] = await sstQuery<{ colab_id: number }>("SELECT colab_id FROM sst_fichas_epi WHERE id = $1", [fichaId]);
+  return f ? Number(f.colab_id) : null;
+}
+
 /** Documento completo para o RH (inclui o comprovante de assinatura). */
 export async function obterDocumentoFicha(fichaId: string): Promise<DocumentoFicha | null> {
   const [f] = await sstQuery<LinhaFicha>(`SELECT ${COLUNAS_FICHA} FROM sst_fichas_epi WHERE id = $1`, [fichaId]);
@@ -509,11 +516,13 @@ export async function assinarFicha(token: string, evidencia: { ip: string; link:
 }
 
 /** Quantas fichas foram enviadas e quantas já têm assinatura (eletrônica ou PDF anexado do modelo antigo). */
-export async function obterResumoFichas(): Promise<{ enviadas: number; assinadas: number }> {
+export async function obterResumoFichas(escopo: EscopoColaboradores = null): Promise<{ enviadas: number; assinadas: number }> {
+  // Gestor comum: conta só as fichas dos colaboradores da equipe dele.
   const [r] = await sstQuery<{ enviadas: number; assinadas: number }>(
     `SELECT count(*)::int AS enviadas,
             count(*) FILTER (WHERE status = 'assinada' OR assinatura_storage_path IS NOT NULL)::int AS assinadas
-       FROM sst_fichas_epi`,
+       FROM sst_fichas_epi${escopo === null ? "" : " WHERE colab_id = ANY($1::int[])"}`,
+    escopo === null ? [] : [[...escopo]],
   );
   return r ?? { enviadas: 0, assinadas: 0 };
 }

@@ -1,5 +1,6 @@
 import { obterSessaoAtual } from "@/lib/auth/sessao";
 import { acessaSst } from "@/lib/auth/perfil";
+import { veEmpresaInteira } from "@/lib/acesso/equipeGestor";
 import { baixarArquivoPrivado } from "@/lib/storage";
 import { excluirAnexoFatura, obterAnexoFatura } from "@/lib/sst/faturasAnexos";
 
@@ -13,6 +14,8 @@ async function soAdmin() {
 
 export async function GET(_request: Request, { params }: Ctx) {
   if (!(await soAdmin())) return Response.json({ erro: "Sem permissão." }, { status: 403 });
+  // Documento da fatura da clínica é da empresa inteira: gestor comum não baixa.
+  if (!(await veEmpresaInteira())) return Response.json({ erro: "Sem permissão." }, { status: 403 });
   const { competencia, tipo } = await params;
   const anexo = await obterAnexoFatura(competencia, tipo);
   if (!anexo) return Response.json({ erro: "Documento não encontrado." }, { status: 404 });

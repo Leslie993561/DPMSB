@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 import { z } from "zod";
 import { gerarRateio } from "@/lib/db/beneficiosRateio";
+import { filtrarPorEquipe } from "@/lib/acesso/equipeGestor";
 import { nomeParaPlanilha, padronizarColunaDeNome } from "@/lib/planilhas/nomeColaborador";
 
 export const runtime = "nodejs";
@@ -14,7 +15,8 @@ export async function GET(request: Request) {
     return Response.json({ erro: "Informe ?competencia=AAAA-MM." }, { status: 400 });
   }
 
-  const { linhas } = await gerarRateio(parsed.data.competencia);
+  const { linhas: todas } = await gerarRateio(parsed.data.competencia);
+  const linhas = await filtrarPorEquipe(todas, (l) => l.colaboradorId);
 
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Rateio");

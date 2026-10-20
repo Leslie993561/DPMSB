@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { obterBreakdown, listarCompetenciasFechadas } from "@/lib/db/folhaBreakdown";
+import { filtrarPorEquipe } from "@/lib/acesso/equipeGestor";
 
 export const runtime = "nodejs";
 
@@ -13,5 +14,6 @@ export async function GET(request: Request) {
   }
 
   const { linhas, fechado } = await obterBreakdown(parsed.data.competencia);
-  return Response.json({ linhas, fechado, competenciasFechadas: await listarCompetenciasFechadas() });
+  // Gestor comum só vê a folha da própria equipe.
+  return Response.json({ linhas: await filtrarPorEquipe(linhas, (l) => l.colaboradorId), fechado, competenciasFechadas: await listarCompetenciasFechadas() });
 }

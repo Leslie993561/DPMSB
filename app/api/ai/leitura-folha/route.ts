@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
+import { editaColaboradores } from "@/lib/auth/perfil";
 import { getAnthropicClient } from "@/lib/ai/client";
 
 export const runtime = "nodejs";
@@ -26,7 +27,7 @@ const schema = z.object({
  */
 export async function POST(request: Request) {
   const sessao = await obterSessaoAtual();
-  if (!sessao || sessao.tipo !== "administrador") {
+  if (!editaColaboradores(sessao)) {
     return Response.json({ erro: "Sem permissão." }, { status: 403 });
   }
 

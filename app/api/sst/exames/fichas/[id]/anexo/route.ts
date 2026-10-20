@@ -1,7 +1,8 @@
 import { obterSessaoAtual } from "@/lib/auth/sessao";
 import { acessaSst } from "@/lib/auth/perfil";
 import { baixarArquivoPrivado } from "@/lib/storage";
-import { obterAnexoFichaExame } from "@/lib/sst/exames";
+import { dentroDoEscopo } from "@/lib/acesso/equipeGestor";
+import { obterAnexoFichaExame, obterColaboradorIdDaFichaExame } from "@/lib/sst/exames";
 
 export const runtime = "nodejs";
 
@@ -11,6 +12,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!acessaSst(sessao)) return Response.json({ erro: "Sem permissão." }, { status: 403 });
 
   const { id } = await params;
+  // Anexo de ficha de quem não é da equipe do gestor: 404, sem revelar que existe.
+  const dono = await obterColaboradorIdDaFichaExame(id);
+  if (dono !== null && !(await dentroDoEscopo(dono))) return Response.json({ erro: "Sem anexo para esta ficha." }, { status: 404 });
   const anexo = await obterAnexoFichaExame(id);
   if (!anexo) return Response.json({ erro: "Sem anexo para esta ficha." }, { status: 404 });
 

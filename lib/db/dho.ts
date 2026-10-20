@@ -1,6 +1,9 @@
 import "server-only";
 import { getDb } from "./client";
 
+/** `null` = vê a empresa inteira; `Set` = só esses `colaboradores.id` (equipe do gestor comum) — ver lib/acesso/equipeGestor.ts. */
+type EscopoColaboradores = Set<number> | null;
+
 export interface ItemEvento {
   id: number;
   /** Bloco temático a que o item pertence (ex.: "Brindes", "Brinquedos") — null/vazio é um item sem bloco. */
@@ -47,7 +50,12 @@ export interface DadosEvento {
   objetivo: string;
   publicoAlvo: string;
   descricao: string;
-  itens: { tema?: string | null; nome: string; quantidade: number; valorUnitario: number }[];
+  itens: {
+    tema?: string | null;
+    nome: string;
+    quantidade: number;
+    valorUnitario: number;
+  }[];
 }
 
 export async function listarEventosCalendario(ano: number): Promise<EventoCalendario[]> {
@@ -65,7 +73,12 @@ export async function listarEventosCalendario(ano: number): Promise<EventoCalend
   });
   const linhasItens = itens.rows as unknown as LinhaItemEvento[];
 
-  return linhas.map((l) => paraEvento(l, linhasItens.filter((i) => i.evento_id === l.id)));
+  return linhas.map((l) =>
+    paraEvento(
+      l,
+      linhasItens.filter((i) => i.evento_id === l.id),
+    ),
+  );
 }
 
 function paraEvento(l: LinhaEvento, itens: LinhaItemEvento[]): EventoCalendario {
@@ -77,14 +90,23 @@ function paraEvento(l: LinhaEvento, itens: LinhaItemEvento[]): EventoCalendario 
     objetivo: l.objetivo,
     publicoAlvo: l.publico_alvo,
     descricao: l.descricao,
-    itens: itens.map((i) => ({ id: i.id, tema: i.tema, nome: i.nome, quantidade: i.quantidade, valorUnitario: i.valor_unitario })),
+    itens: itens.map((i) => ({
+      id: i.id,
+      tema: i.tema,
+      nome: i.nome,
+      quantidade: i.quantidade,
+      valorUnitario: i.valor_unitario,
+    })),
   };
 }
 
 async function salvarItensEvento(eventoId: number, itens: DadosEvento["itens"]): Promise<void> {
   const db = await getDb();
   await db.batch([
-    { sql: "DELETE FROM dho_evento_itens WHERE evento_id = ?", args: [eventoId] },
+    {
+      sql: "DELETE FROM dho_evento_itens WHERE evento_id = ?",
+      args: [eventoId],
+    },
     ...itens.map((i) => ({
       sql: "INSERT INTO dho_evento_itens (evento_id, tema, nome, quantidade, valor_unitario) VALUES (?, ?, ?, ?, ?)",
       args: [eventoId, i.tema ?? null, i.nome, i.quantidade, i.valorUnitario],
@@ -126,7 +148,10 @@ export async function atualizarEventoCalendario(id: number, dados: DadosEvento):
 
 export async function excluirEventoCalendario(id: number): Promise<void> {
   const db = await getDb();
-  await db.execute({ sql: "DELETE FROM dho_eventos_calendario WHERE id = ?", args: [id] });
+  await db.execute({
+    sql: "DELETE FROM dho_eventos_calendario WHERE id = ?",
+    args: [id],
+  });
 }
 
 export type CategoriaDataComemorativa = "nacional" | "regional" | "ponte";
@@ -155,7 +180,11 @@ export async function listarDatasComemorativas(ano: number): Promise<DataComemor
   return resultado.rows as unknown as LinhaDataComemorativa[];
 }
 
-export async function criarDataComemorativa(dados: { data: string; nome: string; categoria: CategoriaDataComemorativa }): Promise<DataComemorativa> {
+export async function criarDataComemorativa(dados: {
+  data: string;
+  nome: string;
+  categoria: CategoriaDataComemorativa;
+}): Promise<DataComemorativa> {
   const db = await getDb();
   const resultado = await db.execute({
     sql: "INSERT INTO dho_datas_comemorativas (data, nome, categoria) VALUES (?, ?, ?) RETURNING id, data, nome, categoria",
@@ -178,7 +207,10 @@ export async function atualizarDataComemorativa(
 
 export async function excluirDataComemorativa(id: number): Promise<void> {
   const db = await getDb();
-  await db.execute({ sql: "DELETE FROM dho_datas_comemorativas WHERE id = ?", args: [id] });
+  await db.execute({
+    sql: "DELETE FROM dho_datas_comemorativas WHERE id = ?",
+    args: [id],
+  });
 }
 
 export interface LinhaOrcamentoMes {
@@ -249,15 +281,18 @@ interface LinhaMaterial {
 }
 
 function paraMaterial(l: LinhaMaterial): MaterialKit {
-  return { id: l.id, nome: l.nome, valor: l.valor, quantidadeEstoque: l.quantidade_estoque };
+  return {
+    id: l.id,
+    nome: l.nome,
+    valor: l.valor,
+    quantidadeEstoque: l.quantidade_estoque,
+  };
 }
 
 export async function listarKits(): Promise<ResumoKit[]> {
   const db = await getDb();
   const kits = await db.execute("SELECT id, nome FROM dho_kits ORDER BY id");
-  const materiais = await db.execute(
-    "SELECT id, kit_id, nome, valor, quantidade_estoque FROM dho_kit_materiais ORDER BY id",
-  );
+  const materiais = await db.execute("SELECT id, kit_id, nome, valor, quantidade_estoque FROM dho_kit_materiais ORDER BY id");
   const linhasMateriais = materiais.rows as unknown as LinhaMaterial[];
 
   return (kits.rows as unknown as { id: number; nome: string }[]).map((k) => {
@@ -289,9 +324,12 @@ export interface DetalheKit {
   historico: EntregaKit[];
 }
 
-export async function obterKit(kitId: number): Promise<DetalheKit | null> {
+export async function obterKit(kitId: number, escopo: EscopoColaboradores = null): Promise<DetalheKit | null> {
   const db = await getDb();
-  const kit = await db.execute({ sql: "SELECT id, nome FROM dho_kits WHERE id = ?", args: [kitId] });
+  const kit = await db.execute({
+    sql: "SELECT id, nome FROM dho_kits WHERE id = ?",
+    args: [kitId],
+  });
   const linhaKit = (kit.rows as unknown as { id: number; nome: string }[])[0];
   if (!linhaKit) return null;
 
@@ -312,6 +350,7 @@ export async function obterKit(kitId: number): Promise<DetalheKit | null> {
     id: linhaKit.id,
     nome: linhaKit.nome,
     materiais: (materiais.rows as unknown as LinhaMaterial[]).map(paraMaterial),
+    // Histórico é por colaborador: gestor comum só vê as entregas de quem é da equipe dele.
     historico: (
       entregas.rows as unknown as {
         id: number;
@@ -323,16 +362,18 @@ export async function obterKit(kitId: number): Promise<DetalheKit | null> {
         responsavel: string;
         criado_em: string;
       }[]
-    ).map((e) => ({
-      id: e.id,
-      colaboradorId: e.colaborador_id,
-      colaboradorNome: String(e.colaborador_nome ?? "").toUpperCase(),
-      colaboradorCargo: e.colaborador_cargo,
-      colaboradorDepartamento: e.colaborador_departamento,
-      materiais: JSON.parse(e.materiais) as string[],
-      responsavel: e.responsavel,
-      criadoEm: e.criado_em,
-    })),
+    )
+      .filter((e) => escopo === null || escopo.has(Number(e.colaborador_id)))
+      .map((e) => ({
+        id: e.id,
+        colaboradorId: e.colaborador_id,
+        colaboradorNome: String(e.colaborador_nome ?? "").toUpperCase(),
+        colaboradorCargo: e.colaborador_cargo,
+        colaboradorDepartamento: e.colaborador_departamento,
+        materiais: JSON.parse(e.materiais) as string[],
+        responsavel: e.responsavel,
+        criadoEm: e.criado_em,
+      })),
   };
 }
 
@@ -374,7 +415,10 @@ export async function enviarKit(dados: {
 /** Apaga um registro do histórico e devolve ao estoque os materiais daquela entrega — desfaz por completo, não só o registro. */
 export async function excluirEntregaKit(entregaId: number): Promise<void> {
   const db = await getDb();
-  const entrega = await db.execute({ sql: "SELECT kit_id, materiais FROM dho_kit_entregas WHERE id = ?", args: [entregaId] });
+  const entrega = await db.execute({
+    sql: "SELECT kit_id, materiais FROM dho_kit_entregas WHERE id = ?",
+    args: [entregaId],
+  });
   const linha = (entrega.rows as unknown as { kit_id: number; materiais: string }[])[0];
   if (!linha) return;
   const nomes = JSON.parse(linha.materiais) as string[];

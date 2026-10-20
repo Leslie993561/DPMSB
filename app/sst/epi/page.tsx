@@ -9,6 +9,7 @@ import {
   obterCustosEpi,
   obterCustosFardamento,
 } from "@/lib/sst/epi";
+import { escopoColaboradoresDoGestor } from "@/lib/acesso/equipeGestor";
 import { obterResumoFichas } from "@/lib/sst/fichas";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { EpiPageClient, type AbaEpi } from "@/components/modules/sst/EpiPageClient";
@@ -34,12 +35,14 @@ export default async function SstEpiPage({
   const abaParam = (await searchParams).aba;
   const aba: AbaEpi = ABAS_VALIDAS.includes(abaParam as AbaEpi) ? (abaParam as AbaEpi) : "colaboradores";
 
+  // Gestor comum só enxerga a própria equipe; admin/RH-editor (null) veem tudo.
+  const escopo = await escopoColaboradoresDoGestor();
   const [colaboradores, matriz, custos, fardamento, resumoFichas, caExtra] = await Promise.all([
-    listarColaboradoresParaEpi(),
+    listarColaboradoresParaEpi(escopo),
     obterMatrizEpi(),
-    obterCustosEpi(),
-    obterCustosFardamento(),
-    obterResumoFichas(),
+    obterCustosEpi(escopo),
+    obterCustosFardamento(escopo),
+    obterResumoFichas(escopo),
     obterCaExtraEpi(),
   ]);
 

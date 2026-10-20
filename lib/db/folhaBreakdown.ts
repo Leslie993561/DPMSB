@@ -777,7 +777,7 @@ const MESES_POR_TRIMESTRE: Record<1 | 2 | 3 | 4, number[]> = {
  * `dias úteis` variam por mês (afeta o VT), por isso cada mês lançado é
  * recalculado, em vez de multiplicar um mês por três.
  */
-export async function obterResumoTrimestral(ano: number): Promise<ResumoTrimestre[]> {
+export async function obterResumoTrimestral(ano: number, escopo: Set<number> | null = null): Promise<ResumoTrimestre[]> {
   const lancadas = await competenciasComLancamento(ano);
   // Colaboradores e programação de férias não mudam entre os meses: carregados
   // uma vez, evitam doze recargas simultâneas e o pool esgotado que vinha daí.
@@ -798,6 +798,7 @@ export async function obterResumoTrimestral(ano: number): Promise<ResumoTrimestr
         const { linhas, fechado } = await obterBreakdown(competencia, colaboradores, janelas);
         if (!fechado) projecao = true;
         for (const l of linhas) {
+          if (escopo && !escopo.has(l.colaboradorId)) continue;
           custoTotal += l.custoTotal;
           colaboradoresSet.add(l.colaboradorId);
           const chave = l.vinculo ?? "Não informado";

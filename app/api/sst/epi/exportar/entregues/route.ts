@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
 import { acessaSst } from "@/lib/auth/perfil";
+import { escopoColaboradoresDoGestor } from "@/lib/acesso/equipeGestor";
 import { listarEntregasConfirmadasParaExportacao } from "@/lib/sst/epi";
 
 export const runtime = "nodejs";
@@ -12,7 +13,7 @@ export async function GET() {
     return Response.json({ erro: "Sem permissão." }, { status: 403 });
   }
 
-  const linhas = await listarEntregasConfirmadasParaExportacao();
+  const linhas = await listarEntregasConfirmadasParaExportacao(await escopoColaboradoresDoGestor());
 
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Entregas");

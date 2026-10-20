@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
 import { acessaSst } from "@/lib/auth/perfil";
 import { CATALOGO_EXAMES_OCUPACIONAIS } from "@/lib/sst/domain";
+import { escopoColaboradoresDoGestor } from "@/lib/acesso/equipeGestor";
 import { listarColaboradoresParaExames, obterCargosOcupacionais, obterCustosExames, obterMatrizExames } from "@/lib/sst/exames";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { ExamesPageClient, type AbaExames } from "@/components/modules/sst/ExamesPageClient";
@@ -25,11 +26,13 @@ export default async function SstExamesPage({
   const abaParam = (await searchParams).aba;
   const aba: AbaExames = ABAS_VALIDAS.includes(abaParam as AbaExames) ? (abaParam as AbaExames) : "colaboradores";
 
+  // Gestor comum só enxerga a própria equipe; admin/RH-editor (null) veem tudo.
+  const escopo = await escopoColaboradoresDoGestor();
   const [colaboradores, matrizExames, setoresOcupacionais, custos] = await Promise.all([
-    listarColaboradoresParaExames(),
+    listarColaboradoresParaExames(escopo),
     obterMatrizExames(),
     obterCargosOcupacionais(),
-    obterCustosExames(),
+    obterCustosExames(escopo),
   ]);
 
   return (

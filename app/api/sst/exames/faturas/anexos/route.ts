@@ -1,5 +1,6 @@
 import { obterSessaoAtual } from "@/lib/auth/sessao";
 import { acessaSst } from "@/lib/auth/perfil";
+import { veEmpresaInteira } from "@/lib/acesso/equipeGestor";
 import { blobConfigurado, subirArquivoPrivado } from "@/lib/storage";
 import { listarAnexosFatura, salvarAnexoFatura, TIPOS_ANEXO_FATURA } from "@/lib/sst/faturasAnexos";
 
@@ -14,6 +15,8 @@ async function soAdmin() {
 
 export async function GET() {
   if (!(await soAdmin())) return Response.json({ erro: "Sem permissão." }, { status: 403 });
+  // Documentos da fatura da clínica são da empresa inteira: gestor comum não vê (lista vazia).
+  if (!(await veEmpresaInteira())) return Response.json({ anexos: [] });
   return Response.json({ anexos: await listarAnexosFatura() });
 }
 

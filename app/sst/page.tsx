@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
 import { acessaSst } from "@/lib/auth/perfil";
+import { escopoColaboradoresDoGestor } from "@/lib/acesso/equipeGestor";
 import { obterDashboardSst } from "@/lib/sst/dashboard";
 import { listarEpisParaComprar } from "@/lib/sst/epi";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -15,7 +16,9 @@ export default async function SstDashboardPage() {
     redirect("/sem-acesso");
   }
 
-  const [data, comprar] = await Promise.all([obterDashboardSst(), listarEpisParaComprar()]);
+  // Gestor comum só enxerga os números da própria equipe; admin/RH-editor (null) veem tudo.
+  const escopo = await escopoColaboradoresDoGestor();
+  const [data, comprar] = await Promise.all([obterDashboardSst(escopo), listarEpisParaComprar(escopo)]);
   const trimestreAtual = Math.floor(new Date().getMonth() / 3);
 
   return (

@@ -49,8 +49,13 @@ function anoMes(dataIso: string | null): { ano: number; mes: number } | null {
  * o histórico nunca diverge dele. Colaborador admitido e desligado no mesmo ano
  * aparece nas duas colunas, cada uma no seu mês.
  */
-export async function obterHistoricoMovimentacoes(ano: number, podeEditar: boolean): Promise<HistoricoMovimentacoes> {
-  const colaboradores = await listarColaboradores();
+export async function obterHistoricoMovimentacoes(
+  ano: number,
+  podeEditar: boolean,
+  escopo: Set<number> | null = null,
+): Promise<HistoricoMovimentacoes> {
+  // Gestor comum só enxerga a própria equipe (escopo); administrador e editor do RH, a empresa toda.
+  const colaboradores = (await listarColaboradores()).filter((c) => escopo === null || escopo.has(c.id));
   const db = await getDb();
   const infos = (await db.execute("SELECT colaborador_id, movimento, tipo, justificativa FROM movimentacoes_info"))
     .rows as unknown as { colaborador_id: number; movimento: TipoMovimento; tipo: string | null; justificativa: string | null }[];

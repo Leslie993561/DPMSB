@@ -1,6 +1,7 @@
 import "server-only";
 import { listarColaboradores, type Vinculo } from "@/lib/db/colaboradores";
 import { sstQuery } from "./db";
+import { emEscopo, type EscopoColaboradores } from "./escopo";
 
 export interface ColaboradorEpi {
   id: number;
@@ -131,7 +132,7 @@ async function obterTrocasDispensadas(): Promise<LinhaTroca[]> {
  * tabelas do SST (sst_entregas_epi etc.) vivem no mesmo banco hoje e
  * referenciam `colaboradores` direto, sem espelho.
  */
-export async function listarColaboradoresParaEpi(): Promise<ColaboradorEpi[]> {
+export async function listarColaboradoresParaEpi(escopo: EscopoColaboradores = null): Promise<ColaboradorEpi[]> {
   const [todos, ultimasEntregas, extras, fichasAguardando, trocasDispensadas] = await Promise.all([
     listarColaboradores(),
     obterUltimasTrocasConfirmadas(),
@@ -159,7 +160,7 @@ export async function listarColaboradoresParaEpi(): Promise<ColaboradorEpi[]> {
   }
 
   return todos
-    .filter((c) => c.status !== "desligado")
+    .filter((c) => c.status !== "desligado" && emEscopo(escopo, c.id))
     .map((c) => {
       const funcao = funcaoDaMatriz(c.cargo, c.departamento);
       const episObrigatorios = funcao ? (extras.get(funcao.funcao) ?? funcao.epis) : [];
@@ -208,7 +209,7 @@ function chaveOrdenacaoData(dataBr: string): string {
  * sem ficha — nunca uma que ainda está só aguardando assinatura). Para a
  * exportação "O que já foi entregue".
  */
-export async function listarEntregasConfirmadasParaExportacao(): Promise<EntregaEpiExportLinha[]> {
+export async function listarEntregasConfirmadasParaExportacao(escopo: EscopoColaboradores = null): Promise<EntregaEpiExportLinha[]> {
   const [todos, entregasEpi, entregasFardamento] = await Promise.all([
     listarColaboradores(),
     sstQuery<{
@@ -243,7 +244,7 @@ export async function listarEntregasConfirmadasParaExportacao(): Promise<Entrega
   const porId = new Map(todos.map((c) => [c.id, c]));
 
   const linhas: EntregaEpiExportLinha[] = [
-    ...entregasEpi.map((e) => {
+    ...entregasEpi.filter((e) => emEscopo(escopo, e.colab_id)).map((e) => {
       const c = porId.get(Number(e.colab_id));
       return {
         nome: c?.nome ?? "Colaborador removido",
@@ -259,7 +260,7 @@ export async function listarEntregasConfirmadasParaExportacao(): Promise<Entrega
         responsavel: e.responsavel,
       };
     }),
-    ...entregasFardamento.map((e) => {
+    ...entregasFardamento.filter((e) => emEscopo(escopo, e.colab_id)).map((e) => {
       const c = porId.get(Number(e.colab_id));
       return {
         nome: c?.nome ?? "Colaborador removido",
@@ -295,7 +296,7 @@ export interface ProjecaoVencimentoLinha {
  * cálculo de vencidos/vencendo da lista de colaboradores) — para a exportação
  * "Projeção de vencimentos", que o RH filtra por mês/ano na hora de gerar.
  */
-export async function listarProjecaoVencimentosEpi(): Promise<ProjecaoVencimentoLinha[]> {
+export async function listarProjecaoVencimentosEpi(escopo: EscopoColaboradores = null): Promise<ProjecaoVencimentoLinha[]> {
   const [todos, ultimasEntregas, trocasDispensadas] = await Promise.all([
     listarColaboradores(),
     obterUltimasTrocasConfirmadas(),
@@ -305,7 +306,7 @@ export async function listarProjecaoVencimentosEpi(): Promise<ProjecaoVencimento
   const porId = new Map(todos.map((c) => [c.id, c]));
 
   return ultimasEntregas
-    .filter((e) => e.data_troca.trim() !== "" && !dispensadas.has(`${e.colab_id}::${e.epi}::${e.data_troca}`))
+    .filter((e) => emEscopo(escopo, e.colab_id) && e.data_troca.trim() !== "" && !dispensadas.has(`${e.colab_id}::${e.epi}::${e.data_troca}`))
     .map((e) => {
       const c = porId.get(Number(e.colab_id));
       return {
@@ -338,8 +339,8 @@ function jaVenceu(dataBr: string): boolean {
  * agrupados por EPI com os colaboradores que vão receber — é a lista de compra.
  * Maior quantidade primeiro.
  */
-export async function listarEpisParaComprar(): Promise<EpiParaComprar[]> {
-  const linhas = (await listarProjecaoVencimentosEpi()).filter((l) => jaVenceu(l.dataTroca));
+export async function listarEpisParaComprar(escopo: EscopoColaboradores = null): Promise<EpiParaComprar[]> {
+  const linhas = (await listarProjecaoVencimentosEpi(escopo)).filter((l) => jaVenceu(l.dataTroca));
   const porEpi = new Map<string, Set<string>>();
   for (const l of linhas) {
     if (!porEpi.has(l.epi)) porEpi.set(l.epi, new Set());
@@ -505,6 +506,7 @@ export const EPI_CATALOGO: { equip: string; valor: number; ca: string }[] = [
 ];
 
 interface LinhaEntregaEpi {
+  colab_id: number;
   epi: string;
   qtd: number;
   valor_unit: number;
@@ -593,17 +595,17 @@ function mesEAnoBr(dataBr: string): { mes: number; ano: number } | null {
  * média paga quando já teve entrega, ou o preço vigente do catálogo como
  * estimativa quando o EPI ainda não foi entregue este ano.
  */
-export async function obterCustosEpi(): Promise<DashboardCustosEpi> {
+export async function obterCustosEpi(escopo: EscopoColaboradores = null): Promise<DashboardCustosEpi> {
   const anoAtual = new Date().getFullYear();
 
   const [todasEntregas, precoPorEpi, caExtra] = await Promise.all([
     sstQuery<LinhaEntregaEpi>(
-      "SELECT epi, qtd, valor_unit::float8 AS valor_unit, data_entrega FROM sst_entregas_epi",
+      "SELECT colab_id, epi, qtd, valor_unit::float8 AS valor_unit, data_entrega FROM sst_entregas_epi",
     ),
     obterPrecosEpi(),
     obterCaExtraEpi(),
   ]);
-  const entregas = todasEntregas.filter((e) => mesEAnoBr(e.data_entrega)?.ano === anoAtual);
+  const entregas = todasEntregas.filter((e) => emEscopo(escopo, e.colab_id) && mesEAnoBr(e.data_entrega)?.ano === anoAtual);
 
   const trimestres: CustoTrimestre[] = ROTULO_TRIMESTRE.map((label) => ({ label, quantidade: 0, valor: 0 }));
   for (const e of entregas) {
@@ -685,15 +687,15 @@ export interface LinhaCustoFardamento {
  * "valor unitário" é a média paga (ou o preço vigente, se nunca entregue
  * este ano).
  */
-export async function obterCustosFardamento(): Promise<LinhaCustoFardamento[]> {
+export async function obterCustosFardamento(escopo: EscopoColaboradores = null): Promise<LinhaCustoFardamento[]> {
   const anoAtual = new Date().getFullYear();
   const [todasEntregas, precoPorTipo] = await Promise.all([
-    sstQuery<{ tipo: string; qtd: number; valor_unit: number; data_entrega: string }>(
-      "SELECT tipo, qtd, valor_unit::float8 AS valor_unit, data_entrega FROM sst_fardamento_entregas",
+    sstQuery<{ colab_id: number; tipo: string; qtd: number; valor_unit: number; data_entrega: string }>(
+      "SELECT colab_id, tipo, qtd, valor_unit::float8 AS valor_unit, data_entrega FROM sst_fardamento_entregas",
     ),
     obterPrecosFardamento(),
   ]);
-  const entregas = todasEntregas.filter((e) => mesEAnoBr(e.data_entrega)?.ano === anoAtual);
+  const entregas = todasEntregas.filter((e) => emEscopo(escopo, e.colab_id) && mesEAnoBr(e.data_entrega)?.ano === anoAtual);
 
   const qtdPorTipo = new Map<string, number>();
   const valorPorTipo = new Map<string, number>();

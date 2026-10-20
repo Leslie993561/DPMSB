@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
 import { acessaDho } from "@/lib/auth/perfil";
+import { escopoColaboradoresDoGestor } from "@/lib/acesso/equipeGestor";
 import { obterKit } from "@/lib/db/dho";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { KitDetalheClient } from "@/components/modules/dho/KitDetalheClient";
@@ -12,7 +13,7 @@ export default async function KitDetalhePage({ params }: { params: Promise<{ id:
   if (!acessaDho(sessao)) redirect("/sem-acesso");
 
   const { id } = await params;
-  const kit = await obterKit(Number(id));
+  const kit = await obterKit(Number(id), await escopoColaboradoresDoGestor());
   if (!kit) notFound();
 
   return (

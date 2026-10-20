@@ -2,6 +2,7 @@ import ExcelJS from "exceljs";
 import { z } from "zod";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
 import { acessaSst } from "@/lib/auth/perfil";
+import { escopoColaboradoresDoGestor } from "@/lib/acesso/equipeGestor";
 import { listarProjecaoVencimentosEpi } from "@/lib/sst/epi";
 
 export const runtime = "nodejs";
@@ -53,7 +54,7 @@ export async function GET(request: Request) {
     return Response.json({ erro: "Informe ?modo=mensal&ano=AAAA&mes=MM ou ?modo=anual&ano=AAAA." }, { status: 400 });
   }
 
-  const todas = await listarProjecaoVencimentosEpi();
+  const todas = await listarProjecaoVencimentosEpi(await escopoColaboradoresDoGestor());
   const filtradas = todas.filter((l) => {
     const data = anoMes(l.dataTroca);
     if (!data || data.ano !== parsed.data.ano) return false;

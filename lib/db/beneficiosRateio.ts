@@ -222,7 +222,7 @@ export interface ResumoMensalBeneficios {
  * esperado (recarga proporcional, catraca não usada, ajuste de crédito) — o
  * que não pode é a divergência ficar invisível.
  */
-export async function obterResumoAnualBeneficios(ano: number): Promise<ResumoMensalBeneficios[]> {
+export async function obterResumoAnualBeneficios(ano: number, escopo: Set<number> | null = null): Promise<ResumoMensalBeneficios[]> {
   const informados = await obterTotaisInformados(ano);
   const fechadas = new Set(await listarCompetenciasFechadas());
 
@@ -230,7 +230,8 @@ export async function obterResumoAnualBeneficios(ano: number): Promise<ResumoMen
     Array.from({ length: 12 }, async (_, i) => {
       const mes = i + 1;
       const competencia = `${ano}-${String(mes).padStart(2, "0")}`;
-      const { linhas } = await gerarRateio(competencia);
+      const { linhas: todas } = await gerarRateio(competencia);
+      const linhas = escopo ? todas.filter((l) => escopo.has(l.colaboradorId)) : todas;
 
       let vt = 0;
       let vm = 0;
@@ -252,7 +253,8 @@ export async function obterResumoAnualBeneficios(ano: number): Promise<ResumoMen
         variaveis += l.variaveis;
       }
 
-      const t = informados.get(mes);
+      // Totais informados pelo DP são da empresa inteira: não valem para uma equipe.
+      const t = escopo ? undefined : informados.get(mes);
 
       return {
         mes,

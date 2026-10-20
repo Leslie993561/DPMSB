@@ -1,6 +1,7 @@
 import "server-only";
 import { sstQuery } from "./db";
 import { listarColaboradoresParaEpi } from "./epi";
+import { emEscopo, type EscopoColaboradores } from "./escopo";
 import {
   CATALOGO_EXAMES_OCUPACIONAIS,
   computeProgramaStatus,
@@ -66,6 +67,7 @@ interface ExamePrecoRow {
 }
 
 interface ExameRealizadoRow {
+  colab_id: number;
   exame: string;
   data_realizacao: string;
 }
@@ -261,18 +263,18 @@ function ranking(entries: Map<string, number>, counts: Map<string, number>, with
  * `portal-sst/src/features/dashboard/useDashboardData.ts`, só trocando "ler
  * de state em memória" por "ler do resultado de umas SELECTs amplas".
  */
-export async function obterDashboardSst(): Promise<DashboardSst> {
+export async function obterDashboardSst(escopo: EscopoColaboradores = null): Promise<DashboardSst> {
   const hoje = new Date();
 
   const [
-    colaboradoresRows,
-    entregasEpiRows,
-    fardamentoEntregasRows,
-    fardamentoReparosRows,
+    colaboradoresTodos,
+    entregasEpiTodas,
+    fardamentoEntregasTodas,
+    fardamentoReparosTodos,
     examePrecosRows,
-    examesRealizadosRows,
-    fichasEpiRows,
-    asoDemissionalPendentesRows,
+    examesRealizadosTodos,
+    fichasEpiTodas,
+    asoDemissionalPendentesTodos,
     programasSaudeRows,
     desligamentosPendentesRows,
   ] = await Promise.all([
@@ -294,7 +296,7 @@ export async function obterDashboardSst(): Promise<DashboardSst> {
     // [] até o dia em que a funcionalidade existir, em vez de quebrar o Dashboard.
     tolerante<FardamentoReparoRow>("sst_fardamento_reparos", "SELECT colab_id, valor, data_reparo FROM sst_fardamento_reparos"),
     tolerante<ExamePrecoRow>("sst_exame_precos", "SELECT codigo, valor FROM sst_exame_precos"),
-    tolerante<ExameRealizadoRow>("sst_exames_realizados", "SELECT exame, data_realizacao FROM sst_exames_realizados"),
+    tolerante<ExameRealizadoRow>("sst_exames_realizados", "SELECT colab_id, exame, data_realizacao FROM sst_exames_realizados"),
     tolerante<FichaEpiRow>("sst_fichas_epi", "SELECT id, colab_id, assinatura_storage_path, status FROM sst_fichas_epi"),
     tolerante<AsoDemissionalPendenteRow>(
       "sst_aso_demissional_pendentes",
@@ -313,6 +315,17 @@ export async function obterDashboardSst(): Promise<DashboardSst> {
       "SELECT colaborador_nome, data_desligamento, motivo, solicitado_por, criado_em FROM peopleflow_desligamento_pendente ORDER BY criado_em ASC",
     ),
   ]);
+
+  // Gestor comum: tudo por colaborador é cortado AQUI, antes de somar/agrupar, pra
+  // nenhum total, ranking ou contador carregar gente de fora da equipe dele.
+  const naEquipe = <T extends { colab_id: number }>(linhas: T[]) => linhas.filter((l) => emEscopo(escopo, l.colab_id));
+  const colaboradoresRows = colaboradoresTodos.filter((c) => emEscopo(escopo, c.id));
+  const entregasEpiRows = naEquipe(entregasEpiTodas);
+  const fardamentoEntregasRows = naEquipe(fardamentoEntregasTodas);
+  const fardamentoReparosRows = naEquipe(fardamentoReparosTodos);
+  const examesRealizadosRows = naEquipe(examesRealizadosTodos);
+  const fichasEpiRows = naEquipe(fichasEpiTodas);
+  const asoDemissionalPendentesRows = naEquipe(asoDemissionalPendentesTodos);
 
   // ---------- colaboradores ativos + exames ----------
 
@@ -519,7 +532,9 @@ export async function obterDashboardSst(): Promise<DashboardSst> {
   const valorExame = (codigo: string) => examePrecoOverride.get(codigo) ?? catExames.find((e) => e.codigo === codigo)?.valor ?? 0;
   const codigoPorExame = new Map(catExames.map((e) => [e.nome, e.codigo]));
   const examesComValor = catExames.filter((e) => valorExame(e.codigo) > 0).length;
-  const previstoExamesAno = catExames.reduce((acc, e) => acc + valorExame(e.codigo) * (Number(e.cargos) || 0), 0);
+  // Previsto = catálogo × cargos da EMPRESA toda: pra gestor comum não faz sentido
+  // comparar com o realizado só da equipe (e exporia o porte da empresa), então zera.
+  const previstoExamesAno = escopo !== null ? 0 : catExames.reduce((acc, e) => acc + valorExame(e.codigo) * (Number(e.cargos) || 0), 0);
   // Realizado = exames de fato lançados (sst_exames_realizados, ficha de ASO) NESTE
   // ano, no preço vigente — comparável ao previsto, que também é estimativa pro ano
   // corrente. (Antes lia sst_anexos_exames, tabela do Portal SST antigo que nunca
@@ -539,8 +554,12 @@ export async function obterDashboardSst(): Promise<DashboardSst> {
   });
 
   // Mês com fatura importada da clínica: vale o total faturado (gasto real), não a estimativa pelas fichas.
-  const faturas = await sstQuery<{ competencia: string; total: number }>("SELECT competencia, total::float8 AS total FROM sst_faturas_exame");
-  for (const fat of faturas) examesValorByMes[fat.competencia] = fat.total;
+  // A fatura da clínica é da empresa inteira (não dá pra separar por equipe): gestor
+  // comum fica só com a estimativa pelas fichas dos colaboradores dele.
+  if (escopo === null) {
+    const faturas = await sstQuery<{ competencia: string; total: number }>("SELECT competencia, total::float8 AS total FROM sst_faturas_exame");
+    for (const fat of faturas) examesValorByMes[fat.competencia] = fat.total;
+  }
 
   const custoMensalEpiExames: CustoMensalEpiExames[] = mesesDoAno(anoAtual).map(({ mes, mesLabel }) => ({
     mes,
@@ -559,7 +578,7 @@ export async function obterDashboardSst(): Promise<DashboardSst> {
   // Quem tem EPI obrigatório pela função (cadastro do Quadro × matriz) e ainda
   // não recebeu nenhuma ficha para assinar.
   const comFicha = new Set(fichasEpiRows.map((f) => Number(f.colab_id)));
-  const entregasSemFicha = (await listarColaboradoresParaEpi()).filter(
+  const entregasSemFicha = (await listarColaboradoresParaEpi(escopo)).filter(
     (c) => c.episObrigatorios.length > 0 && !comFicha.has(c.id),
   ).length;
 
@@ -567,6 +586,7 @@ export async function obterDashboardSst(): Promise<DashboardSst> {
 
   const colabPorNome = new Map(colaboradoresRows.map((c) => [c.nome, c]));
   const desligamentosPendentes: DesligamentoPendenteLinha[] = desligamentosPendentesRows.flatMap((d) => {
+    // colabPorNome já só tem a equipe do gestor comum, então quem é de fora cai aqui.
     const colab = colabPorNome.get(d.colaborador_nome);
     if (!colab) return [];
     const dataIso = pgValueToIso(d.data_desligamento);

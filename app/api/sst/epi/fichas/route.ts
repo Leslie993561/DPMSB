@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
 import { acessaSst } from "@/lib/auth/perfil";
+import { dentroDoEscopo } from "@/lib/acesso/equipeGestor";
 import { criarFicha, listarFichasDoColaborador } from "@/lib/sst/fichas";
 
 export const runtime = "nodejs";
@@ -17,6 +18,8 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const id = Number(url.searchParams.get("colaboradorId"));
   if (!Number.isInteger(id) || id <= 0) return Response.json({ erro: "Informe ?colaboradorId=." }, { status: 400 });
+  // Gestor comum só vê fichas de quem é da equipe dele.
+  if (!(await dentroDoEscopo(id))) return Response.json({ erro: "Sem permissão." }, { status: 403 });
   return Response.json(await listarFichasDoColaborador(id, url.origin));
 }
 
