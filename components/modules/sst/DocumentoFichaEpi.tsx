@@ -10,6 +10,11 @@ function hora(iso: string): string {
   return new Date(iso).toLocaleTimeString("pt-BR", { timeZone: FUSO, hour: "2-digit", minute: "2-digit" });
 }
 
+/** Identificação controlada do documento (procedimento POP-RH-001), exibida no cabeçalho da ficha. */
+export const CODIGO_DOCUMENTO = "POP-RH-001-08";
+export const REVISAO_DOCUMENTO = "00";
+export const DATA_DOCUMENTO = "09/26";
+
 /** A frase que o colaborador marca para assinar — repetida no comprovante. */
 export const CONCORDANCIA = "Li a ficha acima, confirmo o recebimento dos EPIs e concordo com a declaração.";
 
@@ -40,12 +45,26 @@ export function DocumentoFichaEpi({ documento, anexoHref }: { documento: Documen
   const a = documento.assinatura;
   return (
     <div className="flex flex-col gap-3 text-[12px] text-foreground">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-[10px] font-semibold tracking-[0.1em] text-brand-primary-800 uppercase">
+      <div className="flex items-stretch overflow-hidden rounded-md border border-hairline">
+        <div className="flex shrink-0 items-center border-r border-hairline px-3 py-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-msb.png" alt="MSB" width={80} height={25} />
+        </div>
+        <p className="flex flex-1 items-center justify-center px-3 py-2 text-center text-[10px] font-semibold tracking-[0.1em] text-brand-primary-800 uppercase">
           Ficha de entrega de EPI nº {documento.numero}
         </p>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo-msb.png" alt="MSB" width={80} height={25} className="shrink-0" />
+        <dl className="shrink-0 border-l border-hairline text-[10.5px]">
+          {[
+            ["Código", CODIGO_DOCUMENTO],
+            ["Rev.", REVISAO_DOCUMENTO],
+            ["Data", DATA_DOCUMENTO],
+          ].map(([rotulo, valor]) => (
+            <div key={rotulo} className="flex gap-1.5 border-b border-hairline px-2.5 py-0.5 last:border-b-0">
+              <dt className="font-semibold">{rotulo}:</dt>
+              <dd>{valor}</dd>
+            </div>
+          ))}
+        </dl>
       </div>
 
       {documento.anexoUrl && anexoHref && (
