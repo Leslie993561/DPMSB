@@ -428,6 +428,13 @@ CREATE TABLE IF NOT EXISTS colaborador_estrangeiro (
   atualizado_em TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')
 );
 
+-- Check list do processo admissional (lib/checklistAdmissional.ts): estado marcado/preenchido em JSON.
+CREATE TABLE IF NOT EXISTS colaborador_checklist (
+  colaborador_id INTEGER PRIMARY KEY REFERENCES colaboradores(id) ON DELETE CASCADE,
+  dados TEXT NOT NULL DEFAULT '{}',
+  atualizado_em TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')
+);
+
 -- Endomarketing (Portal DHO): calendário de ações/datas comemorativas e
 -- controle de estoque/entrega dos kits (onboarding, reconhecimento).
 

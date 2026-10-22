@@ -5,6 +5,7 @@ import type { Colaborador, DeficienteStatus, RateioD365, SexoColaborador, TipoTr
 import type { SexoDependente } from "@/lib/db/colaboradorDependentes";
 import { RiskCallout } from "@/components/shared/RiskCallout";
 import { Modal } from "@/components/shared/Modal";
+import { ChecklistAdmissionalPanel } from "./ChecklistAdmissionalPanel";
 import { DocumentoFichaEpi } from "@/components/modules/sst/DocumentoFichaEpi";
 import { DocumentoFichaExame } from "@/components/modules/sst/DocumentoFichaExame";
 import type { FichaExameResumo } from "@/lib/sst/exames";
@@ -827,6 +828,7 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
   const [modoEdicao, setModoEdicao] = useState(false);
   const bloqueado = Boolean(editando) && !modoEdicao;
   const [mostrarDocumentos, setMostrarDocumentos] = useState(false);
+  const [mostrarChecklist, setMostrarChecklist] = useState(false);
 
   useEffect(() => {
     if (!editando) return;
@@ -1310,6 +1312,18 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
           </button>
           <button
             type="button"
+            onClick={() => setMostrarChecklist((v) => !v)}
+            className={cn(
+              "flex-1 px-2 py-1 text-left text-[10.5px] font-medium transition-colors",
+              mostrarChecklist
+                ? "bg-brand-primary-100 text-brand-primary-800"
+                : "text-foreground-muted hover:bg-background hover:text-brand-primary",
+            )}
+          >
+            ✅ Check list
+          </button>
+          <button
+            type="button"
             onClick={() => setModoEdicao((v) => !v)}
             title={modoEdicao ? "Bloquear edição" : "Habilitar edição"}
             className={cn(
@@ -1331,6 +1345,16 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
           cargo={editando.cargo}
           departamento={editando.departamento}
           desligado={desligado}
+        />
+      )}
+
+      {editando && mostrarChecklist && (
+        <ChecklistAdmissionalPanel
+          colaboradorId={editando.id}
+          nome={editando.nome}
+          cargo={editando.cargo}
+          departamento={editando.departamento}
+          dataAdmissao={editando.dataAdmissao}
         />
       )}
 
