@@ -3,7 +3,8 @@ import { randomBytes } from "node:crypto";
 import { getDb } from "./client";
 import { emailConfigurado, enviarEmail } from "@/lib/email";
 
-const DURACAO_HORAS = 2;
+/** Validade do link de auto-cadastro. */
+export const DURACAO_HORAS = 72;
 
 export interface ConviteCadastro {
   id: number;
@@ -15,6 +16,8 @@ export interface ConviteCadastro {
   expiraEm: string;
   abertoEm: string | null;
   usadoEm: string | null;
+  /** 1ª etapa (dados pessoais) já enviada ao RH — o link volta direto para a etapa de documentos. */
+  dadosEnviadosEm: string | null;
 }
 
 interface LinhaConvite {
@@ -26,6 +29,7 @@ interface LinhaConvite {
   expira_em: string;
   aberto_em: string | null;
   usado_em: string | null;
+  dados_enviados_em: string | null;
 }
 
 function paraConvite(linha: LinhaConvite): ConviteCadastro {
@@ -38,6 +42,7 @@ function paraConvite(linha: LinhaConvite): ConviteCadastro {
     expiraEm: linha.expira_em,
     abertoEm: linha.aberto_em,
     usadoEm: linha.usado_em,
+    dadosEnviadosEm: linha.dados_enviados_em,
   };
 }
 
@@ -70,20 +75,29 @@ export async function buscarConvitePorToken(token: string): Promise<ConviteCadas
   return linha ? paraConvite(linha) : null;
 }
 
-/** Pode ABRIR (primeira vez): não expirou, não foi aberto antes, não foi usado. */
+/**
+ * Pode ABRIR: não expirou e não foi finalizado. Com 72h e duas etapas, a
+ * pessoa precisa poder voltar ao link (recarregar, anexar o resto depois).
+ */
 export function convitePodeAbrir(convite: ConviteCadastro): boolean {
-  return !convite.abertoEm && !convite.usadoEm && new Date(convite.expiraEm).getTime() > Date.now();
-}
-
-/** Pode SUBMETER: já foi aberto (pela própria abertura que trouxe o formulário), ainda não usado, não expirou. */
-export function convitePodeSubmeter(convite: ConviteCadastro): boolean {
   return !convite.usadoEm && new Date(convite.expiraEm).getTime() > Date.now();
 }
+
+/** Pode SUBMETER dados/documentos: mesma regra de abrir. */
+export const convitePodeSubmeter = convitePodeAbrir;
 
 export async function marcarConviteAberto(id: number): Promise<void> {
   const db = await getDb();
   await db.execute({
     sql: "UPDATE convites_cadastro SET aberto_em = ? WHERE id = ?",
+    args: [new Date().toISOString(), id],
+  });
+}
+
+export async function marcarDadosEnviados(id: number): Promise<void> {
+  const db = await getDb();
+  await db.execute({
+    sql: "UPDATE convites_cadastro SET dados_enviados_em = COALESCE(dados_enviados_em, ?) WHERE id = ?",
     args: [new Date().toISOString(), id],
   });
 }
@@ -104,12 +118,12 @@ function emailConvite(para: string, link: string) {
   return {
     para,
     assunto: "Complete seu cadastro — Portal Recursos Humanos MSB",
-    texto: `Olá!\n\nO RH da MSB gerou um link para você completar seu cadastro no Portal de Recursos Humanos.\n\nAcesse pelo link abaixo — válido por 2 horas e uso único:\n${link}\n\nRH · MSB`,
+    texto: `Olá!\n\nO RH da MSB gerou um link para você completar seu cadastro no Portal de Recursos Humanos.\n\nAcesse pelo link abaixo — válido por 72 horas:\n${link}\n\nRH · MSB`,
     html: `<div style="font-family:Arial,sans-serif;font-size:14px;color:#1f2d3d;max-width:520px">
   <p>Olá!</p>
   <p>O RH da MSB gerou um link para você completar seu cadastro no Portal de Recursos Humanos.</p>
   <p style="margin:24px 0"><a href="${escaparHtml(link)}" style="background:#56a4bb;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:bold">Completar cadastro</a></p>
-  <p style="font-size:12px;color:#6b7c8f">Link válido por 2 horas e uso único. Se o botão não abrir, copie este endereço no navegador:<br>${escaparHtml(link)}</p>
+  <p style="font-size:12px;color:#6b7c8f">Link válido por 72 horas. Se o botão não abrir, copie este endereço no navegador:<br>${escaparHtml(link)}</p>
   <p>RH · MSB</p>
 </div>`,
   };

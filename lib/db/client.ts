@@ -378,7 +378,7 @@ ALTER TABLE colaborador_documentos ADD CONSTRAINT colaborador_documentos_origem_
 -- Link de auto-cadastro: o colaborador preenche os PRÓPRIOS dados pessoais
 -- (endereço, banco, cônjuge, dependentes...) sem precisar de login no portal.
 -- O token vale sozinho como credencial (como um link de redefinir senha) —
--- por isso expira rápido (2h) e só funciona uma vez (usado_em).
+-- por isso expira (72h) e deixa de funcionar ao finalizar (usado_em).
 -- colaborador_id é opcional: quando o RH ainda nem cadastrou a pessoa, o
 -- convite nasce sem colaborador — a própria pessoa preenche tudo do zero
 -- (inclusive o nome) e o cadastro é CRIADO ao submeter (ver
@@ -408,6 +408,25 @@ ALTER TABLE convites_cadastro ALTER COLUMN colaborador_id DROP NOT NULL;
 ALTER TABLE convites_cadastro DROP CONSTRAINT IF EXISTS convites_cadastro_colaborador_id_fkey;
 ALTER TABLE convites_cadastro ADD CONSTRAINT convites_cadastro_colaborador_id_fkey
   FOREIGN KEY (colaborador_id) REFERENCES colaboradores(id) ON DELETE CASCADE;
+
+-- Link de auto-cadastro agora vale 72h e tem duas etapas: dados pessoais
+-- (grava na hora, o RH já vê) e documentos (anexos opcionais). "usado_em" só
+-- é marcado ao finalizar os documentos; "dados_enviados_em" marca a 1ª etapa.
+ALTER TABLE convites_cadastro ADD COLUMN IF NOT EXISTS dados_enviados_em TEXT;
+
+-- "tipo" = chave do item do checklist de documentos pessoais (lib/convite/documentos.ts)
+-- quando o anexo veio pelo link de auto-cadastro; null nos anexos feitos pelo RH.
+ALTER TABLE colaborador_documentos ADD COLUMN IF NOT EXISTS tipo TEXT;
+
+-- Bloco "Estrangeiro" do auto-cadastro (os anexos RNE/chegada vão em colaborador_documentos).
+CREATE TABLE IF NOT EXISTS colaborador_estrangeiro (
+  colaborador_id INTEGER PRIMARY KEY REFERENCES colaboradores(id) ON DELETE CASCADE,
+  data_naturalizacao TEXT,
+  casado_com_brasileiro BOOLEAN,
+  filho_com_brasileiro BOOLEAN,
+  visto TEXT,
+  atualizado_em TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')
+);
 
 -- Endomarketing (Portal DHO): calendário de ações/datas comemorativas e
 -- controle de estoque/entrega dos kits (onboarding, reconhecimento).

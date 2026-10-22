@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { descreverErro } from "@/lib/validacao/erroCampos";
+import type { DadosEstrangeiro } from "@/lib/convite/documentos";
+import { DocumentosEtapa, type DocumentoEnviado } from "./DocumentosEtapa";
 
 const INPUT_CLASS =
   "w-full rounded border border-hairline bg-background px-2.5 py-1.5 text-[13px] text-foreground placeholder:text-foreground-muted/60";
@@ -168,7 +170,10 @@ function Campo({
 }
 
 export function ConviteForm({ token }: { token: string }) {
-  const [estado, setEstadoTela] = useState<"carregando" | "invalido" | "formulario" | "enviado">("carregando");
+  const [estado, setEstadoTela] = useState<"carregando" | "invalido" | "formulario" | "documentos" | "enviado">("carregando");
+  const [expiraEm, setExpiraEm] = useState("");
+  const [documentosIniciais, setDocumentosIniciais] = useState<DocumentoEnviado[]>([]);
+  const [estrangeiroInicial, setEstrangeiroInicial] = useState<DadosEstrangeiro | null>(null);
   const [nomeColaborador, setNomeColaborador] = useState("");
   /** true = pré-cadastro: a pessoa ainda não existe no Quadro, ela preenche até o próprio nome. */
   const [novo, setNovo] = useState(false);
@@ -234,8 +239,19 @@ export function ConviteForm({ token }: { token: string }) {
           setEstadoTela("invalido");
           return;
         }
-        const data: { nome: string; novo: boolean; dados: DadosPessoais } = await res.json();
+        const data: {
+          nome: string;
+          novo: boolean;
+          etapa: "dados" | "documentos";
+          expiraEm: string;
+          documentos?: DocumentoEnviado[];
+          estrangeiro?: DadosEstrangeiro | null;
+          dados: DadosPessoais;
+        } = await res.json();
         setNomeColaborador(data.nome);
+        setExpiraEm(data.expiraEm);
+        setDocumentosIniciais(data.documentos ?? []);
+        setEstrangeiroInicial(data.estrangeiro ?? null);
         setNovo(data.novo);
         const d = data.dados;
         setCpf(d.cpf ?? "");
@@ -286,7 +302,7 @@ export function ConviteForm({ token }: { token: string }) {
         setTamanhoCamisa(d.tamanhoCamisa ?? "");
         setTamanhoCalca(d.tamanhoCalca ?? "");
         setTamanhoSapato(d.tamanhoSapato ?? "");
-        setEstadoTela("formulario");
+        setEstadoTela(data.etapa === "documentos" ? "documentos" : "formulario");
       })
       .catch(() => setEstadoTela("invalido"));
   }, [token]);
@@ -378,7 +394,9 @@ export function ConviteForm({ token }: { token: string }) {
         setErro(descreverErro(data, "Não foi possível salvar."));
         return;
       }
-      setEstadoTela("enviado");
+      // Dados já gravados: o RH vê a pessoa agora. Segue para a aba de documentos.
+      setEstadoTela("documentos");
+      window.scrollTo({ top: 0 });
     } catch {
       setErro("Falha de comunicação com o servidor.");
     } finally {
@@ -396,7 +414,7 @@ export function ConviteForm({ token }: { token: string }) {
         <span className="text-2xl">🔒</span>
         <p className="text-[14px] font-semibold text-foreground">Link inválido ou expirado</p>
         <p className="max-w-sm text-[12.5px] text-foreground-muted">
-          Esse link de cadastro não é mais válido — ele expira 2 horas depois de ser gerado, ou já foi usado. Peça
+          Esse link de cadastro não é mais válido — ele expira 72 horas depois de ser gerado, ou o cadastro já foi finalizado. Peça
           ao RH para enviar um novo.
         </p>
       </div>
@@ -407,12 +425,24 @@ export function ConviteForm({ token }: { token: string }) {
     return (
       <div className="flex flex-col items-center gap-2 py-10 text-center">
         <span className="text-2xl">✅</span>
-        <p className="text-[14px] font-semibold text-foreground">Dados enviados</p>
+        <p className="text-[14px] font-semibold text-foreground">Cadastro finalizado</p>
         <p className="max-w-sm text-[12.5px] text-foreground-muted">
-          Obrigado, {novo ? nome.trim().split(/\s+/)[0] : nomeColaborador}. Seus dados foram recebidos pelo RH. Pode
-          fechar esta página.
+          Obrigado, {(novo ? nome.trim() : nomeColaborador).split(/\s+/)[0]}. Seus dados e documentos foram recebidos
+          pelo RH. Pode fechar esta página.
         </p>
       </div>
+    );
+  }
+
+  if (estado === "documentos") {
+    return (
+      <DocumentosEtapa
+        token={token}
+        expiraEm={expiraEm}
+        documentosIniciais={documentosIniciais}
+        estrangeiroInicial={estrangeiroInicial}
+        onFinalizado={() => setEstadoTela("enviado")}
+      />
     );
   }
 
@@ -659,7 +689,7 @@ export function ConviteForm({ token }: { token: string }) {
         disabled={salvando}
         className="mt-2 rounded-md bg-brand-primary px-4 py-2 text-[13px] font-semibold text-brand-white transition-colors hover:bg-brand-primary-800 disabled:opacity-60"
       >
-        {salvando ? "Enviando…" : "Enviar meus dados"}
+        {salvando ? "Enviando…" : "Enviar ao RH"}
       </button>
     </form>
   );

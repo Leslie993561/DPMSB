@@ -6,9 +6,10 @@ import {
   convitePodeAbrir,
   convitePodeSubmeter,
   marcarConviteAberto,
-  marcarConviteUsado,
+  marcarDadosEnviados,
   vincularConviteAoColaborador,
 } from "@/lib/db/convites";
+import { buscarEstrangeiro, listarDocumentosEnviados } from "@/lib/db/conviteDocumentos";
 
 export const runtime = "nodejs";
 
@@ -71,9 +72,9 @@ const DADOS_VAZIOS = {
  * na URL é a própria credencial (como um link de redefinir senha). Por isso
  * fica de fora do gate de sessão do Proxy (ver proxy.ts).
  *
- * GET só é permitido a primeira vez (marca `aberto_em` na hora): recarregar a
- * página ou reabrir o mesmo link depois já retorna inválido — é o que trava
- * "só pode ser aberto uma vez, na segunda não permite".
+ * O link vale 72h e tem duas etapas (dados pessoais → documentos). Reabrir é
+ * permitido até finalizar ou expirar; se os dados já foram enviados ao RH,
+ * `etapa` volta "documentos" e a tela pula direto para os anexos.
  */
 export async function GET(_request: Request, ctx: RouteContext<"/api/convites/token/[token]">) {
   const { token } = await ctx.params;
@@ -85,7 +86,7 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/convites/to
   // Pré-cadastro: ainda não existe colaborador — devolve um formulário em branco (a pessoa preenche tudo, inclusive o nome).
   if (convite.colaboradorId === null) {
     await marcarConviteAberto(convite.id);
-    return Response.json({ nome: "", novo: true, expiraEm: convite.expiraEm, dados: DADOS_VAZIOS });
+    return Response.json({ nome: "", novo: true, etapa: "dados", expiraEm: convite.expiraEm, dados: DADOS_VAZIOS });
   }
 
   const colaborador = await buscarColaborador(convite.colaboradorId);
@@ -93,10 +94,14 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/convites/to
 
   await marcarConviteAberto(convite.id);
 
+  const etapa = convite.dadosEnviadosEm ? "documentos" : "dados";
   return Response.json({
     nome: colaborador.nome,
     novo: false,
+    etapa,
     expiraEm: convite.expiraEm,
+    documentos: etapa === "documentos" ? await listarDocumentosEnviados(colaborador.id) : [],
+    estrangeiro: etapa === "documentos" ? await buscarEstrangeiro(colaborador.id) : null,
     dados: {
       cpf: colaborador.cpf,
       pis: colaborador.pis,
@@ -261,7 +266,9 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/convites/t
     await substituirDependentes(colaboradorId, dependentesLista);
     await atualizarColaborador(colaboradorId, { dependentes: dependentesLista.length });
   }
-  await marcarConviteUsado(convite.id);
+  // Não marca "usado": a 2ª etapa (documentos) ainda precisa do link. O cadastro
+  // já está gravado e o RH já vê a pessoa — finalizar é em /finalizar.
+  await marcarDadosEnviados(convite.id);
 
   return Response.json({ ok: true });
 }

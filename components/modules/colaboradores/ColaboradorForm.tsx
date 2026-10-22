@@ -93,6 +93,21 @@ function ListaDocumentosManual({
   const [documentos, setDocumentos] = useState<DocumentoColaborador[] | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [estrangeiro, setEstrangeiro] = useState<{
+    dataNaturalizacao: string | null;
+    casadoComBrasileiro: boolean | null;
+    filhoComBrasileiro: boolean | null;
+    visto: string | null;
+  } | null>(null);
+
+  // Respostas do bloco "Estrangeiro" do link de auto-cadastro (só aparecem na aba DP, se a pessoa preencheu).
+  useEffect(() => {
+    if (origem !== "dp") return;
+    fetch(`/api/colaboradores/${colaboradorId}/estrangeiro`)
+      .then((r) => r.json())
+      .then((d) => setEstrangeiro(d.estrangeiro ?? null))
+      .catch(() => setEstrangeiro(null));
+  }, [colaboradorId, origem]);
 
   function carregar() {
     fetch(`/api/colaboradores/${colaboradorId}/documentos?origem=${origem}`)
@@ -184,6 +199,17 @@ function ListaDocumentosManual({
               </button>
             </div>
           ))}
+        </div>
+      )}
+      {estrangeiro && (
+        <div className="mt-1 rounded border border-hairline bg-surface-page px-2 py-1.5 text-[10.5px] text-foreground-muted">
+          <p className="font-semibold uppercase">Estrangeiro (preenchido pelo colaborador)</p>
+          <p>
+            Naturalização: {estrangeiro.dataNaturalizacao ? new Date(`${estrangeiro.dataNaturalizacao}T12:00:00`).toLocaleDateString("pt-BR") : "—"}
+            {" · "}Casado(a) com brasileiro(a): {estrangeiro.casadoComBrasileiro === null ? "—" : estrangeiro.casadoComBrasileiro ? "Sim" : "Não"}
+            {" · "}Filho(a) com brasileiro(a): {estrangeiro.filhoComBrasileiro === null ? "—" : estrangeiro.filhoComBrasileiro ? "Sim" : "Não"}
+            {" · "}Visto: {estrangeiro.visto ?? "—"}
+          </p>
         </div>
       )}
       {erro && <p className="text-[10.5px] text-status-danger">{erro}</p>}
@@ -477,8 +503,9 @@ function Secao({ titulo }: { titulo: string }) {
  * pessoa preenche TUDO do zero, inclusive o nome — o cadastro é criado no
  * Quadro só quando ela envia (cargo, salário e admissão ficam pendentes pro
  * RH completar depois, de propósito: quem se autocadastra não decide isso).
- * O link expira em 2h e só funciona uma vez — ver app/api/convites/route.ts
- * e app/convite/[token].
+ * O link expira em 72h. A pessoa envia os dados (o cadastro já aparece no
+ * Quadro) e em seguida anexa os documentos pessoais; ao finalizar, o link
+ * deixa de funcionar — ver app/api/convites/route.ts e app/convite/[token].
  */
 function EnviarConviteBox({ colaboradorId }: { colaboradorId: number | null }) {
   const [email, setEmail] = useState("");
@@ -546,7 +573,7 @@ function EnviarConviteBox({ colaboradorId }: { colaboradorId: number | null }) {
       {link ? (
         <div className="flex flex-col gap-1">
           <p className="text-[10.5px] text-foreground-muted">
-            Válido por 2h, uso único. Envie pra pessoa por onde preferir:
+            Válido por 72 horas. Envie pra pessoa por onde preferir:
           </p>
           <div className="flex items-center gap-1.5">
             <input readOnly value={link} className={`${INPUT_CLASS} truncate`} onFocus={(e) => e.target.select()} />
