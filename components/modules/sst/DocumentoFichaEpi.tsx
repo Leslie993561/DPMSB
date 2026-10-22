@@ -51,7 +51,7 @@ export function DocumentoFichaEpi({ documento, anexoHref }: { documento: Documen
           <img src="/logo-msb.png" alt="MSB" width={80} height={25} />
         </div>
         <p className="flex flex-1 items-center justify-center px-3 py-2 text-center text-[10px] font-semibold tracking-[0.1em] text-brand-primary-800 uppercase">
-          Ficha de entrega de EPI nº {documento.numero}
+          Ficha de entrega de EPI
         </p>
         <dl className="shrink-0 border-l border-hairline text-[10.5px]">
           {[

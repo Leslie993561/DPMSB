@@ -310,7 +310,7 @@ export function FichaEpiDrawer({
           aberto
           onFechar={() => setDocumento(null)}
           eyebrow="Documento assinado"
-          titulo={`Ficha de entrega de EPI nº ${documento.numero}`}
+          titulo="Ficha de entrega de EPI"
           subtitulo={documento.colaborador.nome}
           largura="40rem"
         >
