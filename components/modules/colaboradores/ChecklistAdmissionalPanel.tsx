@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { chavesMarcaveis, SECOES_CHECKLIST, type EstadoChecklist } from "@/lib/checklistAdmissional";
+import { chavesMarcaveis, SECOES_CHECKLIST, TIPO_ANEXO_POR_ITEM, type EstadoChecklist } from "@/lib/checklistAdmissional";
 
 const INPUT_CLASS =
   "rounded border border-hairline bg-background px-1.5 py-0.5 text-[11px] font-light text-foreground dark:border-brand-neutral/30";
@@ -27,13 +27,17 @@ export function ChecklistAdmissionalPanel({
   dataAdmissao: string | null;
 }) {
   const [dados, setDados] = useState<EstadoChecklist | null>(null);
+  const [anexados, setAnexados] = useState<Set<string>>(new Set());
   const [erro, setErro] = useState<string | null>(null);
   const temporizador = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     fetch(`/api/colaboradores/${colaboradorId}/checklist`)
       .then((r) => r.json())
-      .then((d) => setDados(d.dados ?? {}))
+      .then((d) => {
+        setDados(d.dados ?? {});
+        setAnexados(new Set<string>(d.anexados ?? []));
+      })
       .catch(() => setErro("Não foi possível carregar o check list."));
     return () => {
       if (temporizador.current) clearTimeout(temporizador.current);
@@ -63,7 +67,13 @@ export function ChecklistAdmissionalPanel({
   }
 
   const marcaveis = chavesMarcaveis();
-  const feitos = marcaveis.filter((c) => dados[c] === true).length;
+  /** Item que o colaborador anexou pelo link de cadastro: fica marcado sozinho. */
+  const anexadoPeloColaborador = (chave: string) => {
+    const tipo = TIPO_ANEXO_POR_ITEM[chave];
+    return tipo !== undefined && anexados.has(tipo);
+  };
+  const concluido = (chave: string) => dados[chave] === true || anexadoPeloColaborador(chave);
+  const feitos = marcaveis.filter(concluido).length;
 
   return (
     <div className="flex flex-col gap-2 rounded border border-hairline bg-surface-page p-2 dark:border-brand-neutral/30">
@@ -94,11 +104,17 @@ export function ChecklistAdmissionalPanel({
                   <label className="flex cursor-pointer items-start gap-1.5 text-[11.5px] text-foreground">
                     <input
                       type="checkbox"
-                      checked={dados[item.chave] === true}
+                      checked={concluido(item.chave)}
+                      disabled={anexadoPeloColaborador(item.chave)}
                       onChange={(e) => atualizar(item.chave, e.target.checked)}
                       className="mt-0.5"
                     />
-                    <span className={dados[item.chave] === true ? "text-foreground-muted line-through" : undefined}>{item.rotulo}</span>
+                    <span className={concluido(item.chave) ? "text-foreground-muted line-through" : undefined}>{item.rotulo}</span>
+                    {anexadoPeloColaborador(item.chave) && (
+                      <span className="rounded bg-status-success-bg px-1 text-[9.5px] font-medium text-status-success">
+                        anexado pelo colaborador
+                      </span>
+                    )}
                   </label>
                   {item.detalhes && (
                     <ul className="ml-6 list-disc text-[10.5px] text-foreground-muted">

@@ -222,3 +222,32 @@ export type EstadoChecklist = Record<string, boolean | string>;
 export function chavesMarcaveis(): string[] {
   return SECOES_CHECKLIST.flatMap((s) => s.blocos.flatMap((b) => b.itens.map((i) => i.chave)));
 }
+
+/** Itens do check list que o colaborador anexa pelo link de auto-cadastro (chave do item → `tipo` em colaborador_documentos,
+ *  catálogo em lib/convite/documentos.ts). Quando há anexo desse tipo, o item aparece marcado automaticamente. */
+export const TIPO_ANEXO_POR_ITEM: Record<string, string> = {
+  adm_curriculo: "curriculo",
+  adm_foto: "foto_3x4",
+  adm_escola_filhos: "declaracao_escola",
+  adm_conta_bancaria: "conta_bancaria",
+  adm_carta_recomendacao: "carta_recomendacao",
+  adm_ctps: "ctps",
+  adm_identidade: "identidade",
+  adm_cpf: "cpf",
+  adm_habilitacao: "habilitacao",
+  adm_titulo_eleitor: "titulo_eleitor",
+  adm_reservista: "reservista",
+  adm_pis: "pis",
+  adm_comprovante_residencia: "comprovante_residencia",
+  adm_escolaridade: "escolaridade",
+  adm_certidao_casamento: "certidao_casamento",
+  adm_cpf_conjuge: "cpf_conjuge",
+  adm_certidao_filhos: "certidao_filhos",
+  adm_cpf_filhos: "cpf_filhos",
+  adm_vacina_filhos: "vacina_filhos",
+  adm_laudo_pcd: "laudo_pcd",
+  adm_certificados: "certificados",
+  adm_termo_estagio: "termo_estagio",
+  est_data_chegada: "est_data_chegada",
+  est_rne: "est_rne",
+};

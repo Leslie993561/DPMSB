@@ -1,5 +1,5 @@
 import { obterSessaoAtual } from "@/lib/auth/sessao";
-import { buscarChecklist, salvarChecklist } from "@/lib/db/colaboradorChecklist";
+import { buscarChecklist, listarTiposAnexados, salvarChecklist } from "@/lib/db/colaboradorChecklist";
 import { buscarColaborador } from "@/lib/db/colaboradores";
 import { chavesMarcaveis, SECOES_CHECKLIST } from "@/lib/checklistAdmissional";
 
@@ -23,7 +23,8 @@ async function validar(params: Promise<{ id: string }>) {
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const v = await validar(params);
   if (v.erro) return v.erro;
-  return Response.json({ dados: await buscarChecklist(v.id) });
+  const [dados, anexados] = await Promise.all([buscarChecklist(v.id), listarTiposAnexados(v.id)]);
+  return Response.json({ dados, anexados });
 }
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {

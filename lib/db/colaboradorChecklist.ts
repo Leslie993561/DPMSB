@@ -23,3 +23,13 @@ export async function salvarChecklist(colaboradorId: number, dados: EstadoCheckl
     args: [colaboradorId, JSON.stringify(dados)],
   });
 }
+
+/** Tipos de documento que o colaborador já anexou pelo link de auto-cadastro (colaborador_documentos.tipo). */
+export async function listarTiposAnexados(colaboradorId: number): Promise<string[]> {
+  const db = await getDb();
+  const r = await db.execute({
+    sql: "SELECT DISTINCT tipo FROM colaborador_documentos WHERE colaborador_id = ? AND tipo IS NOT NULL",
+    args: [colaboradorId],
+  });
+  return (r.rows as unknown as { tipo: string }[]).map((l) => l.tipo);
+}
