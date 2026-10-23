@@ -109,13 +109,7 @@ export function ChecklistAdmissionalPanel({
                       onChange={(e) => atualizar(item.chave, e.target.checked)}
                       className="mt-0.5"
                     />
-                    <span className={concluido(item.chave) ? "text-foreground-muted line-through" : undefined}>{item.rotulo}</span>
-                    {anexadoPeloColaborador(item.chave) && (
-                      <span className="rounded bg-status-success-bg px-1 text-[9.5px] font-medium text-status-success">
-                        anexado pelo colaborador
-                      </span>
-                    )}
-                  </label>
+                    <span className={concluido(item.chave) ? "text-foreground-muted line-through" : undefined}>{item.rotulo}</span>                  </label>
                   {item.detalhes && (
                     <ul className="ml-6 list-disc text-[10.5px] text-foreground-muted">
                       {item.detalhes.map((d) => (
