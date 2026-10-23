@@ -431,3 +431,53 @@ export async function excluirEntregaKit(entregaId: number): Promise<void> {
     { sql: "DELETE FROM dho_kit_entregas WHERE id = ?", args: [entregaId] },
   ]);
 }
+
+export interface MelhoriaEmpresa {
+  id: number;
+  data: string;
+  titulo: string;
+  quantidade: number;
+  valorTotal: number;
+}
+
+interface LinhaMelhoria {
+  id: number;
+  data: string;
+  titulo: string;
+  quantidade: number;
+  valor_total: number;
+}
+
+function paraMelhoria(l: LinhaMelhoria): MelhoriaEmpresa {
+  return { id: l.id, data: l.data, titulo: l.titulo, quantidade: l.quantidade, valorTotal: l.valor_total };
+}
+
+export async function listarMelhoriasEmpresa(ano: number): Promise<MelhoriaEmpresa[]> {
+  const db = await getDb();
+  const r = await db.execute({ sql: "SELECT * FROM dho_melhorias_empresa WHERE data LIKE ? ORDER BY data, id", args: [`${ano}-%`] });
+  return (r.rows as unknown as LinhaMelhoria[]).map(paraMelhoria);
+}
+
+export async function criarMelhoriaEmpresa(d: { data: string; titulo: string; quantidade: number; valorTotal: number }): Promise<MelhoriaEmpresa> {
+  const db = await getDb();
+  const r = await db.execute({
+    sql: "INSERT INTO dho_melhorias_empresa (data, titulo, quantidade, valor_total) VALUES (?, ?, ?, ?) RETURNING *",
+    args: [d.data, d.titulo, d.quantidade, d.valorTotal],
+  });
+  return paraMelhoria(r.rows[0] as unknown as LinhaMelhoria);
+}
+
+export async function atualizarMelhoriaEmpresa(id: number, d: { data: string; titulo: string; quantidade: number; valorTotal: number }): Promise<MelhoriaEmpresa | null> {
+  const db = await getDb();
+  const r = await db.execute({
+    sql: "UPDATE dho_melhorias_empresa SET data = ?, titulo = ?, quantidade = ?, valor_total = ? WHERE id = ? RETURNING *",
+    args: [d.data, d.titulo, d.quantidade, d.valorTotal, id],
+  });
+  const linha = r.rows[0] as unknown as LinhaMelhoria | undefined;
+  return linha ? paraMelhoria(linha) : null;
+}
+
+export async function excluirMelhoriaEmpresa(id: number): Promise<void> {
+  const db = await getDb();
+  await db.execute({ sql: "DELETE FROM dho_melhorias_empresa WHERE id = ?", args: [id] });
+}

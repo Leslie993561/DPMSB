@@ -9,6 +9,7 @@ import { Modal } from "@/components/shared/Modal";
 import { formatarDataBr, formatarMoeda } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { ExportarCalendarioModal } from "./ExportarCalendarioModal";
+import { MelhoriasEmpresaCard } from "./MelhoriasEmpresaCard";
 import type { CategoriaDataComemorativa, DataComemorativa, EventoCalendario, ItemEvento, LinhaOrcamentoMes } from "@/lib/db/dho";
 
 export type AbaEndomarketing = "calendario" | "lancamentos" | "orcamento";
@@ -916,6 +917,7 @@ onClick={() => setExportarAberto(true)}
             </button>
           </Card>
 
+          <div className="space-y-3">
           <Card className="p-4">
             <p className="mb-2 text-[11px] font-bold tracking-wide text-foreground-muted uppercase">Ações de {ano}</p>
             <div className="max-h-72 space-y-1.5 overflow-y-auto">
@@ -944,6 +946,9 @@ onClick={() => setExportarAberto(true)}
               )}
             </div>
           </Card>
+
+          <MelhoriasEmpresaCard ano={ano} />
+          </div>
         </div>
       )}
     </div>

@@ -480,6 +480,16 @@ CREATE TABLE IF NOT EXISTS dho_orcamento_mensal (
   PRIMARY KEY (ano, mes)
 );
 
+-- Orçamento à parte para melhorias comuns à empresa (sem ação de endomarketing):
+-- data, título, quantidade e valor total. Não entra no "Utilizado" mensal.
+CREATE TABLE IF NOT EXISTS dho_melhorias_empresa (
+  id SERIAL PRIMARY KEY,
+  data TEXT NOT NULL,
+  titulo TEXT NOT NULL,
+  quantidade INTEGER NOT NULL DEFAULT 1,
+  valor_total DOUBLE PRECISION NOT NULL DEFAULT 0
+);
+
 CREATE TABLE IF NOT EXISTS dho_kits (
   id SERIAL PRIMARY KEY,
   nome TEXT NOT NULL UNIQUE
