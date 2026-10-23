@@ -1,6 +1,8 @@
 import { blobConfigurado, subirArquivoPrivado } from "@/lib/storage";
 import { buscarConvitePorToken, convitePodeSubmeter } from "@/lib/db/convites";
 import { adicionarDocumentoEnviado, listarDocumentosEnviados } from "@/lib/db/conviteDocumentos";
+import { buscarColaborador } from "@/lib/db/colaboradores";
+import { abreviarNome } from "@/lib/format";
 import { buscarDocumentoConvite, REGRAS_ANEXO, TIPOS_MIME } from "@/lib/convite/documentos";
 
 export const runtime = "nodejs";
@@ -53,8 +55,13 @@ export async function POST(request: Request, ctx: { params: Promise<{ token: str
   }
 
   const { url } = await subirArquivoPrivado("colaboradores/documentos", arquivo.name || "documento", arquivo);
-  // O RH vê "Identidade — rg-frente.pdf": o item do checklist + o arquivo que a pessoa mandou.
-  const nome = `${item.nome} — ${(arquivo.name || "documento").slice(0, 120)}`;
+  // O RH vê "Alice Coutinho - Identidade.pdf": nome abreviado do colaborador + nome do documento
+  // (com " (2)", " (3)"... quando o mesmo documento tem mais de um arquivo).
+  const colaborador = await buscarColaborador(convite.colaboradorId);
+  const nomeArquivo = arquivo.name || "documento";
+  const extensao = nomeArquivo.includes(".") ? nomeArquivo.slice(nomeArquivo.lastIndexOf(".")).toLowerCase() : "";
+  const repetido = ja.filter((d) => d.tipo === item.chave).length;
+  const nome = `${abreviarNome(colaborador?.nome ?? "")} - ${item.nome}${repetido > 0 ? ` (${repetido + 1})` : ""}${extensao}`.trim();
   const documento = await adicionarDocumentoEnviado(convite.colaboradorId, { tipo: item.chave, nome, url });
   return Response.json({ documento }, { status: 201 });
 }
