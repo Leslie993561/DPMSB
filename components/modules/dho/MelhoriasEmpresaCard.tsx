@@ -22,7 +22,7 @@ const novaLinha = (data = ""): LinhaForm => ({ chave: proximaChave++, data, titu
 const totalLinha = (l: LinhaForm) => (Number(l.quantidade) || 0) * (Number(l.valorUnitario) || 0);
 
 /** Orçamento à parte: melhorias comuns à empresa (sem ação de endomarketing) — data, item, quantidade e valor. */
-export function MelhoriasEmpresaCard({ ano }: { ano: number }) {
+export function MelhoriasEmpresaCard({ ano, onAlterado }: { ano: number; onAlterado?: () => void }) {
   const [itens, setItens] = useState<MelhoriaEmpresa[]>([]);
   const [editandoId, setEditandoId] = useState<number | null>(null);
   const [linhas, setLinhas] = useState<LinhaForm[]>(() => [novaLinha()]);
@@ -95,6 +95,7 @@ export function MelhoriasEmpresaCard({ ano }: { ano: number }) {
       }
       limpar();
       await carregar();
+      onAlterado?.();
     } finally {
       setSalvando(false);
     }
@@ -104,6 +105,7 @@ export function MelhoriasEmpresaCard({ ano }: { ano: number }) {
     await fetch(`/api/dho/melhorias/${id}`, { method: "DELETE" });
     if (editandoId === id) limpar();
     await carregar();
+    onAlterado?.();
   }
 
   const total = itens.reduce((soma, m) => soma + m.valorTotal, 0);

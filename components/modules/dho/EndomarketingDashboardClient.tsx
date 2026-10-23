@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/shared/Card";
@@ -10,7 +10,7 @@ import { formatarDataBr, formatarMoeda } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { ExportarCalendarioModal } from "./ExportarCalendarioModal";
 import { MelhoriasEmpresaCard } from "./MelhoriasEmpresaCard";
-import type { CategoriaDataComemorativa, DataComemorativa, EventoCalendario, ItemEvento, LinhaOrcamentoMes } from "@/lib/db/dho";
+import type { CategoriaDataComemorativa, DataComemorativa, EventoCalendario, ItemEvento, LinhaOrcamentoMes, MelhoriaEmpresa } from "@/lib/db/dho";
 
 export type AbaEndomarketing = "calendario" | "lancamentos" | "orcamento";
 
@@ -128,6 +128,20 @@ export function EndomarketingDashboardClient({
   const [eventos, setEventos] = useState(eventosIniciais);
   const [orcamento, setOrcamento] = useState(orcamentoInicial);
   const [datasComemorativas, setDatasComemorativas] = useState(datasComemorativasIniciais);
+  // Melhorias para a empresa do ano — só para marcar com "!" os meses do Calendário que têm alguma.
+  const [melhorias, setMelhorias] = useState<MelhoriaEmpresa[]>([]);
+
+  async function recarregarMelhorias() {
+    const res = await fetch(`/api/dho/melhorias?ano=${ano}`);
+    if (res.ok) setMelhorias((await res.json()).melhorias ?? []);
+  }
+
+  useEffect(() => {
+    fetch(`/api/dho/melhorias?ano=${ano}`)
+      .then((r) => (r.ok ? r.json() : { melhorias: [] }))
+      .then((d) => setMelhorias(d.melhorias ?? []))
+      .catch(() => setMelhorias([]));
+  }, [ano]);
   const [novaDataData, setNovaDataData] = useState("");
   const [novaDataNome, setNovaDataNome] = useState("");
   const [novaDataCategoria, setNovaDataCategoria] = useState<CategoriaDataComemorativa>("nacional");
@@ -702,6 +716,7 @@ onClick={() => setExportarAberto(true)}
                   ano={ano}
                   mes={i + 1}
                   nomeMes={nomeMes}
+                  melhorias={melhorias.filter((m) => Number(m.data.slice(5, 7)) === i + 1)}
                   eventosPorDia={eventosPorDia}
                   acaoRangePorDia={acaoRangePorDia}
                   datasComemorativasPorDia={datasComemorativasPorDia}
@@ -915,7 +930,7 @@ onClick={() => setExportarAberto(true)}
             </button>
           </Card>
 
-          <MelhoriasEmpresaCard ano={ano} />
+          <MelhoriasEmpresaCard ano={ano} onAlterado={recarregarMelhorias} />
         </div>
       )}
     </div>
@@ -927,6 +942,7 @@ function MesCalendario({
   ano,
   mes,
   nomeMes,
+  melhorias,
   eventosPorDia,
   acaoRangePorDia,
   datasComemorativasPorDia,
@@ -938,6 +954,8 @@ function MesCalendario({
   ano: number;
   mes: number;
   nomeMes: string;
+  /** Melhorias para a empresa lançadas neste mês — mostram um "!" laranja no título. */
+  melhorias: MelhoriaEmpresa[];
   eventosPorDia: Map<string, EventoCalendario[]>;
   acaoRangePorDia: Map<string, { titulo: string; inicio: boolean; fim: boolean }>;
   datasComemorativasPorDia: Map<string, DataComemorativa[]>;
@@ -953,7 +971,27 @@ function MesCalendario({
 
   return (
     <div className="rounded-md border border-hairline p-2">
-      <p className="mb-1.5 text-[11.5px] font-semibold text-foreground">{nomeMes}</p>
+      <div className="mb-1.5 flex items-center justify-between">
+        <p className="text-[11.5px] font-semibold text-foreground">{nomeMes}</p>
+        {melhorias.length > 0 && (
+          <span
+            className="group relative flex h-4 w-4 items-center justify-center rounded-full bg-orange-100 text-[10px] leading-none font-bold text-orange-500 dark:bg-orange-500/20"
+            aria-label={`${melhorias.length} melhoria(s) para a empresa em ${nomeMes}`}
+          >
+            !
+            <span
+              role="tooltip"
+              className="pointer-events-none absolute top-full right-0 z-50 mt-1 hidden w-max max-w-52 rounded-md bg-brand-dark-900 px-2 py-1 text-left text-[10px] font-normal whitespace-normal text-brand-white shadow-drawer group-hover:block"
+            >
+              {melhorias.map((m) => (
+                <span key={m.id} className="block">
+                  {formatarDataBr(m.data)} · {m.titulo}
+                </span>
+              ))}
+            </span>
+          </span>
+        )}
+      </div>
       <div className="grid grid-cols-7 gap-0.5 text-center text-[8.5px] font-semibold text-foreground-muted">
         {DIAS_SEMANA.map((d, i) => (
           <div key={i}>{d}</div>
