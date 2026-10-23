@@ -5,6 +5,8 @@
  *
  * Nenhum item é obrigatório — o que faltar só aparece em vermelho.
  */
+import { abreviarNome } from "@/lib/format";
+
 export type FormatoAceito = "pdf" | "foto";
 
 export interface DocumentoConvite {
@@ -81,3 +83,16 @@ export const ACCEPT_HTML: Record<FormatoAceito, string> = {
   pdf: "application/pdf,.pdf",
   foto: "image/jpeg,image/png,.jpg,.jpeg,.png",
 };
+
+/**
+ * Nome exibido de um anexo do auto-cadastro: "Nome abreviado - Nome do documento.ext" — o campo onde a pessoa
+ * anexou, nunca o nome do arquivo que ela enviou. `indice` (1, 2, 3...) numera arquivos do mesmo documento.
+ */
+export function nomeDocumentoAutocadastro(colaboradorNome: string, tipo: string, nomeArmazenado: string, indice: number): string {
+  const item = buscarDocumentoConvite(tipo);
+  if (!item) return nomeArmazenado;
+  const ponto = nomeArmazenado.lastIndexOf(".");
+  const extensao = ponto > nomeArmazenado.length - 6 && ponto > 0 ? nomeArmazenado.slice(ponto).toLowerCase() : "";
+  const sufixo = indice > 1 ? ` (${indice})` : "";
+  return `${abreviarNome(colaboradorNome)} - ${item.nome}${sufixo}${extensao}`.trim();
+}

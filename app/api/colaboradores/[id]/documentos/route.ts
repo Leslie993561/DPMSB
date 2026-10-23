@@ -2,6 +2,7 @@ import { obterSessaoAtual } from "@/lib/auth/sessao";
 import { blobConfigurado, subirArquivoPrivado } from "@/lib/storage";
 import { adicionarDocumento, listarDocumentos } from "@/lib/db/colaboradorDocumentos";
 import { buscarColaborador } from "@/lib/db/colaboradores";
+import { nomeDocumentoAutocadastro } from "@/lib/convite/documentos";
 
 export const runtime = "nodejs";
 
@@ -20,7 +21,19 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (!Number.isInteger(id) || id <= 0) return Response.json({ erro: "Colaborador inválido." }, { status: 400 });
   const origemParam = new URL(request.url).searchParams.get("origem");
   const origem = origemParam === "dp" || origemParam === "sst" || origemParam === "desl" ? origemParam : undefined;
-  return Response.json({ documentos: await listarDocumentos(id, origem) });
+  const documentos = await listarDocumentos(id, origem);
+  // Anexos do link de auto-cadastro aparecem como "Nome abreviado - Documento", mesmo os antigos (que guardavam o nome do arquivo).
+  const colaborador = documentos.some((d) => d.tipo) ? await buscarColaborador(id) : null;
+  const contagem = new Map<string, number>();
+  const ordemAntiga = [...documentos].sort((a, b) => a.id - b.id);
+  const nomes = new Map<number, string>();
+  for (const d of ordemAntiga) {
+    if (!d.tipo || !colaborador) continue;
+    const n = (contagem.get(d.tipo) ?? 0) + 1;
+    contagem.set(d.tipo, n);
+    nomes.set(d.id, nomeDocumentoAutocadastro(colaborador.nome, d.tipo, d.nome, n));
+  }
+  return Response.json({ documentos: documentos.map((d) => ({ ...d, nome: nomes.get(d.id) ?? d.nome })) });
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {

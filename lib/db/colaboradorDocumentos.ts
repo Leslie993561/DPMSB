@@ -11,6 +11,8 @@ export interface ColaboradorDocumento {
   url: string;
   enviadoPor: string;
   origem: OrigemDocumento;
+  /** Chave do documento do link de auto-cadastro (lib/convite/documentos.ts); null nos anexos do RH. */
+  tipo: string | null;
   criadoEm: string;
 }
 
@@ -21,6 +23,7 @@ interface LinhaDocumento {
   url: string;
   enviado_por: string;
   origem: OrigemDocumento;
+  tipo: string | null;
   criado_em: string;
 }
 
@@ -32,6 +35,7 @@ function paraDocumento(l: LinhaDocumento): ColaboradorDocumento {
     url: l.url,
     enviadoPor: l.enviado_por,
     origem: l.origem,
+    tipo: l.tipo ?? null,
     criadoEm: l.criado_em,
   };
 }
