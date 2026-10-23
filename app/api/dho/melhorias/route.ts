@@ -14,7 +14,7 @@ export async function GET(request: Request) {
 }
 
 export const schemaMelhoria = z.object({
-  data: z.string().regex(/^d{4}-d{2}-d{2}$/, "Informe a data."),
+  data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Informe a data."),
   titulo: z.string().trim().min(1, "Informe o título."),
   quantidade: z.number().int().min(1, "A quantidade deve ser ao menos 1."),
   valorTotal: z.number().min(0, "Informe o valor total."),

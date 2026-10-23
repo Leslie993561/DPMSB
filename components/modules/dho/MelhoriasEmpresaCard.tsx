@@ -6,20 +6,22 @@ import { formatarDataBr, formatarMoeda } from "@/lib/format";
 import type { MelhoriaEmpresa } from "@/lib/db/dho";
 
 const INPUT_CLASS =
-  "w-full rounded-md border border-hairline bg-background px-2 py-1.5 text-[12px] text-foreground placeholder:text-foreground-muted/60";
+  "w-full rounded border border-hairline bg-background px-2 py-1.5 text-[12px] text-foreground placeholder:text-foreground-muted/60";
 
 interface LinhaForm {
   chave: number;
   data: string;
   titulo: string;
   quantidade: string;
-  valorTotal: string;
+  valorUnitario: string;
 }
 
 let proximaChave = 1;
-const novaLinha = (): LinhaForm => ({ chave: proximaChave++, data: "", titulo: "", quantidade: "1", valorTotal: "" });
+const novaLinha = (data = ""): LinhaForm => ({ chave: proximaChave++, data, titulo: "", quantidade: "1", valorUnitario: "" });
 
-/** Orçamento à parte: melhorias comuns à empresa (sem ação de endomarketing) — data, título, quantidade e valor. */
+const totalLinha = (l: LinhaForm) => (Number(l.quantidade) || 0) * (Number(l.valorUnitario) || 0);
+
+/** Orçamento à parte: melhorias comuns à empresa (sem ação de endomarketing) — data, item, quantidade e valor. */
 export function MelhoriasEmpresaCard({ ano }: { ano: number }) {
   const [itens, setItens] = useState<MelhoriaEmpresa[]>([]);
   const [editandoId, setEditandoId] = useState<number | null>(null);
@@ -47,7 +49,15 @@ export function MelhoriasEmpresaCard({ ano }: { ano: number }) {
 
   function editar(m: MelhoriaEmpresa) {
     setEditandoId(m.id);
-    setLinhas([{ chave: proximaChave++, data: m.data, titulo: m.titulo, quantidade: String(m.quantidade), valorTotal: String(m.valorTotal) }]);
+    setLinhas([
+      {
+        chave: proximaChave++,
+        data: m.data,
+        titulo: m.titulo,
+        quantidade: String(m.quantidade),
+        valorUnitario: String(m.quantidade > 0 ? Math.round((m.valorTotal / m.quantidade) * 100) / 100 : m.valorTotal),
+      },
+    ]);
     setErro(null);
   }
 
@@ -56,7 +66,12 @@ export function MelhoriasEmpresaCard({ ano }: { ano: number }) {
     setLinhas((ls) => ls.map((l) => (l.chave === chave ? { ...l, [campo]: valor } : l)));
   }
 
-  const paraCorpo = (l: LinhaForm) => ({ data: l.data, titulo: l.titulo, quantidade: Number(l.quantidade), valorTotal: Number(l.valorTotal) || 0 });
+  const paraCorpo = (l: LinhaForm) => ({
+    data: l.data,
+    titulo: l.titulo,
+    quantidade: Math.max(1, Math.round(Number(l.quantidade)) || 1),
+    valorTotal: Math.round(totalLinha(l) * 100) / 100,
+  });
   const linhaCompleta = (l: LinhaForm) => l.data !== "" && l.titulo.trim() !== "";
 
   async function salvar() {
@@ -92,80 +107,110 @@ export function MelhoriasEmpresaCard({ ano }: { ano: number }) {
   }
 
   const total = itens.reduce((soma, m) => soma + m.valorTotal, 0);
+  const totalForm = linhas.reduce((soma, l) => soma + totalLinha(l), 0);
 
   return (
     <Card className="h-full p-4">
-      <p className="text-[11px] font-bold tracking-wide text-foreground-muted uppercase">Melhorias para a empresa · {ano}</p>
+      <div className="mb-2 flex items-center justify-between">
+        <p className="text-[12px] font-bold tracking-wide text-foreground-muted uppercase">
+          {editandoId ? "Editar melhoria" : "Melhorias para a empresa"} · {ano}
+        </p>
+        {editandoId && (
+          <button type="button" onClick={limpar} className="text-[11px] text-brand-primary hover:text-brand-primary-hover">
+            Cancelar edição
+          </button>
+        )}
+      </div>
       <p className="mb-2 text-[10.5px] text-foreground-muted">Itens comuns a todos, sem ação de endomarketing.</p>
 
-      <div className="space-y-2">
-        {linhas.map((l, idx) => (
-          <div key={l.chave} className="space-y-1.5 rounded border border-hairline p-2">
-            <div className="grid grid-cols-[1fr_1.4fr] gap-1.5">
-              <label className="block">
-                <span className="mb-0.5 block text-[10px] font-medium text-foreground-muted">Data</span>
-                <input type="date" value={l.data} onChange={(e) => mudar(l.chave, "data", e.target.value)} className={INPUT_CLASS} />
-              </label>
-              <label className="block">
-                <span className="mb-0.5 block text-[10px] font-medium text-foreground-muted">Título</span>
-                <input value={l.titulo} onChange={(e) => mudar(l.chave, "titulo", e.target.value)} className={INPUT_CLASS} />
-              </label>
-            </div>
-            <div className="grid grid-cols-[1fr_1.4fr_auto] items-end gap-1.5">
-              <label className="block">
-                <span className="mb-0.5 block text-[10px] font-medium text-foreground-muted">Qnt.</span>
-                <input type="number" min={1} step={1} value={l.quantidade} onChange={(e) => mudar(l.chave, "quantidade", e.target.value)} className={INPUT_CLASS} />
-              </label>
-              <label className="block">
-                <span className="mb-0.5 block text-[10px] font-medium text-foreground-muted">Valor total (R$)</span>
-                <input type="number" min={0} step="0.01" value={l.valorTotal} onChange={(e) => mudar(l.chave, "valorTotal", e.target.value)} className={INPUT_CLASS} />
-              </label>
-              {linhas.length > 1 && !editandoId && (
+      <div className="rounded border border-hairline p-2">
+        <div className="mb-1 grid grid-cols-[104px_1fr_46px_72px_64px_16px] items-center gap-1.5 text-[10px] font-semibold text-foreground-muted uppercase">
+          <span>Data</span>
+          <span>Item</span>
+          <span>Qtd</span>
+          <span>Val. unid.</span>
+          <span>Total</span>
+          <span />
+        </div>
+        <div className="space-y-1.5">
+          {linhas.map((l, idx) => (
+            <div key={l.chave} className="grid grid-cols-[104px_1fr_46px_72px_64px_16px] items-center gap-1.5">
+              <input
+                type="date"
+                value={l.data}
+                onChange={(e) => mudar(l.chave, "data", e.target.value)}
+                className={INPUT_CLASS}
+                aria-label="Data"
+              />
+              <input
+                value={l.titulo}
+                onChange={(e) => mudar(l.chave, "titulo", e.target.value)}
+                placeholder="Nome"
+                className={INPUT_CLASS}
+                aria-label="Item"
+              />
+              <input
+                type="number"
+                min={1}
+                step={1}
+                value={l.quantidade}
+                onChange={(e) => mudar(l.chave, "quantidade", e.target.value)}
+                className={INPUT_CLASS}
+                aria-label="Quantidade"
+              />
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={l.valorUnitario}
+                onChange={(e) => mudar(l.chave, "valorUnitario", e.target.value)}
+                className={INPUT_CLASS}
+                aria-label="Valor unitário"
+              />
+              <span className="text-[11px] text-brand-primary">{formatarMoeda(totalLinha(l))}</span>
+              {linhas.length > 1 && !editandoId ? (
                 <button
                   type="button"
-                  title="Remover linha"
+                  title="Remover item"
                   onClick={() => setLinhas((ls) => ls.filter((x) => x.chave !== l.chave))}
-                  className="pb-1.5 text-[12px] text-foreground-muted hover:text-status-danger"
-                  aria-label={`Remover linha ${idx + 1}`}
+                  className="text-[12px] text-status-danger hover:opacity-70"
+                  aria-label={`Remover item ${idx + 1}`}
                 >
                   ✕
                 </button>
+              ) : (
+                <span />
               )}
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
 
         {!editandoId && (
           <button
             type="button"
-            onClick={() => setLinhas((ls) => [...ls, novaLinha()])}
-            className="text-[11.5px] font-medium text-brand-primary hover:text-brand-primary-hover"
+            onClick={() => setLinhas((ls) => [...ls, novaLinha(ls[ls.length - 1]?.data ?? "")])}
+            className="mt-1.5 text-[11.5px] font-medium text-brand-primary hover:text-brand-primary-hover"
           >
-            + Adicionar outro
+            + Adicionar item
           </button>
         )}
-
-        {erro && <p className="text-[11px] text-status-danger">{erro}</p>}
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            disabled={salvando || !linhas.every(linhaCompleta)}
-            onClick={salvar}
-            className="flex-1 rounded bg-brand-primary px-3 py-1.5 text-[12px] font-medium text-brand-white hover:bg-brand-primary-hover disabled:opacity-50"
-          >
-            {salvando ? "Salvando..." : editandoId ? "Salvar alterações" : linhas.length > 1 ? `Salvar ${linhas.length} itens` : "Salvar"}
-          </button>
-          {editandoId && (
-            <button type="button" onClick={limpar} className="text-[11px] text-brand-primary hover:text-brand-primary-hover">
-              Cancelar
-            </button>
-          )}
-        </div>
+        <p className="mt-1 text-right text-[11px] text-foreground-muted">Subtotal: {formatarMoeda(totalForm)}</p>
       </div>
 
-      <div className="mt-3 max-h-56 space-y-1.5 overflow-y-auto">
+      {erro && <p className="mt-2 text-[11px] text-status-danger">{erro}</p>}
+      <button
+        type="button"
+        disabled={salvando || !linhas.every(linhaCompleta)}
+        onClick={salvar}
+        className="mt-3 w-full rounded bg-brand-primary px-3 py-2 text-[12.5px] font-medium text-brand-white hover:bg-brand-primary-hover disabled:opacity-50"
+      >
+        {salvando ? "Salvando..." : editandoId ? "Salvar alterações" : "Adicionar"}
+      </button>
+
+      <p className="mt-4 mb-1.5 text-[11px] font-bold tracking-wide text-foreground-muted uppercase">Adicionados em {ano}</p>
+      <div className="max-h-56 space-y-1.5 overflow-y-auto">
         {itens.length === 0 ? (
-          <p className="text-[12px] text-foreground-muted">Nenhuma melhoria cadastrada.</p>
+          <p className="text-[12px] text-foreground-muted">Nenhuma melhoria cadastrada em {ano}.</p>
         ) : (
           itens.map((m) => (
             <div key={m.id} className="flex items-start justify-between gap-2 rounded border border-hairline px-2.5 py-1.5">
@@ -173,7 +218,7 @@ export function MelhoriasEmpresaCard({ ano }: { ano: number }) {
                 <p className="text-[10.5px] font-semibold text-brand-primary-800">{formatarDataBr(m.data)}</p>
                 <p className="truncate text-[12px] text-foreground">{m.titulo}</p>
                 <p className="text-[10.5px] text-foreground-muted">
-                  Qnt. {m.quantidade} · {formatarMoeda(m.valorTotal)}
+                  Qtd. {m.quantidade} · {formatarMoeda(m.valorTotal)}
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-1.5">
