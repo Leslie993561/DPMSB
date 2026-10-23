@@ -34,13 +34,7 @@ export const SECOES_CHECKLIST: SecaoChecklist[] = [
           {
             chave: "doc_enviar_admissionais",
             rotulo: "Enviar documentos admissionais ao novo colaborador",
-            detalhes: [
-              "Carta Proposta",
-              "Formulário de inscrição de colaborador",
-              "Lista de documentos admissionais",
-              "Carta de Abertura de conta",
-              "Arte com benefícios",
-            ],
+            detalhes: ["Carta Proposta", "Carta de Abertura de conta", "Arte com benefícios"],
           },
         ],
       },
