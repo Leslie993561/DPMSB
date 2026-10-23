@@ -29,11 +29,8 @@ export const SECOES_CHECKLIST: SecaoChecklist[] = [
     blocos: [
       {
         itens: [
-          {
-            chave: "doc_dados_basicos",
-            rotulo: "Solicitar dados básicos ao novo colaborador",
-            detalhes: ["Nome completo", "CPF", "RG", "E-mail pessoal", "Data de nascimento", "Localização"],
-          },
+          { chave: "doc_link_portal_dp", rotulo: "Enviar link de cadastro de colaborador Portal DP" },
+          { chave: "doc_link_flash", rotulo: "Enviar link de cadastro de colaborador Flash" },
           {
             chave: "doc_enviar_admissionais",
             rotulo: "Enviar documentos admissionais ao novo colaborador",
