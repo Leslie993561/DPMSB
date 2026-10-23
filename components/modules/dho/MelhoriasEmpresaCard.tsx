@@ -52,6 +52,7 @@ export function MelhoriasEmpresaCard({ ano }: { ano: number }) {
   }
 
   function mudar(chave: number, campo: keyof Omit<LinhaForm, "chave">, valor: string) {
+    setErro(null);
     setLinhas((ls) => ls.map((l) => (l.chave === chave ? { ...l, [campo]: valor } : l)));
   }
 
@@ -93,7 +94,7 @@ export function MelhoriasEmpresaCard({ ano }: { ano: number }) {
   const total = itens.reduce((soma, m) => soma + m.valorTotal, 0);
 
   return (
-    <Card className="p-4">
+    <Card className="h-full p-4">
       <p className="text-[11px] font-bold tracking-wide text-foreground-muted uppercase">Melhorias para a empresa · {ano}</p>
       <p className="mb-2 text-[10.5px] text-foreground-muted">Itens comuns a todos, sem ação de endomarketing.</p>
 

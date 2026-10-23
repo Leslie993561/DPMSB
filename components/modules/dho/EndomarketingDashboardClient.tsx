@@ -163,8 +163,6 @@ export function EndomarketingDashboardClient({
     return mapa;
   }, [eventos]);
 
-  const eventosOrdenados = useMemo(() => [...eventos].sort((a, b) => a.data.localeCompare(b.data)), [eventos]);
-
   // Uma ação pode durar vários dias (data → dataFim) — pra desenhar como uma
   // barra emendada no Calendário (não um ponto solto por dia), cada dia do
   // intervalo precisa saber se é o início, o fim, ou o meio da barra, pra
@@ -892,8 +890,8 @@ onClick={() => setExportarAberto(true)}
       )}
 
       {aba === "lancamentos" && (
-        <div className="grid gap-3 lg:grid-cols-[1fr_360px]">
-          <Card className="p-4">
+        <div className="grid gap-3 lg:grid-cols-2">
+          <Card className="h-full p-4">
             <div className="mb-2 flex items-center justify-between">
               <p className="text-[12px] font-bold tracking-wide text-foreground-muted uppercase">
                 {editandoId ? "Editar ação" : "Nova ação"}
@@ -917,38 +915,7 @@ onClick={() => setExportarAberto(true)}
             </button>
           </Card>
 
-          <div className="space-y-3">
-          <Card className="p-4">
-            <p className="mb-2 text-[11px] font-bold tracking-wide text-foreground-muted uppercase">Ações de {ano}</p>
-            <div className="max-h-72 space-y-1.5 overflow-y-auto">
-              {eventosOrdenados.length === 0 ? (
-                <p className="text-[12px] text-foreground-muted">Nenhuma ação cadastrada.</p>
-              ) : (
-                eventosOrdenados.map((e) => (
-                  <div key={e.id} className="flex items-start justify-between gap-2 rounded border border-hairline px-2.5 py-1.5">
-                    <div className="min-w-0">
-                      <p className="text-[10.5px] font-semibold text-brand-primary-800">
-                        {formatarDataBr(e.data)}
-                        {e.dataFim && e.dataFim !== e.data ? ` – ${formatarDataBr(e.dataFim)}` : ""}
-                      </p>
-                      <p className="truncate text-[12px] text-foreground">{e.titulo}</p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1.5">
-                      <button type="button" title="Editar" onClick={() => iniciarEdicaoAcao(e)} className="text-[11px] text-foreground-muted hover:text-brand-primary">
-                        ✎
-                      </button>
-                      <button type="button" title="Excluir" onClick={() => excluirAcao(e.id)} className="text-[11px] text-foreground-muted hover:text-status-danger">
-                        ✕
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </Card>
-
           <MelhoriasEmpresaCard ano={ano} />
-          </div>
         </div>
       )}
     </div>
