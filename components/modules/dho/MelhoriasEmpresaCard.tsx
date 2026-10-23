@@ -213,14 +213,14 @@ export function MelhoriasEmpresaCard({ ano }: { ano: number }) {
           <p className="text-[12px] text-foreground-muted">Nenhuma melhoria cadastrada em {ano}.</p>
         ) : (
           itens.map((m) => (
-            <div key={m.id} className="flex items-start justify-between gap-2 rounded border border-hairline px-2.5 py-1.5">
-              <div className="min-w-0">
-                <p className="text-[10.5px] font-semibold text-brand-primary-800">{formatarDataBr(m.data)}</p>
-                <p className="truncate text-[12px] text-foreground">{m.titulo}</p>
-                <p className="text-[10.5px] text-foreground-muted">
-                  Qtd. {m.quantidade} · {formatarMoeda(m.valorTotal)}
-                </p>
-              </div>
+            <div key={m.id} className="flex items-center gap-2 rounded border border-hairline px-2.5 py-1">
+              <span className="shrink-0 text-[10.5px] font-semibold text-brand-primary-800">{formatarDataBr(m.data)}</span>
+              <span className="min-w-0 flex-1 truncate text-[12px] text-foreground" title={m.titulo}>
+                {m.titulo}
+              </span>
+              <span className="shrink-0 text-[10.5px] whitespace-nowrap text-foreground-muted">
+                Qtd. {m.quantidade} · {formatarMoeda(m.valorTotal)}
+              </span>
               <div className="flex shrink-0 items-center gap-1.5">
                 <button type="button" title="Editar" onClick={() => editar(m)} className="text-[11px] text-foreground-muted hover:text-brand-primary">
                   ✎
