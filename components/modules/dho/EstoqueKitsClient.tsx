@@ -100,6 +100,7 @@ function ModalDirecionarKitCompleto({
 }) {
   const [colaboradores, setColaboradores] = useState<ColaboradorOpcao[]>([]);
   const [colaboradorId, setColaboradorId] = useState("");
+  const [data, setData] = useState(() => new Date().toLocaleDateString("sv-SE"));
   const [materiaisIds, setMateriaisIds] = useState<number[]>([]);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -118,13 +119,17 @@ function ModalDirecionarKitCompleto({
       setErro("Selecione o colaborador.");
       return;
     }
+    if (!data) {
+      setErro("Informe a data da entrega.");
+      return;
+    }
     setSalvando(true);
     setErro(null);
     try {
       const res = await fetch(`/api/dho/kits/${kit.id}/enviar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ colaboradorId: Number(colaboradorId), materiaisIds }),
+        body: JSON.stringify({ colaboradorId: Number(colaboradorId), materiaisIds, data }),
       });
       const dados = await res.json();
       if (!res.ok) throw new Error(dados.erro ?? "Falha ao registrar entrega.");
@@ -158,6 +163,16 @@ function ModalDirecionarKitCompleto({
               </option>
             ))}
           </select>
+        </label>
+
+        <label className="mt-3 block text-[11px] font-medium text-foreground-muted">
+          Data da entrega
+          <input
+            type="date"
+            value={data}
+            onChange={(e) => setData(e.target.value)}
+            className="mt-1 w-full rounded-md border border-hairline bg-background px-2.5 py-1.5 text-[13px] font-normal text-foreground"
+          />
         </label>
 
         <div className="mt-4 flex gap-2">

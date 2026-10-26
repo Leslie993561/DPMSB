@@ -391,6 +391,8 @@ export async function enviarKit(dados: {
   colaboradorId: number;
   materiaisIds: number[];
   responsavel: string;
+  /** Data da entrega (YYYY-MM-DD); sem ela vale o momento atual. */
+  data?: string;
 }): Promise<void> {
   const db = await getDb();
   const materiais = await db.execute({
@@ -406,8 +408,8 @@ export async function enviarKit(dados: {
       args: [m.id],
     })),
     {
-      sql: "INSERT INTO dho_kit_entregas (kit_id, colaborador_id, materiais, responsavel) VALUES (?, ?, ?, ?)",
-      args: [dados.kitId, dados.colaboradorId, JSON.stringify(linhas.map((m) => m.nome)), dados.responsavel],
+      sql: "INSERT INTO dho_kit_entregas (kit_id, colaborador_id, materiais, responsavel, criado_em) VALUES (?, ?, ?, ?, COALESCE(?::text || to_char(now(), ' HH24:MI:SS'), to_char(now(), 'YYYY-MM-DD HH24:MI:SS')))",
+      args: [dados.kitId, dados.colaboradorId, JSON.stringify(linhas.map((m) => m.nome)), dados.responsavel, dados.data ?? null],
     },
   ]);
 }
