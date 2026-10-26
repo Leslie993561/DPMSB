@@ -222,8 +222,8 @@ export function MelhoriasEmpresaCard({ ano, onAlterado }: { ano: number; onAlter
               <div className="flex items-center justify-between bg-surface-page px-2.5 py-1">
                 <span className="text-[10.5px] font-semibold text-brand-primary-800">{formatarDataBr(data)}</span>
                 {grupo.length > 1 && (
-                  <span className="text-[10.5px] text-foreground-muted">
-                    {grupo.length} itens · {formatarMoeda(grupo.reduce((soma, m) => soma + m.valorTotal, 0))}
+                  <span className="text-[10.5px] font-semibold text-foreground">
+                    {grupo.length} itens · Total: {formatarMoeda(grupo.reduce((soma, m) => soma + m.valorTotal, 0))}
                   </span>
                 )}
               </div>
