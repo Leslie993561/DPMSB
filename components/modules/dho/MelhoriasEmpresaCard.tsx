@@ -109,6 +109,9 @@ export function MelhoriasEmpresaCard({ ano, onAlterado }: { ano: number; onAlter
   }
 
   const total = itens.reduce((soma, m) => soma + m.valorTotal, 0);
+  const porData = Array.from(
+    itens.reduce((mapa, m) => mapa.set(m.data, [...(mapa.get(m.data) ?? []), m]), new Map<string, MelhoriaEmpresa[]>()),
+  );
   const totalForm = linhas.reduce((soma, l) => soma + totalLinha(l), 0);
 
   return (
@@ -214,23 +217,34 @@ export function MelhoriasEmpresaCard({ ano, onAlterado }: { ano: number; onAlter
         {itens.length === 0 ? (
           <p className="text-[12px] text-foreground-muted">Nenhuma melhoria cadastrada em {ano}.</p>
         ) : (
-          itens.map((m) => (
-            <div key={m.id} className="flex items-center gap-2 rounded border border-hairline px-2.5 py-1">
-              <span className="shrink-0 text-[10.5px] font-semibold text-brand-primary-800">{formatarDataBr(m.data)}</span>
-              <span className="min-w-0 flex-1 truncate text-[12px] text-foreground" title={m.titulo}>
-                {m.titulo}
-              </span>
-              <span className="shrink-0 text-[10.5px] whitespace-nowrap text-foreground-muted">
-                Qtd. {m.quantidade} · {formatarMoeda(m.valorTotal)}
-              </span>
-              <div className="flex shrink-0 items-center gap-1.5">
-                <button type="button" title="Editar" onClick={() => editar(m)} className="text-[11px] text-foreground-muted hover:text-brand-primary">
-                  ✎
-                </button>
-                <button type="button" title="Excluir" onClick={() => excluir(m.id)} className="text-[11px] text-foreground-muted hover:text-status-danger">
-                  ✕
-                </button>
+          porData.map(([data, grupo]) => (
+            <div key={data} className="rounded border border-hairline">
+              <div className="flex items-center justify-between bg-surface-page px-2.5 py-1">
+                <span className="text-[10.5px] font-semibold text-brand-primary-800">{formatarDataBr(data)}</span>
+                {grupo.length > 1 && (
+                  <span className="text-[10.5px] text-foreground-muted">
+                    {grupo.length} itens · {formatarMoeda(grupo.reduce((soma, m) => soma + m.valorTotal, 0))}
+                  </span>
+                )}
               </div>
+              {grupo.map((m) => (
+                <div key={m.id} className="flex items-center gap-2 border-t border-hairline px-2.5 py-1">
+                  <span className="min-w-0 flex-1 truncate text-[12px] text-foreground" title={m.titulo}>
+                    {m.titulo}
+                  </span>
+                  <span className="shrink-0 text-[10.5px] whitespace-nowrap text-foreground-muted">
+                    Qtd. {m.quantidade} · {formatarMoeda(m.valorTotal)}
+                  </span>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <button type="button" title="Editar" onClick={() => editar(m)} className="text-[11px] text-foreground-muted hover:text-brand-primary">
+                      ✎
+                    </button>
+                    <button type="button" title="Excluir" onClick={() => excluir(m.id)} className="text-[11px] text-foreground-muted hover:text-status-danger">
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           ))
         )}
