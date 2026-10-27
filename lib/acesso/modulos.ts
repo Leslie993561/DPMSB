@@ -54,6 +54,7 @@ const MODULOS_DP: ModuloAcesso[] = [
     filhos: [
       { chave: "beneficios.dashboard", label: "Dashboard" },
       { chave: "beneficios.rateio", label: "Rateio" },
+      { chave: "beneficios.documentos", label: "Documentos" },
     ],
   },
   { chave: "rescisao", label: "Rescisão" },

@@ -39,6 +39,17 @@ CREATE TABLE IF NOT EXISTS lancamentos_ferias (
   criado_por TEXT NOT NULL,
   criado_em TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')
 );
+
+-- Documentos mensais dos benefícios/contratos (Sólides, Flash, Porto Seguro, TotalPass).
+-- "url" é o caminho do arquivo no bucket privado (lib/storage.ts).
+CREATE TABLE IF NOT EXISTS beneficios_documentos (
+  id SERIAL PRIMARY KEY,
+  fornecedor TEXT NOT NULL,
+  competencia TEXT NOT NULL,
+  url TEXT NOT NULL,
+  nome TEXT NOT NULL,
+  criado_em TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')
+);
 `;
 
 /**

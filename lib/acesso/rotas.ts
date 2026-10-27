@@ -35,7 +35,7 @@ export const ROTAS_PAGINA: RegraPagina[] = [
   },
   {
     caminho: "/beneficios",
-    porAba: { dashboard: "beneficios.dashboard", rateio: "beneficios.rateio" },
+    porAba: { dashboard: "beneficios.dashboard", rateio: "beneficios.rateio", documentos: "beneficios.documentos" },
     abaPadrao: "dashboard",
   },
   { caminho: "/rescisao", modulo: "rescisao" },

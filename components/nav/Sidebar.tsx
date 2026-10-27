@@ -182,6 +182,7 @@ function montarGrupos(counts?: NavCounts): GrupoItem[] {
       itens: [
         { href: "/beneficios?aba=dashboard", label: "Dashboard", modulo: "beneficios.dashboard" },
         { href: "/beneficios?aba=rateio", label: "Rateio", modulo: "beneficios.rateio" },
+        { href: "/beneficios?aba=documentos", label: "Documentos", modulo: "beneficios.documentos" },
       ],
     },
   ];
