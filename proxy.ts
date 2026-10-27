@@ -21,6 +21,7 @@ export async function proxy(request: NextRequest) {
   // da própria rota (ver app/api/convites/token/[token]/route.ts).
   if (
     CAMINHOS_PUBLICOS.has(pathname) ||
+    pathname === "/login/confirmar" ||
     pathname.startsWith("/api/auth/") ||
     pathname.startsWith("/convite/") ||
     pathname.startsWith("/api/convites/token/") ||

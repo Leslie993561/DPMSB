@@ -21,7 +21,7 @@ export default function LoginPage() {
         <div className="px-6 py-5">
           <h1 className="text-[15px] font-semibold text-foreground">Acessar o portal</h1>
           <p className="mt-1 text-[12px] text-foreground-muted">
-            Entre com o seu e-mail corporativo. Apenas gestores liberados pelo administrador têm acesso.
+            Entre com o seu e-mail corporativo. Gestores liberados pelo administrador recebem um link de confirmação no e-mail.
           </p>
           <div className="mt-4">
             <Suspense>

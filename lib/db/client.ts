@@ -40,6 +40,14 @@ CREATE TABLE IF NOT EXISTS lancamentos_ferias (
   criado_em TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')
 );
 
+-- Links de entrada por e-mail (gestor confirma o acesso). Só o hash do token é guardado; uso único.
+CREATE TABLE IF NOT EXISTS login_links (
+  token_hash TEXT PRIMARY KEY,
+  email TEXT NOT NULL,
+  expira_em TIMESTAMPTZ NOT NULL,
+  usado_em TIMESTAMPTZ
+);
+
 -- Documentos mensais dos benefícios/contratos (Sólides, Flash, Porto Seguro, TotalPass).
 -- "url" é o caminho do arquivo no bucket privado (lib/storage.ts).
 CREATE TABLE IF NOT EXISTS beneficios_documentos (
