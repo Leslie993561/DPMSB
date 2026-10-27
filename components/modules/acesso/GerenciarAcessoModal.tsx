@@ -74,6 +74,12 @@ export function GerenciarAcessoModal({ aberto, onFechar }: { aberto: boolean; on
     await recarregar();
   }
 
+  async function excluir(gestor: GestorAcesso) {
+    if (!window.confirm(`Excluir ${gestor.nome} da lista de gestores? Ele perde o acesso ao portal e as permissões dele são apagadas. O cadastro do colaborador não é afetado.`)) return;
+    await fetch(`/api/acesso-gestores/${gestor.id}`, { method: "DELETE" });
+    await recarregar();
+  }
+
   return (
     <>
       <Modal
@@ -175,6 +181,15 @@ export function GerenciarAcessoModal({ aberto, onFechar }: { aberto: boolean; on
                   title="Clique para alternar ativo/inativo"
                 >
                   {gestor.status === "ativo" ? "Ativo" : "Inativo"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void excluir(gestor)}
+                  title="Excluir gestor"
+                  aria-label={`Excluir ${gestor.nome}`}
+                  className="shrink-0 rounded px-1.5 py-1 text-[13px] text-foreground-muted hover:bg-status-danger/10 hover:text-status-danger"
+                >
+                  🗑
                 </button>
               </div>
             ))}

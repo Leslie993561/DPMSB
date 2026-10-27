@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { atualizarStatusGestorAcesso } from "@/lib/db/acessoGestores";
+import { atualizarStatusGestorAcesso, excluirGestorAcesso } from "@/lib/db/acessoGestores";
 
 export const runtime = "nodejs";
 
@@ -18,4 +18,11 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/acesso-ges
   const gestor = await atualizarStatusGestorAcesso(Number(id), parsed.data.status);
   if (!gestor) return Response.json({ erro: "Gestor não encontrado." }, { status: 404 });
   return Response.json({ gestor });
+}
+
+export async function DELETE(_request: Request, ctx: RouteContext<"/api/acesso-gestores/[id]">) {
+  const { id } = await ctx.params;
+  return (await excluirGestorAcesso(Number(id)))
+    ? Response.json({ ok: true })
+    : Response.json({ erro: "Gestor não encontrado." }, { status: 404 });
 }

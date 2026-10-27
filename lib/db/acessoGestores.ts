@@ -170,6 +170,13 @@ export async function atualizarStatusGestorAcesso(
   return linha ? paraGestorAcesso(linha) : null;
 }
 
+/** Remove o gestor da lista de acesso (as permissões dele saem junto, por ON DELETE CASCADE). O colaborador não é afetado. */
+export async function excluirGestorAcesso(id: number): Promise<boolean> {
+  const db = await getDb();
+  const resultado = await db.execute({ sql: "DELETE FROM gestores_acesso WHERE id = ? RETURNING id", args: [id] });
+  return resultado.rows.length > 0;
+}
+
 export async function listarPermissoesGestor(gestorId: number): Promise<string[]> {
   const db = await getDb();
   const resultado = await db.execute({
