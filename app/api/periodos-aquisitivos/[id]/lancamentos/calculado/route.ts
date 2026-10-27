@@ -23,10 +23,10 @@ export async function POST(
     return Response.json({ erro: "Dados inválidos", detalhes: parsed.error.issues }, { status: 400 });
   }
 
-  // Gestor só programa o próprio período de férias (autoagendamento).
+  // Gestor programa a própria equipe e o próprio período (autoagendamento).
   const periodo = await buscarPeriodo(Number(id));
   if (periodo && !(await podeLancarFeriasDe(periodo.colaboradorId))) {
-    return Response.json({ erro: "Você só pode programar o seu próprio período de férias." }, { status: 403 });
+    return Response.json({ erro: "Colaborador fora da sua equipe." }, { status: 403 });
   }
 
   try {

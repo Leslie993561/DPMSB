@@ -34,13 +34,12 @@ export function LancarManualmenteModal({
 }) {
   const { operador } = useOperador();
   const sessao = useSessaoResumo();
-  // Gestor comum só programa o PRÓPRIO período: colaborador fixo, sem escolher outro.
-  const soProprio = sessao?.tipo === "gestor" && !sessao.editorColaboradores;
+  // Gestor comum programa a própria equipe E o próprio período (ele mesmo vem no topo da lista).
+  const gestorComum = sessao?.tipo === "gestor" && !sessao.editorColaboradores;
   const meuId =
-    soProprio && sessao.colaboradorId ? String(sessao.colaboradorId) : null;
+    gestorComum && sessao.colaboradorId ? sessao.colaboradorId : null;
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
-  const [escolhidoId, setColaboradorId] = useState("");
-  const colaboradorId = meuId ?? escolhidoId;
+  const [colaboradorId, setColaboradorId] = useState("");
   const [periodos, setPeriodos] = useState<PeriodoDoHistorico[]>([]);
   const [carregandoPeriodos, setCarregandoPeriodos] = useState(false);
   const [periodoId, setPeriodoId] = useState("");
@@ -53,14 +52,13 @@ export function LancarManualmenteModal({
   const ativos = useMemo(
     () =>
       colaboradores
-        .filter((c) => c.status !== "desligado")
+        .filter((c) => c.status !== "desligado" && c.id !== meuId)
         .sort((a, b) => a.nome.localeCompare(b.nome)),
-    [colaboradores],
+    [colaboradores, meuId],
   );
 
   useEffect(() => {
     let cancelado = false;
-    if (soProprio) return;
     fetch("/api/colaboradores")
       .then((r) => r.json())
       .then((d: { colaboradores?: Colaborador[] }) => {
@@ -70,7 +68,7 @@ export function LancarManualmenteModal({
     return () => {
       cancelado = true;
     };
-  }, [soProprio]);
+  }, []);
 
   // A limpeza ao trocar de colaborador acontece no onChange do select, não
   // aqui — setState síncrono dentro de efeito provoca um render extra.
@@ -204,17 +202,7 @@ export function LancarManualmenteModal({
         </div>
 
         <div className="max-h-[75vh] space-y-3 overflow-y-auto p-4">
-          {soProprio ? (
-            <p className="rounded border border-hairline bg-surface-page px-3 py-2 text-[12px] text-foreground">
-              {meuId ? (
-                <>
-                  Programando as <strong>suas</strong> férias, {sessao?.nome}.
-                </>
-              ) : (
-                "Seu e-mail não está vinculado a um cadastro de colaborador — fale com o RH."
-              )}
-            </p>
-          ) : (
+          {
             <label className="block text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">
               Colaborador
               <select
@@ -231,6 +219,11 @@ export function LancarManualmenteModal({
                 className={`mt-1 font-normal normal-case ${INPUT_CLASS}`}
               >
                 <option value="">Selecione o colaborador…</option>
+                {meuId && (
+                  <option value={meuId}>
+                    {sessao?.nome} — eu (meu planejamento)
+                  </option>
+                )}
                 {ativos.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.nome} — {c.departamento ?? "sem setor"}
@@ -238,7 +231,7 @@ export function LancarManualmenteModal({
                 ))}
               </select>
             </label>
-          )}
+          }
 
           {carregandoPeriodos && (
             <p className="text-[11.5px] text-foreground-muted">

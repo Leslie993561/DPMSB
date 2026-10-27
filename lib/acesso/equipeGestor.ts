@@ -49,12 +49,11 @@ export async function escopoFeriasDoGestor(): Promise<Set<number> | null> {
 
 /**
  * Quem pode lançar/programar férias de um colaborador: RH (administrador ou
- * gestor-editor) lança de qualquer um; gestor comum só o PRÓPRIO período.
+ * gestor-editor) lança de qualquer um; gestor comum lança da própria equipe e do próprio período.
  */
 export async function podeLancarFeriasDe(colaboradorId: number): Promise<boolean> {
-  if ((await escopoColaboradoresDoGestor()) === null) return true;
-  const sessao = await obterSessaoAtual();
-  return sessao?.colaboradorId === colaboradorId;
+  const escopo = await escopoFeriasDoGestor();
+  return escopo === null || escopo.has(colaboradorId);
 }
 
 /** true = vê a empresa inteira (administrador ou gestor-editor do RH); false = só a própria equipe. */
