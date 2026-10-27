@@ -48,11 +48,12 @@ export function DetalheCalculoModal({ item, onFechar }: { item: ItemProgramacaoF
             <div className="rounded border border-hairline bg-surface-page px-2 py-1.5">
               <p className="text-[9px] font-semibold tracking-wide text-foreground-muted uppercase">Dias de férias</p>
               <p className="mt-0.5 text-[11px] font-medium text-foreground">
-                {item.dias} dias
+                {item.dias + (item.abono ? item.diasAbono : 0)} dias
+                {item.abono && item.diasAbono > 0 ? ` (${item.dias} de gozo + ${item.diasAbono} de abono)` : ""}
               </p>
               <p className="mt-0.5 text-[9.5px] font-normal text-foreground-muted">
-                Período: {item.diasOutrosLancamentos} já usados + {item.dias} = {item.diasOutrosLancamentos + item.dias} de{" "}
-                {item.diasDireito}
+                Período: {item.diasOutrosLancamentos} já usados + {item.dias + (item.abono ? item.diasAbono : 0)} ={" "}
+                {item.diasOutrosLancamentos + item.dias + (item.abono ? item.diasAbono : 0)} de {item.diasDireito}
               </p>
             </div>
             <div className="rounded border border-hairline bg-surface-page px-2 py-1.5">

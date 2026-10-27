@@ -102,7 +102,7 @@ export function EquipeDoGestorCard({
                   ? "Sem férias programadas"
                   : programadas
                       .map(
-                        (i) => `${formatarDataBr(i.dataInicio)} (${i.dias}d)`,
+                        (i) => `${formatarDataBr(i.dataInicio)} (${i.dias + (i.abono ? i.diasAbono : 0)}d)`,
                       )
                       .join(" · ")}
               </p>

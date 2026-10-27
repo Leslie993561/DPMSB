@@ -156,16 +156,24 @@ function enriquecerPeriodo(
   // manda — o campo do período só complementa quando NENHUM lançamento tem essa
   // informação (períodos antigos que registraram o abono direto nele).
   const abonoDoLancamento = confirmados.find((l) => l.abono);
+  // Abono só de uma programação ainda não confirmada: o período já vem marcado com
+  // ele (marcarAbonoUtilizado), mas os dias só saem do saldo na baixa — até lá o
+  // Controle mostra o pedido inteiro (ex.: 10 dias = 7 de gozo + 3 de abono).
+  const abonoSoProgramado =
+    !abonoDoLancamento && lancamentosResumo.some((l) => l.abono && l.status === "programada");
   const periodoParaCalculo: PeriodoAquisitivo = abonoDoLancamento
     ? { ...periodo, abonoUtilizado: true, diasAbono: abonoDoLancamento.dias_abono }
-    : periodo;
+    : abonoSoProgramado
+      ? { ...periodo, abonoUtilizado: false, diasAbono: 0 }
+      : periodo;
+  const periodoComProgramados = abonoSoProgramado ? periodo : periodoParaCalculo;
 
   const estado = calcularEstadoPeriodo(
     periodoParaCalculo,
     confirmados.map((l): LancamentoInfo => ({ dias: l.dias })),
   );
   const estadoComProgramados = calcularEstadoPeriodo(
-    periodoParaCalculo,
+    periodoComProgramados,
     lancamentosResumo.map((l): LancamentoInfo => ({ dias: l.dias })),
   );
 
@@ -195,7 +203,7 @@ function enriquecerPeriodo(
   const riscoDobro = avaliarRiscoDobro(limiteGozo, proximaDataInicio ? new Date(proximaDataInicio) : null, hoje);
 
   return {
-    ...periodoParaCalculo,
+    ...(abonoSoProgramado ? periodo : periodoParaCalculo),
     colaboradorNome: colaborador.nome,
     colaboradorCargo: colaborador.cargo,
     colaboradorDepartamento: colaborador.departamento,

@@ -204,7 +204,7 @@ export function PlanejamentoDeFeriasTab({
     for (const item of itensDoAno) {
       const bucket = grupos.get(item.trimestre)!;
       bucket.itens.push(item);
-      bucket.dias += item.dias;
+      bucket.dias += item.dias + (item.abono ? item.diasAbono : 0);
       bucket.colaboradores.add(item.colaboradorId);
       if (baixado(item.status)) bucket.baixados++;
       else bucket.emAberto++;
@@ -445,8 +445,18 @@ export function PlanejamentoDeFeriasTab({
                     <td className="px-3 py-2 text-[10.5px] text-foreground-muted">
                       {formatarDataBr(item.dataInicio)} → {formatarDataBr(dataRetornoExibida(item))}
                     </td>
-                    <td className="px-3 py-2 text-right font-semibold text-foreground">{item.dias}</td>
-                    <td className="px-3 py-2 text-foreground-muted">{item.abono ? "Sim" : "Não"}</td>
+                    {/* "Dias" é o que foi pedido e sai do saldo: gozo + abono vendido (10 = 7 + 3). */}
+                    <td className="px-3 py-2 text-right font-semibold text-foreground">
+                      {item.dias + (item.abono ? item.diasAbono : 0)}
+                      {item.abono && item.diasAbono > 0 && (
+                        <span className="block text-[9.5px] font-normal text-foreground-muted">
+                          {item.dias} gozo + {item.diasAbono} abono
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-foreground-muted">
+                      {item.abono ? `Sim${item.diasAbono > 0 ? ` · ${item.diasAbono}d` : ""}` : "Não"}
+                    </td>
                     <td className="px-3 py-2 text-right font-semibold">
                       {item.semSalario ? (
                         <span className="text-status-warning">a confirmar</span>
