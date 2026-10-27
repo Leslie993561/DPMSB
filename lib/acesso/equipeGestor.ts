@@ -36,6 +36,27 @@ export async function filtrarPorEquipe<T>(itens: T[], idDe: (item: T) => number)
   return escopo === null ? itens : itens.filter((i) => escopo.has(idDe(i)));
 }
 
+/**
+ * Escopo do Planejamento de Férias: a equipe do gestor MAIS ele mesmo — o
+ * gestor se autoagenda, então precisa ver a própria programação. `null` = sem restrição.
+ */
+export async function escopoFeriasDoGestor(): Promise<Set<number> | null> {
+  const escopo = await escopoColaboradoresDoGestor();
+  if (escopo === null) return null;
+  const sessao = await obterSessaoAtual();
+  return sessao?.colaboradorId ? new Set([...escopo, sessao.colaboradorId]) : escopo;
+}
+
+/**
+ * Quem pode lançar/programar férias de um colaborador: RH (administrador ou
+ * gestor-editor) lança de qualquer um; gestor comum só o PRÓPRIO período.
+ */
+export async function podeLancarFeriasDe(colaboradorId: number): Promise<boolean> {
+  if ((await escopoColaboradoresDoGestor()) === null) return true;
+  const sessao = await obterSessaoAtual();
+  return sessao?.colaboradorId === colaboradorId;
+}
+
 /** true = vê a empresa inteira (administrador ou gestor-editor do RH); false = só a própria equipe. */
 export async function veEmpresaInteira(): Promise<boolean> {
   return (await escopoColaboradoresDoGestor()) === null;

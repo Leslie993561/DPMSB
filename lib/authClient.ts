@@ -8,6 +8,9 @@ export interface SessaoResumo {
   tipo: TipoSessaoCliente;
   nome: string;
   cargo: string | null;
+  editorColaboradores: boolean;
+  /** `colaboradores.id` da própria pessoa (null se o e-mail não bate com um cadastro). */
+  colaboradorId: number | null;
 }
 
 /**
@@ -22,8 +25,8 @@ export function useSessaoResumo(): SessaoResumo | null {
   useEffect(() => {
     fetch("/api/auth/sessao")
       .then((r) => r.json())
-      .then((d: { tipo: TipoSessaoCliente | null; nome?: string; cargo?: string | null }) => {
-        if (d.tipo) setSessao({ tipo: d.tipo, nome: d.nome ?? "", cargo: d.cargo ?? null });
+      .then((d: { tipo: TipoSessaoCliente | null; nome?: string; cargo?: string | null; editorColaboradores?: boolean; colaboradorId?: number | null }) => {
+        if (d.tipo) setSessao({ tipo: d.tipo, nome: d.nome ?? "", cargo: d.cargo ?? null, editorColaboradores: d.editorColaboradores === true, colaboradorId: d.colaboradorId ?? null });
       })
       .catch(() => {});
   }, []);

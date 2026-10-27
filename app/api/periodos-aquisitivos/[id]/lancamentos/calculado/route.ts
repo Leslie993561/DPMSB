@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { dentroDoEscopo } from "@/lib/acesso/equipeGestor";
+import { podeLancarFeriasDe } from "@/lib/acesso/equipeGestor";
 import { buscarPeriodo } from "@/lib/db/periodosAquisitivos";
 import { ErroValidacaoFerias, criarLancamentoCalculado } from "@/lib/db/lancamentosFerias";
 
@@ -23,10 +23,10 @@ export async function POST(
     return Response.json({ erro: "Dados inválidos", detalhes: parsed.error.issues }, { status: 400 });
   }
 
-  // Gestor só programa a própria equipe.
+  // Gestor só programa o próprio período de férias (autoagendamento).
   const periodo = await buscarPeriodo(Number(id));
-  if (periodo && !(await dentroDoEscopo(periodo.colaboradorId))) {
-    return Response.json({ erro: "Colaborador fora da sua equipe." }, { status: 403 });
+  if (periodo && !(await podeLancarFeriasDe(periodo.colaboradorId))) {
+    return Response.json({ erro: "Você só pode programar o seu próprio período de férias." }, { status: 403 });
   }
 
   try {
