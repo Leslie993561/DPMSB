@@ -588,12 +588,12 @@ export function DashboardFeriasClient() {
               <div className="px-3">
                 <p className="text-[9.5px] font-bold tracking-wide text-foreground-muted uppercase">Realizadas</p>
                 <p className="mt-0.5 text-2xl font-bold tracking-tight text-status-success">{dados.controle.realizadas}</p>
-                <p className="text-[10px] text-foreground-muted">com gozo confirmado</p>
+                <p className="text-[10px] text-foreground-muted">das programadas, com gozo confirmado</p>
               </div>
               <div className="pl-3">
                 <p className="text-[9.5px] font-bold tracking-wide text-foreground-muted uppercase">Pendentes</p>
                 <p className="mt-0.5 text-2xl font-bold tracking-tight text-foreground">{dados.controle.pendentes}</p>
-                <p className="text-[10px] text-foreground-muted">aguardando gozo</p>
+                <p className="text-[10px] text-foreground-muted">em aberto, sem programação ou com período a programar</p>
               </div>
             </div>
           </Card>
@@ -659,16 +659,19 @@ function CartaoVencimento({
   grupo: GrupoVencimento;
   perigo?: boolean;
 }) {
-  const vazio = grupo.quantidade === 0;
+  const [aberto, setAberto] = useState(false);
 
   return (
-    <div
+    <div className="relative">
+    <button
+      type="button"
+      onClick={() => setAberto((v) => !v)}
+      aria-expanded={aberto}
       className={cn(
-        "group relative rounded-lg border p-2.5",
+        "block w-full cursor-pointer rounded-lg border p-2.5 text-left",
         perigo
           ? "border-status-danger-border bg-status-danger-bg"
           : "border-status-warning-border bg-status-warning-bg",
-        !vazio && "cursor-help",
       )}
     >
       <p
@@ -688,10 +691,17 @@ function CartaoVencimento({
         {grupo.quantidade}
       </p>
       <p className={cn("text-[9px]", perigo ? "text-status-danger/80" : "text-status-warning/80")}>{nota}</p>
+    </button>
 
-      {!vazio && (
-        <div className="pointer-events-none absolute top-full left-0 z-50 mt-1.5 hidden w-64 rounded-md border border-hairline bg-background p-2.5 text-left shadow-drawer group-hover:block">
-          <p className="text-[9.5px] font-bold tracking-wide text-foreground-muted uppercase">{rotulo}</p>
+      {aberto && (
+        <div className="absolute top-full left-0 z-50 mt-1.5 max-h-72 w-64 overflow-y-auto rounded-md border border-hairline bg-background p-2.5 text-left shadow-drawer">
+          <div className="flex items-center justify-between">
+            <p className="text-[9.5px] font-bold tracking-wide text-foreground-muted uppercase">{rotulo}</p>
+            <button type="button" onClick={() => setAberto(false)} aria-label="Fechar" className="text-[12px] text-foreground-muted hover:text-foreground">×</button>
+          </div>
+          {grupo.periodos.length === 0 && (
+            <p className="mt-1.5 text-[11px] text-foreground-muted">Nenhum colaborador nesta faixa.</p>
+          )}
           <ul className="mt-1.5 space-y-1.5">
             {grupo.periodos.map((p, i) => (
               <li key={i}>

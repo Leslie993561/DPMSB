@@ -398,7 +398,9 @@ export async function obterDashboardFerias(
   const controle: ResumoControle = {
     programadas: itensDoAno.length,
     realizadas: gozados.length,
-    pendentes: itensDoAno.filter((i) => i.status === "programada").length,
+    // Pendentes = períodos em aberto que ainda não foram (todos) programados: sem
+    // nenhuma programação, ou com dias restantes para programar.
+    pendentes: periodos.filter((p) => p.diasSemLancamento > 0).length,
     vencidas: grupo(periodosDoAno.filter((p) => p.vencida)),
     vencendo30: grupo(periodosDoAno.filter((p) => !p.vencida && p.diasParaVencer >= 0 && p.diasParaVencer <= 30)),
     vencendo60: grupo(periodosDoAno.filter((p) => !p.vencida && p.diasParaVencer > 30 && p.diasParaVencer <= 60)),
