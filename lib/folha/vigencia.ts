@@ -55,3 +55,76 @@ function mesAtual(): string {
   const agora = new Date();
   return `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, "0")}`;
 }
+
+/** Alimentação paga por dia útil trabalhado a quem é desligado no mês (cortada na data do TRCT). */
+export const VA_DIA_UTIL_DESLIGADO = 38.21;
+
+/** O trecho do mês em que o colaborador esteve de fato na empresa. */
+export interface PeriodoNaFolha {
+  /** Primeiro dia trabalhado no mês (AAAA-MM-DD): a admissão, no mês de entrada; senão dia 1. */
+  inicio: string;
+  /** Último dia trabalhado no mês: a data do desligamento (TRCT), no mês de saída; senão o último dia. */
+  fim: string;
+  admitidoNoMes: boolean;
+  desligadoNoMes: boolean;
+  diasCorridos: number;
+  diasNoMes: number;
+}
+
+const DIA_MS = 86_400_000;
+const dataUtc = (iso: string) => new Date(`${iso}T00:00:00Z`);
+
+/**
+ * Como `estaNaFolha`, mas o mês da saída CONTA (a pessoa trabalhou até o TRCT) e
+ * devolve o trecho trabalhado, para salário e benefícios saírem proporcionais
+ * à admissão e ao desligamento. `null` = fora da folha naquela competência.
+ */
+export function periodoNaFolha(colaborador: VigenciaColaborador, competencia: string): PeriodoNaFolha | null {
+  const adm = colaborador.dataAdmissao;
+  const mesAdmissao = adm?.slice(0, 7);
+  if (!adm || !mesAdmissao || competencia < mesAdmissao) return null;
+
+  const desl = colaborador.dataDesligamento;
+  const dataUtilizavel = Boolean(desl && desl >= adm);
+  if (dataUtilizavel && competencia > desl!.slice(0, 7)) return null;
+  if (!dataUtilizavel && colaborador.status === "desligado" && competencia >= mesAtual()) return null;
+
+  const ano = Number(competencia.slice(0, 4));
+  const mes = Number(competencia.slice(5, 7));
+  const diasNoMes = new Date(Date.UTC(ano, mes, 0)).getUTCDate();
+  const admitidoNoMes = mesAdmissao === competencia;
+  const desligadoNoMes = dataUtilizavel && desl!.slice(0, 7) === competencia;
+  const inicio = admitidoNoMes ? adm : `${competencia}-01`;
+  const fim = desligadoNoMes ? desl! : `${competencia}-${String(diasNoMes).padStart(2, "0")}`;
+  const diasCorridos = Math.round((dataUtc(fim).getTime() - dataUtc(inicio).getTime()) / DIA_MS) + 1;
+  return { inicio, fim, admitidoNoMes, desligadoNoMes, diasCorridos, diasNoMes };
+}
+
+/** Dias de segunda a sexta entre duas datas (inclusive), sem os dias sem expediente informados. */
+function diasUteisEntre(inicio: string, fim: string, semExpediente: Set<string>): number {
+  let dias = 0;
+  for (let d = dataUtc(inicio); d <= dataUtc(fim); d.setUTCDate(d.getUTCDate() + 1)) {
+    const diaSemana = d.getUTCDay();
+    if (diaSemana >= 1 && diaSemana <= 5 && !semExpediente.has(d.toISOString().slice(0, 10))) dias++;
+  }
+  return dias;
+}
+
+/**
+ * Dias úteis efetivamente trabalhados no mês, na escala dos dias úteis que o
+ * DP informou para a competência (`diasUteisDoMes`): mês cheio devolve o
+ * próprio número; mês parcial devolve a parte proporcional, em dias inteiros.
+ */
+export function diasUteisTrabalhados(
+  periodo: PeriodoNaFolha,
+  competencia: string,
+  diasUteisDoMes: number,
+  semExpediente: string[] = [],
+): { dias: number; razao: number } {
+  if (periodo.diasCorridos >= periodo.diasNoMes) return { dias: diasUteisDoMes, razao: 1 };
+  const feriados = new Set(semExpediente);
+  const totalMes = diasUteisEntre(`${competencia}-01`, `${competencia}-${String(periodo.diasNoMes).padStart(2, "0")}`, feriados);
+  const trabalhados = diasUteisEntre(periodo.inicio, periodo.fim, feriados);
+  const razao = totalMes > 0 ? Math.min(1, trabalhados / totalMes) : 0;
+  return { dias: Math.round(diasUteisDoMes * razao), razao };
+}

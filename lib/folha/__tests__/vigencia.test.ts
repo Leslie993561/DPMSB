@@ -47,3 +47,50 @@ describe("estaNaFolha · dados inconsistentes", () => {
     expect(estaNaFolha({ dataAdmissao: "2026-08-01", dataDesligamento: "2026-08-20" }, "2026-08")).toBe(false);
   });
 });
+
+import { periodoNaFolha, diasUteisTrabalhados } from "@/lib/folha/vigencia";
+
+describe("periodoNaFolha", () => {
+  it("mês de admissão conta só a partir da data de entrada", () => {
+    const p = periodoNaFolha(pessoa("2026-08-10"), "2026-08")!;
+    expect(p.inicio).toBe("2026-08-10");
+    expect(p.fim).toBe("2026-08-31");
+    expect(p.diasCorridos).toBe(22);
+    expect(p.admitidoNoMes).toBe(true);
+  });
+
+  it("mês do desligamento conta até a data do TRCT, inclusive", () => {
+    const p = periodoNaFolha(pessoa("2020-01-01", "2026-09-15"), "2026-09")!;
+    expect(p.fim).toBe("2026-09-15");
+    expect(p.diasCorridos).toBe(15);
+    expect(p.desligadoNoMes).toBe(true);
+  });
+
+  it("depois do mês do desligamento e antes da admissão está fora", () => {
+    expect(periodoNaFolha(pessoa("2020-01-01", "2026-09-15"), "2026-10")).toBeNull();
+    expect(periodoNaFolha(pessoa("2026-08-10"), "2026-07")).toBeNull();
+  });
+
+  it("admitido e desligado no mesmo mês", () => {
+    const p = periodoNaFolha(pessoa("2026-06-25", "2026-07-21"), "2026-06")!;
+    expect(p.diasCorridos).toBe(6);
+  });
+});
+
+describe("diasUteisTrabalhados", () => {
+  it("mês cheio devolve os dias úteis do mês", () => {
+    const p = periodoNaFolha(pessoa("2020-01-01"), "2026-09")!;
+    expect(diasUteisTrabalhados(p, "2026-09", 21)).toEqual({ dias: 21, razao: 1 });
+  });
+
+  it("desligado em 15/09/2026 trabalhou 11 dos 22 dias úteis (escala 21)", () => {
+    const p = periodoNaFolha(pessoa("2020-01-01", "2026-09-15"), "2026-09")!;
+    const r = diasUteisTrabalhados(p, "2026-09", 21);
+    expect(r.dias).toBe(11);
+  });
+
+  it("desconta dia sem expediente dentro do período", () => {
+    const p = periodoNaFolha(pessoa("2020-01-01", "2026-09-15"), "2026-09")!;
+    expect(diasUteisTrabalhados(p, "2026-09", 21, ["2026-09-07"]).dias).toBe(10);
+  });
+});

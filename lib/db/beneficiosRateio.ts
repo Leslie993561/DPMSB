@@ -2,7 +2,7 @@ import "server-only";
 import { getDb } from "./client";
 import { obterOverridesRateio, type OverrideRateio } from "./beneficiosOverrides";
 import { listarColaboradores } from "./colaboradores";
-import { estaNaFolha } from "@/lib/folha/vigencia";
+import { periodoNaFolha, diasUteisTrabalhados, VA_DIA_UTIL_DESLIGADO } from "@/lib/folha/vigencia";
 import { casarPorNome } from "@/lib/folha/casarNome";
 import { diasUteisDeFeriasNoMes, proporcionalAosDiasTrabalhados, type JanelaDeFerias } from "@/lib/folha/feriasNoMes";
 import { diasUteisFeriadosNoMes } from "@/lib/folha/feriadosEmpresa";
@@ -78,7 +78,8 @@ export async function gerarRateio(competencia: string): Promise<{ linhas: LinhaR
   // Calendário do Portal ENDO (só se caem em dia útil) — só abatem o Vale-Transporte
   // (tipoTransporte diferente de vm_fixo); Mobilidade e Alimentação seguem os
   // dias úteis normais, por pedido do DP.
-  const diasFeriadosEmpresa = diasUteisFeriadosNoMes(competencia, await listarDiasSemExpediente(ano));
+  const semExpediente = await listarDiasSemExpediente(ano);
+  const diasFeriadosEmpresa = diasUteisFeriadosNoMes(competencia, semExpediente);
 
   // Janelas de gozo vindas da Programação/Controle de Férias — a mesma fonte
   // que as duas telas usam. Cancelada não conta: as férias não vão acontecer.
@@ -104,7 +105,12 @@ export async function gerarRateio(competencia: string): Promise<{ linhas: LinhaR
   // Sem este filtro o rateio listava desligados e PJs com valor cheio, e o
   // alerta de "sem valor de VT cadastrado" cobrava cadastro de gente que não
   // deveria estar na conta.
-  const doMes = (await listarColaboradores()).filter((c) => c.vinculo !== "PJ" && estaNaFolha(c, competencia));
+  // Quem entra ou sai no meio do mês conta só os dias úteis trabalhados (até o TRCT, no
+  // mês da saída) — mesma regra do Breakdown, para os dois módulos fecharem.
+  const doMes = (await listarColaboradores())
+    .filter((c) => c.vinculo !== "PJ")
+    .map((c) => ({ c, periodo: periodoNaFolha(c, competencia) }))
+    .flatMap(({ c, periodo }) => (periodo ? [{ c, periodo, trabalho: diasUteisTrabalhados(periodo, competencia, diasUteis, semExpediente) }] : []));
 
   /** Dias úteis de todas as janelas, sem recorte de competência. */
   const diasUteisDeTodoOGozo = (janelas: JanelaDeFerias[]): number =>
@@ -117,7 +123,7 @@ export async function gerarRateio(competencia: string): Promise<{ linhas: LinhaR
       return soma + Array.from(meses).reduce((s, m) => s + diasUteisDeFeriasNoMes(m, [j]), 0);
     }, 0);
 
-  const linhas: LinhaRateio[] = doMes.map((c) => {
+  const linhas: LinhaRateio[] = doMes.map(({ c, periodo, trabalho }) => {
     // Feriado da empresa só desconta de Vale-Transporte — Mobilidade (vm_fixo)
     // usa sempre os dias úteis "normais" do mês, mesmo quando cadastrada por dia.
     const diasUteisParaTransporte =
@@ -128,10 +134,11 @@ export async function gerarRateio(competencia: string): Promise<{ linhas: LinhaR
     // deslocamento. Alimentação fica fora — o DP paga o mês cheio.
     const janelas = feriasPorColaborador.get(c.id) ?? [];
     const diasDeFerias = diasUteisDeFeriasNoMes(competencia, janelas);
+    const transporteDoPeriodo = trabalho.razao < 1 ? arredondar(transporte.bruto * trabalho.razao) : transporte.bruto;
     const transporteComFerias =
       diasDeFerias > 0
-        ? arredondar(proporcionalAosDiasTrabalhados(transporte.bruto, diasUteis, diasDeFerias))
-        : transporte.bruto;
+        ? arredondar(proporcionalAosDiasTrabalhados(transporteDoPeriodo, trabalho.dias, diasDeFerias))
+        : transporteDoPeriodo;
     const override = extras.get(c.id);
     const extraFolha = extrasFolha.get(c.id);
     const variavelColaborador = variaveis.get(c.id);
@@ -164,7 +171,14 @@ export async function gerarRateio(competencia: string): Promise<{ linhas: LinhaR
         0,
         diasUteisDeTodoOGozo(janelas.filter((j) => diasUteisDeFeriasNoMes(competencia, [j]) > 0)) - diasDeFerias,
       ),
-      valeAlimentacao: override?.valeAlimentacao ?? (c.alimentacaoValor ?? 0),
+      // Desligado no mês: R$ 38,21 por dia útil trabalhado (corte no TRCT); admitido no mês: proporcional.
+      valeAlimentacao:
+        override?.valeAlimentacao ??
+        (periodo.desligadoNoMes
+          ? arredondar(VA_DIA_UTIL_DESLIGADO * trabalho.dias)
+          : trabalho.razao < 1
+            ? arredondar((c.alimentacaoValor ?? 0) * trabalho.razao)
+            : (c.alimentacaoValor ?? 0)),
       // Planilha importada manda; sem ela, vale o plano fixo do cadastro.
       odontologico: extraFolha?.odontologico ?? c.odontologicoValor ?? null,
       solides: extraFolha?.solides ?? null,

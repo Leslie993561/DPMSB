@@ -11,7 +11,8 @@ import {
   type RegimeEncargos,
 } from "@/lib/calc";
 import type { LinhaExtrasImportada, CampoExtra } from "@/lib/parsing/folhaExtras";
-import { estaNaFolha } from "@/lib/folha/vigencia";
+import { periodoNaFolha, diasUteisTrabalhados, VA_DIA_UTIL_DESLIGADO, type PeriodoNaFolha } from "@/lib/folha/vigencia";
+import { listarDiasSemExpediente } from "./beneficiosFeriados";
 import { obterOverridesRateio } from "./beneficiosOverrides";
 import { obterVariaveis } from "./beneficiosVariaveis";
 import { diasUteisDeFeriasNoMes, proporcionalAosDiasTrabalhados, type JanelaDeFerias } from "@/lib/folha/feriasNoMes";
@@ -324,6 +325,7 @@ export async function gerarBreakdown(
   const listaColaboradores = colaboradores ?? (await listarColaboradores());
   const { ano, mes } = competenciaParaAnoMes(competencia);
   const diasUteis = await obterDiasUteis(ano, mes);
+  const semExpediente = await listarDiasSemExpediente(ano);
   // Dias de DSR são o COMPLEMENTO dos dias úteis no mês: se o DP registrou 25
   // úteis num mês de 30 dias, sobram 5 de domingo e feriado. Assim o reflexo
   // usa o mesmo número que o DP já mantém, sem uma segunda tabela para
@@ -349,7 +351,14 @@ export async function gerarBreakdown(
 
   const feriasPorColaborador = janelasDeFerias ?? (await carregarJanelasDeFerias());
 
-  return listaColaboradores.filter((c) => estaNaFolha(c, competencia)).map((c) => {
+  // Quem entra/sai no meio do mês conta só o trecho trabalhado: o mês da saída
+  // também aparece (até o TRCT), e salário, VT e VA saem proporcionais.
+  return listaColaboradores
+    .map((c) => ({ c, periodo: periodoNaFolha(c, competencia) }))
+    .filter((x): x is { c: Colaborador; periodo: PeriodoNaFolha } => x.periodo !== null)
+    .map(({ c, periodo }) => {
+    const fracaoDoMes = periodo.diasCorridos / periodo.diasNoMes;
+    const trabalho = diasUteisTrabalhados(periodo, competencia, diasUteis, semExpediente);
     // PJ é pessoa jurídica prestando serviço, não empregado CLT — não há FGTS,
     // provisão de 13º nem benefícios (VT/VA) estatutários sobre o valor pago a ela.
     const ehPj = c.vinculo === "PJ";
@@ -369,7 +378,7 @@ export async function gerarBreakdown(
           },
           dataCompetencia,
         );
-    const remuneracao = arredondar(c.salarioBase + adicionais.total);
+    const remuneracao = arredondar((c.salarioBase + adicionais.total) * fracaoDoMes);
 
     // PJ não tem INSS nem IRRF de empregado: o que a empresa paga é nota
     // fiscal de prestação de serviço, não salário. Antes só FGTS, 13º e
@@ -401,14 +410,22 @@ export async function gerarBreakdown(
     // Transporte: bruto (valor do vale), abatido pelos dias de férias. O
     // desconto de 6% do empregado NÃO entra aqui — o Rateio mostra o valor
     // integral, e os dois precisam fechar.
-    const transporteCalculado = ehPj ? 0 : detalharTransporteDoMes(c, diasUteis).bruto;
+    const transporteIntegral = ehPj ? 0 : detalharTransporteDoMes(c, diasUteis).bruto;
+    const transporteCalculado = trabalho.razao < 1 ? arredondar(transporteIntegral * trabalho.razao) : transporteIntegral;
     const valeTransporte = ehPj
       ? 0
       : (override?.valeTransporte ??
         (diasDeFerias > 0
-          ? arredondar(proporcionalAosDiasTrabalhados(transporteCalculado, diasUteis, diasDeFerias))
+          ? arredondar(proporcionalAosDiasTrabalhados(transporteCalculado, trabalho.dias, diasDeFerias))
           : transporteCalculado));
-    const valeAlimentacao = ehPj ? 0 : (override?.valeAlimentacao ?? c.alimentacaoValor ?? 0);
+    // Desligado no mês: R$ 38,21 por dia útil trabalhado, cortado no TRCT. Admitido no
+    // mês: o valor do cadastro proporcional aos dias úteis trabalhados.
+    const alimentacaoDoMes = periodo.desligadoNoMes
+      ? arredondar(VA_DIA_UTIL_DESLIGADO * trabalho.dias)
+      : trabalho.razao < 1
+        ? arredondar((c.alimentacaoValor ?? 0) * trabalho.razao)
+        : (c.alimentacaoValor ?? 0);
+    const valeAlimentacao = ehPj ? 0 : (override?.valeAlimentacao ?? alimentacaoDoMes);
     // Valor fixo do cadastro, sem override mensal — mesmo tratamento de valeAlimentacao.
     const auxilioEducacao = ehPj ? 0 : (c.auxilioEducacaoValor ?? 0);
 
@@ -447,7 +464,7 @@ export async function gerarBreakdown(
       // encargos.total já é remuneração (salário + adicionais) com todos os
       // encargos e provisões em cima; somar adicionais de novo aqui contaria
       // duas vezes. Para PJ, o custo é o valor pago pela nota.
-      (encargos?.total ?? arredondar(c.salarioBase + adicionais.total)) +
+      (encargos?.total ?? remuneracao) +
         valeTransporte +
         valeAlimentacao +
         auxilioEducacao +
@@ -470,7 +487,7 @@ export async function gerarBreakdown(
       cargo: c.cargo,
       departamento: c.departamento,
       vinculo: c.vinculo,
-      salarioBase: c.salarioBase,
+      salarioBase: arredondar(c.salarioBase * fracaoDoMes),
       inss: inss.valor,
       irrf: irrf.valor,
       fgts: fgts.valor,
