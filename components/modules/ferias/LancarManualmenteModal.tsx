@@ -28,9 +28,12 @@ function calcularRetorno(inicio: string, dias: number): string | null {
 export function LancarManualmenteModal({
   onFechar,
   onSucesso,
+  colaboradorInicialId,
 }: {
   onFechar: () => void;
   onSucesso: () => void;
+  /** Já abre com este colaborador escolhido (atalho "Programar" da equipe do gestor). */
+  colaboradorInicialId?: number | null;
 }) {
   const { operador } = useOperador();
   const sessao = useSessaoResumo();
@@ -39,7 +42,7 @@ export function LancarManualmenteModal({
   const meuId =
     gestorComum && sessao.colaboradorId ? sessao.colaboradorId : null;
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
-  const [colaboradorId, setColaboradorId] = useState("");
+  const [colaboradorId, setColaboradorId] = useState(colaboradorInicialId ? String(colaboradorInicialId) : "");
   const [periodos, setPeriodos] = useState<PeriodoDoHistorico[]>([]);
   const [carregandoPeriodos, setCarregandoPeriodos] = useState(false);
   const [periodoId, setPeriodoId] = useState("");

@@ -13,6 +13,7 @@ import { ValidadorCltPanel } from "./ValidadorCltPanel";
 import { DetalheCalculoModal } from "./DetalheCalculoModal";
 import { LancarProgramacaoModal } from "./LancarProgramacaoModal";
 import { LancarManualmenteModal } from "./LancarManualmenteModal";
+import { EquipeDoGestorCard } from "./EquipeDoGestorCard";
 
 const FAIXA_TRIMESTRE: Record<1 | 2 | 3 | 4, string> = {
   1: "jan · fev · mar",
@@ -78,6 +79,7 @@ export function PlanejamentoDeFeriasTab({
   const [confirmandoId, setConfirmandoId] = useState<number | null>(null);
   const [erroAcao, setErroAcao] = useState<string | null>(null);
   const [cancelando, setCancelando] = useState<ItemProgramacaoFerias | null>(null);
+  const [colaboradorParaProgramar, setColaboradorParaProgramar] = useState<number | null>(null);
 
   async function recarregar() {
     try {
@@ -234,6 +236,16 @@ export function PlanejamentoDeFeriasTab({
 
   return (
     <div className="space-y-5">
+      {souGestor && (
+        <EquipeDoGestorCard
+          ano={ano}
+          itens={itens}
+          onProgramar={(id) => {
+            setColaboradorParaProgramar(id);
+            onAbrirManual();
+          }}
+        />
+      )}
 
       <p className="text-sm text-foreground-muted">
         Programação anual de {ano} por trimestre — o trimestre é o mês em que a férias começa (ou começou).
@@ -570,8 +582,13 @@ export function PlanejamentoDeFeriasTab({
 
       {manualAberto && (
         <LancarManualmenteModal
-          onFechar={onFecharManual}
+          colaboradorInicialId={colaboradorParaProgramar}
+          onFechar={() => {
+            setColaboradorParaProgramar(null);
+            onFecharManual();
+          }}
           onSucesso={() => {
+            setColaboradorParaProgramar(null);
             onFecharManual();
             void recarregar();
           }}

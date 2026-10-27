@@ -1,5 +1,5 @@
 import { listarControleDeFerias } from "@/lib/db/periodosAquisitivos";
-import { escopoColaboradoresDoGestor } from "@/lib/acesso/equipeGestor";
+import { escopoFeriasDoGestor } from "@/lib/acesso/equipeGestor";
 
 export const runtime = "nodejs";
 
@@ -9,8 +9,8 @@ export async function GET() {
   // As duas listas saem de um carregamento só — ver listarControleDeFerias.
   const { periodos, emCurso } = await listarControleDeFerias();
 
-  // Gestor só vê férias da própria equipe, não da empresa inteira.
-  const escopo = await escopoColaboradoresDoGestor();
+  // Gestor só vê férias da própria equipe e as dele mesmo, não da empresa inteira.
+  const escopo = await escopoFeriasDoGestor();
   if (!escopo) return Response.json({ periodos, emCurso });
 
   return Response.json({
