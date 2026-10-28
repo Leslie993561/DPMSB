@@ -1,7 +1,7 @@
 import "server-only";
 import { getDb } from "./client";
 import { listarColaboradores } from "./colaboradores";
-import { listarPeriodosAbertos } from "./periodosAquisitivos";
+import { listarPeriodosAbertos, listarPeriodosEmCursoPendentes } from "./periodosAquisitivos";
 import { listarProgramacaoFerias, type ItemProgramacaoFerias } from "./programacaoFerias";
 import { calcularFerias, calcularFGTS, calcularInssPatronal, outrasVantagensDeFerias, arredondar } from "@/lib/calc";
 
@@ -186,7 +186,12 @@ export async function obterDashboardFerias(
   );
   const colaboradoresPorId = new Map(todosColaboradores.map((c) => [c.id, c]));
 
-  const [programacao, periodosTodos] = await Promise.all([listarProgramacaoFerias(), listarPeriodosAbertos()]);
+  const [programacao, periodosTodos, emCursoTodos] = await Promise.all([
+    listarProgramacaoFerias(),
+    listarPeriodosAbertos(),
+    listarPeriodosEmCursoPendentes(),
+  ]);
+  const emCurso = emCursoTodos.filter((p) => idsFiltrados.has(p.colaboradorId));
   const itens = programacao.filter((i) => idsFiltrados.has(i.colaboradorId));
   const periodos = periodosTodos.filter((p) => idsFiltrados.has(p.colaboradorId));
 
@@ -399,8 +404,9 @@ export async function obterDashboardFerias(
     programadas: itensDoAno.length,
     realizadas: gozados.length,
     // Pendentes = períodos em aberto que ainda não foram (todos) programados: sem
-    // nenhuma programação, ou com dias restantes para programar.
-    pendentes: periodos.filter((p) => p.diasSemLancamento > 0).length,
+    // nenhuma programação, ou com dias restantes para programar — inclusive os
+    // ainda em aquisição, até fechar os 30 dias.
+    pendentes: periodos.filter((p) => p.diasSemLancamento > 0).length + emCurso.length,
     vencidas: grupo(periodosDoAno.filter((p) => p.vencida)),
     vencendo30: grupo(periodosDoAno.filter((p) => !p.vencida && p.diasParaVencer >= 0 && p.diasParaVencer <= 30)),
     vencendo60: grupo(periodosDoAno.filter((p) => !p.vencida && p.diasParaVencer > 30 && p.diasParaVencer <= 60)),

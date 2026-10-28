@@ -346,6 +346,27 @@ export async function listarPeriodosAbertos(base?: BaseControle): Promise<Period
   });
 }
 
+/**
+ * Períodos ainda em aquisição (a data fim não chegou) de colaboradores ativos
+ * que seguem com dias por programar. O Controle os esconde por não serem
+ * vencíveis, mas contam como pendência do dashboard: período aberto sem
+ * programação (ou com resto a programar) até fechar os 30 dias.
+ */
+export async function listarPeriodosEmCursoPendentes(base?: BaseControle): Promise<PeriodoAquisitivoAberto[]> {
+  const hoje = new Date();
+  const { colaboradores, periodos, lancamentosPorPeriodo } = base ?? (await carregarBase());
+  const colaboradoresPorId = new Map(colaboradores.map((c) => [c.id, c]));
+  const pendentes: PeriodoAquisitivoAberto[] = [];
+  for (const periodo of periodos) {
+    const colaborador = colaboradoresPorId.get(periodo.colaboradorId);
+    if (!colaborador || colaborador.status === "desligado") continue;
+    if (periodo.status === "concluido" || new Date(periodo.dataFim) <= hoje) continue;
+    const candidato = enriquecerPeriodo(periodo, colaborador, hoje, lancamentosPorPeriodo.get(periodo.id) ?? []);
+    if (candidato.diasSemLancamento > 0) pendentes.push(candidato);
+  }
+  return pendentes;
+}
+
 /** Histórico completo (todos os períodos, resolvidos ou não) de um único colaborador — usado na exportação "por colaborador". */
 export async function listarHistoricoColaborador(colaboradorId: number): Promise<PeriodoAquisitivoAberto[]> {
   const hoje = new Date();
