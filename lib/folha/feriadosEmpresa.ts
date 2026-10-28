@@ -23,3 +23,17 @@ export function diasUteisFeriadosNoMes(competencia: string, feriados: string[]):
   }
   return dias;
 }
+
+/**
+ * Dias úteis que valem para o transporte: os do mês menos os dias sem expediente.
+ * Só a mobilidade de valor FIXO mensal ignora os feriados (o valor é o mesmo
+ * seja qual for o mês); mobilidade com valor por dia conta como vale-transporte.
+ */
+export function diasUteisParaTransporte(
+  c: { tipoTransporte: string; valorTransporteDia: number | null },
+  diasUteisDoMes: number,
+  diasSemExpedienteNoMes: number,
+): number {
+  const fixoMensal = c.tipoTransporte === "vm_fixo" && !((c.valorTransporteDia ?? 0) > 0);
+  return fixoMensal ? diasUteisDoMes : Math.max(0, diasUteisDoMes - diasSemExpedienteNoMes);
+}

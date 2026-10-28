@@ -511,8 +511,8 @@ export function RateioTab() {
           {feriadosAbertos && (
             <div className="absolute top-full left-0 z-50 mt-1.5 w-64 rounded-xl border border-hairline bg-background p-3 shadow-lg dark:border-brand-neutral/30">
               <p className="text-[11px] text-foreground-muted">
-                Marque os dias em que a empresa não vai funcionar (feriado local, ponto facultativo, recesso). Só
-                abate do <strong>Vale-Transporte</strong> — Mobilidade e Alimentação não mudam. Os feriados nacionais
+                Marque os dias em que a empresa não vai funcionar (feriado local, ponto facultativo, recesso). Abate
+                do <strong>Vale-Transporte</strong> e da <strong>Mobilidade por dia</strong> — Mobilidade fixa e Alimentação não mudam. Os feriados nacionais
                 lançados no Portal ENDO entram sozinhos (em azul) e só reduzem se caírem em dia útil.
               </p>
               <div className="mt-2 flex items-center justify-between">

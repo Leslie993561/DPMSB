@@ -13,6 +13,7 @@ import {
 import type { LinhaExtrasImportada, CampoExtra } from "@/lib/parsing/folhaExtras";
 import { periodoNaFolha, diasUteisTrabalhados, VA_DIA_UTIL_DESLIGADO, type PeriodoNaFolha } from "@/lib/folha/vigencia";
 import { listarDiasSemExpediente } from "./beneficiosFeriados";
+import { diasUteisFeriadosNoMes, diasUteisParaTransporte } from "@/lib/folha/feriadosEmpresa";
 import { obterOverridesRateio } from "./beneficiosOverrides";
 import { obterVariaveis } from "./beneficiosVariaveis";
 import { diasUteisDeFeriasNoMes, proporcionalAosDiasTrabalhados, type JanelaDeFerias } from "@/lib/folha/feriasNoMes";
@@ -410,13 +411,19 @@ export async function gerarBreakdown(
     // Transporte: bruto (valor do vale), abatido pelos dias de férias. O
     // desconto de 6% do empregado NÃO entra aqui — o Rateio mostra o valor
     // integral, e os dois precisam fechar.
-    const transporteIntegral = ehPj ? 0 : detalharTransporteDoMes(c, diasUteis).bruto;
+    // Mesma base do Rateio: dias úteis do mês menos os dias sem expediente.
+    const diasBaseTransporte = diasUteisParaTransporte(c, diasUteis, diasUteisFeriadosNoMes(competencia, semExpediente));
+    const transporteIntegral = ehPj ? 0 : detalharTransporteDoMes(c, diasBaseTransporte).bruto;
     const transporteCalculado = trabalho.razao < 1 ? arredondar(transporteIntegral * trabalho.razao) : transporteIntegral;
     const valeTransporte = ehPj
       ? 0
       : (override?.valeTransporte ??
         (diasDeFerias > 0
-          ? arredondar(proporcionalAosDiasTrabalhados(transporteCalculado, trabalho.dias, diasDeFerias))
+          ? arredondar(proporcionalAosDiasTrabalhados(
+              transporteCalculado,
+              trabalho.razao < 1 ? Math.round(diasBaseTransporte * trabalho.razao) : diasBaseTransporte,
+              diasDeFerias,
+            ))
           : transporteCalculado));
     // Desligado no mês: R$ 38,21 por dia útil trabalhado, cortado no TRCT. Admitido no
     // mês: o valor do cadastro proporcional aos dias úteis trabalhados.

@@ -5,7 +5,7 @@ import { listarColaboradores } from "./colaboradores";
 import { periodoNaFolha, diasUteisTrabalhados, VA_DIA_UTIL_DESLIGADO } from "@/lib/folha/vigencia";
 import { casarPorNome } from "@/lib/folha/casarNome";
 import { diasUteisDeFeriasNoMes, proporcionalAosDiasTrabalhados, type JanelaDeFerias } from "@/lib/folha/feriasNoMes";
-import { diasUteisFeriadosNoMes } from "@/lib/folha/feriadosEmpresa";
+import { diasUteisFeriadosNoMes, diasUteisParaTransporte } from "@/lib/folha/feriadosEmpresa";
 import { listarProgramacaoFerias } from "./programacaoFerias";
 import { obterDiasUteis } from "./beneficiosDiasUteis";
 import { listarDiasSemExpediente } from "./beneficiosFeriados";
@@ -124,11 +124,10 @@ export async function gerarRateio(competencia: string): Promise<{ linhas: LinhaR
     }, 0);
 
   const linhas: LinhaRateio[] = doMes.map(({ c, periodo, trabalho }) => {
-    // Feriado da empresa só desconta de Vale-Transporte — Mobilidade (vm_fixo)
-    // usa sempre os dias úteis "normais" do mês, mesmo quando cadastrada por dia.
-    const diasUteisParaTransporte =
-      c.tipoTransporte === "vm_fixo" ? diasUteis : Math.max(0, diasUteis - diasFeriadosEmpresa);
-    const transporte = detalharTransporteDoMes(c, diasUteisParaTransporte);
+    // Dia sem expediente não tem deslocamento: sai do VT e da mobilidade com valor
+    // por dia. Só a mobilidade de valor fixo mensal e a alimentação ficam de fora.
+    const diasBaseTransporte = diasUteisParaTransporte(c, diasUteis, diasFeriadosEmpresa);
+    const transporte = detalharTransporteDoMes(c, diasBaseTransporte);
 
     // Transporte e mobilidade pagam deslocamento: em dia de férias não há
     // deslocamento. Alimentação fica fora — o DP paga o mês cheio.
@@ -137,7 +136,13 @@ export async function gerarRateio(competencia: string): Promise<{ linhas: LinhaR
     const transporteDoPeriodo = trabalho.razao < 1 ? arredondar(transporte.bruto * trabalho.razao) : transporte.bruto;
     const transporteComFerias =
       diasDeFerias > 0
-        ? arredondar(proporcionalAosDiasTrabalhados(transporteDoPeriodo, trabalho.dias, diasDeFerias))
+        ? arredondar(
+            proporcionalAosDiasTrabalhados(
+              transporteDoPeriodo,
+              trabalho.razao < 1 ? Math.round(diasBaseTransporte * trabalho.razao) : diasBaseTransporte,
+              diasDeFerias,
+            ),
+          )
         : transporteDoPeriodo;
     const override = extras.get(c.id);
     const extraFolha = extrasFolha.get(c.id);
