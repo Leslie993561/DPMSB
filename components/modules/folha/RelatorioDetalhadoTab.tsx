@@ -52,6 +52,7 @@ interface VerbaColaborador {
   periculosidade: number;
   insalubridade: number;
   adicionalFixo: number;
+  trct: number;
   custoTotal: number;
   variaveis: number;
   encargosDiretos: number;
@@ -220,6 +221,7 @@ export function RelatorioDetalhadoTab() {
           periculosidade: acc.periculosidade + l.periculosidade,
           insalubridade: acc.insalubridade + l.insalubridade,
           adicionalFixo: acc.adicionalFixo + l.adicionalFixo,
+          trct: acc.trct + (l.trct ?? 0),
           horaExtra50: acc.horaExtra50 + (l.horaExtra50 ?? 0),
           horaExtra100: acc.horaExtra100 + (l.horaExtra100 ?? 0),
           descontoHoras: acc.descontoHoras + (l.descontoHoras ?? 0),
@@ -232,6 +234,7 @@ export function RelatorioDetalhadoTab() {
           periculosidade: 0,
           insalubridade: 0,
           adicionalFixo: 0,
+          trct: 0,
           salarioFamilia: 0,
           horaExtra50: 0,
           horaExtra100: 0,
@@ -435,7 +438,7 @@ export function RelatorioDetalhadoTab() {
                   >
                     Hora extra
                   </th>
-                  <th colSpan={6} className={cn(TH_GRUPO, DIVISOR, "border-b border-hairline", GRUPO_OUTROS, "text-foreground-muted")}>
+                  <th colSpan={7} className={cn(TH_GRUPO, DIVISOR, "border-b border-hairline", GRUPO_OUTROS, "text-foreground-muted")}>
                     Outros
                   </th>
                   <th rowSpan={2} className={cn(DIVISOR, "min-w-[130px] bg-brand-dark-900 px-3 py-2 text-right align-bottom text-[9.5px] font-bold tracking-wide text-white uppercase")}>
@@ -504,6 +507,7 @@ export function RelatorioDetalhadoTab() {
                     Insalubridade
                   </th>
                   <th className={cn(TH_COL, GRUPO_OUTROS, "text-foreground-muted")}>Adicional fixo</th>
+                  <th className={cn(TH_COL, GRUPO_OUTROS, "text-foreground-muted")}>TRCT</th>
                 </tr>
               </thead>
               <tbody>
@@ -600,6 +604,7 @@ export function RelatorioDetalhadoTab() {
                     <td className={cn(TD_NUM, GRUPO_OUTROS)}>{formatarNumeroOuTraco(l.periculosidade || null)}</td>
                     <td className={cn(TD_NUM, GRUPO_OUTROS)}>{formatarNumeroOuTraco(l.insalubridade || null)}</td>
                     <td className={cn(TD_NUM, GRUPO_OUTROS)}>{formatarNumeroOuTraco(l.adicionalFixo || null)}</td>
+                    <td className={cn(TD_NUM, GRUPO_OUTROS)} title="TRCT + FGTS/GRRF lançados no cadastro, no mês do desligamento">{formatarNumeroOuTraco(l.trct || null)}</td>
                     <td className={cn(DIVISOR, "bg-brand-dark-900/5 px-3 py-1 text-right text-[11px] font-bold tabular-nums text-foreground", FONTE_NUMERO)}>
                       {/* O custo total abre a composição do empregador — a mesma
                           do demonstrativo do DP: encargos diretos, provisões e
@@ -683,6 +688,7 @@ export function RelatorioDetalhadoTab() {
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.periculosidade)}</td>
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.insalubridade)}</td>
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.adicionalFixo)}</td>
+                  <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.trct)}</td>
                   <td className={cn(DIVISOR, "bg-brand-dark-900 px-3 py-1 text-right text-[11px] tabular-nums text-white", FONTE_NUMERO)}>
                     {formatarNumero(totais.custoTotal)}
                   </td>

@@ -96,7 +96,18 @@ export interface VerbaColaborador {
   periculosidade: number;
   insalubridade: number;
   adicionalFixo: number;
+  /** TRCT + FGTS/GRRF do cadastro, num valor único — só na competência do desligamento; 0 nas demais. */
+  trct: number;
   custoTotal: number;
+}
+
+/** Rescisão (TRCT) somada ao FGTS/GRRF, lançados no mês em que o colaborador foi desligado. */
+function valorTrct(
+  c: { status: string; dataDesligamento: string | null; valorRescisao: number | null; valorFgts: number | null } | undefined,
+  competencia: string,
+): number {
+  if (!c || c.status !== "desligado" || !c.dataDesligamento?.startsWith(competencia)) return 0;
+  return arredondar((c.valorRescisao ?? 0) + (c.valorFgts ?? 0));
 }
 
 export interface ExtrasImportadas {
@@ -492,7 +503,8 @@ export async function gerarBreakdown(
         (extras.bonificacao ?? 0) +
         (extras.outrosCustos ?? 0) +
         variaveis +
-        valorHoras.liquido,
+        valorHoras.liquido +
+        valorTrct(c, competencia),
     );
 
     return {
@@ -537,6 +549,7 @@ export async function gerarBreakdown(
       periculosidade: adicionais.periculosidade,
       insalubridade: adicionais.insalubridade,
       adicionalFixo: adicionais.adicionalFixo,
+      trct: valorTrct(c, competencia),
       custoTotal,
     };
   });
@@ -748,7 +761,8 @@ export async function listarBreakdownPersistido(competencia: string): Promise<Ve
         (extras.bonificacao ?? 0) +
         (extras.outrosCustos ?? 0) +
         valorHoras.liquido +
-        adicionais.total,
+        adicionais.total +
+        valorTrct(colaborador, competencia),
     );
 
     return {
@@ -794,6 +808,7 @@ export async function listarBreakdownPersistido(competencia: string): Promise<Ve
       periculosidade: adicionais.periculosidade,
       insalubridade: adicionais.insalubridade,
       adicionalFixo: adicionais.adicionalFixo,
+      trct: valorTrct(colaborador, competencia),
       custoTotal,
     };
   });

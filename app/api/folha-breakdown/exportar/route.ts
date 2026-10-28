@@ -69,6 +69,7 @@ export async function GET(request: Request) {
     { header: "Periculosidade", key: "periculosidade", width: 15 },
     { header: "Insalubridade", key: "insalubridade", width: 15 },
     { header: "Adicional fixo", key: "adicionalFixo", width: 15 },
+    { header: "TRCT (rescisão + FGTS/GRRF)", key: "trct", width: 22 },
     { header: "Outros custos", key: "outrosCustos", width: 14 },
     { header: "Custo total", key: "custoTotal", width: 16 },
   ];
@@ -108,6 +109,7 @@ export async function GET(request: Request) {
       periculosidade: l.periculosidade || "",
       insalubridade: l.insalubridade || "",
       adicionalFixo: l.adicionalFixo || "",
+      trct: l.trct || "",
       outrosCustos: l.outrosCustos ?? "",
       custoTotal: l.custoTotal,
     });
