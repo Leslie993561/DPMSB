@@ -74,11 +74,10 @@ describe("validarNovoLancamentoCalculado", () => {
       expect(validarNovoLancamentoCalculado(periodoNovo, doisCurtos, 14, false).ok).toBe(true);
     });
 
-    it("rejeita o 3º período curto quando nenhum dos outros chegou a 14 dias", () => {
+    it("não bloqueia o 3º período curto mesmo sem nenhum de 14 dias", () => {
       const doisCurtos = calcularEstadoPeriodo(periodoNovo, [{ dias: 5 }, { dias: 5 }]);
       const r = validarNovoLancamentoCalculado(periodoNovo, doisCurtos, 5, false);
-      expect(r.ok).toBe(false);
-      if (!r.ok) expect(r.erro).toMatch(/14 dias/);
+      expect(r.ok).toBe(true);
     });
 
     it("aceita períodos curtos à vontade depois que um já tem 14+ dias", () => {
@@ -88,12 +87,11 @@ describe("validarNovoLancamentoCalculado", () => {
       expect(validarNovoLancamentoCalculado(periodoNovo, comLongoEUmCurto, 5, false).ok).toBe(true);
     });
 
-    it("rejeita um 2º período que consome o saldo e impede o de 14 dias", () => {
+    it("não bloqueia um 2º período que impede o de 14 dias", () => {
       // 8 já lançados + 12 agora = 20, sobrando 10 em 1 vaga: nunca dá 14
       const estado = calcularEstadoPeriodo(periodoNovo, [{ dias: 8 }]);
       const r = validarNovoLancamentoCalculado(periodoNovo, estado, 12, false);
-      expect(r.ok).toBe(false);
-      if (!r.ok) expect(r.erro).toMatch(/14 dias/);
+      expect(r.ok).toBe(true);
     });
   });
 

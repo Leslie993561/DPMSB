@@ -110,12 +110,19 @@ export async function listarHistoricoFerias(colaboradorId: number): Promise<Peri
       observacao: l.observacao,
     });
 
-    // Só férias confirmadas contam como gozadas — programação ainda não
-    // confirmada reserva a data, mas não consome saldo.
+    // "Gozados" são só as férias confirmadas; a programação ainda não
+    // confirmada não entra aqui, mas já consome o saldo (abaixo).
     if (l.lancamento_status === "concluida" || l.lancamento_status === "alterada") {
       periodo.diasGozados += l.dias ?? 0;
-      periodo.diasRestantes = periodo.diasDireito - periodo.diasGozados;
     }
+  }
+
+  // Saldo para NOVOS lançamentos: desconta tudo que já foi lançado, gozado ou
+  // não, e o abono vendido — o dia programado não pode ser pedido de novo.
+  for (const periodo of porPeriodo.values()) {
+    const lancados = periodo.ferias.reduce((s, f) => s + f.dias, 0);
+    const abono = periodo.abonoUtilizado ? periodo.diasAbono : 0;
+    periodo.diasRestantes = Math.max(0, periodo.diasDireito - abono - lancados);
   }
 
   return Array.from(porPeriodo.values());

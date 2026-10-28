@@ -169,29 +169,9 @@ export function validarNovoLancamentoCalculado(
     };
   }
 
-  const partesDepois = [...estado.partes, diasGozo];
-  const jaTemPeriodoLongo = partesDepois.some((d) => d >= MIN_DIAS_PRIMEIRO_PERIODO);
-
-  // Só cobra o período de 14+ dias se o saldo do período permitir um.
-  if (limite >= MIN_DIAS_PRIMEIRO_PERIODO && !jaTemPeriodoLongo) {
-    const saldoRestante = limite - partesDepois.reduce((s, d) => s + d, 0);
-    const vagasRestantes = MAX_FRACIONAMENTOS - partesDepois.length;
-    const aindaCabeUmLongo = vagasRestantes >= 1 && saldoRestante >= MIN_DIAS_PRIMEIRO_PERIODO;
-
-    if (!aindaCabeUmLongo) {
-      // Quanto encurtar este pedido para ainda caber um período de 14+ dias.
-      const aCortar = MIN_DIAS_PRIMEIRO_PERIODO - saldoRestante;
-      const comoResolver =
-        vagasRestantes >= 1 && aCortar > 0 && diasGozo - aCortar >= MIN_DIAS_DEMAIS_PERIODOS
-          ? ` Retire ${aCortar} dia(s).`
-          : ` Peça ${MIN_DIAS_PRIMEIRO_PERIODO} dias ou mais neste lançamento.`;
-      return {
-        ok: false,
-        erro: `Um dos períodos precisa ter ${MIN_DIAS_PRIMEIRO_PERIODO} dias ou mais (Art. 134, §1º CLT), e assim sobrariam ${saldoRestante} dia(s).${comoResolver}`,
-      };
-    }
-  }
-
+  // O período de 14+ dias (Art. 134, §1º) NÃO bloqueia o lançamento: o gestor
+  // pode programar em partes e fechar a regra depois. Quem confere a regra é o
+  // Validador CLT; aqui só valem saldo, abono, mínimo de 5 dias e o limite de 3.
   return { ok: true };
 }
 

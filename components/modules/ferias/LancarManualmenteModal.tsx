@@ -36,6 +36,7 @@ export function LancarManualmenteModal({
   colaboradorInicialId?: number | null;
 }) {
   const { operador } = useOperador();
+  const hojeIso = new Date().toISOString().slice(0, 10);
   const sessao = useSessaoResumo();
   // Gestor comum programa a própria equipe E o próprio período (ele mesmo vem no topo da lista).
   const gestorComum = sessao?.tipo === "gestor" && !sessao.editorColaboradores;
@@ -268,6 +269,7 @@ export function LancarManualmenteModal({
                     {formatarDataBr(p.aquisitivoInicio)} –{" "}
                     {formatarDataBr(p.aquisitivoFim)} · {p.diasRestantes} dia(s)
                     disponível(is)
+                    {p.aquisitivoFim.slice(0, 10) > hojeIso ? " (não disponível)" : ""}
                   </option>
                 ))}
               </select>
@@ -380,8 +382,7 @@ export function LancarManualmenteModal({
               Regras aplicadas (Art. 134, §1º CLT)
             </p>
             <ul className="mt-1 list-inside list-disc text-[10.5px] text-foreground-muted">
-              <li>O 1º período precisa ter no mínimo 14 dias.</li>
-              <li>O 2º e o 3º período precisam ter no mínimo 5 dias cada.</li>
+              <li>Cada período precisa ter no mínimo 5 dias.</li>
               <li>No máximo 3 períodos por período aquisitivo.</li>
               <li>A soma não pode passar dos dias disponíveis.</li>
             </ul>
