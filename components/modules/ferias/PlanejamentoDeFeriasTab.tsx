@@ -13,7 +13,6 @@ import { ValidadorCltPanel } from "./ValidadorCltPanel";
 import { DetalheCalculoModal } from "./DetalheCalculoModal";
 import { LancarProgramacaoModal } from "./LancarProgramacaoModal";
 import { LancarManualmenteModal } from "./LancarManualmenteModal";
-import { EquipeDoGestorCard } from "./EquipeDoGestorCard";
 import { MenuAcoesLinha } from "./MenuAcoesLinha";
 
 const FAIXA_TRIMESTRE: Record<1 | 2 | 3 | 4, string> = {
@@ -237,17 +236,6 @@ export function PlanejamentoDeFeriasTab({
 
   return (
     <div className="space-y-5">
-      {souGestor && (
-        <EquipeDoGestorCard
-          ano={ano}
-          itens={itens}
-          onProgramar={(id) => {
-            setColaboradorParaProgramar(id);
-            onAbrirManual();
-          }}
-        />
-      )}
-
       <p className="text-sm text-foreground-muted">
         Programação anual de {ano} por trimestre — o trimestre é o mês em que a férias começa (ou começou).
       </p>
