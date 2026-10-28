@@ -19,6 +19,7 @@ export interface LinhaExtrasImportada {
   nomeColaborador: string;
   vm: number | null;
   odontologico: number | null;
+  planoSaude: number | null;
   solides: number | null;
   solidesSaude: number | null;
   flash: number | null;
@@ -42,6 +43,7 @@ type CampoExtra =
   | "nomeColaborador"
   | "vm"
   | "odontologico"
+  | "planoSaude"
   | "solidesSaude"
   | "solides"
   | "flash"
@@ -58,6 +60,7 @@ const SINONIMOS: Record<CampoExtra, string[]> = {
   nomeColaborador: ["nome do colaborador", "colaborador", "nome", "empregado", "funcionario"],
   vm: ["vm", "vale mercado", "vale refeicao"],
   odontologico: ["odontologico", "odonto", "plano odontologico"],
+  planoSaude: ["plano de saude", "plano saude", "assistencia medica", "plano medico"],
   // Mais específico primeiro (mesmo motivo do 100% antes do 50% abaixo): sem
   // isso, "solides" sozinho casaria com a coluna de saúde antes dela ser
   // reconhecida como a mais específica das duas.
@@ -114,6 +117,7 @@ const ROTULO_CAMPO: Record<CampoExtra, string> = {
   nomeColaborador: "Nome do colaborador",
   vm: "VM",
   odontologico: "Odontológico",
+  planoSaude: "Plano de saúde",
   solidesSaude: "Sólides (Saúde)",
   solides: "Sólides",
   flash: "Flash",
@@ -286,6 +290,7 @@ export function converterExtrasImportadas(cabecalhos: string[], linhas: LinhaPla
       nomeColaborador,
       vm: mapa.vm ? paraNumeroOuNulo(linha[mapa.vm]) : null,
       odontologico: mapa.odontologico ? paraNumeroOuNulo(linha[mapa.odontologico]) : null,
+      planoSaude: mapa.planoSaude ? paraNumeroOuNulo(linha[mapa.planoSaude]) : null,
       solidesSaude: mapa.solidesSaude ? paraNumeroOuNulo(linha[mapa.solidesSaude]) : null,
       solides: mapa.solides ? paraNumeroOuNulo(linha[mapa.solides]) : null,
       flash: mapa.flash ? paraNumeroOuNulo(linha[mapa.flash]) : null,

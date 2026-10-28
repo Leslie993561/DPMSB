@@ -54,6 +54,7 @@ export interface VerbaColaborador {
   /** Verbas "extras" do mês — vêm só de planilha importada (Relatório detalhado), nunca calculadas; `null` = nada importado ainda para esse mês. */
   vm: number | null;
   odontologico: number | null;
+  planoSaude: number | null;
   solides: number | null;
   /** Produto de saúde da mesma plataforma do Sólides — verba própria, não soma com `solides`. */
   solidesSaude: number | null;
@@ -101,6 +102,7 @@ export interface VerbaColaborador {
 export interface ExtrasImportadas {
   vm: number | null;
   odontologico: number | null;
+  planoSaude: number | null;
   solides: number | null;
   solidesSaude: number | null;
   flash: number | null;
@@ -118,6 +120,7 @@ export interface ExtrasImportadas {
 const EXTRAS_VAZIAS: ExtrasImportadas = {
   vm: null,
   odontologico: null,
+  planoSaude: null,
   solides: null,
   solidesSaude: null,
   flash: null,
@@ -135,6 +138,7 @@ interface LinhaExtras {
   colaborador_id: number;
   vm: number | null;
   odontologico: number | null;
+  plano_saude: number | null;
   solides: number | null;
   solides_saude: number | null;
   flash: number | null;
@@ -170,7 +174,7 @@ export async function competenciasComLancamento(ano: number): Promise<Set<string
 export async function obterExtras(competencia: string): Promise<Map<number, ExtrasImportadas>> {
   const db = await getDb();
   const resultado = await db.execute({
-    sql: `SELECT colaborador_id, vm, odontologico, solides, solides_saude, flash, total_pass,
+    sql: `SELECT colaborador_id, vm, odontologico, plano_saude, solides, solides_saude, flash, total_pass,
                  bonificacao, premiacao, outros_custos,
                  horas_extra_50, horas_extra_100, horas_desconto, horas_noturnas
           FROM folha_extras WHERE competencia = ?`,
@@ -184,6 +188,7 @@ export async function obterExtras(competencia: string): Promise<Map<number, Extr
       {
         vm: l.vm,
         odontologico: l.odontologico,
+        planoSaude: l.plano_saude,
         horaExtra50: l.horas_extra_50,
         horaExtra100: l.horas_extra_100,
         descontoHoras: l.horas_desconto,
@@ -209,6 +214,7 @@ export async function obterExtras(competencia: string): Promise<Map<number, Extr
 const COLUNA_DE = {
   vm: "vm",
   odontologico: "odontologico",
+  planoSaude: "plano_saude",
   solides: "solides",
   solidesSaude: "solides_saude",
   flash: "flash",
@@ -478,6 +484,7 @@ export async function gerarBreakdown(
         premiacao +
         (extras.vm ?? 0) +
         (odontologico ?? 0) +
+        (extras.planoSaude ?? 0) +
         (extras.solides ?? 0) +
         (extras.solidesSaude ?? 0) +
         (extras.flash ?? 0) +
@@ -512,6 +519,7 @@ export async function gerarBreakdown(
       // mesma fonte que o Rateio de Benefícios usa, para os dois módulos não
       // divergirem no "Total de benefícios" do mês.
       odontologico,
+      planoSaude: extras.planoSaude,
       solides: extras.solides,
       solidesSaude: extras.solidesSaude,
       flash: extras.flash,
@@ -690,6 +698,7 @@ export async function listarBreakdownPersistido(competencia: string): Promise<Ve
         premiacao +
         (extras.vm ?? 0) +
         (odontologico ?? 0) +
+        (extras.planoSaude ?? 0) +
         (extras.solides ?? 0) +
         (extras.solidesSaude ?? 0) +
         (extras.flash ?? 0) +
@@ -725,6 +734,7 @@ export async function listarBreakdownPersistido(competencia: string): Promise<Ve
       auxilioEducacao,
       vm: extras.vm,
       odontologico,
+      planoSaude: extras.planoSaude,
       solides: extras.solides,
       solidesSaude: extras.solidesSaude,
       flash: extras.flash,
@@ -888,6 +898,7 @@ export async function importarExtras(
     await upsertExtras(colaborador.id, competencia, {
       vm: item.vm,
       odontologico: item.odontologico,
+      planoSaude: item.planoSaude,
       solides: item.solides,
       solidesSaude: item.solidesSaude,
       flash: item.flash,

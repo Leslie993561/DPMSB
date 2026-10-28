@@ -25,6 +25,7 @@ interface VerbaColaborador {
   auxilioEducacao: number;
   vm: number | null;
   odontologico: number | null;
+  planoSaude: number | null;
   solides: number | null;
   solidesSaude: number | null;
   flash: number | null;
@@ -212,6 +213,7 @@ export function RelatorioDetalhadoTab() {
           auxilioEducacao: acc.auxilioEducacao + l.auxilioEducacao,
           vm: acc.vm + (l.vm ?? 0),
           odontologico: acc.odontologico + (l.odontologico ?? 0),
+          planoSaude: acc.planoSaude + (l.planoSaude ?? 0),
           solides: acc.solides + (l.solides ?? 0),
           solidesSaude: acc.solidesSaude + (l.solidesSaude ?? 0),
           flash: acc.flash + (l.flash ?? 0),
@@ -252,6 +254,7 @@ export function RelatorioDetalhadoTab() {
           auxilioEducacao: 0,
           vm: 0,
           odontologico: 0,
+          planoSaude: 0,
           solides: 0,
           solidesSaude: 0,
           flash: 0,
@@ -419,7 +422,7 @@ export function RelatorioDetalhadoTab() {
                   <th colSpan={4} className={cn(TH_GRUPO, DIVISOR, "border-b border-hairline", GRUPO_ENCARGOS, "text-status-warning")}>
                     Encargos
                   </th>
-                  <th colSpan={6} className={cn(TH_GRUPO, DIVISOR, "border-b border-hairline", GRUPO_BENEFICIOS, "text-brand-primary-800")}>
+                  <th colSpan={7} className={cn(TH_GRUPO, DIVISOR, "border-b border-hairline", GRUPO_BENEFICIOS, "text-brand-primary-800")}>
                     Benefícios
                   </th>
                   <th colSpan={4} className={cn(TH_GRUPO, DIVISOR, "border-b border-hairline", GRUPO_PLATAFORMAS, "text-brand-primary-800")}>
@@ -449,6 +452,7 @@ export function RelatorioDetalhadoTab() {
                   <th className={cn(TH_COL, GRUPO_BENEFICIOS, "text-brand-primary-800")}>Auxílio educação</th>
                   <th className={cn(TH_COL, GRUPO_BENEFICIOS, "text-brand-primary-800")}>VM</th>
                   <th className={cn(TH_COL, GRUPO_BENEFICIOS, "text-brand-primary-800")}>Odontológico</th>
+                  <th className={cn(TH_COL, GRUPO_BENEFICIOS, "text-brand-primary-800")}>Plano de saúde</th>
                   <th
                     className={cn(TH_COL, GRUPO_BENEFICIOS, "text-brand-primary-800")}
                     title="Cota por filho menor de 14 anos (Lei 8.213/91). Adiantado pelo empregador e compensado na guia do INSS — por isso não entra no total do colaborador."
@@ -523,6 +527,7 @@ export function RelatorioDetalhadoTab() {
                     <td className={cn(TD_NUM, GRUPO_BENEFICIOS)}>{formatarNumeroOuTraco(l.auxilioEducacao || null)}</td>
                     <td className={cn(TD_NUM, GRUPO_BENEFICIOS)}>{formatarNumeroOuTraco(l.vm)}</td>
                     <td className={cn(TD_NUM, GRUPO_BENEFICIOS)}>{formatarNumeroOuTraco(l.odontologico)}</td>
+                    <td className={cn(TD_NUM, GRUPO_BENEFICIOS)}>{formatarNumeroOuTraco(l.planoSaude)}</td>
                     <td
                       className={cn(TD_NUM, GRUPO_BENEFICIOS)}
                       title={
@@ -651,6 +656,7 @@ export function RelatorioDetalhadoTab() {
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.auxilioEducacao)}</td>
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.vm)}</td>
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.odontologico)}</td>
+                  <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.planoSaude)}</td>
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.salarioFamilia)}</td>
                   <td className={cn(TD_NUM, DIVISOR, "bg-surface-page")}>{formatarNumero(totais.solides)}</td>
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.flash)}</td>

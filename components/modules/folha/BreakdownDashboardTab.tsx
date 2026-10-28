@@ -23,6 +23,7 @@ interface VerbaColaborador {
   auxilioEducacao: number;
   vm: number | null;
   odontologico: number | null;
+  planoSaude?: number | null;
   solides: number | null;
   solidesSaude: number | null;
   flash: number | null;
@@ -103,6 +104,7 @@ function totalBeneficios(l: VerbaColaborador): number {
     l.valeAlimentacao +
     (l.vm ?? 0) +
     (l.odontologico ?? 0) +
+    (l.planoSaude ?? 0) +
     (l.solides ?? 0) +
     (l.solidesSaude ?? 0) +
     (l.flash ?? 0) +
@@ -128,6 +130,7 @@ function totalBeneficiosCompleto(l: VerbaColaborador): number {
     l.valeTransporte +
     l.valeAlimentacao +
     (l.odontologico ?? 0) +
+    (l.planoSaude ?? 0) +
     (l.solides ?? 0) +
     (l.solidesSaude ?? 0) +
     (l.flash ?? 0) +

@@ -44,6 +44,7 @@ const COLUNAS: ColunaModelo[] = [
   { titulo: "VA", key: "va", width: 16, grupo: "Benefícios", origem: "calculada" },
   { titulo: "VM", key: "vm", width: 16, grupo: "Benefícios", origem: "importada" },
   { titulo: "Odontológico", key: "odontologico", width: 22, grupo: "Benefícios", origem: "importada" },
+  { titulo: "Plano de saúde", key: "planoSaude", width: 22, grupo: "Benefícios", origem: "importada" },
   { titulo: "Salário família", key: "salarioFamilia", width: 24, grupo: "Benefícios", origem: "calculada" },
 
   { titulo: "Sólides", key: "solides", width: 18, grupo: "Plataformas", origem: "importada" },
