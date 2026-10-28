@@ -261,6 +261,13 @@ CREATE TABLE IF NOT EXISTS folha_breakdown (
   UNIQUE(colaborador_id, competencia)
 );
 
+-- Competências fechadas que o RH reabriu para edição: o retrato gravado em
+-- folha_breakdown continua valendo, só o bloqueio de escrita é levantado.
+CREATE TABLE IF NOT EXISTS folha_competencias_reabertas (
+  competencia TEXT PRIMARY KEY,
+  reaberta_em TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')
+);
+
 CREATE TABLE IF NOT EXISTS folha_extras (
   id SERIAL PRIMARY KEY,
   colaborador_id INTEGER NOT NULL REFERENCES colaboradores(id),

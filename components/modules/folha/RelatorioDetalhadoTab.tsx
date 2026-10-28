@@ -157,16 +157,11 @@ export function RelatorioDetalhadoTab() {
   /**
    * Fechar grava um retrato do breakdown que não muda mais, mesmo que o
    * cadastro (salário, vínculo, benefícios) seja editado depois — é o que
-   * garante que mexer em agosto não altere julho já fechado. Reabrir descarta
-   * esse retrato e devolve o mês ao cálculo ao vivo.
-   *
-   * Reabrir pede confirmação porque é irreversível: os valores congelados não
-   * voltam, só podem ser refeitos com o cadastro de agora, que pode já estar
-   * diferente do que era quando o mês fechou.
+   * garante que mexer em agosto não altere julho já fechado. Reabrir só libera
+   * a edição: o retrato é mantido, e os valores mudam apenas por nova planilha
+   * ou por edição dentro do módulo — nunca por alteração de cadastro.
    */
   async function alternarFechamento() {
-    // Mês fechado não reabre: só uma nova planilha altera os valores.
-    if (fechado) return;
 
     setErroFechar(null);
     setFechando(true);
@@ -322,12 +317,17 @@ export function RelatorioDetalhadoTab() {
                 </span>
               )
             ) : fechado ? (
-              <span
-                title="Mês fechado: os valores são um retrato gravado e só mudam se uma nova planilha for enviada."
-                className="flex items-center gap-1 rounded-full border border-status-success-border bg-status-success-bg px-2.5 py-1 text-[10.5px] font-bold text-status-success"
+              <button
+                type="button"
+                onClick={() => void alternarFechamento()}
+                disabled={fechando}
+                title="Mês fechado: os valores são um retrato gravado. Clique para reabrir e liberar a edição — os valores gravados continuam até você enviar nova planilha ou editar no módulo."
+                className="group/selo flex items-center gap-1 rounded-full border border-status-success-border bg-status-success-bg px-2.5 py-1 text-[10.5px] font-bold text-status-success transition-colors hover:border-brand-primary hover:bg-brand-primary-100 hover:text-brand-primary-800 disabled:opacity-50"
               >
-                <span aria-hidden>🔒</span> Mês fechado
-              </span>
+                <span aria-hidden>🔒</span>
+                <span className="group-hover/selo:hidden">{fechando ? "Reabrindo…" : "Mês fechado"}</span>
+                <span className="hidden group-hover/selo:inline">{fechando ? "Reabrindo…" : "Reabrir mês"}</span>
+              </button>
             ) : (
               <button
                 type="button"

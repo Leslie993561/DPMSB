@@ -559,6 +559,13 @@ interface LinhaBreakdownPersistida {
 
 /** Fecha o mês: grava um retrato do breakdown corrente, que passa a não mudar mais mesmo que o cadastro seja alterado depois. */
 export async function fecharCompetencia(competencia: string): Promise<VerbaColaborador[]> {
+  // Mês já tem retrato e foi só reaberto para edição: volta a travar mantendo
+  // os valores gravados — não recalcula com o cadastro de agora.
+  if (await competenciaTemRetrato(competencia)) {
+    const db = await getDb();
+    await db.execute({ sql: "DELETE FROM folha_competencias_reabertas WHERE competencia = ?", args: [competencia] });
+    return listarBreakdownPersistido(competencia);
+  }
   const colaboradores = await listarColaboradores();
   const linhas = await gerarBreakdown(competencia, colaboradores);
   const db = await getDb();
@@ -605,23 +612,34 @@ export async function fecharCompetencia(competencia: string): Promise<VerbaColab
  * valores que estavam congelados, só refazê-los com o cadastro de agora. Quem
  * chama precisa confirmar antes.
  */
-export async function reabrirCompetencia(competencia: string): Promise<number> {
+export async function reabrirCompetencia(competencia: string): Promise<void> {
   const db = await getDb();
-  const resultado = await db.execute({
-    sql: "DELETE FROM folha_breakdown WHERE competencia = ?",
+  await db.execute({
+    sql: "INSERT INTO folha_competencias_reabertas (competencia) VALUES (?) ON CONFLICT (competencia) DO NOTHING",
     args: [competencia],
   });
-  return resultado.rowsAffected;
 }
 
-export async function competenciaFechada(competencia: string): Promise<boolean> {
+/** O mês tem um retrato gravado (fechado ou apenas reaberto para edição). */
+export async function competenciaTemRetrato(competencia: string): Promise<boolean> {
   const db = await getDb();
   const resultado = await db.execute({
     sql: "SELECT COUNT(*) as n FROM folha_breakdown WHERE competencia = ?",
     args: [competencia],
   });
   const linha = resultado.rows[0] as unknown as { n: number };
-  return linha.n > 0;
+  return Number(linha.n) > 0;
+}
+
+/** Fechado = tem retrato E não foi reaberto. É a trava de escrita do portal inteiro. */
+export async function competenciaFechada(competencia: string): Promise<boolean> {
+  if (!(await competenciaTemRetrato(competencia))) return false;
+  const db = await getDb();
+  const reaberta = await db.execute({
+    sql: "SELECT 1 FROM folha_competencias_reabertas WHERE competencia = ?",
+    args: [competencia],
+  });
+  return reaberta.rows.length === 0;
 }
 
 export async function listarBreakdownPersistido(competencia: string): Promise<VerbaColaborador[]> {
@@ -769,15 +787,21 @@ export async function obterBreakdown(
   colaboradores?: Colaborador[],
   janelasDeFerias?: Map<number, JanelaDeFerias[]>,
 ): Promise<{ linhas: VerbaColaborador[]; fechado: boolean }> {
-  if (await competenciaFechada(competencia)) {
-    return { linhas: await listarBreakdownPersistido(competencia), fechado: true };
+  // Com retrato gravado, os valores do núcleo ficam congelados mesmo com o mês
+  // reaberto: o cadastro editado depois não os altera.
+  if (await competenciaTemRetrato(competencia)) {
+    return { linhas: await listarBreakdownPersistido(competencia), fechado: await competenciaFechada(competencia) };
   }
   return { linhas: await gerarBreakdown(competencia, colaboradores, janelasDeFerias), fechado: false };
 }
 
 export async function listarCompetenciasFechadas(): Promise<string[]> {
   const db = await getDb();
-  const resultado = await db.execute("SELECT DISTINCT competencia FROM folha_breakdown ORDER BY competencia DESC");
+  const resultado = await db.execute(
+    `SELECT DISTINCT competencia FROM folha_breakdown
+      WHERE competencia NOT IN (SELECT competencia FROM folha_competencias_reabertas)
+      ORDER BY competencia DESC`,
+  );
   const linhas = resultado.rows as unknown as { competencia: string }[];
   return linhas.map((l) => l.competencia);
 }
