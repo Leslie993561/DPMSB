@@ -98,6 +98,7 @@ export function FeriasPageClient() {
 
       {aba === "controle" && (
         <ControleDeFeriasTab
+          souGestor={souGestor}
           importarAberto={importarAberto}
           onFecharImportar={() => setImportarAberto(false)}
           exportarAberto={exportarAberto}

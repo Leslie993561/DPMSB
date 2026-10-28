@@ -41,10 +41,13 @@ export function PeriodoDetalheModal({
   alvo,
   onFechar,
   onAtualizado,
+  podeProgramar = true,
 }: {
   alvo: AlvoHistorico;
   onFechar: () => void;
   onAtualizado: () => void;
+  /** Gestor programa pelo Planejamento; aqui só consulta o histórico. */
+  podeProgramar?: boolean;
 }) {
   const periodo = alvo.periodo;
   const { operador } = useOperador();
@@ -252,7 +255,7 @@ export function PeriodoDetalheModal({
           </div>
         )}
 
-        {modo === "lista" && periodo !== null && periodo.diasSemLancamento > 0 && (
+        {podeProgramar && modo === "lista" && periodo !== null && periodo.diasSemLancamento > 0 && (
           <button
             type="button"
             onClick={() => setModo("programar")}

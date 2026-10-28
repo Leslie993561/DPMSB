@@ -63,7 +63,9 @@ export function ControleDeFeriasTab({
   onFecharImportar,
   exportarAberto: exportarArquivoAberto,
   onFecharExportar,
+  souGestor = false,
 }: {
+  souGestor?: boolean;
   importarAberto: boolean;
   onFecharImportar: () => void;
   exportarAberto: boolean;
@@ -526,6 +528,7 @@ export function ControleDeFeriasTab({
       {alvoHistorico && (
         <PeriodoDetalheModal
           alvo={alvoHistorico}
+          podeProgramar={!souGestor}
           onFechar={() => setAlvoHistorico(null)}
           onAtualizado={() => {
             setAlvoHistorico(null);
