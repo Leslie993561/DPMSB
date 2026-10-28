@@ -14,6 +14,7 @@ import { DetalheCalculoModal } from "./DetalheCalculoModal";
 import { LancarProgramacaoModal } from "./LancarProgramacaoModal";
 import { LancarManualmenteModal } from "./LancarManualmenteModal";
 import { EquipeDoGestorCard } from "./EquipeDoGestorCard";
+import { MenuAcoesLinha } from "./MenuAcoesLinha";
 
 const FAIXA_TRIMESTRE: Record<1 | 2 | 3 | 4, string> = {
   1: "jan · fev · mar",
@@ -622,57 +623,20 @@ function MenuLancamento({
   onDetalhe: () => void;
   onCancelar: () => void;
 }) {
-  const [aberto, setAberto] = useState(false);
-
   return (
-    <span className="relative inline-flex">
-      <button
-        type="button"
-        aria-label="Ações do lançamento"
-        aria-expanded={aberto}
-        onClick={() => setAberto((v) => !v)}
-        className="rounded px-1 leading-none text-foreground-muted hover:bg-brand-surface hover:text-foreground"
-      >
-        <span aria-hidden>⋮</span>
-      </button>
-
-      {aberto && (
-        <>
-          {/* Camada de fechamento: qualquer clique fora recolhe o menu. */}
-          <button
-            type="button"
-            aria-hidden
-            tabIndex={-1}
-            onClick={() => setAberto(false)}
-            className="fixed inset-0 z-30 cursor-default"
-          />
-          <span className="absolute top-full left-0 z-40 mt-1 flex w-52 flex-col overflow-hidden rounded-md border border-hairline bg-background py-1 shadow-drawer">
-            <button
-              type="button"
-              onClick={() => {
-                setAberto(false);
-                onDetalhe();
-              }}
-              className="px-3 py-1.5 text-left text-[12px] font-normal text-foreground normal-case hover:bg-surface-page"
-            >
-              Ver cálculo das férias
-            </button>
-            <button
-              type="button"
-              disabled={!podeCancelar}
-              onClick={() => {
-                setAberto(false);
-                onCancelar();
-              }}
-              title={podeCancelar ? undefined : "Desfaça a baixa antes de cancelar"}
-              className="px-3 py-1.5 text-left text-[12px] font-normal text-red-600 normal-case hover:bg-surface-page disabled:cursor-not-allowed disabled:text-foreground-muted/50 disabled:hover:bg-transparent dark:text-red-400"
-            >
-              Cancelar lançamento
-            </button>
-          </span>
-        </>
-      )}
-    </span>
+    <MenuAcoesLinha
+      rotuloAria="Ações do lançamento"
+      itens={[
+        { rotulo: "Ver cálculo das férias", onClick: onDetalhe },
+        {
+          rotulo: "Cancelar lançamento",
+          onClick: onCancelar,
+          desabilitado: !podeCancelar,
+          titulo: podeCancelar ? undefined : "Desfaça a baixa antes de cancelar",
+          perigo: true,
+        },
+      ]}
+    />
   );
 }
 

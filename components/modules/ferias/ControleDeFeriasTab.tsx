@@ -9,6 +9,7 @@ import { Badge, type CorBadge } from "@/components/shared/Badge";
 import { Card } from "@/components/shared/Card";
 import { FilterChip } from "@/components/shared/FilterChip";
 import { PeriodoDetalheModal, type AlvoHistorico } from "./PeriodoDetalheModal";
+import { MenuAcoesLinha } from "./MenuAcoesLinha";
 
 const ROTULO_SITUACAO: Record<SituacaoPeriodo, { label: string; cor: CorBadge }> = {
   vencida: { label: "Vencido", cor: "vermelho" },
@@ -750,57 +751,20 @@ function MenuLinha({
   onHistorico: () => void;
   onCancelar: () => void;
 }) {
-  const [aberto, setAberto] = useState(false);
-
   return (
-    <span className="relative inline-flex">
-      <button
-        type="button"
-        aria-label="Ações do colaborador"
-        aria-expanded={aberto}
-        onClick={() => setAberto((v) => !v)}
-        className="rounded px-1 leading-none text-foreground-muted hover:bg-brand-surface hover:text-foreground"
-      >
-        <span aria-hidden>⋮</span>
-      </button>
-
-      {aberto && (
-        <>
-          {/* Camada de fechamento: qualquer clique fora recolhe o menu. */}
-          <button
-            type="button"
-            aria-hidden
-            tabIndex={-1}
-            onClick={() => setAberto(false)}
-            className="fixed inset-0 z-30 cursor-default"
-          />
-          <span className="absolute top-full left-0 z-40 mt-1 flex w-52 flex-col overflow-hidden rounded-md border border-hairline bg-background py-1 shadow-drawer">
-            <button
-              type="button"
-              onClick={() => {
-                setAberto(false);
-                onHistorico();
-              }}
-              className="px-3 py-1.5 text-left text-[12px] font-normal text-foreground normal-case hover:bg-surface-page"
-            >
-              Ver histórico de férias
-            </button>
-            <button
-              type="button"
-              disabled={!temProgramacao}
-              onClick={() => {
-                setAberto(false);
-                onCancelar();
-              }}
-              title={temProgramacao ? undefined : "Nenhum lançamento programado para cancelar"}
-              className="px-3 py-1.5 text-left text-[12px] font-normal normal-case text-red-600 hover:bg-surface-page disabled:cursor-not-allowed disabled:text-foreground-muted/50 disabled:hover:bg-transparent dark:text-red-400"
-            >
-              Cancelar lançamento
-            </button>
-          </span>
-        </>
-      )}
-    </span>
+    <MenuAcoesLinha
+      rotuloAria="Ações do colaborador"
+      itens={[
+        { rotulo: "Ver histórico de férias", onClick: onHistorico },
+        {
+          rotulo: "Cancelar lançamento",
+          onClick: onCancelar,
+          desabilitado: !temProgramacao,
+          titulo: temProgramacao ? undefined : "Nenhum lançamento programado para cancelar",
+          perigo: true,
+        },
+      ]}
+    />
   );
 }
 
