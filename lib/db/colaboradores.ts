@@ -943,7 +943,7 @@ export async function contarVinculos(colaboradorId: number): Promise<VinculosDoC
         (SELECT COUNT(*) FROM dho_kit_entregas WHERE colaborador_id = ?) AS kits,
         (SELECT COUNT(*) FROM movimentacoes_info WHERE colaborador_id = ?) AS movimentacoes,
         (SELECT COUNT(*) FROM gestores_acesso WHERE colaborador_id = ?) AS acesso`,
-    args: Array(18).fill(colaboradorId),
+    args: Array(17).fill(colaboradorId),
   });
   const l = resultado.rows[0] as unknown as {
     periodos: number;
