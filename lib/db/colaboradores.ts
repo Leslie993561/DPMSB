@@ -664,6 +664,12 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
       input.adicionalFixoDescricao !== undefined ? input.adicionalFixoDescricao : atual.adicionalFixoDescricao,
   };
 
+  // Trocou o líder: o nome em texto acompanha, senão o antigo ("Tássio Antônio")
+  // seguia aparecendo em exportação e outros módulos mesmo com o gestor_id novo.
+  if (input.gestorId !== undefined && input.gestorId !== atual.gestorId) {
+    mesclado.liderDiretoNome = input.gestorId ? ((await buscarColaborador(input.gestorId))?.nome ?? null) : null;
+  }
+
   const db = await getDb();
   await db.execute({
     sql: `UPDATE colaboradores
