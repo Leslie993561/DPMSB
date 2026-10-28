@@ -50,6 +50,7 @@ export function LancarManualmenteModal({
   const [dataInicio, setDataInicio] = useState("");
   const [dias, setDias] = useState("");
   const [abono, setAbono] = useState(false);
+  const [adiantamento13, setAdiantamento13] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
@@ -172,6 +173,7 @@ export function LancarManualmenteModal({
             diasSolicitados: diasNum,
             dataInicioPrevista: dataInicio,
             abonoSolicitado: abono,
+            adiantamento13,
             operador,
           }),
         },
@@ -366,6 +368,16 @@ export function LancarManualmenteModal({
                     )}
                   </div>
                 )}
+
+              <label className="flex items-center gap-2 text-[11.5px] text-foreground">
+                <input
+                  type="checkbox"
+                  checked={adiantamento13}
+                  onChange={(e) => setAdiantamento13(e.target.checked)}
+                  className="accent-brand-primary"
+                />
+                Adiantamento do 13º salário junto com as férias
+              </label>
 
               {/* A observação que impede a ação: dias acima do disponível, período
                   abaixo do mínimo legal ou mais de 3 fracionamentos. */}

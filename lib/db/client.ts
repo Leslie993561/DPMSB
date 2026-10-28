@@ -84,6 +84,8 @@ const MIGRACOES: { tabela: string; coluna: string; definicao: string }[] = [
   // quando o abono foi pago.
   { tabela: "lancamentos_ferias", coluna: "abono_inicio", definicao: "TEXT" },
   { tabela: "lancamentos_ferias", coluna: "abono_fim", definicao: "TEXT" },
+  // Adiantamento da 1ª parcela do 13º junto com as férias (pedido do colaborador).
+  { tabela: "lancamentos_ferias", coluna: "adiantamento_13", definicao: "INTEGER NOT NULL DEFAULT 0" },
   // Base de cálculo do AVISO DE FÉRIAS, como o DP emitiu.
   //
   // A média de horas do Art. 142 §5º varia de aviso para aviso — o Iago tem

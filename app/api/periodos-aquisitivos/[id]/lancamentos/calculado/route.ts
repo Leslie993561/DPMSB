@@ -9,6 +9,7 @@ const schema = z.object({
   diasSolicitados: z.coerce.number().min(1),
   dataInicioPrevista: z.iso.date(),
   abonoSolicitado: z.coerce.boolean().default(false),
+  adiantamento13: z.coerce.boolean().default(false),
   operador: z.string().trim().min(1, "Informe o nome do operador antes de continuar."),
 });
 
@@ -35,6 +36,7 @@ export async function POST(
       diasSolicitados: parsed.data.diasSolicitados,
       dataInicioPrevista: parsed.data.dataInicioPrevista,
       abonoSolicitado: parsed.data.abonoSolicitado,
+      adiantamento13: parsed.data.adiantamento13,
       operador: parsed.data.operador,
     });
     return Response.json({ lancamento }, { status: 201 });

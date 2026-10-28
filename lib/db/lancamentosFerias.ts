@@ -28,6 +28,7 @@ export interface LancamentoFerias {
   dataBaixa: string | null;
   abono: boolean;
   diasAbono: number;
+  adiantamento13: boolean;
   observacao: string | null;
   observacaoBaixa: string | null;
   anexoNome: string | null;
@@ -48,6 +49,7 @@ interface LinhaLancamento {
   data_baixa: string | null;
   abono: number;
   dias_abono: number;
+  adiantamento_13?: number;
   observacao: string | null;
   observacao_baixa: string | null;
   anexo_nome: string | null;
@@ -69,6 +71,7 @@ function paraLancamento(linha: LinhaLancamento): LancamentoFerias {
     dataBaixa: linha.data_baixa,
     abono: Boolean(linha.abono),
     diasAbono: linha.dias_abono,
+    adiantamento13: Boolean(linha.adiantamento_13),
     observacao: linha.observacao,
     observacaoBaixa: linha.observacao_baixa,
     anexoNome: linha.anexo_nome,
@@ -157,14 +160,15 @@ async function inserirLancamento(params: {
   dataFimGozo: string | null;
   abono: boolean;
   diasAbono: number;
+  adiantamento13?: boolean;
   observacao: string | null;
   criadoPor: string;
 }): Promise<LancamentoFerias> {
   const db = await getDb();
   const info = await db.execute({
     sql: `INSERT INTO lancamentos_ferias
-         (periodo_aquisitivo_id, origem, status, dias, data_inicio_prevista, data_inicio_gozo, data_fim_gozo, abono, dias_abono, observacao, criado_por)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (periodo_aquisitivo_id, origem, status, dias, data_inicio_prevista, data_inicio_gozo, data_fim_gozo, abono, dias_abono, adiantamento_13, observacao, criado_por)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       params.periodoAquisitivoId,
       params.origem,
@@ -175,6 +179,7 @@ async function inserirLancamento(params: {
       params.dataFimGozo,
       params.abono ? 1 : 0,
       params.diasAbono,
+      params.adiantamento13 ? 1 : 0,
       params.observacao,
       params.criadoPor,
     ],
@@ -188,6 +193,7 @@ export interface CriarLancamentoCalculadoInput {
   diasSolicitados: number;
   dataInicioPrevista: string;
   abonoSolicitado: boolean;
+  adiantamento13?: boolean;
   operador: string;
 }
 
@@ -222,6 +228,7 @@ export async function criarLancamentoCalculado(input: CriarLancamentoCalculadoIn
     dataFimGozo: null,
     abono: input.abonoSolicitado,
     diasAbono,
+    adiantamento13: input.adiantamento13,
     observacao: null,
     criadoPor: input.operador,
   });

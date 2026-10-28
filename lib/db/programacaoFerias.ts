@@ -52,6 +52,7 @@ export interface ItemProgramacaoFerias {
   dias: number;
   abono: boolean;
   diasAbono: number;
+  adiantamento13: boolean;
   dataInicio: string;
   dataRetorno: string | null;
   trimestre: 1 | 2 | 3 | 4;
@@ -71,6 +72,7 @@ interface LinhaProgramacao {
   dias: number;
   abono: number;
   dias_abono: number;
+  adiantamento_13: number | null;
   data_inicio_prevista: string | null;
   data_inicio_gozo: string | null;
   data_retorno: string | null;
@@ -104,7 +106,7 @@ export async function listarProgramacaoFerias(): Promise<ItemProgramacaoFerias[]
 
   const db = await getDb();
   const resultado = await db.execute(
-    `SELECT l.id, l.status, l.dias, l.abono, l.dias_abono,
+    `SELECT l.id, l.status, l.dias, l.abono, l.dias_abono, l.adiantamento_13,
               l.data_inicio_prevista, l.data_inicio_gozo, l.data_retorno,
               l.media_horas, l.media_valores, l.outras_vantagens, l.salario_base_aviso,
               p.id AS periodo_aquisitivo_id, p.data_inicio AS periodo_inicio, p.data_fim AS periodo_fim,
@@ -222,6 +224,7 @@ export async function listarProgramacaoFerias(): Promise<ItemProgramacaoFerias[]
       dias: linha.dias,
       abono: Boolean(linha.abono),
       diasAbono: linha.dias_abono,
+      adiantamento13: Boolean(linha.adiantamento_13),
       dataInicio,
       dataRetorno: linha.data_retorno,
       trimestre: Math.ceil((dataRef.getMonth() + 1) / 3) as 1 | 2 | 3 | 4,

@@ -445,6 +445,9 @@ export function PlanejamentoDeFeriasTab({
                     </td>
                     <td className="px-3 py-2 text-foreground-muted">
                       {item.abono ? `Sim${item.diasAbono > 0 ? ` · ${item.diasAbono}d` : ""}` : "Não"}
+                      {item.adiantamento13 && (
+                        <span className="block text-[9.5px] text-foreground-muted">13º adiantado</span>
+                      )}
                     </td>
                     <td className="px-3 py-2 text-right font-semibold">
                       {item.semSalario ? (
