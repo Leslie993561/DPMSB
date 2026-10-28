@@ -91,25 +91,13 @@ function formatarK(valor: number): string {
   return valor >= 1000 ? `${(valor / 1000).toFixed(1)}k` : formatarMoeda(valor);
 }
 
-interface MesDiasUteis {
-  mes: number;
-  diasUteis: number;
-  origem: "ajustado" | "herdado" | "padrao";
-}
-
 export function BeneficiosDashboardTab() {
   const [competencia, setCompetencia] = useState(competenciaAtual());
   const [linhas, setLinhas] = useState<LinhaRateio[]>([]);
   const [resumoAnual, setResumoAnual] = useState<ResumoMensal[]>([]);
   const [carregando, setCarregando] = useState(true);
-  const [diasUteisAno, setDiasUteisAno] = useState(ANO_ATUAL);
-  const [meses, setMeses] = useState<MesDiasUteis[]>([]);
-  const [editando, setEditando] = useState<number | null>(null);
-  const [valorEdicao, setValorEdicao] = useState("");
   const [detalheSetorAberto, setDetalheSetorAberto] = useState(false);
   const [periodoExportar, setPeriodoExportar] = useState<"mes" | "ano">("mes");
-  const [salvando, setSalvando] = useState(false);
-  const [diasUteisAberto, setDiasUteisAberto] = useState(false);
 
   const ano = Number(competencia.slice(0, 4));
 
@@ -136,18 +124,6 @@ export function BeneficiosDashboardTab() {
 
   // Voltar para o Dashboard depois de mexer no Rateio traz o número novo.
   useAtualizacaoAoVoltar(recarregar);
-
-  async function recarregarDiasUteis() {
-    const res = await fetch(`/api/beneficios/dias-uteis?ano=${diasUteisAno}`);
-    const data = await res.json();
-    setMeses(data.meses ?? []);
-  }
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- busca de dados ao trocar de ano; setState só ocorre após o await do fetch
-    void recarregarDiasUteis();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [diasUteisAno]);
 
   const mesAtual = Number(competencia.slice(5, 7));
 
@@ -199,35 +175,6 @@ export function BeneficiosDashboardTab() {
   }, [linhas]);
 
   const maxMensal = Math.max(1, ...resumoAnual.map((m) => m.total));
-
-  function abrirEdicao(m: MesDiasUteis) {
-    setEditando(m.mes);
-    setValorEdicao(String(m.diasUteis));
-  }
-
-  const mesEstaFechado = (mes: number) => resumoAnual.some((m) => m.mes === mes && m.fechado);
-
-  async function salvarEdicao(mes: number) {
-    // O servidor recusa de qualquer jeito (409); barrar aqui é só para não
-    // deixar a pessoa digitar um número que vai ser jogado fora.
-    if (diasUteisAno === ano && mesEstaFechado(mes)) {
-      setEditando(null);
-      return;
-    }
-    setSalvando(true);
-    try {
-      const res = await fetch("/api/beneficios/dias-uteis", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ano: diasUteisAno, mes, diasUteis: Number(valorEdicao) }),
-      });
-      const data = await res.json();
-      if (res.ok) setMeses(data.meses ?? []);
-      setEditando(null);
-    } finally {
-      setSalvando(false);
-    }
-  }
 
   if (carregando) return <p className="text-sm text-foreground-muted">Carregando...</p>;
 
@@ -427,82 +374,6 @@ export function BeneficiosDashboardTab() {
           </div>
         </div>
       </Card>
-
-      <div>
-        <button
-          type="button"
-          onClick={() => setDiasUteisAberto((v) => !v)}
-          className="text-[11.5px] font-semibold text-brand-primary-800 hover:underline"
-        >
-          {diasUteisAberto ? "Ocultar" : "Ajustar"} dias úteis por mês (usado no cálculo do vale-transporte) {diasUteisAberto ? "▴" : "▾"}
-        </button>
-
-        {diasUteisAberto && (
-          <div className="mt-3 space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-[11px] text-foreground-muted">
-                Clique em um mês para ajustar manualmente (ex.: feriados locais, folgas coletivas).
-              </p>
-              <select
-                value={diasUteisAno}
-                onChange={(e) => setDiasUteisAno(Number(e.target.value))}
-                className="rounded-md border border-brand-surface bg-background px-3 py-1.5 text-sm text-foreground dark:border-brand-neutral/30"
-              >
-                {ANOS_DISPONIVEIS.map((a) => (
-                  <option key={a} value={a}>
-                    {a}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4 lg:grid-cols-6">
-              {meses.map((m) => (
-                <Card key={m.mes} className={cn("p-3", m.origem !== "padrao" && "border-brand-primary/40")}>
-                  {editando === m.mes ? (
-                    <div className="flex flex-col gap-1.5">
-                      <span className="text-xs font-semibold text-foreground-muted">{MESES[m.mes - 1]}</span>
-                      <input
-                        type="number"
-                        min={0}
-                        max={31}
-                        autoFocus
-                        value={valorEdicao}
-                        onChange={(e) => setValorEdicao(e.target.value)}
-                        className="w-full rounded-md border border-brand-primary bg-background px-2 py-1 text-sm text-foreground"
-                      />
-                      <div className="flex gap-1">
-                        <button
-                          type="button"
-                          disabled={salvando}
-                          onClick={() => salvarEdicao(m.mes)}
-                          className="flex-1 rounded bg-brand-primary px-2 py-1 text-[11px] font-semibold text-brand-white hover:bg-brand-primary-hover disabled:opacity-50"
-                        >
-                          Salvar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setEditando(null)}
-                          className="rounded border border-brand-surface px-2 py-1 text-[11px] text-foreground-muted hover:bg-brand-surface"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <button type="button" onClick={() => abrirEdicao(m)} className="flex w-full flex-col items-start gap-1 text-left">
-                      <span className="text-xs font-semibold text-foreground-muted">{MESES[m.mes - 1]}</span>
-                      <span className="text-lg font-semibold text-foreground">{m.diasUteis}</span>
-                      <span className="text-[10px] text-foreground-muted">
-                        {m.origem === "ajustado" ? "ajustado" : m.origem === "herdado" ? "herdado" : "padrão"}
-                      </span>
-                    </button>
-                  )}
-                </Card>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
     </div>
   );
 }
