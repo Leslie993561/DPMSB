@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { sincronizarRetratoReaberto } from "@/lib/db/folhaBreakdown";
 import { bloquearSeFechada, competenciaDeAnoMes } from "@/lib/db/fechamento";
 import { listarDiasUteisAno, definirDiasUteis } from "@/lib/db/beneficiosDiasUteis";
 
@@ -30,5 +31,6 @@ export async function PATCH(request: Request) {
   if (bloqueio) return bloqueio;
 
   await definirDiasUteis(ano, mes, diasUteis);
+  await sincronizarRetratoReaberto(competenciaDeAnoMes(ano, mes));
   return Response.json({ ano, meses: await listarDiasUteisAno(ano) });
 }

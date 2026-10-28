@@ -620,6 +620,25 @@ export async function reabrirCompetencia(competencia: string): Promise<void> {
   });
 }
 
+/**
+ * Mês reaberto para edição: leva ao retrato gravado o que o Rateio de
+ * Benefícios mostra (VT, VA e variáveis), para o dashboard do Breakdown seguir
+ * o que foi editado no módulo. Salário e encargos continuam congelados. Mês
+ * fechado, ou sem retrato, não muda.
+ */
+export async function sincronizarRetratoReaberto(competencia: string): Promise<void> {
+  if (!(await competenciaTemRetrato(competencia)) || (await competenciaFechada(competencia))) return;
+  const linhas = await gerarBreakdown(competencia);
+  const db = await getDb();
+  for (const l of linhas) {
+    await db.execute({
+      sql: `UPDATE folha_breakdown SET vale_transporte = ?, vale_alimentacao = ?, outros_beneficios = ?
+             WHERE colaborador_id = ? AND competencia = ?`,
+      args: [l.valeTransporte, l.valeAlimentacao, l.variaveis, l.colaboradorId, competencia],
+    });
+  }
+}
+
 /** O mês tem um retrato gravado (fechado ou apenas reaberto para edição). */
 export async function competenciaTemRetrato(competencia: string): Promise<boolean> {
   const db = await getDb();
@@ -665,7 +684,12 @@ export async function listarBreakdownPersistido(competencia: string): Promise<Ve
     // Núcleo (salário/encargos/VT/VA) fica congelado no fechamento; as extras
     // (importadas à parte) continuam valendo mesmo depois do mês fechado.
     const nucleoCongelado = arredondar(
-      l.salario_base + l.fgts + l.provisao_decimo_terceiro + l.vale_transporte + l.vale_alimentacao,
+      l.salario_base +
+        l.fgts +
+        l.provisao_decimo_terceiro +
+        l.vale_transporte +
+        l.vale_alimentacao +
+        l.outros_beneficios,
     );
     const extras = extrasPorColaborador.get(l.colaborador_id) ?? EXTRAS_VAZIAS;
     const premiacao = extras.premiacao ?? 0;
@@ -738,7 +762,7 @@ export async function listarBreakdownPersistido(competencia: string): Promise<Ve
       irrf: l.irrf,
       fgts: l.fgts,
       provisaoDecimoTerceiro: l.provisao_decimo_terceiro,
-      variaveis: 0,
+      variaveis: l.outros_beneficios,
       // O retrato do mês fechado guarda só salário, encargos e benefícios; a
       // abertura em diretos/provisões não foi persistida quando o mês fechou.
       // Zerar é o honesto: melhor a tela não mostrar composição do que mostrar

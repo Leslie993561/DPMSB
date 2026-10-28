@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { gerarRateio, upsertOverrideRateio } from "@/lib/db/beneficiosRateio";
+import { sincronizarRetratoReaberto } from "@/lib/db/folhaBreakdown";
 import { bloquearSeFechada } from "@/lib/db/fechamento";
 import { filtrarPorEquipe } from "@/lib/acesso/equipeGestor";
 
@@ -44,5 +45,6 @@ export async function PATCH(request: Request) {
     valeAlimentacao: parsed.data.valeAlimentacao ?? null,
     variaveis: null,
   });
+  await sincronizarRetratoReaberto(parsed.data.competencia);
   return Response.json({ ok: true });
 }

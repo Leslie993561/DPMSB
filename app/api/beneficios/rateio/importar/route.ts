@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { sincronizarRetratoReaberto } from "@/lib/db/folhaBreakdown";
 import { bloquearSeFechada } from "@/lib/db/fechamento";
 import { parsearPlanilha } from "@/lib/parsing/spreadsheet";
 import { converterRateioImportado } from "@/lib/parsing/rateioBeneficios";
@@ -32,6 +33,7 @@ export async function POST(request: Request) {
     const { cabecalhos, linhas } = await parsearPlanilha(buffer, arquivo.name);
     const conversao = converterRateioImportado(cabecalhos, linhas);
     const resultado = await importarRateio(conversao.itens, parsed.data.competencia);
+    await sincronizarRetratoReaberto(parsed.data.competencia);
 
     return Response.json({
       aplicadas: resultado.aplicadas,

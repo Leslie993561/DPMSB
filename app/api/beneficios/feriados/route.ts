@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { sincronizarRetratoReaberto } from "@/lib/db/folhaBreakdown";
 import { bloquearSeFechada } from "@/lib/db/fechamento";
 import { listarFeriadosEmpresa, listarFeriadosNacionaisEndo, alternarFeriadoEmpresa } from "@/lib/db/beneficiosFeriados";
 
@@ -28,5 +29,6 @@ export async function POST(request: Request) {
   if (bloqueio) return bloqueio;
 
   const resultado = await alternarFeriadoEmpresa(data);
+  await sincronizarRetratoReaberto(data.slice(0, 7));
   return Response.json(resultado);
 }
