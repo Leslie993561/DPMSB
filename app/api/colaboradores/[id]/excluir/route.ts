@@ -34,6 +34,12 @@ export async function POST(_request: Request, ctx: RouteContext<"/api/colaborado
   if (vinculos.mesesFechados > 0) impedimentos.push(`${vinculos.mesesFechados} mês(es) de folha já fechado(s)`);
   if (vinculos.liderados > 0) impedimentos.push(`${vinculos.liderados} colaborador(es) que têm ele como gestor`);
 
+  if (vinculos.beneficiosLancados > 0) impedimentos.push(`${vinculos.beneficiosLancados} lançamento(s) de benefícios`);
+  if (vinculos.registrosSst > 0) impedimentos.push(`${vinculos.registrosSst} registro(s) de SST (EPI, fardamento, exames)`);
+  if (vinculos.kitsEntregues > 0) impedimentos.push(`${vinculos.kitsEntregues} kit(s) entregue(s) pelo DHO`);
+  if (vinculos.movimentacoes > 0) impedimentos.push(`${vinculos.movimentacoes} movimentação(ões)`);
+  if (vinculos.acessoGestor > 0) impedimentos.push("acesso de gestor ao portal (remova em Gerenciar acesso)");
+
   if (impedimentos.length > 0) {
     return Response.json(
       {
@@ -47,6 +53,16 @@ export async function POST(_request: Request, ctx: RouteContext<"/api/colaborado
     );
   }
 
-  await excluirColaborador(colaboradorId);
+  try {
+    await excluirColaborador(colaboradorId);
+  } catch (erro) {
+    // Qualquer vínculo que a checagem acima não conheça cai aqui como erro do banco;
+    // sem isso a tela só via uma resposta vazia e dizia "falha de comunicação".
+    console.error("Falha ao excluir colaborador", colaboradorId, erro);
+    return Response.json(
+      { erro: "Não foi possível excluir: ainda há registros ligados a este colaborador. Use “Desligar colaborador”." },
+      { status: 409 },
+    );
+  }
   return Response.json({ excluido: true, nome: colaborador.nome.trim() });
 }

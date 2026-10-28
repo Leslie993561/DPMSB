@@ -902,6 +902,15 @@ export interface VinculosDoColaborador {
   verbasImportadas: number;
   mesesFechados: number;
   liderados: number;
+  /** Benefícios variáveis e extras do Rateio. */
+  beneficiosLancados: number;
+  /** Fichas, entregas e exames do SST (EPI, fardamento, ASO). */
+  registrosSst: number;
+  /** Kits entregues pelo DHO. */
+  kitsEntregues: number;
+  movimentacoes: number;
+  /** Acesso como gestor ao portal. */
+  acessoGestor: number;
 }
 
 /** O que existe amarrado ao colaborador — o que impede apagá-lo sem perder histórico. */
@@ -915,8 +924,20 @@ export async function contarVinculos(colaboradorId: number): Promise<VinculosDoC
           WHERE p.colaborador_id = ?) AS lancamentos,
         (SELECT COUNT(*) FROM folha_extras WHERE colaborador_id = ?) AS extras,
         (SELECT COUNT(*) FROM folha_breakdown WHERE colaborador_id = ?) AS fechados,
-        (SELECT COUNT(*) FROM colaboradores WHERE gestor_id = ?) AS liderados`,
-    args: [colaboradorId, colaboradorId, colaboradorId, colaboradorId, colaboradorId],
+        (SELECT COUNT(*) FROM colaboradores WHERE gestor_id = ?) AS liderados,
+        (SELECT COUNT(*) FROM beneficios_variaveis WHERE colaborador_id = ?)
+          + (SELECT COUNT(*) FROM beneficios_rateio_extras WHERE colaborador_id = ?) AS beneficios,
+        (SELECT COUNT(*) FROM sst_fichas_epi WHERE colab_id = ?)
+          + (SELECT COUNT(*) FROM sst_entregas_epi WHERE colab_id = ?)
+          + (SELECT COUNT(*) FROM sst_fardamento_entregas WHERE colab_id = ?)
+          + (SELECT COUNT(*) FROM sst_fichas_exame WHERE colab_id = ?)
+          + (SELECT COUNT(*) FROM sst_exames_realizados WHERE colab_id = ?)
+          + (SELECT COUNT(*) FROM sst_epi_trocas_dispensadas WHERE colab_id = ?)
+          + (SELECT COUNT(*) FROM sst_epi_divergencias_dispensadas WHERE colab_id = ?) AS sst,
+        (SELECT COUNT(*) FROM dho_kit_entregas WHERE colaborador_id = ?) AS kits,
+        (SELECT COUNT(*) FROM movimentacoes_info WHERE colaborador_id = ?) AS movimentacoes,
+        (SELECT COUNT(*) FROM gestores_acesso WHERE colaborador_id = ?) AS acesso`,
+    args: Array(18).fill(colaboradorId),
   });
   const l = resultado.rows[0] as unknown as {
     periodos: number;
@@ -924,6 +945,11 @@ export async function contarVinculos(colaboradorId: number): Promise<VinculosDoC
     extras: number;
     fechados: number;
     liderados: number;
+    beneficios: number;
+    sst: number;
+    kits: number;
+    movimentacoes: number;
+    acesso: number;
   };
   return {
     periodosAquisitivos: Number(l.periodos),
@@ -931,6 +957,11 @@ export async function contarVinculos(colaboradorId: number): Promise<VinculosDoC
     verbasImportadas: Number(l.extras),
     mesesFechados: Number(l.fechados),
     liderados: Number(l.liderados),
+    beneficiosLancados: Number(l.beneficios),
+    registrosSst: Number(l.sst),
+    kitsEntregues: Number(l.kits),
+    movimentacoes: Number(l.movimentacoes),
+    acessoGestor: Number(l.acesso),
   };
 }
 

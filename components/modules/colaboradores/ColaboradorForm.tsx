@@ -793,7 +793,7 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
     setExcluindo(true);
     try {
       const res = await fetch(`/api/colaboradores/${editando.id}/excluir`, { method: "POST" });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}) as { erro?: string });
       if (!res.ok) {
         setErroExcluir(data.erro ?? "Erro ao excluir o colaborador.");
         return;
