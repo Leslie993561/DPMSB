@@ -5,6 +5,7 @@ import { buscarSemCache, useAtualizacaoAoVoltar } from "@/lib/useAtualizacaoAoVo
 import { Card, StatCard } from "@/components/shared/Card";
 import { cn } from "@/lib/cn";
 import { formatarMoeda } from "@/lib/format";
+import { comporPorSetor, totalBrindes } from "@/lib/beneficios/composicaoSetor";
 
 interface LinhaRateio {
   colaboradorId: number;
@@ -90,51 +91,6 @@ function formatarK(valor: number): string {
   return valor >= 1000 ? `${(valor / 1000).toFixed(1)}k` : formatarMoeda(valor);
 }
 
-function totalBrindes(l: LinhaRateio): number {
-  return (l.bonificacao ?? 0) + (l.outrosCustos ?? 0);
-}
-
-type MacroSetor = "Produção" | "Administrativo";
-
-/**
- * Agrupamento em 2 macro-categorias (visão executiva do Dashboard) — setores
- * de chão de fábrica/operação caem em "Produção", áreas de escritório/apoio
- * em "Administrativo". Mapeamento nosso, não vem do cadastro; o Rateio (aba
- * ao lado) continua mostrando o departamento real de cada colaborador.
- */
-const MACRO_SETOR: Record<string, MacroSetor> = {
-  Produção: "Produção",
-  Manutenção: "Produção",
-  Engenharia: "Produção",
-  "Controle da Qualidade": "Produção",
-  "Garantia da Qualidade": "Produção",
-  Logística: "Produção",
-  Industrial: "Produção",
-  Administrativo: "Administrativo",
-  "Recursos Humanos": "Administrativo",
-  Financeiro: "Administrativo",
-  Contábil: "Administrativo",
-  Comercial: "Administrativo",
-  Diretoria: "Administrativo",
-  Planejamento: "Administrativo",
-  "Operações de Vendas": "Administrativo",
-  "Tecnologia da Informacao": "Administrativo",
-};
-
-/**
- * Onde o custo do colaborador é rateado.
- *
- * O centro informado no D365 manda: é classificação contábil, feita por quem
- * responde por ela. O mapa por departamento é só o palpite de quando o campo
- * está vazio — e "Administrativo" como último caso significa "não sabemos",
- * que foi como a Ourivania, sem setor nenhum, virou administrativa em silêncio.
- */
-function macroSetor(departamento: string | null, rateioD365?: string | null): MacroSetor {
-  if (rateioD365 === "PRO") return "Produção";
-  if (rateioD365 === "ADM") return "Administrativo";
-  return (departamento && MACRO_SETOR[departamento]) || "Administrativo";
-}
-
 interface MesDiasUteis {
   mes: number;
   diasUteis: number;
@@ -151,6 +107,7 @@ export function BeneficiosDashboardTab() {
   const [editando, setEditando] = useState<number | null>(null);
   const [valorEdicao, setValorEdicao] = useState("");
   const [detalheSetorAberto, setDetalheSetorAberto] = useState(false);
+  const [periodoExportar, setPeriodoExportar] = useState<"mes" | "ano">("mes");
   const [salvando, setSalvando] = useState(false);
   const [diasUteisAberto, setDiasUteisAberto] = useState(false);
 
@@ -216,32 +173,7 @@ export function BeneficiosDashboardTab() {
   // onde havia 57 pessoas na conta.
   const colaboradoresNaFolha = linhas.length;
 
-  const composicaoPorSetor = useMemo(() => {
-    const vazio = { vt: 0, vm: 0, vr: 0, variaveis: 0, colaboradores: 0 };
-    const mapa = new Map<MacroSetor, typeof vazio>([
-      ["Produção", { ...vazio }],
-      ["Administrativo", { ...vazio }],
-    ]);
-    for (const l of linhas) {
-      const chave = macroSetor(l.departamento, l.rateioD365);
-      const atual = mapa.get(chave)!;
-      // Transporte e mobilidade são verbas diferentes e cada uma tem a sua
-      // linha: somadas, o setor perdia de vista quanto era catraca e quanto
-      // era auxílio fixo.
-      mapa.set(chave, {
-        vt: atual.vt + (l.tipoTransporte === "vm_fixo" ? 0 : l.valeTransporte),
-        vm: atual.vm + (l.tipoTransporte === "vm_fixo" ? l.valeTransporte : 0),
-        vr: atual.vr + l.valeAlimentacao,
-        variaveis: atual.variaveis + l.variaveis + totalBrindes(l),
-        colaboradores: atual.colaboradores + 1,
-      });
-    }
-    return Array.from(mapa.entries()).map(([setor, v]) => ({
-      setor,
-      ...v,
-      total: v.vt + v.vm + v.vr + v.variaveis,
-    }));
-  }, [linhas]);
+  const composicaoPorSetor = useMemo(() => comporPorSetor(linhas), [linhas]);
 
   // Os dois cartões acima agrupam em Produção/Administrativo, que é mapeamento
   // nosso. Este detalhe usa o departamento REAL do cadastro — inclusive o
@@ -343,7 +275,26 @@ export function BeneficiosDashboardTab() {
       )}
 
       <Card className="p-4">
-        <h3 className="text-[13px] font-bold text-foreground">Composição dos benefícios por setor</h3>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <h3 className="text-[13px] font-bold text-foreground">Composição dos benefícios por setor</h3>
+          <div className="flex items-center gap-1.5">
+            <select
+              value={periodoExportar}
+              onChange={(e) => setPeriodoExportar(e.target.value as "mes" | "ano")}
+              aria-label="Período da exportação"
+              className="rounded-md border border-hairline bg-background px-2 py-1 text-[11px] text-foreground-muted"
+            >
+              <option value="mes">Mês: {competenciaExibida(competencia)}</option>
+              <option value="ano">Ano todo: {ano}</option>
+            </select>
+            <a
+              href={`/api/beneficios/exportar?ano=${ano}${periodoExportar === "mes" ? `&mes=${mesAtual}` : ""}`}
+              className="rounded-md border border-hairline px-2.5 py-1 text-[11px] font-semibold text-brand-primary-800 hover:border-brand-primary"
+            >
+              ↓ Exportar Excel
+            </a>
+          </div>
+        </div>
         <p className="text-[10.5px] text-foreground-muted">
           rateado por headcount · {composicaoPorSetor.map((s) => `${s.colaboradores} ${s.setor}`).join(" · ")} ·{" "}
           {competenciaExibida(competencia)}
