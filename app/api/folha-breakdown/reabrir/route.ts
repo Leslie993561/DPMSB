@@ -26,6 +26,8 @@ export async function POST(request: Request) {
     return Response.json({ erro: "Informe competencia no formato AAAA-MM." }, { status: 400 });
   }
 
-  const removidas = await reabrirCompetencia(parsed.data.competencia);
-  return Response.json({ removidas, fechado: false });
+  // O mês fechado não é mais reaberto pelo portal: descartar o retrato congelado
+  // perdia os valores sem volta. Só uma nova planilha altera o que foi fechado.
+  void reabrirCompetencia;
+  return Response.json({ erro: "Mês fechado não é reaberto: só uma nova planilha altera os valores." }, { status: 409 });
 }

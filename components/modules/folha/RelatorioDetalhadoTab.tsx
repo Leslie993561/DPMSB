@@ -164,13 +164,8 @@ export function RelatorioDetalhadoTab() {
    * diferente do que era quando o mês fechou.
    */
   async function alternarFechamento() {
-    if (fechado) {
-      const confirmou = window.confirm(
-        `Reabrir ${competenciaCurta(competencia)}?\n\nOs valores congelados serão descartados e o mês volta a ser ` +
-          "calculado com o cadastro atual. Não há como recuperar o retrato anterior.",
-      );
-      if (!confirmou) return;
-    }
+    // Mês fechado não reabre: só uma nova planilha altera os valores.
+    if (fechado) return;
 
     setErroFechar(null);
     setFechando(true);
@@ -324,17 +319,12 @@ export function RelatorioDetalhadoTab() {
                 </span>
               )
             ) : fechado ? (
-              <button
-                type="button"
-                onClick={() => void alternarFechamento()}
-                disabled={fechando}
-                title="Mês fechado: os valores são um retrato gravado e não mudam mais. Clique para reabrir e voltar ao cálculo ao vivo."
-                className="group/selo flex items-center gap-1 rounded-full border border-status-success-border bg-status-success-bg px-2.5 py-1 text-[10.5px] font-bold text-status-success transition-colors hover:border-status-danger-border hover:bg-status-danger-bg hover:text-status-danger disabled:opacity-50"
+              <span
+                title="Mês fechado: os valores são um retrato gravado e só mudam se uma nova planilha for enviada."
+                className="flex items-center gap-1 rounded-full border border-status-success-border bg-status-success-bg px-2.5 py-1 text-[10.5px] font-bold text-status-success"
               >
-                <span aria-hidden>🔒</span>
-                <span className="group-hover/selo:hidden">{fechando ? "Reabrindo…" : "Mês fechado"}</span>
-                <span className="hidden group-hover/selo:inline">{fechando ? "Reabrindo…" : "Reabrir mês"}</span>
-              </button>
+                <span aria-hidden>🔒</span> Mês fechado
+              </span>
             ) : (
               <button
                 type="button"
