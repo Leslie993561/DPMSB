@@ -93,6 +93,7 @@ const schema = z.object({
   insalubridadePercentual: z.coerce.number().min(0).max(100).nullable().optional(),
   adicionalFixo: z.coerce.number().min(0).nullable().optional(),
   adicionalFixoDescricao: z.string().nullable().optional(),
+  dataFimContrato: z.iso.date().nullable().optional(),
   dependentesLista: z.array(schemaDependente).optional(),
 });
 

@@ -112,6 +112,8 @@ export interface Colaborador {
   /** Adicional em reais que não segue percentual — quebra de caixa, ajuda de custo fixa etc. */
   adicionalFixo: number | null;
   adicionalFixoDescricao: string | null;
+  /** Término do contrato por prazo determinado — só para vínculos JÁ e EST. */
+  dataFimContrato: string | null;
 }
 
 export interface ColaboradorInput {
@@ -192,6 +194,7 @@ export interface ColaboradorInput {
   insalubridadePercentual?: number | null;
   adicionalFixo?: number | null;
   adicionalFixoDescricao?: string | null;
+  dataFimContrato?: string | null;
 }
 
 interface LinhaColaborador {
@@ -244,6 +247,7 @@ interface LinhaColaborador {
   insalubridade_percentual: number | null;
   adicional_fixo: number | null;
   adicional_fixo_descricao: string | null;
+  data_fim_contrato?: string | null;
   conjuge_nome: string | null;
   conjuge_cpf: string | null;
   conjuge_nascimento: string | null;
@@ -355,6 +359,7 @@ function paraColaborador(linha: LinhaColaborador): Colaborador {
     insalubridadePercentual: linha.insalubridade_percentual,
     adicionalFixo: linha.adicional_fixo,
     adicionalFixoDescricao: linha.adicional_fixo_descricao,
+    dataFimContrato: linha.data_fim_contrato ?? null,
   };
 }
 
@@ -429,6 +434,7 @@ export function paraColaboradorProfissional(c: Colaborador): Colaborador {
     insalubridadePercentual: null,
     adicionalFixo: null,
     adicionalFixoDescricao: null,
+    dataFimContrato: null,
     valorRescisao: null,
     valorFgts: null,
     motivoDesligamento: null,
@@ -569,7 +575,11 @@ export async function criarColaborador(input: ColaboradorInput): Promise<Colabor
       input.tamanhoSapato ?? null,
     ],
   });
-  return (await buscarColaborador(Number(info.lastInsertRowid)))!;
+  const novoId = Number(info.lastInsertRowid);
+  if (input.dataFimContrato && (input.vinculo === "JÁ" || input.vinculo === "EST")) {
+    await db.execute({ sql: "UPDATE colaboradores SET data_fim_contrato = ? WHERE id = ?", args: [input.dataFimContrato, novoId] });
+  }
+  return (await buscarColaborador(novoId))!;
 }
 
 export async function atualizarColaborador(id: number, input: Partial<ColaboradorInput>): Promise<Colaborador> {
@@ -662,6 +672,14 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
     adicionalFixo: input.adicionalFixo !== undefined ? input.adicionalFixo : atual.adicionalFixo,
     adicionalFixoDescricao:
       input.adicionalFixoDescricao !== undefined ? input.adicionalFixoDescricao : atual.adicionalFixoDescricao,
+    // Só JÁ e EST têm prazo determinado; trocar para outro vínculo limpa a data.
+    dataFimContrato:
+      (input.vinculo !== undefined ? input.vinculo : atual.vinculo) === "JÁ" ||
+      (input.vinculo !== undefined ? input.vinculo : atual.vinculo) === "EST"
+        ? input.dataFimContrato !== undefined
+          ? input.dataFimContrato
+          : atual.dataFimContrato
+        : null,
   };
 
   // Trocou o líder: o nome em texto acompanha, senão o antigo ("Tássio Antônio")
@@ -687,7 +705,7 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
            deficiente = ?, deficiencia_tipo = ?, nacionalidade_pai = ?, nacionalidade_mae = ?, escolaridade = ?,
            tamanho_camisa = ?, tamanho_calca = ?, tamanho_sapato = ?,
            periculosidade_percentual = ?, insalubridade_percentual = ?, adicional_fixo = ?,
-           adicional_fixo_descricao = ?
+           adicional_fixo_descricao = ?, data_fim_contrato = ?
        WHERE id = ?`,
     args: [
       mesclado.nome,
@@ -767,6 +785,7 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
       mesclado.insalubridadePercentual ?? null,
       mesclado.adicionalFixo ?? null,
       mesclado.adicionalFixoDescricao ?? null,
+      mesclado.dataFimContrato ?? null,
       id,
     ],
   });

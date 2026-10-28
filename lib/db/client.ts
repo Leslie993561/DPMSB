@@ -205,6 +205,8 @@ const MIGRACOES: { tabela: string; coluna: string; definicao: string }[] = [
   { tabela: "colaboradores", coluna: "insalubridade_percentual", definicao: "REAL" },
   { tabela: "colaboradores", coluna: "adicional_fixo", definicao: "REAL" },
   { tabela: "colaboradores", coluna: "adicional_fixo_descricao", definicao: "TEXT" },
+  // Fim do contrato por prazo determinado (vínculos JÁ e EST).
+  { tabela: "colaboradores", coluna: "data_fim_contrato", definicao: "TEXT" },
   // Hora extra e afins do Relatório detalhado. Vão em MIGRACOES e não no
   // CREATE TABLE porque folha_extras já existe em produção — o IF NOT EXISTS
   // não acrescenta coluna a uma tabela criada antes.

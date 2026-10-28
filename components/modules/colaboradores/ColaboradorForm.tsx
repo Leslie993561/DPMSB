@@ -771,6 +771,7 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
     editando?.adicionalFixo != null ? String(editando.adicionalFixo) : "",
   );
   const [adicionalFixoDescricao, setAdicionalFixoDescricao] = useState(editando?.adicionalFixoDescricao ?? "");
+  const [dataFimContrato, setDataFimContrato] = useState(editando?.dataFimContrato ?? "");
 
   const desligado = editando?.status === "desligado";
 
@@ -977,6 +978,7 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
         insalubridadePercentual: insalubridade ? Number(insalubridade) : null,
         adicionalFixo: adicionalFixo ? Number(adicionalFixo) : null,
         adicionalFixoDescricao: adicionalFixoDescricao || null,
+        dataFimContrato: vinculo === "JÁ" || vinculo === "EST" ? dataFimContrato || null : null,
         dependentesLista,
         ...(desligado
           ? {
@@ -1928,6 +1930,20 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
           </select>
         </label>
       </div>
+
+      {(vinculo === "JÁ" || vinculo === "EST") && (
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Data final do contrato
+          <input
+            type="date"
+            value={dataFimContrato}
+            min={dataAdmissao || undefined}
+            onChange={(e) => setDataFimContrato(e.target.value)}
+            disabled={bloqueado}
+            className={INPUT_CLASS}
+          />
+        </label>
+      )}
 
       <div className="grid grid-cols-2 gap-2">
         <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
