@@ -862,12 +862,18 @@ function LinhaPj({ pj, onAbrir }: { pj: ControleFeriasPj; onAbrir: (p: ControleF
     <tr className="border-b border-hairline/60 last:border-0 hover:bg-surface-page/60">
       <td className="px-3 py-2 text-[10px] text-foreground-muted/70">#{pj.colaboradorId}</td>
       <td className="px-3 py-2">
-        <button type="button" onClick={() => onAbrir(pj)} className="text-left hover:text-brand-primary-800">
-          <span className="block font-medium text-foreground uppercase">{pj.colaboradorNome}</span>
-          <span className="block text-[10px] font-normal text-foreground-muted normal-case">
-            {pj.colaboradorCargo ?? "—"} · {pj.colaboradorDepartamento ?? "—"}
-          </span>
-        </button>
+        <span className="flex items-center gap-1.5">
+          <MenuAcoesLinha
+            rotuloAria="Ações do colaborador"
+            itens={[{ rotulo: "Ver períodos e lançamentos de férias", onClick: () => onAbrir(pj) }]}
+          />
+          <button type="button" onClick={() => onAbrir(pj)} className="text-left hover:text-brand-primary-800">
+            <span className="block font-medium text-foreground uppercase">{pj.colaboradorNome}</span>
+            <span className="block text-[10px] font-normal text-foreground-muted normal-case">
+              {pj.colaboradorCargo ?? "—"} · {pj.colaboradorDepartamento ?? "—"}
+            </span>
+          </button>
+        </span>
       </td>
       <td className="px-3 py-2 text-foreground-muted">{formatarDataBr(pj.colaboradorAdmissao)}</td>
       <td className="px-3 py-2 text-foreground-muted">
