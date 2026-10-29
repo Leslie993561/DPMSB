@@ -287,6 +287,41 @@ export async function criarLancamentoManual(input: CriarLancamentoManualInput): 
   return lancamento;
 }
 
+export interface CriarLancamentoPjInput {
+  periodoAquisitivoId: number;
+  dias: number;
+  dataInicioGozo: string;
+  dataFimGozo: string;
+  observacao: string | null;
+  operador: string;
+}
+
+/**
+ * Lançamento de férias de PJ: já nasce "concluída" e NÃO passa pelas
+ * validações de fracionamento/abono da CLT (sem mínimo de dias, sem limite de
+ * parcelas, sem abono). Quem chama (`lancarFeriasPj`) já garantiu que os dias
+ * cabem no saldo — essa é a única regra de PJ.
+ */
+export async function criarLancamentoPj(input: CriarLancamentoPjInput): Promise<LancamentoFerias> {
+  await garantirMesAberto(input.dataInicioGozo, "lançar férias");
+  const periodo = await buscarPeriodoOuFalhar(input.periodoAquisitivoId);
+  const lancamento = await inserirLancamento({
+    periodoAquisitivoId: periodo.id,
+    origem: "manual",
+    status: "concluida",
+    dias: input.dias,
+    dataInicioPrevista: null,
+    dataInicioGozo: input.dataInicioGozo,
+    dataFimGozo: input.dataFimGozo,
+    abono: false,
+    diasAbono: 0,
+    observacao: input.observacao,
+    criadoPor: input.operador,
+  });
+  await atualizarStatusPeriodo(periodo.id);
+  return lancamento;
+}
+
 export interface DarBaixaInput {
   dataInicioReal: string;
   dataFimReal: string;

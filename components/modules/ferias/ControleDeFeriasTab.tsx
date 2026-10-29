@@ -3,12 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import type { PeriodoAquisitivoAberto, PeriodoEmCurso, SituacaoPeriodo } from "@/lib/db/periodosAquisitivos";
 import type { Colaborador } from "@/lib/db/colaboradores";
+import type { ControleFeriasPj } from "@/lib/db/feriasPj";
 import { formatarDataBr } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { Badge, type CorBadge } from "@/components/shared/Badge";
 import { Card } from "@/components/shared/Card";
 import { FilterChip } from "@/components/shared/FilterChip";
 import { PeriodoDetalheModal, type AlvoHistorico } from "./PeriodoDetalheModal";
+import { PjDetalheModal } from "./PjDetalheModal";
 import { MenuAcoesLinha } from "./MenuAcoesLinha";
 
 const ROTULO_SITUACAO: Record<SituacaoPeriodo, { label: string; cor: CorBadge }> = {
@@ -43,9 +45,10 @@ function situacaoExibida(p: PeriodoAquisitivoAberto): { label: string; cor: CorB
  */
 type LinhaControle =
   | { chave: string; nome: string; tipo: "periodo"; periodo: PeriodoAquisitivoAberto }
-  | { chave: string; nome: string; tipo: "emDia"; emCurso: PeriodoEmCurso };
+  | { chave: string; nome: string; tipo: "emDia"; emCurso: PeriodoEmCurso }
+  | { chave: string; nome: string; tipo: "pj"; pj: ControleFeriasPj };
 
-type FiltroStatus = "todos" | "vencidas" | "a_vencer";
+type FiltroStatus = "todos" | "vencidas" | "a_vencer" | "pj";
 type CategoriaExportar = "colaborador" | "setor" | "trimestre";
 
 const ANO_ATUAL = new Date().getFullYear();
@@ -77,6 +80,8 @@ export function ControleDeFeriasTab({
   const [periodos, setPeriodos] = useState<PeriodoAquisitivoAberto[]>([]);
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [emCurso, setEmCurso] = useState<PeriodoEmCurso[]>([]);
+  const [pjs, setPjs] = useState<ControleFeriasPj[]>([]);
+  const [pjAberto, setPjAberto] = useState<number | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [busca, setBusca] = useState("");
   const [departamento, setDepartamento] = useState("");
@@ -96,6 +101,7 @@ export function ControleDeFeriasTab({
       const [pData, cData] = await Promise.all([pRes.json(), cRes.json()]);
       setPeriodos(pData.periodos ?? []);
       setEmCurso(pData.emCurso ?? []);
+      setPjs(pData.pj ?? []);
       setColaboradores(cData.colaboradores ?? []);
     } finally {
       setCarregando(false);
@@ -206,24 +212,31 @@ export function ControleDeFeriasTab({
     const emDia = emCurso.map(
       (e): LinhaControle => ({ chave: `c${e.colaboradorId}`, nome: e.colaboradorNome, tipo: "emDia", emCurso: e }),
     );
-    return [...comPeriodo, ...emDia];
-  }, [periodos, emCurso]);
+    const comoPj = pjs.map(
+      (p): LinhaControle => ({ chave: `pj${p.colaboradorId}`, nome: p.colaboradorNome, tipo: "pj", pj: p }),
+    );
+    return [...comPeriodo, ...emDia, ...comoPj];
+  }, [periodos, emCurso, pjs]);
 
   const filtrados = useMemo(() => {
     const buscaNorm = busca.trim().toLowerCase();
     return linhas.filter((l) => {
       const nome = l.nome;
-      const cpf = l.tipo === "periodo" ? l.periodo.colaboradorCpf : l.emCurso.colaboradorCpf;
-      const depto = l.tipo === "periodo" ? l.periodo.colaboradorDepartamento : l.emCurso.colaboradorDepartamento;
+      const base = l.tipo === "periodo" ? l.periodo : l.tipo === "pj" ? l.pj : l.emCurso;
+      const cpf = base.colaboradorCpf;
+      const depto = base.colaboradorDepartamento;
 
       const bateBusca =
         !buscaNorm || nome.toLowerCase().includes(buscaNorm) || (cpf ?? "").toLowerCase().includes(buscaNorm);
       const bateDepartamento = !departamento || depto === departamento;
       // "Vencidas" e "A vencer" falam de saldo — quem está em dia só aparece em "Todos".
+      // PJ não tem concessivo, então nunca é vencido nem a vencer: só aparece em "Todos" e "PJ".
       const bateStatus =
         filtroStatus === "todos"
           ? true
-          : l.tipo === "periodo" &&
+          : filtroStatus === "pj"
+            ? l.tipo === "pj"
+            : l.tipo === "periodo" &&
             (filtroStatus === "vencidas"
               ? l.periodo.vencida
               : !l.periodo.vencida && l.periodo.situacao === "a_vencer");
@@ -304,6 +317,9 @@ export function ControleDeFeriasTab({
             </FilterChip>
             <FilterChip ativo={filtroStatus === "a_vencer"} onClick={() => setFiltroStatus("a_vencer")}>
               A vencer
+            </FilterChip>
+            <FilterChip ativo={filtroStatus === "pj"} onClick={() => setFiltroStatus("pj")}>
+              PJ
             </FilterChip>
           </div>
           <select
@@ -499,6 +515,8 @@ export function ControleDeFeriasTab({
                         })
                       }
                     />
+                  ) : l.tipo === "pj" ? (
+                    <LinhaPj key={l.chave} pj={l.pj} onAbrir={(p) => setPjAberto(p.colaboradorId)} />
                   ) : (
                     <LinhaEmDia
                       key={l.chave}
@@ -534,6 +552,15 @@ export function ControleDeFeriasTab({
             setAlvoHistorico(null);
             void recarregar();
           }}
+        />
+      )}
+
+      {pjAberto !== null && pjs.find((p) => p.colaboradorId === pjAberto) && (
+        <PjDetalheModal
+          pj={pjs.find((p) => p.colaboradorId === pjAberto)!}
+          podeLancar={!souGestor}
+          onFechar={() => setPjAberto(null)}
+          onAtualizado={() => void recarregar()}
         />
       )}
 
@@ -818,6 +845,48 @@ function LinhaPeriodo({
       </td>
       <td className="px-3 py-2">
         <Badge cor={situacaoExibida(p).cor}>{situacaoExibida(p).label}</Badge>
+      </td>
+    </tr>
+  );
+}
+
+/**
+ * Colaborador PJ: sem concessivo nem limite p/ gozo (nada vence). DIR é o que
+ * já foi adquirido (30 por aquisitivo completo), REST o saldo acumulado total;
+ * o detalhe com o saldo de cada período abre ao clicar no nome.
+ */
+function LinhaPj({ pj, onAbrir }: { pj: ControleFeriasPj; onAbrir: (p: ControleFeriasPj) => void }) {
+  const direito = pj.periodos.length * 30;
+  const ultimo = pj.periodos[pj.periodos.length - 1];
+  return (
+    <tr className="border-b border-hairline/60 last:border-0 hover:bg-surface-page/60">
+      <td className="px-3 py-2 text-[10px] text-foreground-muted/70">#{pj.colaboradorId}</td>
+      <td className="px-3 py-2">
+        <button type="button" onClick={() => onAbrir(pj)} className="text-left hover:text-brand-primary-800">
+          <span className="block font-medium text-foreground uppercase">{pj.colaboradorNome}</span>
+          <span className="block text-[10px] font-normal text-foreground-muted normal-case">
+            {pj.colaboradorCargo ?? "—"} · {pj.colaboradorDepartamento ?? "—"}
+          </span>
+        </button>
+      </td>
+      <td className="px-3 py-2 text-foreground-muted">{formatarDataBr(pj.colaboradorAdmissao)}</td>
+      <td className="px-3 py-2 text-foreground-muted">
+        {ultimo ? `${formatarDataBr(pj.periodos[0].inicio)} – ${formatarDataBr(ultimo.fim)}` : "—"}
+      </td>
+      <td className="px-3 py-2 text-foreground-muted/50">—</td>
+      <td className="px-3 py-2 text-right text-foreground-muted">{direito}</td>
+      <td
+        className={cn(
+          "px-3 py-2 text-right font-semibold",
+          pj.diasGozados > 0 ? "text-status-success" : "font-normal text-foreground-muted/60",
+        )}
+      >
+        {pj.diasGozados}
+      </td>
+      <td className="px-3 py-2 text-right font-semibold text-foreground">{pj.saldoTotal}</td>
+      <td className="px-3 py-2 text-foreground-muted/50">—</td>
+      <td className="px-3 py-2">
+        <Badge cor="amarelo">PJ</Badge>
       </td>
     </tr>
   );

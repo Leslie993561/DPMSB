@@ -3,6 +3,7 @@ import { getDb } from "./client";
 import { listarColaboradores, type Colaborador } from "./colaboradores";
 import { calcularEstadoPeriodo, avaliarRiscoDobro, type LancamentoInfo } from "@/lib/ferias-gestao/validacoes";
 import { avaliarPrazoConcessao } from "@/lib/calc";
+import { listarControlePj, type ControleFeriasPj } from "./feriasPj";
 
 export type StatusPeriodo = "aberto" | "concluido";
 
@@ -284,6 +285,8 @@ export async function listarPeriodosAbertos(base?: BaseControle): Promise<Period
     // dashboard e dos alertas, mesmo que o período tenha saldo (o histórico
     // continua acessível por `listarHistoricoColaborador`).
     if (colaborador.status === "desligado") continue;
+    // PJ não tem concessivo: nada vence nem alerta. Ele tem linha própria (`listarControlePj`).
+    if (colaborador.vinculo === "PJ") continue;
 
     // Ainda dentro do período aquisitivo (não fechou) — não conta como aberto/vencido ainda.
     if (new Date(periodo.dataFim) > hoje) continue;
@@ -359,7 +362,7 @@ export async function listarPeriodosEmCursoPendentes(base?: BaseControle): Promi
   const pendentes: PeriodoAquisitivoAberto[] = [];
   for (const periodo of periodos) {
     const colaborador = colaboradoresPorId.get(periodo.colaboradorId);
-    if (!colaborador || colaborador.status === "desligado") continue;
+    if (!colaborador || colaborador.status === "desligado" || colaborador.vinculo === "PJ") continue;
     if (periodo.status === "concluido" || new Date(periodo.dataFim) <= hoje) continue;
     const candidato = enriquecerPeriodo(periodo, colaborador, hoje, lancamentosPorPeriodo.get(periodo.id) ?? []);
     if (candidato.diasSemLancamento > 0) pendentes.push(candidato);
@@ -511,7 +514,7 @@ export async function listarPeriodosEmCurso(base?: BaseControle): Promise<Period
   const emCurso: PeriodoEmCurso[] = [];
 
   for (const colaborador of colaboradores) {
-    if (colaborador.status === "desligado") continue;
+    if (colaborador.status === "desligado" || colaborador.vinculo === "PJ") continue;
     if (comPeriodoAberto.has(colaborador.id)) continue;
 
     // O PRIMEIRO que ainda não fechou — é o que está sendo adquirido agora.
@@ -577,9 +580,11 @@ export async function listarPeriodosEmCurso(base?: BaseControle): Promise<Period
 export async function listarControleDeFerias(): Promise<{
   periodos: PeriodoAquisitivoAberto[];
   emCurso: PeriodoEmCurso[];
+  pj: ControleFeriasPj[];
 }> {
   const base = await carregarBase();
   const periodos = await listarPeriodosAbertos(base);
   const emCurso = await listarPeriodosEmCurso(base);
-  return { periodos, emCurso };
+  const pj = await listarControlePj(base.colaboradores);
+  return { periodos, emCurso, pj };
 }

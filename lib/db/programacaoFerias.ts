@@ -126,6 +126,9 @@ export async function listarProgramacaoFerias(): Promise<ItemProgramacaoFerias[]
   for (const linha of linhas) {
     const colaborador = colaboradoresPorId.get(linha.colaborador_id);
     if (!colaborador) continue;
+    // PJ não tem 1/3, abono, dobra, INSS nem FGTS: o cálculo CLT abaixo daria um valor
+    // errado. O valor das férias de PJ (mensal ÷ 30 × dias) fica no Controle de Férias.
+    if (colaborador.vinculo === "PJ") continue;
 
     const dataInicio = linha.data_inicio_gozo ?? linha.data_inicio_prevista;
     if (!dataInicio) continue;
