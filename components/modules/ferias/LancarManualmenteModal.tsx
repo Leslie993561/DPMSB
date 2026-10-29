@@ -11,6 +11,8 @@ import {
 import { useOperador } from "@/lib/currentUser";
 import { useSessaoResumo } from "@/lib/authClient";
 import { RiskCallout } from "@/components/shared/RiskCallout";
+import type { ControleFeriasPj } from "@/lib/db/feriasPj";
+import { PjPainel } from "./PjDetalheModal";
 import { formatarDataBr } from "@/lib/format";
 import { cn } from "@/lib/cn";
 
@@ -61,6 +63,24 @@ export function LancarManualmenteModal({
         .sort((a, b) => a.nome.localeCompare(b.nome)),
     [colaboradores, meuId],
   );
+
+  // PJ não segue a CLT (sem concessivo, fracionamento livre, sem proventos): tem painel próprio.
+  const selecionadoPj = colaboradores.find((c) => String(c.id) === colaboradorId)?.vinculo === "PJ";
+  const [pjControle, setPjControle] = useState<ControleFeriasPj | null>(null);
+
+  useEffect(() => {
+    if (!selecionadoPj) return;
+    let cancelado = false;
+    fetch(`/api/periodos-aquisitivos/pj?colaboradorId=${colaboradorId}`)
+      .then((r) => r.json())
+      .then((d: { controle?: ControleFeriasPj | null }) => {
+        if (!cancelado) setPjControle(d.controle ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      cancelado = true;
+    };
+  }, [selecionadoPj, colaboradorId]);
 
   useEffect(() => {
     let cancelado = false;
@@ -239,13 +259,29 @@ export function LancarManualmenteModal({
             </label>
           }
 
-          {carregandoPeriodos && (
+          {selecionadoPj && (
+            pjControle && String(pjControle.colaboradorId) === colaboradorId ? (
+              <PjPainel
+                pj={pjControle}
+                podeLancar
+                onAtualizado={() => {
+                  setPjControle(null);
+                  onSucesso();
+                }}
+              />
+            ) : (
+              <p className="text-[11.5px] text-foreground-muted">Carregando férias do colaborador PJ…</p>
+            )
+          )}
+
+          {!selecionadoPj && carregandoPeriodos && (
             <p className="text-[11.5px] text-foreground-muted">
               Carregando férias do colaborador…
             </p>
           )}
 
           {colaboradorId &&
+            !selecionadoPj &&
             !carregandoPeriodos &&
             periodosDisponiveis.length === 0 && (
               <RiskCallout nivel="atencao">
@@ -254,7 +290,7 @@ export function LancarManualmenteModal({
               </RiskCallout>
             )}
 
-          {periodosDisponiveis.length > 0 && (
+          {!selecionadoPj && periodosDisponiveis.length > 0 && (
             <label className="block text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">
               Período aquisitivo
               <select
@@ -278,7 +314,7 @@ export function LancarManualmenteModal({
             </label>
           )}
 
-          {periodo && (
+          {!selecionadoPj && periodo && (
             <>
               <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 rounded border border-hairline bg-surface-page px-3 py-2.5">
                 <Info
@@ -389,16 +425,29 @@ export function LancarManualmenteModal({
 
           {erro && <RiskCallout nivel="critico">{erro}</RiskCallout>}
 
-          <div className="rounded border border-hairline bg-surface-page px-3 py-2">
-            <p className="text-[10px] font-semibold tracking-wide text-brand-primary-800 uppercase">
-              Regras aplicadas (Art. 134, §1º CLT)
-            </p>
-            <ul className="mt-1 list-inside list-disc text-[10.5px] text-foreground-muted">
-              <li>Cada período precisa ter no mínimo 5 dias.</li>
-              <li>No máximo 3 períodos por período aquisitivo.</li>
-              <li>A soma não pode passar dos dias disponíveis.</li>
-            </ul>
-          </div>
+          {selecionadoPj ? (
+            <div className="rounded border border-hairline bg-surface-page px-3 py-2">
+              <p className="text-[10px] font-semibold tracking-wide text-brand-primary-800 uppercase">
+                Regras aplicadas (PJ)
+              </p>
+              <ul className="mt-1 list-inside list-disc text-[10.5px] text-foreground-muted">
+                <li>Fracionamento livre: sem mínimo de dias, sem limite de períodos.</li>
+                <li>A soma não pode passar do saldo; o abatimento é do período aquisitivo mais antigo.</li>
+                <li>Sem proventos de férias: valor = mensal ÷ 30 × dias.</li>
+              </ul>
+            </div>
+          ) : (
+            <div className="rounded border border-hairline bg-surface-page px-3 py-2">
+              <p className="text-[10px] font-semibold tracking-wide text-brand-primary-800 uppercase">
+                Regras aplicadas (Art. 134, §1º CLT)
+              </p>
+              <ul className="mt-1 list-inside list-disc text-[10.5px] text-foreground-muted">
+                <li>Cada período precisa ter no mínimo 5 dias.</li>
+                <li>No máximo 3 períodos por período aquisitivo.</li>
+                <li>A soma não pode passar dos dias disponíveis.</li>
+              </ul>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-hairline px-4 py-3">
@@ -407,16 +456,18 @@ export function LancarManualmenteModal({
             onClick={onFechar}
             className="rounded border border-hairline px-3 py-1.5 text-[12px] font-medium text-foreground-muted hover:bg-surface-page dark:border-brand-neutral/30"
           >
-            Cancelar
+            {selecionadoPj ? "Fechar" : "Cancelar"}
           </button>
-          <button
-            type="button"
-            onClick={lancar}
-            disabled={!podeLancar}
-            className="flex items-center gap-1.5 rounded bg-brand-primary px-3 py-1.5 text-[12px] font-medium text-brand-white transition-colors hover:bg-brand-primary-hover disabled:opacity-50"
-          >
-            {enviando ? "Lançando..." : "✓ Lançar programação"}
-          </button>
+          {!selecionadoPj && (
+            <button
+              type="button"
+              onClick={lancar}
+              disabled={!podeLancar}
+              className="flex items-center gap-1.5 rounded bg-brand-primary px-3 py-1.5 text-[12px] font-medium text-brand-white transition-colors hover:bg-brand-primary-hover disabled:opacity-50"
+            >
+              {enviando ? "Lançando..." : "✓ Lançar programação"}
+            </button>
+          )}
         </div>
       </div>
     </div>

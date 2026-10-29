@@ -15,15 +15,14 @@ const INPUT_CLASS =
  * separado, lançamento livre (só exige caber no saldo) e valor das férias —
  * apenas valor mensal ÷ 30 × dias, sem nenhum provento de CLT.
  */
-export function PjDetalheModal({
+/** Conteúdo do detalhe PJ (saldo por período, lançamento e férias lançadas) — usado no modal do Controle e no "Lançar programação manualmente". */
+export function PjPainel({
   pj,
   podeLancar,
-  onFechar,
   onAtualizado,
 }: {
   pj: ControleFeriasPj;
   podeLancar: boolean;
-  onFechar: () => void;
   onAtualizado: () => void;
 }) {
   const { operador } = useOperador();
@@ -73,30 +72,7 @@ export function PjDetalheModal({
   }
 
   return (
-    <Modal
-      aberto
-      onFechar={onFechar}
-      eyebrow="Férias · PJ"
-      titulo={pj.colaboradorNome}
-      subtitulo={`Contrato desde ${formatarDataBr(pj.colaboradorAdmissao)} · saldo total ${pj.saldoTotal} dia(s) · sem prazo para gozo`}
-      largura="46rem"
-      rodape={
-        <>
-          <span className="text-xs text-foreground-muted">
-            Colaborador PJ · {pj.colaboradorDepartamento ?? "—"} · mensal {formatarMoeda(pj.valorMensal)}
-          </span>
-          <span className="flex-1" />
-          <button
-            type="button"
-            onClick={onFechar}
-            className="rounded-md border border-brand-surface px-4 py-2 text-sm text-foreground-muted hover:bg-brand-surface dark:border-brand-neutral/30"
-          >
-            Fechar
-          </button>
-        </>
-      }
-    >
-      <div className="space-y-5">
+    <div className="space-y-5">
         <section>
           <h3 className="mb-2 text-xs font-semibold tracking-wide text-foreground-muted uppercase">
             Saldo por período aquisitivo
@@ -233,6 +209,45 @@ export function PjDetalheModal({
           )}
         </section>
       </div>
+  );
+}
+
+export function PjDetalheModal({
+  pj,
+  podeLancar,
+  onFechar,
+  onAtualizado,
+}: {
+  pj: ControleFeriasPj;
+  podeLancar: boolean;
+  onFechar: () => void;
+  onAtualizado: () => void;
+}) {
+  return (
+    <Modal
+      aberto
+      onFechar={onFechar}
+      eyebrow="Férias · PJ"
+      titulo={pj.colaboradorNome}
+      subtitulo={`Contrato desde ${formatarDataBr(pj.colaboradorAdmissao)} · saldo total ${pj.saldoTotal} dia(s) · sem prazo para gozo`}
+      largura="46rem"
+      rodape={
+        <>
+          <span className="text-xs text-foreground-muted">
+            Colaborador PJ · {pj.colaboradorDepartamento ?? "—"} · mensal {formatarMoeda(pj.valorMensal)}
+          </span>
+          <span className="flex-1" />
+          <button
+            type="button"
+            onClick={onFechar}
+            className="rounded-md border border-brand-surface px-4 py-2 text-sm text-foreground-muted hover:bg-brand-surface dark:border-brand-neutral/30"
+          >
+            Fechar
+          </button>
+        </>
+      }
+    >
+        <PjPainel pj={pj} podeLancar={podeLancar} onAtualizado={onAtualizado} />
     </Modal>
   );
 }

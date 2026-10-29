@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ErroValidacaoFerias } from "@/lib/db/lancamentosFerias";
-import { lancarFeriasPj } from "@/lib/db/feriasPj";
+import { lancarFeriasPj, listarControlePj } from "@/lib/db/feriasPj";
 import { podeLancarFeriasDe } from "@/lib/acesso/equipeGestor";
 
 export const runtime = "nodejs";
@@ -13,6 +13,19 @@ const schema = z.object({
   observacao: z.string().trim().nullable().optional(),
   operador: z.string().trim().min(1, "Informe o nome do operador antes de continuar."),
 });
+
+/** Saldo e histórico de férias de UM colaborador PJ (usado pelo "Lançar programação manualmente"). */
+export async function GET(request: Request) {
+  const id = Number(new URL(request.url).searchParams.get("colaboradorId"));
+  if (!Number.isInteger(id) || id <= 0) {
+    return Response.json({ erro: "Informe o colaborador." }, { status: 400 });
+  }
+  if (!(await podeLancarFeriasDe(id))) {
+    return Response.json({ erro: "Sem permissão para este colaborador." }, { status: 403 });
+  }
+  const [controle] = (await listarControlePj()).filter((c) => c.colaboradorId === id);
+  return Response.json({ controle: controle ?? null });
+}
 
 /** Lança férias de um colaborador PJ (fracionamento livre; só exige que os dias caibam no saldo). */
 export async function POST(request: Request) {

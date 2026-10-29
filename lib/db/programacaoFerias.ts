@@ -1,6 +1,7 @@
 import "server-only";
 import { getDb } from "./client";
 import { listarColaboradores } from "./colaboradores";
+import { valorFeriasPj } from "@/lib/ferias-pj/calc";
 import {
   calcularFerias,
   calcularFGTS,
@@ -126,9 +127,7 @@ export async function listarProgramacaoFerias(): Promise<ItemProgramacaoFerias[]
   for (const linha of linhas) {
     const colaborador = colaboradoresPorId.get(linha.colaborador_id);
     if (!colaborador) continue;
-    // PJ não tem 1/3, abono, dobra, INSS nem FGTS: o cálculo CLT abaixo daria um valor
-    // errado. O valor das férias de PJ (mensal ÷ 30 × dias) fica no Controle de Férias.
-    if (colaborador.vinculo === "PJ") continue;
+    const pj = colaborador.vinculo === "PJ";
 
     const dataInicio = linha.data_inicio_gozo ?? linha.data_inicio_prevista;
     if (!dataInicio) continue;
@@ -139,7 +138,9 @@ export async function listarProgramacaoFerias(): Promise<ItemProgramacaoFerias[]
     // Avaliado ANTES do cálculo: se as férias saem depois do fim do período
     // concessivo, a remuneração é paga em dobro (Art. 137 CLT) e isso muda o
     // valor. `vencida` aqui olha a data de início destas férias, não "hoje".
-    const prazo = avaliarPrazoConcessao(new Date(linha.periodo_fim), dataRef, linha.dias);
+    const prazoCalculado = avaliarPrazoConcessao(new Date(linha.periodo_fim), dataRef, linha.dias);
+    // PJ não tem concessivo: nada vence e não há dobra.
+    const prazo = pj ? { ...prazoCalculado, vencida: false, diasEmDobro: 0 } : prazoCalculado;
 
     // Férias históricas (importadas da "Relação de Férias Calculadas") podem
     // ser anteriores à tabela legal mais antiga que o app tem — nesse caso
@@ -149,6 +150,7 @@ export async function listarProgramacaoFerias(): Promise<ItemProgramacaoFerias[]
     // em vez de derrubar a listagem inteira. Nada é estimado.
     let calculo: ReturnType<typeof calcularFerias> | null = null;
     try {
+      if (pj) throw new Error("PJ não usa o cálculo CLT");
       // Quando o aviso de férias do DP foi registrado, é ele que manda: o
       // portal reproduz o documento que o colaborador assinou em vez de
       // recalcular a base com o cadastro de hoje, que daria outro número.
@@ -171,7 +173,9 @@ export async function listarProgramacaoFerias(): Promise<ItemProgramacaoFerias[]
     } catch {
       calculo = null;
     }
-    const semTabelaLegal = calculo === null;
+    const semTabelaLegal = !pj && calculo === null;
+    // PJ: sem 1/3, abono, 13º, INSS, FGTS nem dobra — só mensal ÷ 30 × dias.
+    const valorPj = pj ? valorFeriasPj(colaborador.salarioBase, linha.dias) : 0;
 
     // Base de encargos: a dobra fica fora (é penalidade, não contraprestação),
     // mas entra no custo total, que é o desembolso real da empresa.
@@ -182,27 +186,27 @@ export async function listarProgramacaoFerias(): Promise<ItemProgramacaoFerias[]
             calculo.detalhe.abono +
             calculo.detalhe.tercoAbono,
         )
-      : 0;
+      : valorPj;
     const dobra = calculo?.detalhe.dobra ?? 0;
     const fgts = calculo ? calcularFGTS(bruto, dataRef).valor : 0;
     const patronal = calculo ? calcularInssPatronal(bruto, dataRef).valor : 0;
-    const custoPrevisto = calculo ? arredondar(bruto + dobra + fgts + patronal) : 0;
+    const custoPrevisto = calculo ? arredondar(bruto + dobra + fgts + patronal) : valorPj;
     const resultado = calculo ?? {
       detalhe: {
-        valorGozado: 0,
+        valorGozado: valorPj,
         tercoConstitucional: 0,
         abono: 0,
         tercoAbono: 0,
         dobra: 0,
         inss: 0,
         irrf: 0,
-        valorLiquido: 0,
+        valorLiquido: valorPj,
       },
     };
 
     const hoje = new Date();
     const limiteConcessao = new Date(prazo.limiteConcessao);
-    const diasParaVencer = Math.round((limiteConcessao.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+    const diasParaVencer = pj ? 99999 : Math.round((limiteConcessao.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
 
     const lider = colaborador.gestorId ? (colaboradoresPorId.get(colaborador.gestorId)?.nome ?? null) : null;
 
