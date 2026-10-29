@@ -558,9 +558,7 @@ export function ControleDeFeriasTab({
       {pjAberto !== null && pjs.find((p) => p.colaboradorId === pjAberto) && (
         <PjDetalheModal
           pj={pjs.find((p) => p.colaboradorId === pjAberto)!}
-          podeLancar={!souGestor}
           onFechar={() => setPjAberto(null)}
-          onAtualizado={() => void recarregar()}
         />
       )}
 

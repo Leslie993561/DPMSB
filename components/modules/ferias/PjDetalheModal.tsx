@@ -209,30 +209,79 @@ export function PjPainel({
   );
 }
 
-export function PjDetalheModal({
-  pj,
-  podeLancar,
-  onFechar,
-  onAtualizado,
-}: {
-  pj: ControleFeriasPj;
-  podeLancar: boolean;
-  onFechar: () => void;
-  onAtualizado: () => void;
-}) {
+interface LinhaHistoricoPj {
+  chave: string;
+  aquisitivoInicio: string;
+  aquisitivoFim: string;
+  concessivoInicio: string;
+  concessivoFim: string;
+  gozoInicio: string | null;
+  gozoFim: string | null;
+  dias: number;
+}
+
+function somarAnos(iso: string, anos: number): string {
+  const [a, m, d] = iso.slice(0, 10).split("-").map(Number);
+  const alvo = new Date(Date.UTC(a + anos, m - 1, 1));
+  alvo.setUTCDate(Math.min(d, new Date(Date.UTC(a + anos, m, 0)).getUTCDate()));
+  return alvo.toISOString().slice(0, 10);
+}
+
+/**
+ * Uma linha por período aquisitivo e por férias gozadas nele. Os dias gozados
+ * saem do período mais antigo primeiro (mesma regra do saldo); o concessivo é só
+ * informativo, como na CLT — para PJ nada vence.
+ */
+function montarHistorico(pj: ControleFeriasPj): LinhaHistoricoPj[] {
+  const restante = pj.periodos.map(() => 30);
+  const gozos = pj.periodos.map(() => [] as LinhaHistoricoPj[]);
+  const base = (i: number) => ({
+    aquisitivoInicio: pj.periodos[i].inicio,
+    aquisitivoFim: pj.periodos[i].fim,
+    concessivoInicio: pj.periodos[i].fim,
+    concessivoFim: somarAnos(pj.periodos[i].fim, 1),
+  });
+
+  for (const l of pj.lancamentos) {
+    let falta = l.dias;
+    for (let i = 0; i < pj.periodos.length && falta > 0; i++) {
+      const parte = Math.min(restante[i], falta);
+      if (parte <= 0) continue;
+      restante[i] -= parte;
+      falta -= parte;
+      gozos[i].push({
+        chave: `${pj.periodos[i].inicio}-${l.id}`,
+        ...base(i),
+        gozoInicio: l.dataInicio,
+        gozoFim: l.dataFim,
+        dias: parte,
+      });
+    }
+  }
+
+  return pj.periodos
+    .flatMap((p, i) =>
+      gozos[i].length > 0
+        ? gozos[i]
+        : [{ chave: p.inicio, ...base(i), gozoInicio: null, gozoFim: null, dias: 0 }],
+    )
+    .reverse();
+}
+
+/** Histórico de férias de um PJ, no formato do histórico da CLT: aquisitivo, concessivo (informativo), período de férias e dias gozados. */
+export function PjDetalheModal({ pj, onFechar }: { pj: ControleFeriasPj; onFechar: () => void }) {
+  const linhas = montarHistorico(pj);
   return (
     <Modal
       aberto
       onFechar={onFechar}
-      eyebrow="Férias · PJ"
+      eyebrow="Histórico de férias"
       titulo={pj.colaboradorNome}
-      subtitulo={`Contrato desde ${formatarDataBr(pj.colaboradorAdmissao)} · saldo total ${pj.saldoTotal} dia(s) · sem prazo para gozo`}
-      largura="46rem"
+      subtitulo={`Colaborador PJ · contrato desde ${formatarDataBr(pj.colaboradorAdmissao)} · saldo ${pj.saldoTotal} dia(s)`}
+      largura="52rem"
       rodape={
         <>
-          <span className="text-xs text-foreground-muted">
-            Colaborador PJ · {pj.colaboradorDepartamento ?? "—"} · mensal {formatarMoeda(pj.valorMensal)}
-          </span>
+          <span className="text-xs text-foreground-muted">Colaborador PJ · {pj.colaboradorDepartamento ?? "—"}</span>
           <span className="flex-1" />
           <button
             type="button"
@@ -244,7 +293,41 @@ export function PjDetalheModal({
         </>
       }
     >
-        <PjPainel pj={pj} podeLancar={podeLancar} onAtualizado={onAtualizado} />
+      {linhas.length === 0 ? (
+        <p className="text-sm text-foreground-muted">
+          Ainda não completou 12 meses de contrato — nenhum período aquisitivo fechado. O primeiro fecha em{" "}
+          {formatarDataBr(proximoAniversario(pj.colaboradorAdmissao))}.
+        </p>
+      ) : (
+        <div className="overflow-hidden rounded-md border border-hairline">
+          <table className="w-full text-[12px]">
+            <thead>
+              <tr className="border-b border-hairline bg-surface-page text-left text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">
+                <th className="px-3 py-2">Período aquisitivo</th>
+                <th className="px-3 py-2">Período concessivo</th>
+                <th className="px-3 py-2">Período de férias</th>
+                <th className="px-3 py-2 text-right">Dias gozados</th>
+              </tr>
+            </thead>
+            <tbody>
+              {linhas.map((l) => (
+                <tr key={l.chave} className="border-b border-hairline/60 last:border-0">
+                  <td className="px-3 py-2.5 text-foreground">
+                    {formatarDataBr(l.aquisitivoInicio)} – {formatarDataBr(l.aquisitivoFim)}
+                  </td>
+                  <td className="px-3 py-2.5 text-foreground-muted">
+                    {formatarDataBr(l.concessivoInicio)} – {formatarDataBr(l.concessivoFim)}
+                  </td>
+                  <td className="px-3 py-2.5 text-foreground-muted">
+                    {l.gozoInicio ? `${formatarDataBr(l.gozoInicio)} – ${l.gozoFim ? formatarDataBr(l.gozoFim) : "—"}` : "—"}
+                  </td>
+                  <td className="px-3 py-2.5 text-right font-semibold text-foreground">{l.dias > 0 ? l.dias : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </Modal>
   );
 }
