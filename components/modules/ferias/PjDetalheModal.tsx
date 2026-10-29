@@ -28,7 +28,6 @@ export function PjPainel({
   const { operador } = useOperador();
   const [dias, setDias] = useState("");
   const [inicio, setInicio] = useState("");
-  const [fim, setFim] = useState("");
   const [observacao, setObservacao] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
@@ -36,7 +35,9 @@ export function PjPainel({
   const diasNum = Number(dias);
   const diasValidos = Number.isInteger(diasNum) && diasNum > 0;
   const cabeNoSaldo = diasValidos && diasNum <= pj.saldoTotal;
-  const pronto = cabeNoSaldo && Boolean(inicio) && Boolean(fim) && fim >= inicio && !enviando;
+  // Último dia de gozo = início + dias − 1 (dias corridos), como no lançamento CLT.
+  const fim = inicio && diasValidos ? ultimoDia(inicio, diasNum) : "";
+  const pronto = cabeNoSaldo && Boolean(inicio) && Boolean(fim) && !enviando;
 
   async function lancar() {
     if (!operador.trim()) {
@@ -138,16 +139,12 @@ export function PjPainel({
                   className={`mt-1 font-normal ${INPUT_CLASS}`}
                 />
               </label>
-              <label className="text-[11px] font-semibold text-foreground-muted">
-                Fim do gozo
-                <input
-                  type="date"
-                  value={fim}
-                  min={inicio || undefined}
-                  onChange={(e) => setFim(e.target.value)}
-                  className={`mt-1 font-normal ${INPUT_CLASS}`}
-                />
-              </label>
+              <div className="text-[11px] font-semibold text-foreground-muted">
+                Último dia de gozo
+                <p className="mt-1 rounded-md border border-hairline bg-surface-page px-2.5 py-1.5 text-xs font-normal text-foreground">
+                  {fim ? formatarDataBr(fim) : "—"}
+                </p>
+              </div>
             </div>
             <label className="mt-3 block text-[11px] font-semibold text-foreground-muted">
               Observação (opcional)
@@ -250,6 +247,13 @@ export function PjDetalheModal({
         <PjPainel pj={pj} podeLancar={podeLancar} onAtualizado={onAtualizado} />
     </Modal>
   );
+}
+
+/** Último dia de gozo: início + dias − 1, em dias corridos. */
+function ultimoDia(inicio: string, dias: number): string {
+  const d = new Date(`${inicio}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + dias - 1);
+  return d.toISOString().slice(0, 10);
 }
 
 /** Data em que o primeiro período aquisitivo fecha (12 meses depois do início do contrato). */
