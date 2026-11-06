@@ -460,6 +460,7 @@ const PROJETAR_PELA_ADMISSAO = new Set(
     "THIAGO ALVES DIAS",
     "YURI IVONEI CRISPIM",
     "EDUARDA DE SOUSA DA CRUZ",
+    "EDILCELIA SOUZA DE JESUS",
   ].map(normalizarNome),
 );
 
