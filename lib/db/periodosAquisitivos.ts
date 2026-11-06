@@ -459,6 +459,7 @@ const PROJETAR_PELA_ADMISSAO = new Set(
     "TASSIO ANTONIO LIMA SANT ANA",
     "THIAGO ALVES DIAS",
     "YURI IVONEI CRISPIM",
+    "EDUARDA DE SOUSA DA CRUZ",
   ].map(normalizarNome),
 );
 
