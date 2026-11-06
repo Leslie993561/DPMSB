@@ -8,12 +8,18 @@ export function ehEmailAdmin(email: string): boolean {
 }
 
 /**
+ * Gestor-editor do RH que vale em qualquer ambiente, somado ao que vier da variável de
+ * ambiente — sem isso, quem ficasse fora da variável em produção entrava como gestor
+ * comum e só enxergava a própria equipe (o Yuri, do DP, via a lista vazia).
+ */
+const EDITORES_COLABORADORES_FIXOS = ["yuri.crispim@msbbrasil.com"];
+
+/**
  * Gestoras do RH que veem e editam TODOS os colaboradores sem serem administradoras
  * (não gerenciam acesso, nem SST/DHO, nem excluem). Config de ambiente, como ADMIN_EMAILS.
  */
 export function ehEmailEditorColaboradores(email: string): boolean {
-  const lista = (process.env.EDITORES_COLABORADORES_EMAILS ?? "")
-    .split(",")
+  const lista = [...EDITORES_COLABORADORES_FIXOS, ...(process.env.EDITORES_COLABORADORES_EMAILS ?? "").split(",")]
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
   return lista.includes(email.trim().toLowerCase());
