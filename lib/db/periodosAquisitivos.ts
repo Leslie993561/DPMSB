@@ -342,9 +342,20 @@ export async function listarPeriodosAbertos(base?: BaseControle): Promise<Period
     if (!atual || p.dataInicio > atual) fechadoMaisRecente.set(p.colaboradorId, p.dataInicio);
   }
 
+  // Quem gozou os 30 dias e já tem o PRÓXIMO período (ainda em aquisição, vindo do
+  // DP ou projetado pela admissão) passa para ele: a linha "Concluído" sai e a
+  // pessoa aparece como "Em dia" com o novo aquisitivo/concessivo. Sem próximo
+  // período conhecido, o "Concluído" fica — melhor que uma linha sem datas.
+  const comProximoPeriodo = new Set(
+    periodos.filter((p) => new Date(p.dataFim) > hoje).map((p) => p.colaboradorId),
+  );
+  const temProximo = (colaboradorId: number, nome: string) =>
+    comProximoPeriodo.has(colaboradorId) || PROJETAR_PELA_ADMISSAO.has(normalizarNome(nome));
+
   return abertos.filter((p) => {
     if (p.diasATirar > 0) return true;
     if (temSaldo.has(p.colaboradorId)) return false;
+    if (temProximo(p.colaboradorId, p.colaboradorNome)) return false;
     return fechadoMaisRecente.get(p.colaboradorId) === p.dataInicio;
   });
 }
