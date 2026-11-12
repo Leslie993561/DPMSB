@@ -8,6 +8,7 @@ import { useOperador } from "@/lib/currentUser";
 import { RiskCallout } from "@/components/shared/RiskCallout";
 import { Badge, type CorBadge } from "@/components/shared/Badge";
 import { Modal } from "@/components/shared/Modal";
+import { MenuAcoesLinha } from "./MenuAcoesLinha";
 import { formatarDataBr } from "@/lib/format";
 import { cn } from "@/lib/cn";
 
@@ -608,75 +609,24 @@ function MenuFerias({
   onCancelar: () => void;
   onDesfazer: () => void;
 }) {
-  const [aberto, setAberto] = useState(false);
   const confirmada = status === "concluida" || status === "alterada";
 
   // Lançamento cancelado não tem ação: não há o que baixar nem o que reabrir.
   if (status === "cancelada") return null;
+  if (revertendo) return <span aria-hidden className="px-1 leading-none text-foreground-muted">…</span>;
 
+  // Menu com position: fixed (MenuAcoesLinha): dentro de `absolute` o overflow da tabela cortava a lista.
   return (
-    <span className="relative inline-flex">
-      <button
-        type="button"
-        aria-label="Ações destas férias"
-        aria-expanded={aberto}
-        disabled={revertendo}
-        onClick={() => setAberto((v) => !v)}
-        className="rounded px-1 leading-none text-foreground-muted hover:bg-brand-surface hover:text-foreground disabled:opacity-50"
-      >
-        <span aria-hidden>{revertendo ? "…" : "⋮"}</span>
-      </button>
-
-      {aberto && (
-        <>
-          {/* Camada de fechamento: qualquer clique fora recolhe o menu. */}
-          <button
-            type="button"
-            aria-hidden
-            tabIndex={-1}
-            onClick={() => setAberto(false)}
-            className="fixed inset-0 z-30 cursor-default"
-          />
-          <span className="absolute top-full right-0 z-40 mt-1 flex w-56 flex-col overflow-hidden rounded-md border border-hairline bg-background py-1 shadow-drawer">
-            {confirmada ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setAberto(false);
-                  onDesfazer();
-                }}
-                className="px-3 py-1.5 text-left text-[12px] font-normal text-foreground normal-case hover:bg-surface-page"
-              >
-                Retornar ao planejamento
-                <span className="block text-[10px] text-foreground-muted">Desfaz a baixa e reabre os dias</span>
-              </button>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAberto(false);
-                    onBaixa();
-                  }}
-                  className="px-3 py-1.5 text-left text-[12px] font-normal text-foreground normal-case hover:bg-surface-page"
-                >
-                  Dar baixa
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAberto(false);
-                    onCancelar();
-                  }}
-                  className="px-3 py-1.5 text-left text-[12px] font-normal text-red-600 normal-case hover:bg-surface-page dark:text-red-400"
-                >
-                  Cancelar lançamento
-                </button>
-              </>
-            )}
-          </span>
-        </>
-      )}
-    </span>
+    <MenuAcoesLinha
+      rotuloAria="Ações destas férias"
+      itens={
+        confirmada
+          ? [{ rotulo: "Retornar ao planejamento", titulo: "Desfaz a baixa e reabre os dias", onClick: onDesfazer }]
+          : [
+              { rotulo: "Dar baixa", onClick: onBaixa },
+              { rotulo: "Cancelar lançamento", onClick: onCancelar, perigo: true },
+            ]
+      }
+    />
   );
 }
