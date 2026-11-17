@@ -37,6 +37,7 @@ const MODULOS_DP: ModuloAcesso[] = [
       { chave: "ferias.dashboard", label: "Dashboard" },
       { chave: "ferias.controle", label: "Controle de Férias" },
       { chave: "ferias.planejamento", label: "Planejamento de Férias" },
+      { chave: "ferias.recibos", label: "Recibos de férias" },
     ],
   },
   {
@@ -46,6 +47,7 @@ const MODULOS_DP: ModuloAcesso[] = [
       { chave: "folha.dashboard", label: "Dashboard" },
       { chave: "folha.relatorio", label: "Relatório detalhado" },
       { chave: "folha.movimentacoes", label: "Histórico de movimentações" },
+      { chave: "folha.documentos", label: "Documentos DP" },
     ],
   },
   {
@@ -54,16 +56,7 @@ const MODULOS_DP: ModuloAcesso[] = [
     filhos: [
       { chave: "beneficios.dashboard", label: "Dashboard" },
       { chave: "beneficios.rateio", label: "Rateio" },
-      { chave: "beneficios.documentos", label: "Documentos" },
-    ],
-  },
-  {
-    chave: "doc_dp",
-    label: "Doc. DP",
-    filhos: [
-      { chave: "doc_dp.beneficios", label: "Benefícios" },
-      { chave: "doc_dp.programas", label: "Programas" },
-      { chave: "doc_dp.departamento", label: "Departamento Pessoal" },
+      { chave: "beneficios.documentos", label: "Faturas e contratos" },
     ],
   },
   { chave: "rescisao", label: "Rescisão" },

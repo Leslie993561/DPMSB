@@ -1,31 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/shared/Card";
-import { PageHeader } from "@/components/shared/PageHeader";
-import { INFO_DOC_DP, type CategoriaDocDp } from "@/lib/docDp";
+import { useSessaoResumo } from "@/lib/authClient";
+import type { CategoriaDocDp } from "@/lib/docDp";
 import type { DocumentoDocDp } from "@/lib/db/docDp";
 
 const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
-function categoriaDaAba(aba: string | null): CategoriaDocDp {
-  return aba === "programas" || aba === "departamento-pessoal" ? aba : "beneficios";
-}
-
-export function DocDpPageClient({ admin }: { admin: boolean }) {
-  const categoria = categoriaDaAba(useSearchParams().get("aba"));
-  const info = INFO_DOC_DP[categoria];
-  return (
-    <div className="space-y-5">
-      <PageHeader eyebrow="Doc. DP" titulo={info.label} subtitulo={info.subtitulo} />
-      <DocumentosPorMes key={categoria} categoria={categoria} admin={admin} />
-    </div>
-  );
-}
-
-/** Biblioteca de documentos de uma aba: um cartão por mês do ano escolhido. */
-function DocumentosPorMes({ categoria, admin }: { categoria: CategoriaDocDp; admin: boolean }) {
+/** Biblioteca de documentos de um módulo: um cartão por mês do ano escolhido. Só o administrador anexa/exclui. */
+export function DocumentosPorMes({ categoria }: { categoria: CategoriaDocDp }) {
+  const admin = useSessaoResumo()?.tipo === "administrador";
   const [ano, setAno] = useState(() => new Date().getFullYear());
   const [documentos, setDocumentos] = useState<DocumentoDocDp[]>([]);
   const [enviandoMes, setEnviandoMes] = useState<string | null>(null);
@@ -33,7 +18,7 @@ function DocumentosPorMes({ categoria, admin }: { categoria: CategoriaDocDp; adm
 
   const carregar = useCallback(async () => {
     try {
-      const r = await fetch(`/api/doc-dp/documentos?categoria=${categoria}&ano=${ano}`);
+      const r = await fetch(`/api/doc-dp/${categoria}/documentos?ano=${ano}`);
       setDocumentos(r.ok ? ((await r.json()) as { documentos: DocumentoDocDp[] }).documentos : []);
     } catch {
       setDocumentos([]);
@@ -51,10 +36,9 @@ function DocumentosPorMes({ categoria, admin }: { categoria: CategoriaDocDp; adm
     setErro(null);
     try {
       const form = new FormData();
-      form.append("categoria", categoria);
       form.append("competencia", competencia);
       for (const a of arquivos) form.append("arquivos", a);
-      const r = await fetch("/api/doc-dp/documentos", { method: "POST", body: form });
+      const r = await fetch(`/api/doc-dp/${categoria}/documentos`, { method: "POST", body: form });
       const d = await r.json();
       if (!r.ok) throw new Error(d.erro ?? "Falha ao anexar.");
       await carregar();
@@ -67,7 +51,7 @@ function DocumentosPorMes({ categoria, admin }: { categoria: CategoriaDocDp; adm
 
   async function remover(d: DocumentoDocDp) {
     if (!window.confirm(`Remover "${d.nome}"?`)) return;
-    await fetch(`/api/doc-dp/documentos/${d.id}`, { method: "DELETE" });
+    await fetch(`/api/doc-dp/${categoria}/documentos/${d.id}`, { method: "DELETE" });
     await carregar();
   }
 
@@ -112,7 +96,7 @@ function DocumentosPorMes({ categoria, admin }: { categoria: CategoriaDocDp; adm
                   {docs.map((d) => (
                     <li key={d.id} className="flex items-center gap-2 rounded border border-hairline px-2 py-1">
                       <a
-                        href={`/api/doc-dp/documentos/${d.id}`}
+                        href={`/api/doc-dp/${categoria}/documentos/${d.id}`}
                         target="_blank"
                         rel="noreferrer"
                         title={d.nome}

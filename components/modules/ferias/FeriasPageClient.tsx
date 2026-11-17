@@ -6,12 +6,14 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { useSessaoResumo } from "@/lib/authClient";
 import { ControleDeFeriasTab } from "./ControleDeFeriasTab";
 import { PlanejamentoDeFeriasTab } from "./PlanejamentoDeFeriasTab";
+import { DocumentosPorMes } from "@/components/shared/DocumentosPorMes";
 
-type Aba = "controle" | "planejamento";
+type Aba = "controle" | "planejamento" | "recibos";
 
 const INFO: Record<Aba, { titulo: string; subtitulo: string }> = {
   controle: { titulo: "Controle de Férias", subtitulo: "Períodos aquisitivos em aberto, alertas e histórico" },
   planejamento: { titulo: "Planejamento de Férias", subtitulo: "Programação anual por trimestre e conflitos de agenda" },
+  recibos: { titulo: "Recibos de férias", subtitulo: "Recibos de férias anexados mês a mês" },
 };
 
 const ABAS_VALIDAS = new Set<string>(Object.keys(INFO));
@@ -105,6 +107,7 @@ export function FeriasPageClient() {
           onFecharExportar={() => setExportarAberto(false)}
         />
       )}
+      {aba === "recibos" && <DocumentosPorMes categoria="ferias-recibos" />}
       {aba === "planejamento" && (
         <PlanejamentoDeFeriasTab
           ano={ano}

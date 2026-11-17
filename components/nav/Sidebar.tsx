@@ -57,14 +57,6 @@ function IconeBeneficios() {
   );
 }
 
-function IconeDocDp() {
-  return (
-    <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-      <path d="M2 5a2 2 0 0 1 2-2h3.17a2 2 0 0 1 1.42.59L9.41 4.4a1 1 0 0 0 .71.3H16a2 2 0 0 1 2 2V15a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5Z" />
-    </svg>
-  );
-}
-
 function IconePortal() {
   return (
     <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
@@ -168,6 +160,7 @@ function montarGrupos(counts?: NavCounts): GrupoItem[] {
         { href: "/dashboard", label: "Dashboard", modulo: "ferias.dashboard" },
         { href: "/ferias?aba=controle", label: "Controle de Férias", modulo: "ferias.controle" },
         { href: "/ferias?aba=planejamento", label: "Planejamento de Férias", modulo: "ferias.planejamento" },
+        { href: "/ferias?aba=recibos", label: "Recibos de férias", modulo: "ferias.recibos" },
       ],
     },
     {
@@ -180,6 +173,7 @@ function montarGrupos(counts?: NavCounts): GrupoItem[] {
         { href: "/folha?aba=dashboard", label: "Dashboard", modulo: "folha.dashboard" },
         { href: "/folha?aba=relatorio", label: "Relatório detalhado", modulo: "folha.relatorio" },
         { href: "/folha?aba=movimentacoes", label: "Histórico de movimentações", modulo: "folha.movimentacoes" },
+        { href: "/folha?aba=documentos", label: "Documentos DP", modulo: "folha.documentos" },
       ],
     },
     {
@@ -190,18 +184,7 @@ function montarGrupos(counts?: NavCounts): GrupoItem[] {
       itens: [
         { href: "/beneficios?aba=dashboard", label: "Dashboard", modulo: "beneficios.dashboard" },
         { href: "/beneficios?aba=rateio", label: "Rateio", modulo: "beneficios.rateio" },
-        { href: "/beneficios?aba=documentos", label: "Documentos", modulo: "beneficios.documentos" },
-      ],
-    },
-    {
-      id: "doc_dp",
-      label: "DOC. DP",
-      Icone: IconeDocDp,
-      base: "/doc-dp",
-      itens: [
-        { href: "/doc-dp?aba=beneficios", label: "Benefícios", modulo: "doc_dp.beneficios" },
-        { href: "/doc-dp?aba=programas", label: "Programas", modulo: "doc_dp.programas" },
-        { href: "/doc-dp?aba=departamento-pessoal", label: "Departamento Pessoal", modulo: "doc_dp.departamento" },
+        { href: "/beneficios?aba=documentos", label: "Faturas e contratos", modulo: "beneficios.documentos" },
       ],
     },
   ];

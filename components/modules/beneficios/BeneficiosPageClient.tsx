@@ -14,7 +14,7 @@ const INFO: Record<Aba, { titulo: string; subtitulo: string }> = {
     titulo: "Rateio de benefícios",
     subtitulo: "Distribuição do custo de cada benefício entre setores e colaboradores",
   },
-  documentos: { titulo: "Documentos", subtitulo: "Documentos mensais dos benefícios e contratos" },
+  documentos: { titulo: "Faturas e contratos", subtitulo: "Documentos mensais dos benefícios e contratos" },
 };
 
 export function BeneficiosPageClient() {

@@ -74,7 +74,7 @@ export function DocumentosTab() {
     <div className="space-y-4">
       <PageHeader
         eyebrow="Benefícios"
-        titulo="Documentos"
+        titulo="Faturas e contratos"
         subtitulo="Documentos mensais dos benefícios e contratos: Sólides, Flash, Porto Seguro e TotalPass"
       />
 

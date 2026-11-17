@@ -4,10 +4,11 @@ import { excluirDocumentoDocDp, obterDocumentoDocDp } from "@/lib/db/docDp";
 
 export const runtime = "nodejs";
 
-type Ctx = { params: Promise<{ id: string }> };
+type Ctx = { params: Promise<{ categoria: string; id: string }> };
 
 export async function GET(_request: Request, { params }: Ctx) {
-  const doc = await obterDocumentoDocDp(Number((await params).id));
+  const { categoria, id } = await params;
+  const doc = await obterDocumentoDocDp(Number(id), categoria);
   if (!doc) return Response.json({ erro: "Documento não encontrado." }, { status: 404 });
   const resposta = await baixarArquivoPrivado(doc.url);
   if (!resposta.ok || !resposta.body) return Response.json({ erro: "Não foi possível carregar o documento." }, { status: 502 });
@@ -21,7 +22,7 @@ export async function GET(_request: Request, { params }: Ctx) {
 
 export async function DELETE(_request: Request, { params }: Ctx) {
   if ((await obterSessaoAtual())?.tipo !== "administrador") return Response.json({ erro: "Sem permissão." }, { status: 403 });
-  return (await excluirDocumentoDocDp(Number((await params).id)))
+  return (await excluirDocumentoDocDp(Number((await params).id), (await params).categoria))
     ? Response.json({ ok: true })
     : Response.json({ erro: "Documento não encontrado." }, { status: 404 });
 }

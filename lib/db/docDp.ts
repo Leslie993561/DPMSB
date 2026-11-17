@@ -49,14 +49,14 @@ export async function salvarDocumentoDocDp(categoria: string, competencia: strin
   });
 }
 
-export async function obterDocumentoDocDp(id: number): Promise<{ url: string; nome: string } | null> {
+export async function obterDocumentoDocDp(id: number, categoria: string): Promise<{ url: string; nome: string } | null> {
   const db = await getDb();
-  const r = await db.execute({ sql: "SELECT url, nome FROM doc_dp_documentos WHERE id = ?", args: [id] });
+  const r = await db.execute({ sql: "SELECT url, nome FROM doc_dp_documentos WHERE id = ? AND categoria = ?", args: [id, categoria] });
   return (r.rows as unknown as { url: string; nome: string }[])[0] ?? null;
 }
 
-export async function excluirDocumentoDocDp(id: number): Promise<boolean> {
+export async function excluirDocumentoDocDp(id: number, categoria: string): Promise<boolean> {
   const db = await getDb();
-  const r = await db.execute({ sql: "DELETE FROM doc_dp_documentos WHERE id = ? RETURNING id", args: [id] });
+  const r = await db.execute({ sql: "DELETE FROM doc_dp_documentos WHERE id = ? AND categoria = ? RETURNING id", args: [id, categoria] });
   return r.rows.length > 0;
 }
