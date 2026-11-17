@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { formatarDataBr } from "@/lib/format";
 import type { DocumentoBeneficio } from "@/lib/db/beneficiosDocumentos";
 
-const FORNECEDORES = ["Sólides", "Flash", "Porto Seguro", "TotalPass"] as const;
+const FORNECEDORES = ["Sólides", "Flash", "Porto Seguro"] as const;
 const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
 /** Faturas e contratos dos benefícios: escolhe o fornecedor, depois o ano e o mês (pasta) onde anexar. */
@@ -72,11 +72,10 @@ export function DocumentosTab() {
       <PageHeader
         eyebrow="Benefícios"
         titulo="Faturas e contratos"
-        subtitulo="Documentos mensais dos benefícios e contratos: Sólides, Flash, Porto Seguro e TotalPass"
+        subtitulo="Documentos mensais dos benefícios e contratos: Sólides, Flash e Porto Seguro"
       />
 
-      <Card className="space-y-3 p-4">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2">
           <button type="button" onClick={() => setAno((a) => a - 1)} aria-label="Ano anterior" className="rounded border border-hairline px-2 py-0.5 text-[12px] text-foreground-muted hover:bg-surface-page">
             ‹
           </button>
@@ -87,7 +86,7 @@ export function DocumentosTab() {
         </div>
 
         {FORNECEDORES.map((forn) => (
-          <section key={forn} className="space-y-1.5">
+          <Card key={forn} className="space-y-2 p-4">
             <h2 className="text-[11px] font-bold tracking-wide text-brand-primary-800 uppercase">{forn}</h2>
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-12">
               {MESES.map((nome, i) => {
@@ -111,9 +110,8 @@ export function DocumentosTab() {
                 );
               })}
             </div>
-          </section>
+          </Card>
         ))}
-      </Card>
 
       <Modal
         aberto={aberto !== null}
