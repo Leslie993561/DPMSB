@@ -9,10 +9,8 @@ import type { DocumentoDocDp } from "@/lib/db/docDp";
 
 const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
-/** Biblioteca de documentos de um módulo: um cartão por mês do ano escolhido. Só o administrador anexa/exclui. */
-export function DocumentosPorMes({ categoria }: { categoria: CategoriaDocDp }) {
+function Secao({ categoria, titulo, ano }: { categoria: CategoriaDocDp; titulo?: string; ano: number }) {
   const admin = useSessaoResumo()?.tipo === "administrador";
-  const [ano, setAno] = useState(() => new Date().getFullYear());
   const [documentos, setDocumentos] = useState<DocumentoDocDp[]>([]);
   const [enviandoMes, setEnviandoMes] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -63,26 +61,8 @@ export function DocumentosPorMes({ categoria }: { categoria: CategoriaDocDp }) {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setAno((a) => a - 1)}
-          aria-label="Ano anterior"
-          className="rounded border border-hairline px-2.5 py-1 text-[13px] text-foreground-muted hover:bg-surface-page"
-        >
-          ‹
-        </button>
-        <span className="min-w-[3.5rem] text-center text-[15px] font-bold text-brand-primary-800">{ano}</span>
-        <button
-          type="button"
-          onClick={() => setAno((a) => a + 1)}
-          aria-label="Próximo ano"
-          className="rounded border border-hairline px-2.5 py-1 text-[13px] text-foreground-muted hover:bg-surface-page"
-        >
-          ›
-        </button>
-      </div>
+    <div className="space-y-2">
+      {titulo && <h2 className="text-[13px] font-bold tracking-wide text-brand-primary-800 uppercase">{titulo}</h2>}
       <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
         {MESES.map((nome, i) => {
           const competencia = `${ano}-${String(i + 1).padStart(2, "0")}`;
@@ -191,6 +171,39 @@ export function DocumentosPorMes({ categoria }: { categoria: CategoriaDocDp }) {
           </div>
         )}
       </Modal>
+    </div>
+  );
+}
+
+/** Biblioteca de documentos por mês: uma ou mais seções (cada uma com suas 12 pastas) sob a mesma navegação de ano. Só o administrador anexa/exclui. */
+export function DocumentosPorMes({ categoria, secoes }: { categoria?: CategoriaDocDp; secoes?: { categoria: CategoriaDocDp; titulo: string }[] }) {
+  const [ano, setAno] = useState(() => new Date().getFullYear());
+  const lista = secoes ?? (categoria ? [{ categoria, titulo: "" }] : []);
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setAno((a) => a - 1)}
+          aria-label="Ano anterior"
+          className="rounded border border-hairline px-2.5 py-1 text-[13px] text-foreground-muted hover:bg-surface-page"
+        >
+          ‹
+        </button>
+        <span className="min-w-[3.5rem] text-center text-[15px] font-bold text-brand-primary-800">{ano}</span>
+        <button
+          type="button"
+          onClick={() => setAno((a) => a + 1)}
+          aria-label="Próximo ano"
+          className="rounded border border-hairline px-2.5 py-1 text-[13px] text-foreground-muted hover:bg-surface-page"
+        >
+          ›
+        </button>
+      </div>
+
+      {lista.map((sec) => (
+        <Secao key={sec.categoria} categoria={sec.categoria} titulo={sec.titulo || undefined} ano={ano} />
+      ))}
     </div>
   );
 }

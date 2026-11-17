@@ -78,6 +78,7 @@ export const ROTAS_API: RegraApi[] = [
   { prefixo: "/api/beneficios", modulo: "beneficios" },
   { prefixo: "/api/doc-dp/ferias-recibos", modulo: "ferias.recibos" },
   { prefixo: "/api/doc-dp/folha-documentos", modulo: "folha.documentos" },
+  { prefixo: "/api/doc-dp/folha-arh", modulo: "folha.documentos" },
   { prefixo: "/api/upload", modulo: "folha" },
   { prefixo: "/api/ai", modulo: "folha" },
   { prefixo: "/api/chat", modulo: "chat" },

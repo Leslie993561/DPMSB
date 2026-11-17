@@ -33,7 +33,12 @@ export function FolhaPageClient() {
       {aba === "dashboard" && <BreakdownDashboardTab />}
       {aba === "relatorio" && <RelatorioDetalhadoTab />}
       {aba === "movimentacoes" && <HistoricoMovimentacoesTab />}
-      {aba === "documentos" && <DocumentosPorMes categoria="folha-documentos" />}
+      {aba === "documentos" && <DocumentosPorMes
+          secoes={[
+            { categoria: "folha-documentos", titulo: "Folha" },
+            { categoria: "folha-arh", titulo: "ARH" },
+          ]}
+        />}
     </div>
   );
 }
