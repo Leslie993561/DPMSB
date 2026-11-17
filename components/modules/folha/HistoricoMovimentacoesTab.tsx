@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { abreviarNome, formatarDataBr } from "@/lib/format";
 import { Card } from "@/components/shared/Card";
+import { Modal } from "@/components/shared/Modal";
+import type { MesTurnover } from "@/lib/folha/turnover";
 import { tiposDoMovimento } from "@/lib/folha/movimentacoesTipos";
 import type { HistoricoMovimentacoes, MovimentoColaborador } from "@/lib/db/movimentacoes";
 
@@ -20,6 +22,92 @@ const MESES = [
   "Novembro",
   "Dezembro",
 ];
+
+const ABREV = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
+const pct = (v: number | null) => (v === null ? "—" : `${v.toFixed(2).replace(".", ",")}%`);
+
+/** Doze quadrados (JAN–DEZ): efetivo no fim do mês em destaque e o turnover do mês, discreto. */
+function QuadradosTurnover({ meses, onAbrir }: { meses: MesTurnover[]; onAbrir: (mes: number) => void }) {
+  return (
+    <div className="grid min-w-0 flex-1 grid-cols-4 gap-1.5 sm:grid-cols-6 lg:grid-cols-12">
+      {meses.map((m) => (
+        <button
+          key={m.mes}
+          type="button"
+          disabled={m.futuro}
+          onClick={() => onAbrir(m.mes)}
+          title={m.futuro ? "Mês ainda não alcançado" : `Efetivo em ${formatarDataBr(m.dataFim)}${m.parcial ? " (mês em andamento)" : ""}`}
+          className="rounded-lg border border-hairline bg-background px-1 py-1.5 text-center transition-colors enabled:hover:border-brand-primary enabled:hover:bg-surface-page disabled:cursor-default disabled:opacity-60"
+        >
+          <span className="block text-[9px] font-semibold tracking-wide text-foreground-muted">{ABREV[m.mes - 1]}</span>
+          <span className="block text-[18px] leading-tight font-bold text-brand-primary-800">{m.futuro ? "—" : m.efetivoFinal}</span>
+          <span className="block text-[9.5px] font-light text-foreground-muted">{m.futuro ? "" : pct(m.turnoverPct)}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ListaPessoas({ titulo, pessoas, cor }: { titulo: string; pessoas: { colaboradorId: number; nome: string; data: string }[]; cor: string }) {
+  return (
+    <div>
+      <p className={`mb-1 text-[10px] font-semibold tracking-wide uppercase ${cor}`}>
+        {titulo} ({pessoas.length})
+      </p>
+      {pessoas.length === 0 ? (
+        <p className="text-[11px] font-light text-foreground-muted">Nenhum no mês.</p>
+      ) : (
+        <ul className="space-y-0.5">
+          {pessoas.map((p) => (
+            <li key={`${p.colaboradorId}-${p.data}`} className="flex justify-between gap-2 text-[12px]">
+              <span className="min-w-0 truncate text-foreground">{p.nome}</span>
+              <span className="shrink-0 text-foreground-muted">{formatarDataBr(p.data)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function DetalheTurnover({ m, ano, onFechar }: { m: MesTurnover | null; ano: number; onFechar: () => void }) {
+  return (
+    <Modal
+      aberto={m !== null}
+      onFechar={onFechar}
+      eyebrow="Turnover"
+      titulo={m ? `${MESES[m.mes - 1]} / ${ano}` : ""}
+      subtitulo={m?.parcial ? `Mês em andamento: dados até ${formatarDataBr(m.dataFim)}` : undefined}
+    >
+      {m && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {[
+              ["Efetivo inicial", String(m.efetivoInicial)],
+              ["Admissões", String(m.admissoes)],
+              ["Desligamentos", String(m.desligamentos)],
+              ["Efetivo final", String(m.efetivoFinal)],
+              ["Efetivo médio", m.efetivoMedio.toFixed(1).replace(".", ",")],
+              ["Turnover do mês", pct(m.turnoverPct)],
+            ].map(([rotulo, valor]) => (
+              <div key={rotulo} className="rounded-md border border-hairline px-3 py-2">
+                <p className="text-[9px] font-semibold tracking-wide text-foreground-muted uppercase">{rotulo}</p>
+                <p className="text-[18px] font-bold text-brand-primary-800">{valor}</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-[11px] font-light text-foreground-muted">
+            Turnover = [(admissões + desligamentos) ÷ 2] ÷ efetivo médio × 100, com efetivo médio = (inicial + final) ÷ 2.
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <ListaPessoas titulo="Admitidos" pessoas={m.admitidos} cor="text-status-success" />
+            <ListaPessoas titulo="Desligados" pessoas={m.desligados} cor="text-status-danger" />
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}
 
 const INPUT_CLASS =
   "h-6 w-full rounded border border-hairline/70 bg-background px-1.5 text-[11px] font-light text-foreground placeholder:text-foreground-muted/50 disabled:border-transparent disabled:bg-transparent disabled:px-0";
@@ -149,6 +237,7 @@ export function HistoricoMovimentacoesTab() {
   const [ano, setAno] = useState(new Date().getFullYear());
   const [dados, setDados] = useState<HistoricoMovimentacoes | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  const [mesAberto, setMesAberto] = useState<number | null>(null);
 
   useEffect(() => {
     let ativo = true;
@@ -184,8 +273,8 @@ export function HistoricoMovimentacoesTab() {
 
   return (
     <div className="space-y-2.5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Card className="px-4 py-2">
+      <div className="flex flex-wrap items-stretch gap-3">
+        <Card className="shrink-0 px-4 py-2">
           <p className="text-[9px] font-semibold tracking-wide text-foreground-muted uppercase">
             Colaboradores atuais
           </p>
@@ -194,6 +283,7 @@ export function HistoricoMovimentacoesTab() {
             Em {dados.ano}: {totalEntradas} entrada(s) · {totalSaidas} saída(s)
           </p>
         </Card>
+        <QuadradosTurnover meses={dados.turnover} onAbrir={setMesAberto} />
         <label className="flex items-center gap-2 text-[12px] text-foreground-muted">
           Ano
           <select
@@ -247,6 +337,7 @@ export function HistoricoMovimentacoesTab() {
           </div>
         </Card>
       ))}
+      <DetalheTurnover m={mesAberto ? (dados.turnover.find((t) => t.mes === mesAberto) ?? null) : null} ano={dados.ano} onFechar={() => setMesAberto(null)} />
     </div>
   );
 }

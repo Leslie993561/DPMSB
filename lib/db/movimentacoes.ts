@@ -2,6 +2,7 @@ import "server-only";
 import { listarColaboradores } from "./colaboradores";
 import { getDb } from "./client";
 import type { TipoMovimento } from "@/lib/folha/movimentacoesTipos";
+import { calcularTurnoverAno, type MesTurnover } from "@/lib/folha/turnover";
 
 export interface MovimentoColaborador {
   colaboradorId: number;
@@ -30,6 +31,8 @@ export interface HistoricoMovimentacoes {
   /** Anos com ao menos uma admissão ou desligamento, para o seletor da tela. */
   anos: number[];
   meses: MesMovimentacao[];
+  /** Efetivo e turnover mês a mês do ano (calculados das datas de admissão/desligamento). */
+  turnover: MesTurnover[];
   /** Colaboradores ativos hoje no Quadro (o número principal da tela). */
   ativosAtuais: number;
   /** Só quem está em ehEmailEditorMovimentacoes classifica as movimentações. */
@@ -100,7 +103,9 @@ export async function obterHistoricoMovimentacoes(
   }
 
   const ativosAtuais = colaboradores.filter((c) => c.status === "ativo").length;
-  return { ano, anos: [...anos].sort((a, b) => b - a), meses, ativosAtuais, podeEditar };
+  const hoje = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+  const turnover = calcularTurnoverAno(colaboradores, ano, hoje);
+  return { ano, anos: [...anos].sort((a, b) => b - a), meses, turnover, ativosAtuais, podeEditar };
 }
 
 /**
