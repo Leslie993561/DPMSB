@@ -172,7 +172,7 @@ function montarGrupos(counts?: NavCounts): GrupoItem[] {
       itens: [
         { href: "/folha?aba=dashboard", label: "Dashboard", modulo: "folha.dashboard" },
         { href: "/folha?aba=relatorio", label: "Relatório detalhado", modulo: "folha.relatorio" },
-        { href: "/folha?aba=movimentacoes", label: "Histórico de movimentações", modulo: "folha.movimentacoes" },
+        { href: "/folha?aba=movimentacoes", label: "Movimentações", modulo: "folha.movimentacoes" },
         { href: "/folha?aba=documentos", label: "Documentos DP", modulo: "folha.documentos" },
       ],
     },
