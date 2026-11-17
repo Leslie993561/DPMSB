@@ -43,7 +43,10 @@ export function DocumentosPorMes({ categoria }: { categoria: CategoriaDocDp }) {
       form.append("competencia", competencia);
       for (const a of arquivos) form.append("arquivos", a);
       const r = await fetch(`/api/doc-dp/${categoria}/documentos`, { method: "POST", body: form });
-      const d = await r.json();
+      if (r.status === 413) {
+        throw new Error("Arquivo grande demais para enviar de uma vez (limite do servidor: cerca de 4,5 MB no total). Envie menos arquivos por vez ou reduza o tamanho do PDF.");
+      }
+      const d = (await r.json().catch(() => ({}))) as { erro?: string };
       if (!r.ok) throw new Error(d.erro ?? "Falha ao anexar.");
       await carregar();
     } catch (e) {
