@@ -65,11 +65,16 @@ export function LancarManualmenteModal({
   );
 
   // PJ não segue a CLT (sem concessivo, fracionamento livre, sem proventos): tem painel próprio.
-  const selecionadoPj = colaboradores.find((c) => String(c.id) === colaboradorId)?.vinculo === "PJ";
+  const pjNaLista = colaboradores.find((c) => String(c.id) === colaboradorId)?.vinculo === "PJ";
+  // O gestor comum não está na própria lista (ela traz só a equipe), então o vínculo
+  // dele não aparece em `colaboradores`: pergunta ao painel PJ, que responde null
+  // para quem não é PJ.
+  const ehEuMesmo = meuId !== null && colaboradorId === String(meuId);
   const [pjControle, setPjControle] = useState<ControleFeriasPj | null>(null);
+  const selecionadoPj = pjNaLista || (ehEuMesmo && pjControle?.colaboradorId === meuId);
 
   useEffect(() => {
-    if (!selecionadoPj) return;
+    if (!pjNaLista && !ehEuMesmo) return;
     let cancelado = false;
     fetch(`/api/periodos-aquisitivos/pj?colaboradorId=${colaboradorId}`)
       .then((r) => r.json())
@@ -80,7 +85,7 @@ export function LancarManualmenteModal({
     return () => {
       cancelado = true;
     };
-  }, [selecionadoPj, colaboradorId]);
+  }, [pjNaLista, ehEuMesmo, colaboradorId]);
 
   useEffect(() => {
     let cancelado = false;

@@ -1,4 +1,5 @@
-import { carregarPdfParse } from "./carregarPdfParse";
+import { carregarPdfParse, carregarPdfjs } from "./carregarPdfParse";
+import { extrairHolerites, paraNumeroBR, type HoleriteLido, type ItemTexto } from "./reciboEventos";
 import "server-only";
 
 export interface FuncionarioRecibo {
@@ -12,15 +13,6 @@ export interface FuncionarioLiquido {
   codigo: string;
   nome: string;
   cpf: string;
-}
-
-/** "1.234,56" → 1234.56; "*********" (linha em branco/carry-forward) → null. */
-function paraNumeroBR(texto: string | undefined): number | null {
-  if (!texto) return null;
-  const limpo = texto.trim();
-  if (!/^\d{1,3}(\.\d{3})*,\d{2}$/.test(limpo)) return null;
-  const n = Number(limpo.replace(/\./g, "").replace(",", "."));
-  return Number.isFinite(n) ? n : null;
 }
 
 async function extrairTexto(buffer: ArrayBuffer): Promise<string> {
@@ -116,4 +108,35 @@ export async function parsearRelatorioLiquidos(buffer: ArrayBuffer): Promise<Fun
     resultado.push({ codigo, nome: nome.trim(), cpf });
   }
   return resultado;
+}
+
+/**
+ * Holerites com os eventos (proventos/descontos) de cada via, lidos pela
+ * posição do texto na página — ver reciboEventos.ts. Devolve um por
+ * funcionário: a primeira via com Salário Base válido vence, igual a
+ * parsearReciboPagamento (a via "em branco" de um lote reprocessado não conta).
+ */
+export async function lerHolerites(buffer: ArrayBuffer): Promise<HoleriteLido[]> {
+  const pdfjs = await carregarPdfjs();
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(buffer), verbosity: 0 }).promise;
+  const porCodigo = new Map<string, HoleriteLido>();
+  try {
+    for (let n = 1; n <= doc.numPages; n++) {
+      const pagina = await doc.getPage(n);
+      const conteudo = await pagina.getTextContent();
+      const itens: ItemTexto[] = [];
+      for (const item of conteudo.items) {
+        if (!("str" in item) || !item.str.trim()) continue;
+        itens.push({ x: item.transform[4], y: item.transform[5], texto: item.str.trim() });
+      }
+      for (const holerite of extrairHolerites(itens)) {
+        if (holerite.salarioBase !== null && !porCodigo.has(holerite.codigo)) {
+          porCodigo.set(holerite.codigo, holerite);
+        }
+      }
+    }
+  } finally {
+    await doc.destroy();
+  }
+  return [...porCodigo.values()];
 }

@@ -57,6 +57,14 @@ function IconeBeneficios() {
   );
 }
 
+function IconeDocDp() {
+  return (
+    <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+      <path d="M2 5a2 2 0 0 1 2-2h3.17a2 2 0 0 1 1.42.59L9.41 4.4a1 1 0 0 0 .71.3H16a2 2 0 0 1 2 2V15a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5Z" />
+    </svg>
+  );
+}
+
 function IconePortal() {
   return (
     <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
@@ -183,6 +191,17 @@ function montarGrupos(counts?: NavCounts): GrupoItem[] {
         { href: "/beneficios?aba=dashboard", label: "Dashboard", modulo: "beneficios.dashboard" },
         { href: "/beneficios?aba=rateio", label: "Rateio", modulo: "beneficios.rateio" },
         { href: "/beneficios?aba=documentos", label: "Documentos", modulo: "beneficios.documentos" },
+      ],
+    },
+    {
+      id: "doc_dp",
+      label: "DOC. DP",
+      Icone: IconeDocDp,
+      base: "/doc-dp",
+      itens: [
+        { href: "/doc-dp?aba=beneficios", label: "Benefícios", modulo: "doc_dp.beneficios" },
+        { href: "/doc-dp?aba=programas", label: "Programas", modulo: "doc_dp.programas" },
+        { href: "/doc-dp?aba=departamento-pessoal", label: "Departamento Pessoal", modulo: "doc_dp.departamento" },
       ],
     },
   ];

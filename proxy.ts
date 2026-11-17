@@ -5,7 +5,7 @@ import { ROTAS_API, ROTAS_PAGINA, PREFIXO_ADMIN, permiteAcesso, moduloDaPagina }
 
 const NOME_COOKIE = "portaldp_sessao";
 const CAMINHOS_PUBLICOS = new Set(["/login"]);
-const PREFIXOS_SOMENTE_LEITURA = ["/api/folha-breakdown", "/api/beneficios", "/api/upload", "/api/sst", "/api/dho"];
+const PREFIXOS_SOMENTE_LEITURA = ["/api/folha-breakdown", "/api/beneficios", "/api/doc-dp", "/api/upload", "/api/sst", "/api/dho"];
 
 /**
  * Gate de autenticação e permissão de TODAS as páginas e rotas de API do

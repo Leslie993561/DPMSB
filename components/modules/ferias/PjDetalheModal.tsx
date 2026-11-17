@@ -6,6 +6,58 @@ import { valorFeriasPj } from "@/lib/ferias-pj/calc";
 import { formatarDataBr, formatarMoeda } from "@/lib/format";
 import { useOperador } from "@/lib/currentUser";
 import { Modal } from "@/components/shared/Modal";
+import { Badge } from "@/components/shared/Badge";
+
+/** Botão "Excluir" de um lançamento de PJ: confirma, apaga e avisa quem chamou para recarregar. */
+function BotaoExcluirGozo({
+  lancamentoId,
+  descricao,
+  onExcluido,
+}: {
+  lancamentoId: number;
+  descricao: string;
+  onExcluido: () => void;
+}) {
+  const { operador } = useOperador();
+  const [excluindo, setExcluindo] = useState(false);
+
+  async function excluir() {
+    if (!operador.trim()) {
+      window.alert("Não foi possível identificar seu usuário — recarregue a página e tente de novo.");
+      return;
+    }
+    if (!window.confirm(`Excluir o lançamento de férias ${descricao}? Os dias voltam para o saldo do colaborador.`)) return;
+    setExcluindo(true);
+    try {
+      const res = await fetch("/api/periodos-aquisitivos/pj", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lancamentoId, operador }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        window.alert(data.erro ?? "Erro ao excluir o lançamento.");
+        return;
+      }
+      onExcluido();
+    } catch {
+      window.alert("Falha de comunicação com o servidor.");
+    } finally {
+      setExcluindo(false);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => void excluir()}
+      disabled={excluindo}
+      className="rounded px-1.5 py-0.5 text-[10.5px] font-semibold text-status-danger hover:bg-status-danger-bg disabled:opacity-50"
+    >
+      {excluindo ? "Excluindo…" : "Excluir"}
+    </button>
+  );
+}
 
 const INPUT_CLASS =
   "w-full rounded-md border border-brand-surface bg-background px-2.5 py-1.5 text-xs text-foreground dark:border-brand-neutral/30";
@@ -189,6 +241,7 @@ export function PjPainel({
                   <th className="px-2 py-1.5">Gozo</th>
                   <th className="px-2 py-1.5 text-right">Dias</th>
                   <th className="px-2 py-1.5 text-right">Valor das férias</th>
+                  {podeLancar && <th className="px-2 py-1.5" />}
                 </tr>
               </thead>
               <tbody>
@@ -199,6 +252,15 @@ export function PjPainel({
                     </td>
                     <td className="px-2 py-1.5 text-right text-foreground-muted">{l.dias}</td>
                     <td className="px-2 py-1.5 text-right font-semibold text-foreground">{formatarMoeda(l.valor)}</td>
+                    {podeLancar && (
+                      <td className="px-2 py-1.5 text-right">
+                        <BotaoExcluirGozo
+                          lancamentoId={l.id}
+                          descricao={`de ${l.dias} dia(s)${l.dataInicio ? ` a partir de ${formatarDataBr(l.dataInicio)}` : ""}`}
+                          onExcluido={onAtualizado}
+                        />
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -211,6 +273,8 @@ export function PjPainel({
 
 interface LinhaHistoricoPj {
   chave: string;
+  /** Lançamento que originou esta linha (null no período sem gozo). */
+  lancamentoId: number | null;
   aquisitivoInicio: string;
   aquisitivoFim: string;
   concessivoInicio: string;
@@ -218,6 +282,8 @@ interface LinhaHistoricoPj {
   gozoInicio: string | null;
   gozoFim: string | null;
   dias: number;
+  /** Primeira linha do período: só ela mostra aquisitivo/concessivo, como no histórico da CLT. */
+  primeira: boolean;
 }
 
 function somarAnos(iso: string, anos: number): string {
@@ -251,25 +317,42 @@ function montarHistorico(pj: ControleFeriasPj): LinhaHistoricoPj[] {
       falta -= parte;
       gozos[i].push({
         chave: `${pj.periodos[i].inicio}-${l.id}`,
+        lancamentoId: l.id,
         ...base(i),
         gozoInicio: l.dataInicio,
         gozoFim: l.dataFim,
         dias: parte,
+        primeira: false,
       });
     }
   }
 
+  // Períodos do mais novo para o mais antigo, e os gozos de cada um em ordem de data (igual à CLT).
   return pj.periodos
-    .flatMap((p, i) =>
-      gozos[i].length > 0
-        ? gozos[i]
-        : [{ chave: p.inicio, ...base(i), gozoInicio: null, gozoFim: null, dias: 0 }],
-    )
-    .reverse();
+    .map((p, i) => ({ p, i }))
+    .reverse()
+    .flatMap(({ p, i }) => {
+      const doPeriodo: LinhaHistoricoPj[] =
+        gozos[i].length > 0
+          ? [...gozos[i]].sort((a, z) => (a.gozoInicio ?? "").localeCompare(z.gozoInicio ?? ""))
+          : [{ chave: p.inicio, lancamentoId: null, ...base(i), gozoInicio: null, gozoFim: null, dias: 0, primeira: false }];
+      return doPeriodo.map((l, k) => ({ ...l, primeira: k === 0 }));
+    });
 }
 
 /** Histórico de férias de um PJ, no formato do histórico da CLT: aquisitivo, concessivo (informativo), período de férias e dias gozados. */
-export function PjDetalheModal({ pj, onFechar }: { pj: ControleFeriasPj; onFechar: () => void }) {
+export function PjDetalheModal({
+  pj,
+  onFechar,
+  podeExcluir = false,
+  onAtualizado,
+}: {
+  pj: ControleFeriasPj;
+  onFechar: () => void;
+  /** Mostra o "Excluir" de cada lançamento — é do RH (o servidor confere a permissão de novo). */
+  podeExcluir?: boolean;
+  onAtualizado?: () => void;
+}) {
   const linhas = montarHistorico(pj);
   return (
     <Modal
@@ -306,22 +389,39 @@ export function PjDetalheModal({ pj, onFechar }: { pj: ControleFeriasPj; onFecha
                 <th className="px-3 py-2">Período aquisitivo</th>
                 <th className="px-3 py-2">Período concessivo</th>
                 <th className="px-3 py-2">Período de férias</th>
-                <th className="px-3 py-2 text-right">Dias gozados</th>
+                <th className="px-3 py-2 text-right">Dias</th>
+                <th className="px-3 py-2">Situação</th>
+                {podeExcluir && <th className="px-3 py-2" />}
               </tr>
             </thead>
             <tbody>
               {linhas.map((l) => (
                 <tr key={l.chave} className="border-b border-hairline/60 last:border-0">
-                  <td className="px-3 py-2.5 text-foreground">
-                    {formatarDataBr(l.aquisitivoInicio)} – {formatarDataBr(l.aquisitivoFim)}
+                  {/* Aquisitivo/concessivo só na primeira linha do período, para não repetir a mesma data em cada gozo */}
+                  <td className="px-3 py-2.5 whitespace-nowrap text-foreground">
+                    {l.primeira ? `${formatarDataBr(l.aquisitivoInicio)} – ${formatarDataBr(l.aquisitivoFim)}` : ""}
                   </td>
-                  <td className="px-3 py-2.5 text-foreground-muted">
-                    {formatarDataBr(l.concessivoInicio)} – {formatarDataBr(l.concessivoFim)}
+                  <td className="px-3 py-2.5 whitespace-nowrap text-foreground-muted">
+                    {l.primeira ? `${formatarDataBr(l.concessivoInicio)} – ${formatarDataBr(l.concessivoFim)}` : ""}
                   </td>
-                  <td className="px-3 py-2.5 text-foreground-muted">
+                  <td className="px-3 py-2.5 whitespace-nowrap text-foreground">
                     {l.gozoInicio ? `${formatarDataBr(l.gozoInicio)} – ${l.gozoFim ? formatarDataBr(l.gozoFim) : "—"}` : "—"}
                   </td>
-                  <td className="px-3 py-2.5 text-right font-semibold text-foreground">{l.dias > 0 ? l.dias : "—"}</td>
+                  <td className="px-3 py-2.5 text-right whitespace-nowrap text-foreground">{l.dias > 0 ? l.dias : "—"}</td>
+                  <td className="px-3 py-2.5">
+                    <Badge cor={l.dias > 0 ? "verde" : "neutro"}>{l.dias > 0 ? "Concluída" : "Sem gozo"}</Badge>
+                  </td>
+                  {podeExcluir && (
+                    <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                      {l.lancamentoId !== null && (
+                        <BotaoExcluirGozo
+                          lancamentoId={l.lancamentoId}
+                          descricao={`${l.gozoInicio ? `de ${formatarDataBr(l.gozoInicio)}` : ""} (${l.dias} dia(s))`}
+                          onExcluido={() => onAtualizado?.()}
+                        />
+                      )}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

@@ -57,6 +57,15 @@ const MODULOS_DP: ModuloAcesso[] = [
       { chave: "beneficios.documentos", label: "Documentos" },
     ],
   },
+  {
+    chave: "doc_dp",
+    label: "Doc. DP",
+    filhos: [
+      { chave: "doc_dp.beneficios", label: "Benefícios" },
+      { chave: "doc_dp.programas", label: "Programas" },
+      { chave: "doc_dp.departamento", label: "Departamento Pessoal" },
+    ],
+  },
   { chave: "rescisao", label: "Rescisão" },
   { chave: "chat", label: "Chat com o Assistente" },
 ];

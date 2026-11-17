@@ -30,6 +30,8 @@ export interface DetalheCalculoFerias {
 }
 
 export interface ItemProgramacaoFerias {
+  /** PJ: sem 1/3, abono, INSS, IRRF, FGTS nem INSS patronal — só salário ÷ 30 × dias. */
+  pj: boolean;
   lancamentoId: number;
   periodoAquisitivoId: number;
   colaboradorId: number;
@@ -211,6 +213,7 @@ export async function listarProgramacaoFerias(): Promise<ItemProgramacaoFerias[]
     const lider = colaborador.gestorId ? (colaboradoresPorId.get(colaborador.gestorId)?.nome ?? null) : null;
 
     itens.push({
+      pj,
       lancamentoId: linha.id,
       periodoAquisitivoId: linha.periodo_aquisitivo_id,
       colaboradorId: colaborador.id,

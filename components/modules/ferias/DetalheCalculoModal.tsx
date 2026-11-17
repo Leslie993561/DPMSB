@@ -72,24 +72,32 @@ export function DetalheCalculoModal({ item, onFechar }: { item: ItemProgramacaoF
               <LinhaValor label="Salário base mensal (folha)" valor={d.salarioBase} />
               <LinhaValor label="Base diária (salário ÷ 30)" valor={d.valorDiario} />
               <LinhaValor label={`Férias · ${item.dias} dias`} valor={d.valorGozado} />
-              <LinhaValor label="1/3 constitucional" valor={d.tercoConstitucional} />
-              <LinhaValor label="Abono pecuniário" valor={item.abono ? d.abono + d.tercoAbono : null} />
-              {d.dobra > 0 && <LinhaValor label="Dobra — Art. 137 CLT (fora do prazo)" valor={d.dobra} />}
-              <LinhaValor label="Bruto das férias" valor={d.bruto + d.dobra} destaque />
-              <LinhaValor label="(–) INSS" valor={-d.inss || 0} negativo />
-              <LinhaValor label="(–) IRRF" valor={-d.irrf || 0} negativo />
-              <LinhaValor label="Líquido a receber" valor={d.liquido} destaque cor="text-status-success" />
+              {item.pj ? (
+                <LinhaValor label="Valor a pagar (PJ, sem encargos)" valor={item.custoPrevisto} destaque cor="text-status-success" />
+              ) : (
+                <>
+                  <LinhaValor label="1/3 constitucional" valor={d.tercoConstitucional} />
+                  <LinhaValor label="Abono pecuniário" valor={item.abono ? d.abono + d.tercoAbono : null} />
+                  {d.dobra > 0 && <LinhaValor label="Dobra — Art. 137 CLT (fora do prazo)" valor={d.dobra} />}
+                  <LinhaValor label="Bruto das férias" valor={d.bruto + d.dobra} destaque />
+                  <LinhaValor label="(–) INSS" valor={-d.inss || 0} negativo />
+                  <LinhaValor label="(–) IRRF" valor={-d.irrf || 0} negativo />
+                  <LinhaValor label="Líquido a receber" valor={d.liquido} destaque cor="text-status-success" />
+                </>
+              )}
             </dl>
           </div>
 
-          <div className="rounded border border-hairline p-3">
-            <p className="mb-1.5 text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">Encargos da empresa</p>
-            <dl className="space-y-1 text-[11px]">
-              <LinhaValor label="FGTS 8%" valor={d.fgts} corValor="text-status-warning" />
-              <LinhaValor label="INSS patronal 20%" valor={d.inssPatronal} corValor="text-status-warning" />
-              <LinhaValor label="Bruto + encargos" valor={brutoMaisEncargos} destaque />
-            </dl>
-          </div>
+          {!item.pj && (
+            <div className="rounded border border-hairline p-3">
+              <p className="mb-1.5 text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">Encargos da empresa</p>
+              <dl className="space-y-1 text-[11px]">
+                <LinhaValor label="FGTS 8%" valor={d.fgts} corValor="text-status-warning" />
+                <LinhaValor label="INSS patronal 20%" valor={d.inssPatronal} corValor="text-status-warning" />
+                <LinhaValor label="Bruto + encargos" valor={brutoMaisEncargos} destaque />
+              </dl>
+            </div>
+          )}
 
           <div className="rounded border border-brand-dark-900 bg-brand-dark-900 p-3">
             <p className="text-[10px] font-semibold tracking-wide text-brand-white/70 uppercase">Custo total previsto</p>
@@ -100,7 +108,12 @@ export function DetalheCalculoModal({ item, onFechar }: { item: ItemProgramacaoF
             </p>
           </div>
 
-          {item.vencida ? (
+          {item.pj ? (
+            <div className="rounded border border-status-info-bg bg-status-info-bg px-2.5 py-1.5 text-[11px] text-brand-primary-800">
+              <span aria-hidden>ⓘ</span> PJ: férias pagas pelo valor do contrato ÷ 30 × dias, sem 1/3, abono, INSS, IRRF,
+              FGTS nem INSS patronal, e sem período concessivo.
+            </div>
+          ) : item.vencida ? (
             <div className="rounded border border-status-danger-border bg-status-danger-bg px-2.5 py-1.5 text-[11px] text-status-danger">
               <span aria-hidden>▲</span> Período vencido: para caber no concessivo (até{" "}
               {formatarDataBr(item.concessivoFim)}), estes {item.dias} dias teriam que começar até{" "}

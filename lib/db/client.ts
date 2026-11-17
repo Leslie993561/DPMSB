@@ -58,6 +58,17 @@ CREATE TABLE IF NOT EXISTS beneficios_documentos (
   nome TEXT NOT NULL,
   criado_em TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')
 );
+
+-- Módulo DOC. DP: documentos mensais de cada aba (beneficios, programas, departamento-pessoal).
+CREATE TABLE IF NOT EXISTS doc_dp_documentos (
+  id SERIAL PRIMARY KEY,
+  categoria TEXT NOT NULL,
+  competencia TEXT NOT NULL,
+  rotulo TEXT,
+  url TEXT NOT NULL,
+  nome TEXT NOT NULL,
+  criado_em TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')
+);
 `;
 
 /**

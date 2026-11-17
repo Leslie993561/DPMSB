@@ -463,6 +463,17 @@ export function PlanejamentoDeFeriasTab({
                           </span>
 
                           <span className="pointer-events-none absolute top-full right-0 z-50 hidden w-64 rounded-lg border border-hairline bg-background p-2.5 text-left text-[11px] font-normal shadow-lg group-hover:block group-focus-within:block dark:border-brand-neutral/30">
+                            {item.pj ? (
+                              <>
+                                <span className="block font-semibold text-foreground">PJ · sem encargos</span>
+                                <LinhaValor rotulo={`Férias (${item.dias} dias)`} valor={item.detalhe.valorGozado} />
+                                <LinhaValor rotulo="Valor a pagar" valor={item.custoPrevisto} destaque />
+                                <span className="mt-1 block text-[10px] text-foreground-muted">
+                                  {formatarMoeda(item.detalhe.salarioBase)} ÷ 30 × {item.dias} dias
+                                </span>
+                              </>
+                            ) : (
+                              <>
                             <span className="block font-semibold text-foreground">Recebe o colaborador</span>
                             <LinhaValor rotulo={`Férias (${item.dias} dias)`} valor={item.detalhe.valorGozado} />
                             <LinhaValor rotulo="1/3 constitucional" valor={item.detalhe.tercoConstitucional} />
@@ -478,6 +489,8 @@ export function PlanejamentoDeFeriasTab({
                             <LinhaValor rotulo="FGTS" valor={item.detalhe.fgts} />
                             <LinhaValor rotulo="INSS patronal" valor={item.detalhe.inssPatronal} />
                             <LinhaValor rotulo="Custo total" valor={item.custoPrevisto} destaque />
+                              </>
+                            )}
                           </span>
                         </span>
                       )}

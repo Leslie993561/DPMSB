@@ -452,8 +452,8 @@ export function RelatorioDetalhadoTab() {
                   <th className={cn(TH_COL, GRUPO_ENCARGOS, "text-status-warning")}>Total encargos</th>
                   <th className={cn(TH_COL, DIVISOR, GRUPO_BENEFICIOS, "text-brand-primary-800")}>VT</th>
                   <th className={cn(TH_COL, GRUPO_BENEFICIOS, "text-brand-primary-800")}>VA</th>
-                  <th className={cn(TH_COL, GRUPO_BENEFICIOS, "text-brand-primary-800")}>Auxílio educação</th>
                   <th className={cn(TH_COL, GRUPO_BENEFICIOS, "text-brand-primary-800")}>VM</th>
+                  <th className={cn(TH_COL, GRUPO_BENEFICIOS, "text-brand-primary-800")}>Auxílio educação</th>
                   <th className={cn(TH_COL, GRUPO_BENEFICIOS, "text-brand-primary-800")}>Odontológico</th>
                   <th className={cn(TH_COL, GRUPO_BENEFICIOS, "text-brand-primary-800")}>Plano de saúde</th>
                   <th
@@ -528,8 +528,8 @@ export function RelatorioDetalhadoTab() {
                     <td className={cn(TD_NUM, GRUPO_ENCARGOS, "font-bold")}>{formatarNumero(totalEncargos(l))}</td>
                     <td className={cn(TD_NUM, DIVISOR, GRUPO_BENEFICIOS)}>{formatarNumero(l.valeTransporte)}</td>
                     <td className={cn(TD_NUM, GRUPO_BENEFICIOS)}>{formatarNumero(l.valeAlimentacao)}</td>
-                    <td className={cn(TD_NUM, GRUPO_BENEFICIOS)}>{formatarNumeroOuTraco(l.auxilioEducacao || null)}</td>
                     <td className={cn(TD_NUM, GRUPO_BENEFICIOS)}>{formatarNumeroOuTraco(l.vm)}</td>
+                    <td className={cn(TD_NUM, GRUPO_BENEFICIOS)}>{formatarNumeroOuTraco(l.auxilioEducacao || null)}</td>
                     <td className={cn(TD_NUM, GRUPO_BENEFICIOS)}>{formatarNumeroOuTraco(l.odontologico)}</td>
                     <td className={cn(TD_NUM, GRUPO_BENEFICIOS)}>{formatarNumeroOuTraco(l.planoSaude)}</td>
                     <td
@@ -658,8 +658,8 @@ export function RelatorioDetalhadoTab() {
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.encargos)}</td>
                   <td className={cn(TD_NUM, DIVISOR, "bg-surface-page")}>{formatarNumero(totais.vt)}</td>
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.va)}</td>
-                  <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.auxilioEducacao)}</td>
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.vm)}</td>
+                  <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.auxilioEducacao)}</td>
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.odontologico)}</td>
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.planoSaude)}</td>
                   <td className={cn(TD_NUM, "bg-surface-page")}>{formatarNumero(totais.salarioFamilia)}</td>
@@ -1002,11 +1002,33 @@ function ImportarPopover({
 
 /**
  * "Opção 3" do popover de importar: lê o Recibo de Pagamento + o Relatório de
- * Líquidos (os dois PDFs que a folha mensal já gera) e atualiza o Salário
- * Base do cadastro de quem mudou. Só o salário é gravado — INSS, FGTS e IRRF
- * continuam saindo do cálculo automático (gerarBreakdown), então corrigir o
- * salário aqui já corrige o Breakdown inteiro sozinho.
+ * Líquidos (os dois PDFs que a folha mensal já gera) e atualiza, de quem mudou,
+ * o Salário Base, os adicionais de periculosidade/insalubridade (no cadastro) e
+ * as horas extras do mês do recibo. INSS, FGTS e IRRF continuam saindo do
+ * cálculo automático (gerarBreakdown), então corrigir o salário aqui já corrige
+ * o Breakdown inteiro sozinho.
  */
+interface LinhaRecibo {
+  colaboradorId: number;
+  nome: string;
+  salarioAtual: number;
+  salarioNovo: number;
+  periculosidadeAtual: number | null;
+  periculosidadeNova: number | null;
+  insalubridadeAtual: number | null;
+  insalubridadeNova: number | null;
+  horaExtra50Atual: number;
+  horaExtra50Nova: number;
+  horaExtra100Atual: number;
+  horaExtra100Nova: number;
+  mudouSalario: boolean;
+  mudouAdicionais: boolean;
+  mudouHoras: boolean;
+  mudou: boolean;
+  avisos: string[];
+}
+
+const percentualOuZero = (v: number | null) => `${v ?? 0}%`;
 function ImportarSalariosSecao({ onAplicado }: { onAplicado: () => void }) {
   const [reciboArquivo, setReciboArquivo] = useState<File | null>(null);
   const [liquidosArquivo, setLiquidosArquivo] = useState<File | null>(null);
@@ -1014,7 +1036,8 @@ function ImportarSalariosSecao({ onAplicado }: { onAplicado: () => void }) {
   const [aplicando, setAplicando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [preview, setPreview] = useState<{
-    linhas: { colaboradorId: number; nome: string; salarioAtual: number; salarioNovo: number; mudou: boolean }[];
+    competencia: string | null;
+    linhas: LinhaRecibo[];
     descartados: { codigo: string; nome: string; motivo: string }[];
   } | null>(null);
   const [selecionados, setSelecionados] = useState<Set<number>>(new Set());
@@ -1041,9 +1064,7 @@ function ImportarSalariosSecao({ onAplicado }: { onAplicado: () => void }) {
       setPreview(data);
       setSelecionados(
         new Set(
-          (data.linhas as { colaboradorId: number; mudou: boolean }[])
-            .filter((l) => l.mudou)
-            .map((l) => l.colaboradorId),
+          (data.linhas as LinhaRecibo[]).filter((l) => l.mudou).map((l) => l.colaboradorId),
         ),
       );
     } catch {
@@ -1055,9 +1076,18 @@ function ImportarSalariosSecao({ onAplicado }: { onAplicado: () => void }) {
 
   async function aplicar() {
     if (!preview) return;
+    // Só vai o que mudou em cada pessoa — o resto do cadastro não é tocado.
     const atualizacoes = preview.linhas
       .filter((l) => selecionados.has(l.colaboradorId))
-      .map((l) => ({ colaboradorId: l.colaboradorId, salarioBase: l.salarioNovo }));
+      .map((l) => ({
+        colaboradorId: l.colaboradorId,
+        ...(l.mudouSalario && { salarioBase: l.salarioNovo }),
+        ...(l.periculosidadeNova !== null &&
+          l.periculosidadeNova !== l.periculosidadeAtual && { periculosidadePercentual: l.periculosidadeNova }),
+        ...(l.insalubridadeNova !== null &&
+          l.insalubridadeNova !== l.insalubridadeAtual && { insalubridadePercentual: l.insalubridadeNova }),
+        ...(l.mudouHoras && { horaExtra50: l.horaExtra50Nova, horaExtra100: l.horaExtra100Nova }),
+      }));
     if (atualizacoes.length === 0) return;
     setErro(null);
     setAplicando(true);
@@ -1065,7 +1095,7 @@ function ImportarSalariosSecao({ onAplicado }: { onAplicado: () => void }) {
       const res = await fetch("/api/colaboradores/atualizar-salarios", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ atualizacoes }),
+        body: JSON.stringify({ competencia: preview.competencia ?? undefined, atualizacoes }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -1088,11 +1118,14 @@ function ImportarSalariosSecao({ onAplicado }: { onAplicado: () => void }) {
 
   return (
     <div className="mt-5 border-t border-hairline pt-4">
-      <p className="text-[12.5px] font-bold text-foreground">Opção 3 · Atualizar salários (Recibo de Pagamento)</p>
+      <p className="text-[12.5px] font-bold text-foreground">
+        Opção 3 · Atualizar salários, adicionais e horas extras (Recibo de Pagamento)
+      </p>
       <p className="mt-2 text-[11px] leading-relaxed text-foreground-muted">
         Lê o Recibo de Pagamento e o Relatório de Líquidos do mesmo mês (os dois PDFs que a folha já gera), casa cada
-        pessoa pelo CPF (pelo nome, se faltar CPF) e mostra quem mudou de Salário Base antes de gravar. INSS, FGTS e
-        IRRF não são importados — continuam calculados a partir do salário.
+        pessoa pelo CPF (pelo nome, se faltar CPF) e mostra, antes de gravar, quem mudou de Salário Base,
+        periculosidade/insalubridade ou horas extras (estas vão para o mês impresso no recibo). INSS, FGTS e IRRF não
+        são importados — continuam calculados a partir do salário.
       </p>
 
       <label className="mt-3 flex cursor-pointer items-center justify-center gap-1.5 rounded-md border-2 border-dashed border-hairline px-3 py-2.5 text-center text-[11.5px] font-medium text-foreground hover:border-brand-primary">
@@ -1133,7 +1166,7 @@ function ImportarSalariosSecao({ onAplicado }: { onAplicado: () => void }) {
       {aplicadas !== null && (
         <div className="mt-2.5">
           <RiskCallout nivel="sucesso">
-            <strong>{aplicadas} colaborador(es) com o Salário Base atualizado.</strong>
+            <strong>{aplicadas} colaborador(es) atualizado(s).</strong>
           </RiskCallout>
         </div>
       )}
@@ -1152,49 +1185,80 @@ function ImportarSalariosSecao({ onAplicado }: { onAplicado: () => void }) {
       {preview && (
         <div className="mt-3 space-y-2">
           <p className="text-[11px] text-foreground-muted">
-            {linhasComMudanca.length} de {preview.linhas.length} vieram com salário diferente do cadastro.
+            {linhasComMudanca.length} de {preview.linhas.length} vieram diferentes do cadastro
+            {preview.competencia ? ` (horas extras de ${preview.competencia.split("-").reverse().join("/")})` : ""}.
           </p>
+          {!preview.competencia && (
+            <RiskCallout nivel="atencao">
+              Não encontrei o mês impresso no recibo — as horas extras não serão lançadas, só salário e adicionais.
+            </RiskCallout>
+          )}
 
           {linhasComMudanca.length > 0 && (
-            <div className="max-h-52 overflow-y-auto rounded-md border border-hairline">
-              <table className="w-full text-[11px]">
-                <thead className="bg-surface-page text-left text-[9.5px] font-semibold tracking-wide text-foreground-muted uppercase">
-                  <tr>
-                    <th className="px-2 py-1"></th>
-                    <th className="px-2 py-1">Nome</th>
-                    <th className="px-2 py-1 text-right">Atual</th>
-                    <th className="px-2 py-1 text-right">Novo</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-hairline">
-                  {linhasComMudanca.map((l) => (
-                    <tr key={l.colaboradorId}>
-                      <td className="px-2 py-1">
-                        <input
-                          type="checkbox"
-                          checked={selecionados.has(l.colaboradorId)}
-                          onChange={(e) =>
-                            setSelecionados((atual) => {
-                              const novo = new Set(atual);
-                              if (e.target.checked) novo.add(l.colaboradorId);
-                              else novo.delete(l.colaboradorId);
-                              return novo;
-                            })
-                          }
-                        />
-                      </td>
-                      <td className="max-w-[110px] truncate px-2 py-1 text-foreground" title={l.nome}>
-                        {l.nome}
-                      </td>
-                      <td className="px-2 py-1 text-right text-foreground-muted">{formatarMoeda(l.salarioAtual)}</td>
-                      <td className="px-2 py-1 text-right font-semibold text-brand-primary-800">
-                        {formatarMoeda(l.salarioNovo)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <ul className="max-h-64 divide-y divide-hairline overflow-y-auto rounded-md border border-hairline">
+              {linhasComMudanca.map((l) => (
+                <li key={l.colaboradorId} className="flex gap-2 px-2 py-1.5 text-[11px]">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={selecionados.has(l.colaboradorId)}
+                    onChange={(e) =>
+                      setSelecionados((atual) => {
+                        const novo = new Set(atual);
+                        if (e.target.checked) novo.add(l.colaboradorId);
+                        else novo.delete(l.colaboradorId);
+                        return novo;
+                      })
+                    }
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold text-foreground" title={l.nome}>
+                      {l.nome}
+                    </p>
+                    {l.mudouSalario && (
+                      <LinhaMudanca
+                        rotulo="Salário"
+                        de={formatarMoeda(l.salarioAtual)}
+                        para={formatarMoeda(l.salarioNovo)}
+                      />
+                    )}
+                    {l.periculosidadeNova !== null && l.periculosidadeNova !== (l.periculosidadeAtual ?? 0) && (
+                      <LinhaMudanca
+                        rotulo="Periculosidade"
+                        de={percentualOuZero(l.periculosidadeAtual)}
+                        para={percentualOuZero(l.periculosidadeNova)}
+                      />
+                    )}
+                    {l.insalubridadeNova !== null && l.insalubridadeNova !== (l.insalubridadeAtual ?? 0) && (
+                      <LinhaMudanca
+                        rotulo="Insalubridade"
+                        de={percentualOuZero(l.insalubridadeAtual)}
+                        para={percentualOuZero(l.insalubridadeNova)}
+                      />
+                    )}
+                    {l.mudouHoras && l.horaExtra50Atual !== l.horaExtra50Nova && (
+                      <LinhaMudanca
+                        rotulo="HE 50%"
+                        de={formatarHoras(l.horaExtra50Atual)}
+                        para={formatarHoras(l.horaExtra50Nova)}
+                      />
+                    )}
+                    {l.mudouHoras && l.horaExtra100Atual !== l.horaExtra100Nova && (
+                      <LinhaMudanca
+                        rotulo="HE 100%"
+                        de={formatarHoras(l.horaExtra100Atual)}
+                        para={formatarHoras(l.horaExtra100Nova)}
+                      />
+                    )}
+                    {l.avisos.map((aviso, i) => (
+                      <p key={i} className="mt-0.5 text-[10px] text-status-warning">
+                        ⚠ {aviso}
+                      </p>
+                    ))}
+                  </div>
+                </li>
+              ))}
+            </ul>
           )}
 
           {preview.descartados.length > 0 && (
@@ -1223,5 +1287,13 @@ function ImportarSalariosSecao({ onAplicado }: { onAplicado: () => void }) {
         </div>
       )}
     </div>
+  );
+}
+
+function LinhaMudanca({ rotulo, de, para }: { rotulo: string; de: string; para: string }) {
+  return (
+    <p className="text-foreground-muted">
+      {rotulo}: {de} → <span className="font-semibold text-brand-primary-800">{para}</span>
+    </p>
   );
 }

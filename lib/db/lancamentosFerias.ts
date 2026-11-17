@@ -322,6 +322,44 @@ export async function criarLancamentoPj(input: CriarLancamentoPjInput): Promise<
   return lancamento;
 }
 
+/** Colaborador dono de um lançamento e se ele é PJ — para a rota checar a permissão antes de excluir. */
+export async function donoDoLancamento(lancamentoId: number): Promise<{ colaboradorId: number; pj: boolean } | null> {
+  const db = await getDb();
+  const resultado = await db.execute({
+    sql: `SELECT c.id, c.vinculo
+            FROM lancamentos_ferias l
+            JOIN periodos_aquisitivos p ON p.id = l.periodo_aquisitivo_id
+            JOIN colaboradores c ON c.id = p.colaborador_id
+           WHERE l.id = ?`,
+    args: [lancamentoId],
+  });
+  const linha = resultado.rows[0] as unknown as { id: number; vinculo: string | null } | undefined;
+  return linha ? { colaboradorId: linha.id, pj: linha.vinculo === "PJ" } : null;
+}
+
+/**
+ * Exclui um lançamento de férias de PJ lançado por engano (ou para corrigir).
+ * Marca como cancelado — e não apaga a linha — para ficar a trilha de quem
+ * excluiu e quando; cancelado sai de todos os saldos e custos, então o saldo
+ * volta ao período. Não vale em mês fechado, como o resto dos lançamentos.
+ */
+export async function excluirLancamentoPj(lancamentoId: number, operador: string): Promise<void> {
+  const lancamento = await buscarLancamento(lancamentoId);
+  if (!lancamento) throw new ErroValidacaoFerias("Lançamento não encontrado.");
+  if (lancamento.status === "cancelada") throw new ErroValidacaoFerias("Este lançamento já foi excluído.");
+  await garantirMesAbertoDoLancamento(lancamento, "excluir o lançamento");
+
+  const db = await getDb();
+  await db.execute({
+    sql: `UPDATE lancamentos_ferias
+       SET status = 'cancelada', data_baixa = to_char(now(), 'YYYY-MM-DD HH24:MI:SS'),
+           observacao_baixa = 'Excluído (correção de lançamento PJ)', criado_por = ?
+       WHERE id = ?`,
+    args: [operador, lancamentoId],
+  });
+  await atualizarStatusPeriodo(lancamento.periodoAquisitivoId);
+}
+
 export interface DarBaixaInput {
   dataInicioReal: string;
   dataFimReal: string;
