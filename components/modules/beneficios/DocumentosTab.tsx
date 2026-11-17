@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import { Card } from "@/components/shared/Card";
 import { Modal } from "@/components/shared/Modal";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { cn } from "@/lib/cn";
 import { formatarDataBr } from "@/lib/format";
 import type { DocumentoBeneficio } from "@/lib/db/beneficiosDocumentos";
 
@@ -14,9 +13,10 @@ const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julh
 /** Faturas e contratos dos benefícios: escolhe o fornecedor, depois o ano e o mês (pasta) onde anexar. */
 export function DocumentosTab() {
   const [documentos, setDocumentos] = useState<DocumentoBeneficio[]>([]);
-  const [fornecedor, setFornecedor] = useState<string>(FORNECEDORES[0]);
   const [ano, setAno] = useState(() => new Date().getFullYear());
-  const [mesAberto, setMesAberto] = useState<number | null>(null);
+  const [aberto, setAberto] = useState<{ fornecedor: string; mes: number } | null>(null);
+  const mesAberto = aberto?.mes ?? null;
+  const fornecedor = aberto?.fornecedor ?? FORNECEDORES[0];
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -35,8 +35,8 @@ export function DocumentosTab() {
   }, [carregar]);
 
   const competencia = (mes: number) => `${ano}-${String(mes).padStart(2, "0")}`;
-  const doMes = (mes: number) => documentos.filter((d) => d.fornecedor === fornecedor && d.competencia === competencia(mes));
-  const docsAbertos = mesAberto ? doMes(mesAberto) : [];
+  const doMes = (forn: string, mes: number) => documentos.filter((d) => d.fornecedor === forn && d.competencia === competencia(mes));
+  const docsAbertos = mesAberto ? doMes(fornecedor, mesAberto) : [];
 
   async function anexar(arquivos: File[]) {
     if (!mesAberto || arquivos.length === 0) return;
@@ -76,23 +76,6 @@ export function DocumentosTab() {
       />
 
       <Card className="space-y-3 p-4">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="mr-1 text-[10px] font-semibold tracking-wide text-foreground-muted uppercase">Benefício</span>
-          {FORNECEDORES.map((f) => (
-            <button
-              key={f}
-              type="button"
-              onClick={() => setFornecedor(f)}
-              className={cn(
-                "rounded-full border px-3 py-1 text-[12px] font-medium",
-                fornecedor === f ? "border-brand-primary bg-brand-primary text-brand-white" : "border-hairline text-foreground-muted hover:bg-surface-page",
-              )}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
-
         <div className="flex items-center gap-2">
           <button type="button" onClick={() => setAno((a) => a - 1)} aria-label="Ano anterior" className="rounded border border-hairline px-2 py-0.5 text-[12px] text-foreground-muted hover:bg-surface-page">
             ‹
@@ -103,30 +86,38 @@ export function DocumentosTab() {
           </button>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-12">
-          {MESES.map((nome, i) => {
-            const qtd = doMes(i + 1).length;
-            return (
-              <button
-                key={nome}
-                type="button"
-                onClick={() => setMesAberto(i + 1)}
-                className="rounded-lg border border-hairline bg-background px-2 py-1.5 text-left transition-colors hover:border-brand-primary hover:bg-surface-page"
-              >
-                <span className="block text-[13px] leading-none" aria-hidden>📁</span>
-                <span className="mt-1 block text-[10.5px] font-bold tracking-wide text-brand-primary-800 uppercase">{nome.slice(0, 3)}</span>
-                <span className="block text-[10px] text-foreground-muted">
-                  {qtd} {qtd === 1 ? "arquivo" : "arquivos"}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+        {FORNECEDORES.map((forn) => (
+          <section key={forn} className="space-y-1.5">
+            <h2 className="text-[11px] font-bold tracking-wide text-brand-primary-800 uppercase">{forn}</h2>
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-12">
+              {MESES.map((nome, i) => {
+                const qtd = doMes(forn, i + 1).length;
+                return (
+                  <button
+                    key={nome}
+                    type="button"
+                    onClick={() => {
+                      setErro(null);
+                      setAberto({ fornecedor: forn, mes: i + 1 });
+                    }}
+                    className="rounded-lg border border-hairline bg-background px-2 py-1.5 text-left transition-colors hover:border-brand-primary hover:bg-surface-page"
+                  >
+                    <span className="block text-[13px] leading-none" aria-hidden>📁</span>
+                    <span className="mt-1 block text-[10.5px] font-bold tracking-wide text-brand-primary-800 uppercase">{nome.slice(0, 3)}</span>
+                    <span className="block text-[10px] text-foreground-muted">
+                      {qtd} {qtd === 1 ? "arquivo" : "arquivos"}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        ))}
       </Card>
 
       <Modal
-        aberto={mesAberto !== null}
-        onFechar={() => setMesAberto(null)}
+        aberto={aberto !== null}
+        onFechar={() => setAberto(null)}
         eyebrow={fornecedor}
         titulo={mesAberto ? `${MESES[mesAberto - 1].toUpperCase()} / ${ano}` : ""}
         subtitulo={`${docsAbertos.length} ${docsAbertos.length === 1 ? "arquivo anexado" : "arquivos anexados"}`}
@@ -136,7 +127,7 @@ export function DocumentosTab() {
             <span className="flex-1 text-[11.5px] text-foreground-muted">
               {fornecedor} · {mesAberto ? MESES[mesAberto - 1] : ""} de {ano}
             </span>
-            <button type="button" onClick={() => setMesAberto(null)} className="rounded-md border border-hairline bg-background px-4 py-1.5 text-[12.5px] text-foreground-muted hover:bg-surface-page">
+            <button type="button" onClick={() => setAberto(null)} className="rounded-md border border-hairline bg-background px-4 py-1.5 text-[12.5px] text-foreground-muted hover:bg-surface-page">
               Fechar
             </button>
           </>
