@@ -1,4 +1,4 @@
-import { buscarColaborador, contarVinculos, excluirColaborador } from "@/lib/db/colaboradores";
+import { buscarColaborador, contarVinculos, excluirColaborador, excluirColaboradorComHistorico } from "@/lib/db/colaboradores";
 import { obterSessaoAtual } from "@/lib/auth/sessao";
 
 export const runtime = "nodejs";
@@ -6,16 +6,20 @@ export const runtime = "nodejs";
 /**
  * Exclusão definitiva do colaborador — para o cadastro criado por engano.
  *
- * Quem tem histórico não pode ser apagado: a rota recusa e diz exatamente o
- * que existe amarrado a ele. Para quem saiu da empresa o caminho é o
- * desligamento, que preserva férias e folha já apuradas.
+ * Quem tem histórico NÃO é apagado de primeira: a rota responde 409 com
+ * `exigeConfirmacao` e diz exatamente o que existe amarrado a ele. A tela então
+ * pergunta "Tem certeza?" e, se o RH confirmar, repete o pedido com
+ * `{ "forcar": true }` — aí apaga tudo junto, sem volta. Para quem saiu da
+ * empresa o caminho certo continua sendo o desligamento, que preserva o histórico.
  */
-export async function POST(_request: Request, ctx: RouteContext<"/api/colaboradores/[id]/excluir">) {
+export async function POST(request: Request, ctx: RouteContext<"/api/colaboradores/[id]/excluir">) {
   const sessao = await obterSessaoAtual();
   if (sessao?.tipo !== "administrador") {
     return Response.json({ erro: "Só o RH pode excluir colaboradores." }, { status: 403 });
   }
 
+  const corpo = (await request.json().catch(() => ({}))) as { forcar?: boolean };
+  const forcar = corpo.forcar === true;
   const { id } = await ctx.params;
   const colaboradorId = Number(id);
 
@@ -38,15 +42,23 @@ export async function POST(_request: Request, ctx: RouteContext<"/api/colaborado
   if (vinculos.registrosSst > 0) impedimentos.push(`${vinculos.registrosSst} registro(s) de SST (EPI, fardamento, exames)`);
   if (vinculos.kitsEntregues > 0) impedimentos.push(`${vinculos.kitsEntregues} kit(s) entregue(s) pelo DHO`);
   if (vinculos.movimentacoes > 0) impedimentos.push(`${vinculos.movimentacoes} movimentação(ões)`);
-  if (vinculos.acessoGestor > 0) impedimentos.push("acesso de gestor ao portal (remova em Gerenciar acesso)");
+  if (vinculos.acessoGestor > 0) impedimentos.push("acesso de gestor ao portal");
+
+  if (impedimentos.length > 0 && forcar) {
+    try {
+      await excluirColaboradorComHistorico(colaboradorId);
+    } catch (erro) {
+      console.error("Falha ao excluir colaborador com histórico", colaboradorId, erro);
+      return Response.json({ erro: "Não foi possível excluir: há registros ligados a este colaborador que o sistema não conseguiu remover. Nada foi apagado." }, { status: 409 });
+    }
+    return Response.json({ excluido: true, nome: colaborador.nome.trim(), comHistorico: true });
+  }
 
   if (impedimentos.length > 0) {
     return Response.json(
       {
-        erro:
-          `Não dá para excluir ${colaborador.nome.trim()}: existe histórico ligado a ele — ` +
-          `${impedimentos.join(", ")}. Apagar arrancaria férias e folha já apuradas. ` +
-          "Se a pessoa saiu da empresa, use “Desligar colaborador”, que preserva o histórico.",
+        erro: `${colaborador.nome.trim()} tem histórico ligado a ele: ${impedimentos.join(", ")}.`,
+        exigeConfirmacao: true,
         impedimentos,
       },
       { status: 409 },

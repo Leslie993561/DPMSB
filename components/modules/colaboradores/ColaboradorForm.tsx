@@ -793,8 +793,25 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
     setErroExcluir(null);
     setExcluindo(true);
     try {
-      const res = await fetch(`/api/colaboradores/${editando.id}/excluir`, { method: "POST" });
-      const data = await res.json().catch(() => ({}) as { erro?: string });
+      const url = `/api/colaboradores/${editando.id}/excluir`;
+      let res = await fetch(url, { method: "POST" });
+      let data = (await res.json().catch(() => ({}))) as { erro?: string; exigeConfirmacao?: boolean };
+      // Tem histórico ligado: a API recusou e listou o que existe. Pergunta de novo, com o
+      // que será perdido; só se o RH confirmar repete o pedido autorizando apagar tudo.
+      if (res.status === 409 && data.exigeConfirmacao) {
+        const certeza = window.confirm(
+          `${data.erro}
+
+Tem certeza que deseja excluir mesmo assim?
+
+` +
+            "Tudo isso será APAGADO junto com o cadastro — férias, folha já fechada e demais registros — " +
+            "e não há como recuperar.",
+        );
+        if (!certeza) return;
+        res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ forcar: true }) });
+        data = (await res.json().catch(() => ({}))) as { erro?: string };
+      }
       if (!res.ok) {
         setErroExcluir(data.erro ?? "Erro ao excluir o colaborador.");
         return;

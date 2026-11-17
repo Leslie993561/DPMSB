@@ -1008,3 +1008,43 @@ export async function excluirColaborador(colaboradorId: number): Promise<void> {
     { sql: "DELETE FROM colaboradores WHERE id = ?", args: [colaboradorId] },
   ]);
 }
+
+/**
+ * Exclusão FORÇADA: apaga o colaborador junto com todo o histórico ligado a ele
+ * (férias, folha fechada, benefícios, SST, kits, movimentações). Irreversível —
+ * só chamar depois da confirmação explícita do RH na tela. Roda numa transação
+ * única: se qualquer vínculo desconhecido barrar, nada é apagado.
+ * Quem era gestor dele fica sem gestor; o acesso de gestor ao portal é mantido,
+ * só desligado do cadastro apagado.
+ */
+export async function excluirColaboradorComHistorico(colaboradorId: number): Promise<void> {
+  const db = await getDb();
+  const porColab = (tabela: string, coluna = "colaborador_id") => ({
+    sql: `DELETE FROM ${tabela} WHERE ${coluna} = ?`,
+    args: [colaboradorId],
+  });
+  await db.batch([
+    {
+      sql: "DELETE FROM lancamentos_ferias WHERE periodo_aquisitivo_id IN (SELECT id FROM periodos_aquisitivos WHERE colaborador_id = ?)",
+      args: [colaboradorId],
+    },
+    porColab("periodos_aquisitivos"),
+    porColab("folha_extras"),
+    porColab("folha_breakdown"),
+    porColab("beneficios_variaveis"),
+    porColab("beneficios_rateio_extras"),
+    porColab("movimentacoes_info"),
+    porColab("dho_kit_entregas"),
+    porColab("sst_exames_realizados", "colab_id"),
+    porColab("sst_fichas_exame", "colab_id"),
+    porColab("sst_entregas_epi", "colab_id"),
+    porColab("sst_fardamento_entregas", "colab_id"),
+    porColab("sst_epi_trocas_dispensadas", "colab_id"),
+    porColab("sst_epi_divergencias_dispensadas", "colab_id"),
+    porColab("sst_fichas_epi", "colab_id"),
+    { sql: "UPDATE gestores_acesso SET colaborador_id = NULL WHERE colaborador_id = ?", args: [colaboradorId] },
+    { sql: "UPDATE colaboradores SET gestor_id = NULL WHERE gestor_id = ?", args: [colaboradorId] },
+    porColab("colaborador_dependentes"),
+    { sql: "DELETE FROM colaboradores WHERE id = ?", args: [colaboradorId] },
+  ]);
+}

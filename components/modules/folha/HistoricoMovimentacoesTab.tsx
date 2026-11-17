@@ -26,22 +26,33 @@ const MESES = [
 const ABREV = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
 const pct = (v: number | null) => (v === null ? "—" : `${v.toFixed(2).replace(".", ",")}%`);
 
-/** Doze quadrados (JAN–DEZ): efetivo no fim do mês em destaque e o turnover do mês, discreto. */
+/** Doze quadrinhos (JAN–DEZ): mês, efetivo no fim do mês, entradas e saídas; o turnover do mês fica ao lado. */
 function QuadradosTurnover({ meses, onAbrir }: { meses: MesTurnover[]; onAbrir: (mes: number) => void }) {
   return (
-    <div className="grid min-w-0 flex-1 grid-cols-4 gap-1.5 sm:grid-cols-6 lg:grid-cols-12">
+    <div className="grid min-w-0 flex-1 grid-cols-3 gap-x-3 gap-y-1.5 sm:grid-cols-4 lg:grid-cols-6">
       {meses.map((m) => (
         <button
           key={m.mes}
           type="button"
           disabled={m.futuro}
           onClick={() => onAbrir(m.mes)}
-          title={m.futuro ? "Mês ainda não alcançado" : `Efetivo em ${formatarDataBr(m.dataFim)}${m.parcial ? " (mês em andamento)" : ""}`}
-          className="rounded-lg border border-hairline bg-background px-1 py-1.5 text-center transition-colors enabled:hover:border-brand-primary enabled:hover:bg-surface-page disabled:cursor-default disabled:opacity-60"
+          title={m.futuro ? "Mês ainda não alcançado" : `Efetivo em ${formatarDataBr(m.dataFim)}${m.parcial ? " (mês em andamento)" : ""} — clique para detalhar`}
+          className="group flex items-center gap-1.5 text-left disabled:cursor-default disabled:opacity-50"
         >
-          <span className="block text-[9px] font-semibold tracking-wide text-foreground-muted">{ABREV[m.mes - 1]}</span>
-          <span className="block text-[18px] leading-tight font-bold text-brand-primary-800">{m.futuro ? "—" : m.efetivoFinal}</span>
-          <span className="block text-[9.5px] font-light text-foreground-muted">{m.futuro ? "" : pct(m.turnoverPct)}</span>
+          <span className="w-[58px] shrink-0 rounded-md border border-hairline bg-background px-1 py-1 text-center transition-colors group-enabled:group-hover:border-brand-primary group-enabled:group-hover:bg-surface-page">
+            <span className="block text-[8.5px] leading-none font-semibold tracking-wide text-foreground-muted">{ABREV[m.mes - 1]}</span>
+            <span className="block text-[15px] leading-tight font-bold text-brand-primary-800">{m.futuro ? "—" : m.efetivoFinal}</span>
+            <span className="block text-[8.5px] leading-tight font-medium">
+              {m.futuro ? (
+                <span className="text-foreground-muted">&nbsp;</span>
+              ) : (
+                <>
+                  <span className="text-status-success">+{m.admissoes}</span> <span className="text-status-danger">−{m.desligamentos}</span>
+                </>
+              )}
+            </span>
+          </span>
+          <span className="text-[10px] font-light text-foreground-muted">{m.futuro ? "" : pct(m.turnoverPct)}</span>
         </button>
       ))}
     </div>
