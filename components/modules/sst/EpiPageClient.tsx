@@ -260,7 +260,7 @@ function ColaboradoresTab({
   itensFardamento: string[];
 }) {
   const [fichaAberta, setFichaAberta] = useState<ColaboradorEpi | null>(null);
-  const [colunaAberta, setColunaAberta] = useState<"vinculo" | "texto" | null>(null);
+  const [colunaAberta, setColunaAberta] = useState<"vinculo" | "texto" | "situacao" | null>(null);
   const [filtroVinculo, setFiltroVinculo] = useState<string>("");
   const [filtroResumo, setFiltroResumo] = useState<"vencidos" | "ativos" | "aguardando" | "pendente" | null>(null);
 
@@ -300,6 +300,8 @@ function ColaboradoresTab({
   const totalAtivos = colaboradores.reduce((acc, c) => acc + (c.situacaoEpi.emDia > 0 ? 1 : 0), 0);
   const totalAguardando = colaboradores.reduce((acc, c) => acc + (c.aguardandoAssinatura ? 1 : 0), 0);
   const totalPendente = colaboradores.reduce((acc, c) => acc + (semNenhumRegistro(c) ? 1 : 0), 0);
+
+  const ROTULO_RESUMO = { vencidos: "Vencidos", ativos: "Ativos", aguardando: "Aguard. assin.", pendente: "EPI pendente" } as const;
 
   function alternarFiltroResumo(v: "vencidos" | "ativos" | "aguardando" | "pendente") {
     setFiltroResumo((atual) => (atual === v ? null : v));
@@ -343,43 +345,38 @@ function ColaboradoresTab({
               >
                 <CampoTexto valor={busca} onChange={onBusca} placeholder="Buscar nome, cargo ou setor" />
               </CabecalhoFiltravel>
-              <th className="px-2 py-1" />
-              <th className="px-2 py-1 align-top text-right">
-                <div className="flex flex-nowrap items-center justify-end gap-x-2 text-[9.5px] leading-tight font-bold tracking-normal normal-case">
-                  <button
-                    type="button"
-                    onClick={() => alternarFiltroResumo("vencidos")}
-                    title="Colaboradores com EPI vencido"
-                    className={cn("whitespace-nowrap text-status-danger", filtroResumo === "vencidos" && "underline underline-offset-2")}
-                  >
-                    Vencidos {totalVencidos}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => alternarFiltroResumo("ativos")}
-                    title="Colaboradores com EPI em dia"
-                    className={cn("whitespace-nowrap text-status-success", filtroResumo === "ativos" && "underline underline-offset-2")}
-                  >
-                    Ativos {totalAtivos}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => alternarFiltroResumo("aguardando")}
-                    title="Colaboradores com ficha de EPI enviada e ainda não assinada"
-                    className={cn("whitespace-nowrap text-status-warning", filtroResumo === "aguardando" && "underline underline-offset-2")}
-                  >
-                    Aguard. assin. {totalAguardando}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => alternarFiltroResumo("pendente")}
-                    title="Colaboradores com EPI na matriz mas sem nenhuma entrega registrada ainda"
-                    className={cn("whitespace-nowrap text-orange-700", filtroResumo === "pendente" && "underline underline-offset-2")}
-                  >
-                    EPI pendente {totalPendente}
-                  </button>
-                </div>
+              <th className="relative px-2 py-1 text-right">
+                <button type="button" onClick={() => setColunaAberta(colunaAberta === "situacao" ? null : "situacao")} className="ml-auto flex items-center gap-1 hover:text-foreground">
+                  <span>{filtroResumo ? ROTULO_RESUMO[filtroResumo] : "Situação"}</span>
+                  <span className={filtroResumo ? "text-brand-primary" : "text-foreground-muted/70"}>▾</span>
+                </button>
+                {colunaAberta === "situacao" && (
+                  <>
+                    <div className="fixed inset-0 z-20" onClick={() => setColunaAberta(null)} />
+                    <div
+                      className="absolute top-full right-0 z-30 mt-1 w-44 rounded-md border border-hairline bg-background p-2.5 text-left text-[11px] font-normal tracking-normal text-foreground normal-case shadow-drawer"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex flex-col items-start gap-1">
+                        {([null, "vencidos", "ativos", "aguardando", "pendente"] as const).map((v) => (
+                          <button
+                            key={v ?? "todos"}
+                            type="button"
+                            onClick={() => {
+                              setFiltroResumo(v);
+                              setColunaAberta(null);
+                            }}
+                            className={filtroResumo === v ? "font-semibold text-brand-primary-800" : "text-foreground-muted"}
+                          >
+                            {v ? ROTULO_RESUMO[v] : "Todos"}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
               </th>
+              <th className="w-8 px-2 py-1" />
             </tr>
           </thead>
           <tbody>
@@ -401,7 +398,26 @@ function ColaboradoresTab({
                       {c.cargo ?? "—"} · {c.departamento ?? "—"}
                     </div>
                   </td>
-                  <td className="px-2 py-1" />
+                  <td className="px-2 py-1 text-right whitespace-nowrap">
+                    <span className="inline-flex items-center justify-end gap-1">
+                      {c.situacaoEpi.vencidos > 0 ? (
+                        <span title="Há EPI vencido">
+                          <Badge cor="vermelho">Vencido</Badge>
+                        </span>
+                      ) : c.situacaoEpi.emDia > 0 ? (
+                        <Badge cor="verde">Ativo</Badge>
+                      ) : semNenhumRegistro(c) ? (
+                        <span title="Tem EPI previsto na matriz para o cargo, mas nenhuma entrega registrada">
+                          <Badge cor="amarelo">Pendente</Badge>
+                        </span>
+                      ) : null}
+                      {c.aguardandoAssinatura && (
+                        <span title="Ficha enviada, aguardando assinatura">
+                          <Badge cor="amarelo">!</Badge>
+                        </span>
+                      )}
+                    </span>
+                  </td>
                   <td className="px-2 py-1 text-right">
                     <button
                       type="button"
@@ -418,6 +434,42 @@ function ColaboradoresTab({
             )}
           </tbody>
         </table>
+      </div>
+      <div className="flex items-center justify-end border-t border-hairline bg-surface-page px-3 py-1.5">
+        <div className="flex flex-nowrap items-center justify-end gap-x-2 text-[9.5px] leading-tight font-bold tracking-normal normal-case">
+            <button
+              type="button"
+              onClick={() => alternarFiltroResumo("vencidos")}
+              title="Colaboradores com EPI vencido"
+              className={cn("whitespace-nowrap text-status-danger", filtroResumo === "vencidos" && "underline underline-offset-2")}
+            >
+              Vencidos {totalVencidos}
+            </button>
+            <button
+              type="button"
+              onClick={() => alternarFiltroResumo("ativos")}
+              title="Colaboradores com EPI em dia"
+              className={cn("whitespace-nowrap text-status-success", filtroResumo === "ativos" && "underline underline-offset-2")}
+            >
+              Ativos {totalAtivos}
+            </button>
+            <button
+              type="button"
+              onClick={() => alternarFiltroResumo("aguardando")}
+              title="Colaboradores com ficha de EPI enviada e ainda não assinada"
+              className={cn("whitespace-nowrap text-status-warning", filtroResumo === "aguardando" && "underline underline-offset-2")}
+            >
+              Aguard. assin. {totalAguardando}
+            </button>
+            <button
+              type="button"
+              onClick={() => alternarFiltroResumo("pendente")}
+              title="Colaboradores com EPI na matriz mas sem nenhuma entrega registrada ainda"
+              className={cn("whitespace-nowrap text-orange-700", filtroResumo === "pendente" && "underline underline-offset-2")}
+            >
+              EPI pendente {totalPendente}
+            </button>
+          </div>
       </div>
       <FichaEpiDrawer
         colaborador={fichaAberta}
