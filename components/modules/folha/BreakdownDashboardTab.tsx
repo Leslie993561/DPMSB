@@ -227,11 +227,16 @@ export function BreakdownDashboardTab() {
   const maxLinhaVinculo = Math.max(1, ...linhasVinculo.map((l) => l.custo));
 
   const porSetor = useMemo(() => {
-    const mapa = new Map<string, { folha: number; beneficios: number }>();
+    const mapa = new Map<string, { qtd: number; folha: number; beneficios: number }>();
+    const contados = new Set<string>();
     for (const l of filtrados) {
-      const chave = l.departamento ?? "Sem setor";
-      const atual = mapa.get(chave) ?? { folha: 0, beneficios: 0 };
+      const chave = l.departamento?.trim() || "Sem setor";
+      const atual = mapa.get(chave) ?? { qtd: 0, folha: 0, beneficios: 0 };
+      const chavePessoa = chave + "|" + l.colaboradorId;
+      const novaPessoa = !contados.has(chavePessoa);
+      contados.add(chavePessoa);
       mapa.set(chave, {
+        qtd: atual.qtd + (novaPessoa ? 1 : 0),
         folha: atual.folha + l.salarioBase + l.fgts + l.provisaoDecimoTerceiro + totalPremiacaoExtras(l),
         beneficios: atual.beneficios + totalBeneficios(l),
       });
@@ -456,7 +461,10 @@ export function BreakdownDashboardTab() {
                 </span>
               </div>
               <div className="flex items-center justify-between border-b border-hairline/60 px-4 py-1.5 text-[9.5px] font-semibold tracking-wide text-foreground-muted uppercase">
-                <span>Setor</span>
+                <div className="flex items-center gap-3">
+                  <span className="w-8 text-right">Qnt.</span>
+                  <span>Setor</span>
+                </div>
                 <div className="flex gap-4">
                   <span className="w-20 text-right">Folha</span>
                   <span className="w-20 text-right">Benefícios</span>
@@ -469,7 +477,12 @@ export function BreakdownDashboardTab() {
                     key={s.setor}
                     className="flex items-center justify-between border-b border-hairline/60 px-4 py-1.5 text-xs last:border-0"
                   >
-                    <span className="text-foreground-muted">{s.setor}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="w-8 text-right text-[11px] font-semibold text-foreground [font-family:Arial,_Helvetica,_sans-serif]">
+                        {s.qtd}
+                      </span>
+                      <span className="text-foreground-muted">{s.setor}</span>
+                    </div>
                     <div className="flex gap-4">
                       <span className="w-20 text-right text-[11px] text-foreground-muted [font-family:Arial,_Helvetica,_sans-serif]">
                         {formatarMoeda(s.folha)}
