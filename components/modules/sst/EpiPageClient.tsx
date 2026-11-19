@@ -262,6 +262,7 @@ function ColaboradoresTab({
   const [fichaAberta, setFichaAberta] = useState<ColaboradorEpi | null>(null);
   const [colunaAberta, setColunaAberta] = useState<"vinculo" | "texto" | "situacao" | null>(null);
   const [filtroVinculo, setFiltroVinculo] = useState<string>("");
+  const [posSituacao, setPosSituacao] = useState({ top: 0, right: 0 });
   const [filtroResumo, setFiltroResumo] = useState<"vencidos" | "ativos" | "aguardando" | "pendente" | null>(null);
 
   // Só o que está de fato cadastrado em alguma função da Matriz de EPI pode
@@ -346,15 +347,23 @@ function ColaboradoresTab({
                 <CampoTexto valor={busca} onChange={onBusca} placeholder="Buscar nome, cargo ou setor" />
               </CabecalhoFiltravel>
               <th className="relative px-2 py-1 text-right">
-                <button type="button" onClick={() => setColunaAberta(colunaAberta === "situacao" ? null : "situacao")} className="ml-auto flex items-center gap-1 hover:text-foreground">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setPosSituacao({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+                    setColunaAberta(colunaAberta === "situacao" ? null : "situacao");
+                  }}
+                  className="ml-auto flex items-center gap-1 hover:text-foreground">
                   <span>{filtroResumo ? ROTULO_RESUMO[filtroResumo] : "Situação"}</span>
                   <span className={filtroResumo ? "text-brand-primary" : "text-foreground-muted/70"}>▾</span>
                 </button>
                 {colunaAberta === "situacao" && (
                   <>
-                    <div className="fixed inset-0 z-20" onClick={() => setColunaAberta(null)} />
+                    <div className="fixed inset-0 z-40" onClick={() => setColunaAberta(null)} />
                     <div
-                      className="absolute top-full right-0 z-30 mt-1 w-44 rounded-md border border-hairline bg-background p-2.5 text-left text-[11px] font-normal tracking-normal text-foreground normal-case shadow-drawer"
+                      style={{ top: posSituacao.top, right: posSituacao.right }}
+                      className="fixed z-50 w-44 rounded-md border border-hairline bg-background p-2.5 text-left text-[11px] font-normal tracking-normal text-foreground normal-case shadow-drawer"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <div className="flex flex-col items-start gap-1">
