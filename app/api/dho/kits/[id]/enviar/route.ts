@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 const schema = z.object({
   colaboradorId: z.number().int().positive(),
   materiaisIds: z.array(z.number().int().positive()).min(1, "Selecione ao menos um material."),
-  data: z.string().regex(/^d{4}-d{2}-d{2}$/, "Data inválida.").optional(),
+  data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida.").optional(),
 });
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
