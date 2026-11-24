@@ -19,7 +19,7 @@ export default async function SstProgramasPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader eyebrow="SST" titulo="Programas SST" subtitulo="PCMSO, LTCAT e PGR — vigência e documento anexado" />
+      <PageHeader eyebrow="SST" titulo="Programas SST" subtitulo="PCMSO, LTCAT, PGR e AET — vigência e documento anexado" />
       <ProgramasSaudeClient programasIniciais={programas} />
     </div>
   );

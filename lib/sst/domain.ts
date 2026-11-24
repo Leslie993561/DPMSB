@@ -220,7 +220,7 @@ export function computeProgramaStatus(vigenciaFim: string, precisaoFim: Precisao
 }
 
 /** Os 3 programas de saúde ocupacional que a tela acompanha, nesta ordem fixa. */
-export const PROGRAMAS_SAUDE = ["PCMSO", "LTCAT", "PGR"] as const;
+export const PROGRAMAS_SAUDE = ["PCMSO", "LTCAT", "PGR", "AET"] as const;
 export type ProgramaSaude = (typeof PROGRAMAS_SAUDE)[number];
 
 export interface ProgramaSaudeVersao {

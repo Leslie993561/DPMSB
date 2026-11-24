@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 // espaço pro resto do multipart e a rota conseguir devolver um erro decente.
 const TAMANHO_MAX = 4 * 1024 * 1024; // 4MB
 
-/** Sobe o PDF do programa (PCMSO/LTCAT/PGR) antes de registrar a nova versão. */
+/** Sobe o PDF do programa (PCMSO/LTCAT/PGR/AET) antes de registrar a nova versão. */
 export async function POST(request: Request) {
   const sessao = await obterSessaoAtual();
   if (!acessaSst(sessao)) return Response.json({ erro: "Sem permissão." }, { status: 403 });

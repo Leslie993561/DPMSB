@@ -51,7 +51,7 @@ function paraVersao(l: LinhaProgramaSaude): VersaoProgramaSaude {
   };
 }
 
-/** Última versão carregada de cada programa (PCMSO/LTCAT/PGR) — null para o que nunca foi cadastrado. */
+/** Última versão carregada de cada programa (PCMSO/LTCAT/PGR/AET) — null para o que nunca foi cadastrado. */
 export async function listarProgramasSaude(): Promise<Record<ProgramaSaude, VersaoProgramaSaude | null>> {
   const linhas = await sstQuery<LinhaProgramaSaude>(
     "SELECT id, programa, vigencia_inicio, vigencia_fim, precisao_fim, autor, anexo_url, anexo_nome, ts FROM sst_programas_saude ORDER BY ts DESC",

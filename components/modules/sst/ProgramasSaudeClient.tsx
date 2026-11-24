@@ -11,6 +11,7 @@ const DESCRICAO_PROGRAMA: Record<ProgramaSaude, string> = {
   PCMSO: "Programa de Controle Médico de Saúde Ocupacional",
   LTCAT: "Laudo Técnico das Condições do Ambiente de Trabalho",
   PGR: "Programa de Gerenciamento de Riscos",
+  AET: "Análise Ergonômica do Trabalho",
 };
 
 // A hospedagem recusa o corpo da requisição acima disso (413) antes até de chegar
@@ -55,7 +56,7 @@ export function ProgramasSaudeClient({
   programasIniciais: Record<ProgramaSaude, VersaoProgramaSaude | null>;
 }) {
   return (
-    <div className="grid gap-3 md:grid-cols-3">
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
       {PROGRAMAS_SAUDE.map((programa) => (
         <CardPrograma key={programa} programa={programa} versaoInicial={programasIniciais[programa]} />
       ))}
