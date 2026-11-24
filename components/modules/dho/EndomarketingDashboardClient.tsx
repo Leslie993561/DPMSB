@@ -166,6 +166,26 @@ export function EndomarketingDashboardClient({
   const [formItens, setFormItens] = useState<ItemForm[]>(() => [novoItem(formBlocos[0].id)]);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  // Mês escolhido na aba Lançamentos mensais (1–12): define onde a nova ação cai e quais ações aparecem pra editar.
+  const [mesLancamento, setMesLancamento] = useState(() => {
+    const hoje = new Date();
+    return hoje.getFullYear() === anoInicial ? hoje.getMonth() + 1 : 1;
+  });
+
+  function escolherMesLancamento(mes: number) {
+    limparForm();
+    setMesLancamento(mes);
+    const inicio = `${ano}-${String(mes).padStart(2, "0")}-01`;
+    setFormData(inicio);
+    setFormDataFim(inicio);
+  }
+
+  const acoesDoMes = useMemo(() => {
+    const prefixo = `${ano}-${String(mesLancamento).padStart(2, "0")}`;
+    return eventos
+      .filter((e) => e.data.startsWith(prefixo) || (e.dataFim ?? e.data).startsWith(prefixo))
+      .sort((a, b) => a.data.localeCompare(b.data));
+  }, [eventos, ano, mesLancamento]);
 
   const eventosPorDia = useMemo(() => {
     const mapa = new Map<string, EventoCalendario[]>();
@@ -262,6 +282,7 @@ export function EndomarketingDashboardClient({
     if (dataPreenchida) {
       setFormData(dataPreenchida);
       setFormDataFim(dataPreenchida);
+      setMesLancamento(Number(dataPreenchida.slice(5, 7)));
       // Clicou num dia do Calendário: pula pra aba de Lançamentos, que é onde mora o formulário.
       if (aba !== "lancamentos") router.push("/dho/endomarketing?aba=lancamentos");
     }
@@ -269,6 +290,7 @@ export function EndomarketingDashboardClient({
 
   function iniciarEdicaoAcao(evento: EventoCalendario) {
     setEditandoId(evento.id);
+    if (evento.data.startsWith(`${ano}-`)) setMesLancamento(Number(evento.data.slice(5, 7)));
     setFormData(evento.data);
     setFormDataFim(evento.dataFim ?? evento.data);
     setFormTitulo(evento.titulo);
@@ -907,6 +929,64 @@ onClick={() => setExportarAberto(true)}
       {aba === "lancamentos" && (
         <div className="grid gap-3 lg:grid-cols-2">
           <Card className="h-full p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[11.5px] font-semibold text-foreground">Mês de lançamento · {ano}</p>
+              {seletorAno}
+            </div>
+            <div className="mb-3 flex flex-wrap gap-1.5">
+              {MESES_ABREV.map((nome, i) => (
+                <button
+                  key={nome}
+                  type="button"
+                  onClick={() => escolherMesLancamento(i + 1)}
+                  className={cn(
+                    "rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
+                    mesLancamento === i + 1
+                      ? "border-brand-primary/50 bg-brand-primary-100 text-brand-primary-800"
+                      : "border-hairline bg-background text-foreground hover:border-brand-primary hover:bg-brand-primary-050",
+                  )}
+                >
+                  {nome}
+                </button>
+              ))}
+            </div>
+            <div className="mb-3 rounded border border-hairline p-2">
+              <p className="mb-1 text-[11px] font-semibold text-foreground-muted">
+                Ações em {MESES_COMPLETOS[mesLancamento - 1]} ({acoesDoMes.length})
+              </p>
+              {acoesDoMes.length === 0 ? (
+                <p className="text-[11px] text-foreground-muted">Nenhuma ação lançada neste mês.</p>
+              ) : (
+                <ul className="space-y-1">
+                  {acoesDoMes.map((e) => (
+                    <li key={e.id}>
+                      <button
+                        type="button"
+                        onClick={() => iniciarEdicaoAcao(e)}
+                        className={cn(
+                          "flex w-full items-center justify-between gap-2 rounded px-2 py-1 text-left text-[11.5px] hover:bg-surface-page",
+                          editandoId === e.id && "bg-brand-primary-050",
+                        )}
+                      >
+                        <span className="truncate">{e.titulo}</span>
+                        <span className="shrink-0 text-foreground-muted">
+                          {e.data.slice(8, 10)}/{e.data.slice(5, 7)}
+                          {e.dataFim && e.dataFim !== e.data ? ` – ${e.dataFim.slice(8, 10)}/${e.dataFim.slice(5, 7)}` : ""}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <button
+                type="button"
+                onClick={() => escolherMesLancamento(mesLancamento)}
+                className="mt-2 text-[11px] font-medium text-brand-primary hover:text-brand-primary-hover"
+              >
+                + Nova ação em {MESES_COMPLETOS[mesLancamento - 1]}
+              </button>
+            </div>
+
             <div className="mb-2 flex items-center justify-between">
               <p className="text-[12px] font-bold tracking-wide text-foreground-muted uppercase">
                 {editandoId ? "Editar ação" : "Nova ação"}
