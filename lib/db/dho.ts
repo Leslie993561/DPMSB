@@ -440,6 +440,8 @@ export interface MelhoriaEmpresa {
   titulo: string;
   quantidade: number;
   valorTotal: number;
+  /** Já foi implementado — a tela mostra o item mais transparente. */
+  implementado: boolean;
 }
 
 interface LinhaMelhoria {
@@ -448,10 +450,16 @@ interface LinhaMelhoria {
   titulo: string;
   quantidade: number;
   valor_total: number;
+  implementado: boolean;
 }
 
 function paraMelhoria(l: LinhaMelhoria): MelhoriaEmpresa {
-  return { id: l.id, data: l.data, titulo: l.titulo, quantidade: l.quantidade, valorTotal: l.valor_total };
+  return { id: l.id, data: l.data, titulo: l.titulo, quantidade: l.quantidade, valorTotal: l.valor_total, implementado: Boolean(l.implementado) };
+}
+
+export async function marcarMelhoriaImplementada(id: number, implementado: boolean): Promise<void> {
+  const db = await getDb();
+  await db.execute({ sql: "UPDATE dho_melhorias_empresa SET implementado = ? WHERE id = ?", args: [implementado, id] });
 }
 
 export async function listarMelhoriasEmpresa(ano: number): Promise<MelhoriaEmpresa[]> {

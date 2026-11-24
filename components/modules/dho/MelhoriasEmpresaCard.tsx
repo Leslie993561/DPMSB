@@ -101,6 +101,16 @@ export function MelhoriasEmpresaCard({ ano, onAlterado }: { ano: number; onAlter
     }
   }
 
+  async function alternarImplementado(id: number, implementado: boolean) {
+    setItens((atual) => atual.map((m) => (m.id === id ? { ...m, implementado } : m)));
+    const res = await fetch(`/api/dho/melhorias/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ implementado }),
+    });
+    if (!res.ok) await carregar();
+  }
+
   async function excluir(id: number) {
     await fetch(`/api/dho/melhorias/${id}`, { method: "DELETE" });
     if (editandoId === id) limpar();
@@ -228,7 +238,18 @@ export function MelhoriasEmpresaCard({ ano, onAlterado }: { ano: number; onAlter
                 )}
               </div>
               {grupo.map((m) => (
-                <div key={m.id} className="flex items-center gap-2 border-t border-hairline px-2.5 py-1">
+                <div
+                  key={m.id}
+                  className={`flex items-center gap-2 border-t border-hairline px-2.5 py-1 transition-opacity ${m.implementado ? "opacity-45" : ""}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={m.implementado}
+                    onChange={(e) => alternarImplementado(m.id, e.target.checked)}
+                    title={m.implementado ? "Implementado — clique para desmarcar" : "Marcar como implementado"}
+                    aria-label={`Marcar "${m.titulo}" como implementado`}
+                    className="h-3.5 w-3.5 shrink-0 cursor-pointer accent-brand-primary"
+                  />
                   <span className="min-w-0 flex-1 truncate text-[12px] text-foreground" title={m.titulo}>
                     {m.titulo}
                   </span>
