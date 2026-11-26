@@ -95,6 +95,10 @@ interface DadosPessoais {
   tamanhoCamisa: string | null;
   tamanhoCalca: string | null;
   tamanhoSapato: string | null;
+  contatoEmergencia1Nome: string | null;
+  contatoEmergencia1Parentesco: string | null;
+  contatoEmergencia2Nome: string | null;
+  contatoEmergencia2Parentesco: string | null;
 }
 
 function Secao({ titulo }: { titulo: string }) {
@@ -229,6 +233,10 @@ export function ConviteForm({ token }: { token: string }) {
   const [tamanhoCamisa, setTamanhoCamisa] = useState("");
   const [tamanhoCalca, setTamanhoCalca] = useState("");
   const [tamanhoSapato, setTamanhoSapato] = useState("");
+  const [contatoEmergencia1Nome, setContatoEmergencia1Nome] = useState("");
+  const [contatoEmergencia1Parentesco, setContatoEmergencia1Parentesco] = useState("");
+  const [contatoEmergencia2Nome, setContatoEmergencia2Nome] = useState("");
+  const [contatoEmergencia2Parentesco, setContatoEmergencia2Parentesco] = useState("");
   const [temDependente, setTemDependente] = useState(false);
   const [dependentes, setDependentes] = useState<DependenteForm[]>([]);
 
@@ -302,6 +310,10 @@ export function ConviteForm({ token }: { token: string }) {
         setTamanhoCamisa(d.tamanhoCamisa ?? "");
         setTamanhoCalca(d.tamanhoCalca ?? "");
         setTamanhoSapato(d.tamanhoSapato ?? "");
+        setContatoEmergencia1Nome(d.contatoEmergencia1Nome ?? "");
+        setContatoEmergencia1Parentesco(d.contatoEmergencia1Parentesco ?? "");
+        setContatoEmergencia2Nome(d.contatoEmergencia2Nome ?? "");
+        setContatoEmergencia2Parentesco(d.contatoEmergencia2Parentesco ?? "");
         setEstadoTela(data.etapa === "documentos" ? "documentos" : "formulario");
       })
       .catch(() => setEstadoTela("invalido"));
@@ -371,6 +383,10 @@ export function ConviteForm({ token }: { token: string }) {
         tamanhoCamisa: tamanhoCamisa || null,
         tamanhoCalca: tamanhoCalca || null,
         tamanhoSapato: tamanhoSapato || null,
+        contatoEmergencia1Nome: contatoEmergencia1Nome.trim() || null,
+        contatoEmergencia1Parentesco: contatoEmergencia1Parentesco.trim() || null,
+        contatoEmergencia2Nome: contatoEmergencia2Nome.trim() || null,
+        contatoEmergencia2Parentesco: contatoEmergencia2Parentesco.trim() || null,
         dependentesLista: temDependente
           ? dependentes.map((d) => ({
               nome: d.nome,
@@ -556,6 +572,14 @@ export function ConviteForm({ token }: { token: string }) {
         <Campo label="Tamanho de camisa" value={tamanhoCamisa} onChange={setTamanhoCamisa} />
         <Campo label="Tamanho de calça" value={tamanhoCalca} onChange={setTamanhoCalca} />
         <Campo label="Tamanho de sapato" value={tamanhoSapato} onChange={setTamanhoSapato} />
+      </div>
+
+      <Secao titulo="Contatos de emergência" />
+      <div className="grid grid-cols-2 gap-2.5">
+        <Campo label="Contato 1 · nome" value={contatoEmergencia1Nome} onChange={setContatoEmergencia1Nome} />
+        <Campo label="Grau de parentesco" value={contatoEmergencia1Parentesco} onChange={setContatoEmergencia1Parentesco} />
+        <Campo label="Contato 2 · nome" value={contatoEmergencia2Nome} onChange={setContatoEmergencia2Nome} />
+        <Campo label="Grau de parentesco" value={contatoEmergencia2Parentesco} onChange={setContatoEmergencia2Parentesco} />
       </div>
 
       <Secao titulo="Dados bancários" />
