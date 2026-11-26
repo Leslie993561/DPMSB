@@ -5,10 +5,12 @@ import {
   ACCEPT_HTML,
   DOCUMENTOS_ESTRANGEIRO,
   DOCUMENTOS_PESSOAIS,
+  DOCUMENTOS_PJ,
   REGRAS_ANEXO,
   VISTOS,
   type DadosEstrangeiro,
   type DocumentoConvite,
+  type TipoContratacao,
 } from "@/lib/convite/documentos";
 
 export interface DocumentoEnviado {
@@ -44,16 +46,37 @@ export function DocumentosEtapa({
   const [docs, setDocs] = useState<DocumentoEnviado[]>(documentosIniciais);
   const [enviandoChave, setEnviandoChave] = useState<string | null>(null);
   const [erros, setErros] = useState<Record<string, string>>({});
-  const [estrangeiro, setEstrangeiro] = useState<DadosEstrangeiro>(estrangeiroInicial ?? ESTRANGEIRO_VAZIO);
+  const [estrangeiro, setEstrangeiro] = useState<DadosEstrangeiro>(
+    estrangeiroInicial ?? ESTRANGEIRO_VAZIO,
+  );
   const [mostrarEstrangeiro, setMostrarEstrangeiro] = useState(
-    Boolean(estrangeiroInicial) || documentosIniciais.some((d) => DOCUMENTOS_ESTRANGEIRO.some((e) => e.chave === d.tipo)),
+    Boolean(estrangeiroInicial) ||
+      documentosIniciais.some((d) =>
+        DOCUMENTOS_ESTRANGEIRO.some((e) => e.chave === d.tipo),
+      ),
   );
   const [erroEstrangeiro, setErroEstrangeiro] = useState<string | null>(null);
   const [finalizando, setFinalizando] = useState(false);
   const [erroGeral, setErroGeral] = useState<string | null>(null);
 
-  const enviadosPorItem = (chave: string) => docs.filter((d) => d.tipo === chave);
-  const pendentes = DOCUMENTOS_PESSOAIS.filter((i) => enviadosPorItem(i.chave).length === 0);
+  // Quem já anexou algo só de PJ volta direto na aba PJ; senão começa em CLT.
+  const [contratacao, setContratacao] = useState<TipoContratacao>(
+    documentosIniciais.some((d) =>
+      DOCUMENTOS_PJ.some((p) => p.chave === d.tipo),
+    ) &&
+      !documentosIniciais.some((d) =>
+        DOCUMENTOS_PESSOAIS.some((p) => p.chave === d.tipo),
+      )
+      ? "PJ"
+      : "CLT",
+  );
+  const listaAtual = contratacao === "PJ" ? DOCUMENTOS_PJ : DOCUMENTOS_PESSOAIS;
+
+  const enviadosPorItem = (chave: string) =>
+    docs.filter((d) => d.tipo === chave);
+  const pendentes = listaAtual.filter(
+    (i) => enviadosPorItem(i.chave).length === 0,
+  );
 
   async function anexar(item: DocumentoConvite, arquivos: FileList) {
     setErros((e) => ({ ...e, [item.chave]: "" }));
@@ -65,9 +88,15 @@ export function DocumentosEtapa({
         form.append("tipo", item.chave);
         form.append("arquivo", arquivo);
         try {
-          const res = await fetch(`/api/convites/token/${token}/documentos`, { method: "POST", body: form });
+          const res = await fetch(`/api/convites/token/${token}/documentos`, {
+            method: "POST",
+            body: form,
+          });
           const data = await res.json();
-          if (!res.ok) falhas.push(`${arquivo.name}: ${data.erro ?? "não foi possível anexar"}`);
+          if (!res.ok)
+            falhas.push(
+              `${arquivo.name}: ${data.erro ?? "não foi possível anexar"}`,
+            );
           else setDocs((atual) => [...atual, data.documento]);
         } catch {
           falhas.push(`${arquivo.name}: falha de comunicação com o servidor`);
@@ -75,14 +104,22 @@ export function DocumentosEtapa({
       }
     } finally {
       setEnviandoChave(null);
-      if (falhas.length > 0) setErros((e) => ({ ...e, [item.chave]: falhas.join(" · ") }));
+      if (falhas.length > 0)
+        setErros((e) => ({ ...e, [item.chave]: falhas.join(" · ") }));
     }
   }
 
   async function remover(doc: DocumentoEnviado) {
-    const res = await fetch(`/api/convites/token/${token}/documentos/${doc.id}`, { method: "DELETE" });
+    const res = await fetch(
+      `/api/convites/token/${token}/documentos/${doc.id}`,
+      { method: "DELETE" },
+    );
     if (res.ok) setDocs((atual) => atual.filter((d) => d.id !== doc.id));
-    else setErros((e) => ({ ...e, [doc.tipo]: "Não foi possível remover o arquivo." }));
+    else
+      setErros((e) => ({
+        ...e,
+        [doc.tipo]: "Não foi possível remover o arquivo.",
+      }));
   }
 
   async function salvarEstrangeiro(novo: DadosEstrangeiro) {
@@ -94,7 +131,8 @@ export function DocumentosEtapa({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(novo),
       });
-      if (!res.ok) setErroEstrangeiro("Não foi possível salvar essa informação.");
+      if (!res.ok)
+        setErroEstrangeiro("Não foi possível salvar essa informação.");
     } catch {
       setErroEstrangeiro("Falha de comunicação com o servidor.");
     }
@@ -109,7 +147,9 @@ export function DocumentosEtapa({
     if (!window.confirm(aviso)) return;
     setFinalizando(true);
     try {
-      const res = await fetch(`/api/convites/token/${token}/finalizar`, { method: "POST" });
+      const res = await fetch(`/api/convites/token/${token}/finalizar`, {
+        method: "POST",
+      });
       if (!res.ok) {
         setErroGeral("Não foi possível finalizar. Tente novamente.");
         return;
@@ -128,14 +168,32 @@ export function DocumentosEtapa({
     const formato = item.formato ?? "pdf";
     const cheio = enviados.length >= REGRAS_ANEXO.maxArquivosPorItem;
     return (
-      <div className={`rounded-md border px-3 py-2 ${falta ? "border-status-danger/40 bg-status-danger/5" : "border-hairline"}`}>
+      <div
+        className={`rounded-md border px-3 py-2 ${falta ? "border-status-danger/40 bg-status-danger/5" : "border-hairline"}`}
+      >
         <div className="flex items-start gap-2">
           <div className="min-w-0 flex-1">
-            <p className={`text-[13px] font-medium ${falta ? "text-status-danger" : "text-foreground"}`}>{item.nome}</p>
-            {item.dica && <p className="mt-0.5 text-[11px] text-foreground-muted">{item.dica}</p>}
+            <p
+              className={`text-[13px] font-medium ${falta ? "text-status-danger" : "text-foreground"}`}
+            >
+              {item.nome}
+            </p>
+            {item.dica && (
+              <p className="mt-0.5 text-[11px] text-foreground-muted">
+                {item.dica}
+              </p>
+            )}
           </div>
-          {enviados.length > 0 && <span className="shrink-0 text-[11px] font-semibold text-status-success">✓ Anexado</span>}
-          {falta && <span className="shrink-0 text-[11px] font-semibold text-status-danger">Pendente</span>}
+          {enviados.length > 0 && (
+            <span className="shrink-0 text-[11px] font-semibold text-status-success">
+              ✓ Anexado
+            </span>
+          )}
+          {falta && (
+            <span className="shrink-0 text-[11px] font-semibold text-status-danger">
+              Pendente
+            </span>
+          )}
           <label
             title={cheio ? "Limite de arquivos atingido" : "Anexar arquivo"}
             className={`shrink-0 rounded border border-hairline px-2 py-1 text-[15px] leading-none ${
@@ -144,7 +202,13 @@ export function DocumentosEtapa({
                 : "cursor-pointer hover:bg-surface-page"
             }`}
           >
-            {enviandoChave === item.chave ? <span className="text-[11px]">Enviando…</span> : <>📎<span className="sr-only"> Anexar {item.nome}</span></>}
+            {enviandoChave === item.chave ? (
+              <span className="text-[11px]">Enviando…</span>
+            ) : (
+              <>
+                📎<span className="sr-only"> Anexar {item.nome}</span>
+              </>
+            )}
             <input
               type="file"
               accept={ACCEPT_HTML[formato]}
@@ -153,7 +217,8 @@ export function DocumentosEtapa({
               disabled={cheio || enviandoChave === item.chave}
               onChange={(e) => {
                 const arquivos = e.target.files;
-                if (arquivos && arquivos.length > 0) void anexar(item, arquivos);
+                if (arquivos && arquivos.length > 0)
+                  void anexar(item, arquivos);
                 e.target.value = "";
               }}
             />
@@ -162,8 +227,13 @@ export function DocumentosEtapa({
         {enviados.length > 0 && (
           <ul className="mt-1.5 flex flex-col gap-0.5">
             {enviados.map((d) => (
-              <li key={d.id} className="flex items-center gap-2 text-[11.5px] text-foreground-muted">
-                <span className="min-w-0 flex-1 truncate">{d.arquivo.replace(`${item.nome} — `, "")}</span>
+              <li
+                key={d.id}
+                className="flex items-center gap-2 text-[11.5px] text-foreground-muted"
+              >
+                <span className="min-w-0 flex-1 truncate">
+                  {d.arquivo.replace(`${item.nome} — `, "")}
+                </span>
                 <button
                   type="button"
                   onClick={() => void remover(d)}
@@ -176,12 +246,20 @@ export function DocumentosEtapa({
             ))}
           </ul>
         )}
-        {erros[item.chave] && <p className="mt-1 text-[11px] text-status-danger">{erros[item.chave]}</p>}
+        {erros[item.chave] && (
+          <p className="mt-1 text-[11px] text-status-danger">
+            {erros[item.chave]}
+          </p>
+        )}
       </div>
     );
   }
 
-  function simNao(rotulo: string, valor: boolean | null, onChange: (v: boolean) => void) {
+  function simNao(
+    rotulo: string,
+    valor: boolean | null,
+    onChange: (v: boolean) => void,
+  ) {
     return (
       <div className="flex items-center gap-2">
         <span className="flex-1 text-[13px] text-foreground">{rotulo}</span>
@@ -191,7 +269,9 @@ export function DocumentosEtapa({
             type="button"
             onClick={() => onChange(opcao)}
             className={`rounded border px-3 py-1 text-[12px] font-medium ${
-              valor === opcao ? "border-brand-primary bg-brand-primary-050 text-brand-primary-800" : "border-hairline text-foreground-muted"
+              valor === opcao
+                ? "border-brand-primary bg-brand-primary-050 text-brand-primary-800"
+                : "border-hairline text-foreground-muted"
             }`}
           >
             {opcao ? "Sim" : "Não"}
@@ -201,85 +281,185 @@ export function DocumentosEtapa({
     );
   }
 
-  const prazo = new Date(expiraEm).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" });
+  const prazo = new Date(expiraEm).toLocaleString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    dateStyle: "short",
+    timeStyle: "short",
+  });
 
   return (
     <div className="flex flex-col gap-3">
       <div className="rounded-md border border-status-success-border bg-status-success-bg px-3 py-2">
-        <p className="text-[12.5px] font-semibold text-status-success">✓ Seus dados pessoais foram enviados ao RH</p>
-        <p className="text-[11.5px] text-foreground-muted">Agora anexe seus documentos pessoais abaixo.</p>
+        <p className="text-[12.5px] font-semibold text-status-success">
+          ✓ Seus dados pessoais foram enviados ao RH
+        </p>
+        <p className="text-[11.5px] text-foreground-muted">
+          Agora anexe seus documentos pessoais abaixo.
+        </p>
       </div>
 
       <div className="rounded-md border border-hairline bg-surface-page px-3 py-2 text-[11.5px] text-foreground-muted">
         <p className="font-semibold text-foreground">Regras para anexar</p>
         <ul className="mt-1 list-disc pl-4">
-          <li>Anexe em <strong>PDF</strong> (a foto 3x4 pode ser JPG ou PNG), com até <strong>10 MB</strong> por arquivo.</li>
-          <li>Documentos de frente e verso, como Identidade e CTPS, vão juntos em um único PDF.</li>
-          <li>O arquivo precisa estar legível, completo e dentro da validade.</li>
-          <li>Até {REGRAS_ANEXO.maxArquivosPorItem} arquivos por documento; use 📎 para anexar e &quot;Remover&quot; para trocar.</li>
           <li>
-            Nenhum documento é obrigatório: o que não for anexado aparece em <span className="font-semibold text-status-danger">vermelho</span> como pendente.
+            Anexe em <strong>PDF</strong> (a foto 3x4 pode ser JPG ou PNG), com
+            até <strong>10 MB</strong> por arquivo.
+          </li>
+          <li>
+            Documentos de frente e verso, como Identidade e CTPS, vão juntos em
+            um único PDF.
+          </li>
+          <li>
+            O arquivo precisa estar legível, completo e dentro da validade.
+          </li>
+          <li>
+            Até {REGRAS_ANEXO.maxArquivosPorItem} arquivos por documento; use 📎
+            para anexar e &quot;Remover&quot; para trocar.
+          </li>
+          <li>
+            Nenhum documento é obrigatório: o que não for anexado aparece em{" "}
+            <span className="font-semibold text-status-danger">vermelho</span>{" "}
+            como pendente.
           </li>
           <li>Este link vale até {prazo}.</li>
         </ul>
       </div>
 
-      <p className="mt-1 text-[10.5px] font-semibold tracking-wide text-brand-primary-800 uppercase">Documentos pessoais</p>
+      <div className="flex flex-col gap-1">
+        <p className="text-[10.5px] font-semibold tracking-wide text-brand-primary-800 uppercase">
+          Tipo de contratação
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          {(["CLT", "PJ"] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setContratacao(t)}
+              className={`rounded-md border px-3 py-2 text-[13px] font-semibold ${
+                contratacao === t
+                  ? "border-brand-primary bg-brand-primary-050 text-brand-primary-800"
+                  : "border-hairline text-foreground-muted"
+              }`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <p className="mt-1 text-[10.5px] font-semibold tracking-wide text-brand-primary-800 uppercase">
+        {contratacao === "PJ" ? "Documentos PJ" : "Documentos pessoais"}
+      </p>
       <div className="flex flex-col gap-2">
-        {DOCUMENTOS_PESSOAIS.map((item) => (
+        {listaAtual.map((item) => (
           <div key={item.chave}>{linhaDocumento(item, true)}</div>
         ))}
       </div>
 
-      <div className="mt-2 border-t border-hairline pt-3">
-        <button
-          type="button"
-          onClick={() => setMostrarEstrangeiro((v) => !v)}
-          className="text-[10.5px] font-semibold tracking-wide text-brand-primary-800 uppercase"
-        >
-          {mostrarEstrangeiro ? "▾" : "▸"} Estrangeiro <span className="font-normal normal-case text-foreground-muted">— preencha só se for o seu caso</span>
-        </button>
-        {mostrarEstrangeiro && (
-          <div className="mt-2 flex flex-col gap-2">
-            {DOCUMENTOS_ESTRANGEIRO.map((item) => (
-              <div key={item.chave}>{linhaDocumento(item, true)}</div>
-            ))}
-            <label className="flex flex-col gap-1">
-              <span className="text-[10.5px] font-medium text-foreground-muted">Data da naturalização</span>
-              <input
-                type="date"
-                value={estrangeiro.dataNaturalizacao ?? ""}
-                onChange={(e) => void salvarEstrangeiro({ ...estrangeiro, dataNaturalizacao: e.target.value || null })}
-                className={INPUT_CLASS}
-              />
-            </label>
-            <div>{simNao("Casado(a) com brasileiro(a)", estrangeiro.casadoComBrasileiro, (v) => void salvarEstrangeiro({ ...estrangeiro, casadoComBrasileiro: v }))}</div>
-            <div>{simNao("Filho(a) com brasileiro(a)", estrangeiro.filhoComBrasileiro, (v) => void salvarEstrangeiro({ ...estrangeiro, filhoComBrasileiro: v }))}</div>
-            <div className="flex items-center gap-2">
-              <span className="flex-1 text-[13px] text-foreground">Visto</span>
-              {VISTOS.map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => void salvarEstrangeiro({ ...estrangeiro, visto: estrangeiro.visto === v ? null : v })}
-                  className={`rounded border px-2.5 py-1 text-[12px] font-medium ${
-                    estrangeiro.visto === v ? "border-brand-primary bg-brand-primary-050 text-brand-primary-800" : "border-hairline text-foreground-muted"
-                  }`}
-                >
-                  {v}
-                </button>
+      {contratacao === "CLT" && (
+        <div className="mt-2 border-t border-hairline pt-3">
+          <button
+            type="button"
+            onClick={() => setMostrarEstrangeiro((v) => !v)}
+            className="text-[10.5px] font-semibold tracking-wide text-brand-primary-800 uppercase"
+          >
+            {mostrarEstrangeiro ? "▾" : "▸"} Estrangeiro{" "}
+            <span className="font-normal normal-case text-foreground-muted">
+              — preencha só se for o seu caso
+            </span>
+          </button>
+          {mostrarEstrangeiro && (
+            <div className="mt-2 flex flex-col gap-2">
+              {DOCUMENTOS_ESTRANGEIRO.map((item) => (
+                <div key={item.chave}>{linhaDocumento(item, true)}</div>
               ))}
+              <label className="flex flex-col gap-1">
+                <span className="text-[10.5px] font-medium text-foreground-muted">
+                  Data da naturalização
+                </span>
+                <input
+                  type="date"
+                  value={estrangeiro.dataNaturalizacao ?? ""}
+                  onChange={(e) =>
+                    void salvarEstrangeiro({
+                      ...estrangeiro,
+                      dataNaturalizacao: e.target.value || null,
+                    })
+                  }
+                  className={INPUT_CLASS}
+                />
+              </label>
+              <div>
+                {simNao(
+                  "Casado(a) com brasileiro(a)",
+                  estrangeiro.casadoComBrasileiro,
+                  (v) =>
+                    void salvarEstrangeiro({
+                      ...estrangeiro,
+                      casadoComBrasileiro: v,
+                    }),
+                )}
+              </div>
+              <div>
+                {simNao(
+                  "Filho(a) com brasileiro(a)",
+                  estrangeiro.filhoComBrasileiro,
+                  (v) =>
+                    void salvarEstrangeiro({
+                      ...estrangeiro,
+                      filhoComBrasileiro: v,
+                    }),
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="flex-1 text-[13px] text-foreground">
+                  Visto
+                </span>
+                {VISTOS.map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() =>
+                      void salvarEstrangeiro({
+                        ...estrangeiro,
+                        visto: estrangeiro.visto === v ? null : v,
+                      })
+                    }
+                    className={`rounded border px-2.5 py-1 text-[12px] font-medium ${
+                      estrangeiro.visto === v
+                        ? "border-brand-primary bg-brand-primary-050 text-brand-primary-800"
+                        : "border-hairline text-foreground-muted"
+                    }`}
+                  >
+                    {v}
+                  </button>
+                ))}
+              </div>
+              {erroEstrangeiro && (
+                <p className="text-[11px] text-status-danger">
+                  {erroEstrangeiro}
+                </p>
+              )}
             </div>
-            {erroEstrangeiro && <p className="text-[11px] text-status-danger">{erroEstrangeiro}</p>}
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
-      {erroGeral && <p className="rounded-md bg-status-danger/10 px-3 py-2 text-[12px] text-status-danger">{erroGeral}</p>}
+      {erroGeral && (
+        <p className="rounded-md bg-status-danger/10 px-3 py-2 text-[12px] text-status-danger">
+          {erroGeral}
+        </p>
+      )}
 
       <p className="text-[11.5px] text-foreground-muted">
-        {DOCUMENTOS_PESSOAIS.length - pendentes.length} de {DOCUMENTOS_PESSOAIS.length} documentos anexados
-        {pendentes.length > 0 && <span className="font-semibold text-status-danger"> · {pendentes.length} pendente(s)</span>}
+        {listaAtual.length - pendentes.length} de {listaAtual.length} documentos
+        anexados
+        {pendentes.length > 0 && (
+          <span className="font-semibold text-status-danger">
+            {" "}
+            · {pendentes.length} pendente(s)
+          </span>
+        )}
       </p>
       <button
         type="button"

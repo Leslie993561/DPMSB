@@ -53,7 +53,17 @@ export const DOCUMENTOS_ESTRANGEIRO: DocumentoConvite[] = [
   { chave: "est_rne", nome: "Carteira RNE" },
 ];
 
-export const TODOS_DOCUMENTOS: DocumentoConvite[] = [...DOCUMENTOS_PESSOAIS, ...DOCUMENTOS_ESTRANGEIRO];
+/** Documentos de quem é contratado como PJ — chaves próprias, para não se misturarem com os da lista CLT. */
+export const DOCUMENTOS_PJ: DocumentoConvite[] = [
+  { chave: "pj_rg", nome: "RG", dica: "Frente e verso em um único PDF." },
+  { chave: "pj_cpf", nome: "CPF" },
+  { chave: "pj_cnpj", nome: "Cartão CNPJ" },
+  { chave: "pj_comprovante_residencia", nome: "Comprovante de residência" },
+];
+
+export type TipoContratacao = "CLT" | "PJ";
+
+export const TODOS_DOCUMENTOS: DocumentoConvite[] = [...DOCUMENTOS_PESSOAIS, ...DOCUMENTOS_ESTRANGEIRO, ...DOCUMENTOS_PJ];
 
 export function buscarDocumentoConvite(chave: string): DocumentoConvite | undefined {
   return TODOS_DOCUMENTOS.find((d) => d.chave === chave);
