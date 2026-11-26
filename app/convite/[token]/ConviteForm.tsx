@@ -47,6 +47,7 @@ const ESCOLARIDADE_OPCOES = [
 ];
 
 interface DadosPessoais {
+  vinculo: string | null;
   cpf: string | null;
   pis: string | null;
   dataNascimento: string | null;
@@ -241,6 +242,8 @@ export function ConviteForm({ token }: { token: string }) {
   const [contatoEmergencia2Parentesco, setContatoEmergencia2Parentesco] = useState("");
   const [contatoEmergencia1Telefone, setContatoEmergencia1Telefone] = useState("");
   const [contatoEmergencia2Telefone, setContatoEmergencia2Telefone] = useState("");
+  const [contratacao, setContratacao] = useState<"CLT" | "PJ">("CLT");
+  const [vinculoOriginal, setVinculoOriginal] = useState<string | null>(null);
   const [temDependente, setTemDependente] = useState(false);
   const [dependentes, setDependentes] = useState<DependenteForm[]>([]);
 
@@ -261,6 +264,8 @@ export function ConviteForm({ token }: { token: string }) {
           dados: DadosPessoais;
         } = await res.json();
         setNomeColaborador(data.nome);
+        setVinculoOriginal(data.dados.vinculo ?? null);
+        setContratacao(data.dados.vinculo === "PJ" ? "PJ" : "CLT");
         setExpiraEm(data.expiraEm);
         setDocumentosIniciais(data.documentos ?? []);
         setEstrangeiroInicial(data.estrangeiro ?? null);
@@ -341,8 +346,10 @@ export function ConviteForm({ token }: { token: string }) {
     try {
       const payload = {
         nome: novo ? nome.trim() : undefined,
+        // Só grava o vínculo quando a escolha muda algo: quem já tem outro vínculo (estágio etc.) e fica em CLT não é alterado.
+        vinculo: contratacao === "PJ" ? ("PJ" as const) : vinculoOriginal === "PJ" ? ("CLT" as const) : undefined,
         cpf: cpf || null,
-        pis: pis || null,
+        pis: contratacao === "PJ" ? null : pis || null,
         dataNascimento: dataNascimento || null,
         cidadeNascimento: cidadeNascimento || null,
         ufNascimento: ufNascimento || null,
@@ -367,14 +374,14 @@ export function ConviteForm({ token }: { token: string }) {
         rg: rg || null,
         rgEmissao: rgEmissao || null,
         cpfEmissao: cpfEmissao || null,
-        pisEmissao: pisEmissao || null,
+        pisEmissao: contratacao === "PJ" ? null : pisEmissao || null,
         tituloEleitor: tituloEleitor || null,
         tituloEleitorZona: tituloEleitorZona || null,
         tituloEleitorSecao: tituloEleitorSecao || null,
         tituloEleitorEmissao: tituloEleitorEmissao || null,
-        ctpsSerie: ctpsSerie || null,
-        ctpsUf: ctpsUf || null,
-        ctpsEmissao: ctpsEmissao || null,
+        ctpsSerie: contratacao === "PJ" ? null : ctpsSerie || null,
+        ctpsUf: contratacao === "PJ" ? null : ctpsUf || null,
+        ctpsEmissao: contratacao === "PJ" ? null : ctpsEmissao || null,
         cnhCategoria: cnhCategoria || null,
         cnhNumero: cnhNumero || null,
         cnhValidade: cnhValidade || null,
@@ -465,6 +472,7 @@ export function ConviteForm({ token }: { token: string }) {
         expiraEm={expiraEm}
         documentosIniciais={documentosIniciais}
         estrangeiroInicial={estrangeiroInicial}
+        contratacao={contratacao}
         onFinalizado={() => setEstadoTela("enviado")}
       />
     );
@@ -472,6 +480,24 @@ export function ConviteForm({ token }: { token: string }) {
 
   return (
     <form onSubmit={enviar} className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1">
+        <p className="text-[10.5px] font-semibold tracking-wide text-brand-primary-800 uppercase">Tipo de contratação</p>
+        <div className="grid grid-cols-2 gap-2">
+          {(["CLT", "PJ"] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setContratacao(t)}
+              className={`rounded-md border px-3 py-2 text-[13px] font-semibold ${
+                contratacao === t ? "border-brand-primary bg-brand-primary-050 text-brand-primary-800" : "border-hairline text-foreground-muted"
+              }`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <p className="text-[12.5px] text-foreground-muted">
         {novo ? (
           "Olá! Você foi convidado a se cadastrar no Portal Recursos Humanos. Preencha seus dados abaixo — o RH completa o restante (cargo, admissão) depois."
@@ -547,10 +573,12 @@ export function ConviteForm({ token }: { token: string }) {
         <Campo label="RG · emissão" value={rgEmissao} onChange={setRgEmissao} tipo="date" />
         <Campo label="CPF · emissão" value={cpfEmissao} onChange={setCpfEmissao} tipo="date" />
       </div>
-      <div className="grid grid-cols-2 gap-2.5">
-        <Campo label="PIS" value={pis} onChange={setPis} />
-        <Campo label="PIS · emissão" value={pisEmissao} onChange={setPisEmissao} tipo="date" />
-      </div>
+      {contratacao === "CLT" && (
+        <div className="grid grid-cols-2 gap-2.5">
+          <Campo label="PIS" value={pis} onChange={setPis} />
+          <Campo label="PIS · emissão" value={pisEmissao} onChange={setPisEmissao} tipo="date" />
+        </div>
+      )}
       <div className="grid grid-cols-3 gap-2.5">
         <Campo label="Título de eleitor" value={tituloEleitor} onChange={setTituloEleitor} />
         <Campo label="Zona" value={tituloEleitorZona} onChange={setTituloEleitorZona} />
@@ -559,11 +587,13 @@ export function ConviteForm({ token }: { token: string }) {
       <div className="grid grid-cols-2 gap-2.5">
         <Campo label="Emissão do título" value={tituloEleitorEmissao} onChange={setTituloEleitorEmissao} tipo="date" />
       </div>
-      <div className="grid grid-cols-3 gap-2.5">
-        <Campo label="CTPS · série" value={ctpsSerie} onChange={setCtpsSerie} />
-        <Campo label="CTPS · UF" value={ctpsUf} onChange={(v) => setCtpsUf(v.toUpperCase())} />
-        <Campo label="CTPS · emissão" value={ctpsEmissao} onChange={setCtpsEmissao} tipo="date" />
-      </div>
+      {contratacao === "CLT" && (
+        <div className="grid grid-cols-3 gap-2.5">
+          <Campo label="CTPS · série" value={ctpsSerie} onChange={setCtpsSerie} />
+          <Campo label="CTPS · UF" value={ctpsUf} onChange={(v) => setCtpsUf(v.toUpperCase())} />
+          <Campo label="CTPS · emissão" value={ctpsEmissao} onChange={setCtpsEmissao} tipo="date" />
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-2.5">
         <Campo label="CNH · número" value={cnhNumero} onChange={setCnhNumero} />
         <Campo label="CNH · categoria" value={cnhCategoria} onChange={(v) => setCnhCategoria(v.toUpperCase())} />

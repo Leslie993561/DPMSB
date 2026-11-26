@@ -35,12 +35,14 @@ export function DocumentosEtapa({
   expiraEm,
   documentosIniciais,
   estrangeiroInicial,
+  contratacao,
   onFinalizado,
 }: {
   token: string;
   expiraEm: string;
   documentosIniciais: DocumentoEnviado[];
   estrangeiroInicial: DadosEstrangeiro | null;
+  contratacao: TipoContratacao;
   onFinalizado: () => void;
 }) {
   const [docs, setDocs] = useState<DocumentoEnviado[]>(documentosIniciais);
@@ -59,17 +61,6 @@ export function DocumentosEtapa({
   const [finalizando, setFinalizando] = useState(false);
   const [erroGeral, setErroGeral] = useState<string | null>(null);
 
-  // Quem já anexou algo só de PJ volta direto na aba PJ; senão começa em CLT.
-  const [contratacao, setContratacao] = useState<TipoContratacao>(
-    documentosIniciais.some((d) =>
-      DOCUMENTOS_PJ.some((p) => p.chave === d.tipo),
-    ) &&
-      !documentosIniciais.some((d) =>
-        DOCUMENTOS_PESSOAIS.some((p) => p.chave === d.tipo),
-      )
-      ? "PJ"
-      : "CLT",
-  );
   const listaAtual = contratacao === "PJ" ? DOCUMENTOS_PJ : DOCUMENTOS_PESSOAIS;
 
   const enviadosPorItem = (chave: string) =>
@@ -323,28 +314,6 @@ export function DocumentosEtapa({
           </li>
           <li>Este link vale até {prazo}.</li>
         </ul>
-      </div>
-
-      <div className="flex flex-col gap-1">
-        <p className="text-[10.5px] font-semibold tracking-wide text-brand-primary-800 uppercase">
-          Tipo de contratação
-        </p>
-        <div className="grid grid-cols-2 gap-2">
-          {(["CLT", "PJ"] as const).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setContratacao(t)}
-              className={`rounded-md border px-3 py-2 text-[13px] font-semibold ${
-                contratacao === t
-                  ? "border-brand-primary bg-brand-primary-050 text-brand-primary-800"
-                  : "border-hairline text-foreground-muted"
-              }`}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
       </div>
 
       <p className="mt-1 text-[10.5px] font-semibold tracking-wide text-brand-primary-800 uppercase">

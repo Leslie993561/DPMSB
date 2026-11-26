@@ -17,6 +17,7 @@ const ERRO_INVALIDO = { erro: "Link inválido, expirado ou já usado." };
 
 /** Formulário em branco para o convite de pré-cadastro (colaborador ainda não existe). */
 const DADOS_VAZIOS = {
+  vinculo: null,
   cpf: null,
   pis: null,
   dataNascimento: null,
@@ -109,6 +110,7 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/convites/to
     documentos: etapa === "documentos" ? await listarDocumentosEnviados(colaborador.id) : [],
     estrangeiro: etapa === "documentos" ? await buscarEstrangeiro(colaborador.id) : null,
     dados: {
+      vinculo: colaborador.vinculo,
       cpf: colaborador.cpf,
       pis: colaborador.pis,
       dataNascimento: colaborador.dataNascimento,
@@ -183,6 +185,8 @@ const schemaDependente = z.object({
  * gestor aqui: quem preenche o próprio cadastro nunca decide isso.
  */
 const schema = z.object({
+  // Só CLT ou PJ: a pessoa escolhe no topo do link; os demais vínculos (estágio, jovem aprendiz) são do RH.
+  vinculo: z.enum(["CLT", "PJ"]).optional(),
   // Só obrigatório (e só usado) quando o convite é de pré-cadastro (colaboradorId null).
   nome: z.string().trim().min(1).optional(),
   cpf: z.string().nullable().optional(),
