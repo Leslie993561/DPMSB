@@ -38,6 +38,8 @@ export interface Colaborador {
   contatoEmergencia1Parentesco: string | null;
   contatoEmergencia2Nome: string | null;
   contatoEmergencia2Parentesco: string | null;
+  contatoEmergencia1Telefone: string | null;
+  contatoEmergencia2Telefone: string | null;
   agencia: string | null;
   conta: string | null;
   tipoTransporte: TipoTransporte;
@@ -144,6 +146,8 @@ export interface ColaboradorInput {
   contatoEmergencia1Parentesco?: string | null;
   contatoEmergencia2Nome?: string | null;
   contatoEmergencia2Parentesco?: string | null;
+  contatoEmergencia1Telefone?: string | null;
+  contatoEmergencia2Telefone?: string | null;
   agencia?: string | null;
   conta?: string | null;
   tipoTransporte?: TipoTransporte;
@@ -231,6 +235,8 @@ interface LinhaColaborador {
   contato_emergencia1_parentesco: string | null;
   contato_emergencia2_nome: string | null;
   contato_emergencia2_parentesco: string | null;
+  contato_emergencia1_telefone: string | null;
+  contato_emergencia2_telefone: string | null;
   agencia: string | null;
   conta: string | null;
   tipo_transporte: TipoTransporte;
@@ -319,6 +325,8 @@ function paraColaborador(linha: LinhaColaborador): Colaborador {
     contatoEmergencia1Parentesco: linha.contato_emergencia1_parentesco ?? null,
     contatoEmergencia2Nome: linha.contato_emergencia2_nome ?? null,
     contatoEmergencia2Parentesco: linha.contato_emergencia2_parentesco ?? null,
+    contatoEmergencia1Telefone: linha.contato_emergencia1_telefone ?? null,
+    contatoEmergencia2Telefone: linha.contato_emergencia2_telefone ?? null,
     agencia: linha.agencia,
     conta: linha.conta,
     tipoTransporte: linha.tipo_transporte,
@@ -601,8 +609,8 @@ export async function criarColaborador(input: ColaboradorInput): Promise<Colabor
     await db.execute({ sql: "UPDATE colaboradores SET data_fim_contrato = ? WHERE id = ?", args: [input.dataFimContrato, novoId] });
   }
   await db.execute({
-    sql: "UPDATE colaboradores SET matricula = ?, contato_emergencia1_nome = ?, contato_emergencia1_parentesco = ?, contato_emergencia2_nome = ?, contato_emergencia2_parentesco = ? WHERE id = ?",
-    args: [input.matricula ?? null, input.contatoEmergencia1Nome ?? null, input.contatoEmergencia1Parentesco ?? null, input.contatoEmergencia2Nome ?? null, input.contatoEmergencia2Parentesco ?? null, novoId],
+    sql: "UPDATE colaboradores SET matricula = ?, contato_emergencia1_nome = ?, contato_emergencia1_parentesco = ?, contato_emergencia2_nome = ?, contato_emergencia2_parentesco = ?, contato_emergencia1_telefone = ?, contato_emergencia2_telefone = ? WHERE id = ?",
+    args: [input.matricula ?? null, input.contatoEmergencia1Nome ?? null, input.contatoEmergencia1Parentesco ?? null, input.contatoEmergencia2Nome ?? null, input.contatoEmergencia2Parentesco ?? null, input.contatoEmergencia1Telefone ?? null, input.contatoEmergencia2Telefone ?? null, novoId],
   });
   return (await buscarColaborador(novoId))!;
 }
@@ -634,6 +642,8 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
     contatoEmergencia1Parentesco: input.contatoEmergencia1Parentesco !== undefined ? input.contatoEmergencia1Parentesco : atual.contatoEmergencia1Parentesco,
     contatoEmergencia2Nome: input.contatoEmergencia2Nome !== undefined ? input.contatoEmergencia2Nome : atual.contatoEmergencia2Nome,
     contatoEmergencia2Parentesco: input.contatoEmergencia2Parentesco !== undefined ? input.contatoEmergencia2Parentesco : atual.contatoEmergencia2Parentesco,
+    contatoEmergencia1Telefone: input.contatoEmergencia1Telefone !== undefined ? input.contatoEmergencia1Telefone : atual.contatoEmergencia1Telefone,
+    contatoEmergencia2Telefone: input.contatoEmergencia2Telefone !== undefined ? input.contatoEmergencia2Telefone : atual.contatoEmergencia2Telefone,
     agencia: input.agencia !== undefined ? input.agencia : atual.agencia,
     conta: input.conta !== undefined ? input.conta : atual.conta,
     tipoTransporte: input.tipoTransporte ?? atual.tipoTransporte,
@@ -820,8 +830,8 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
     ],
   });
   await db.execute({
-    sql: "UPDATE colaboradores SET matricula = ?, contato_emergencia1_nome = ?, contato_emergencia1_parentesco = ?, contato_emergencia2_nome = ?, contato_emergencia2_parentesco = ? WHERE id = ?",
-    args: [mesclado.matricula ?? null, mesclado.contatoEmergencia1Nome ?? null, mesclado.contatoEmergencia1Parentesco ?? null, mesclado.contatoEmergencia2Nome ?? null, mesclado.contatoEmergencia2Parentesco ?? null, id],
+    sql: "UPDATE colaboradores SET matricula = ?, contato_emergencia1_nome = ?, contato_emergencia1_parentesco = ?, contato_emergencia2_nome = ?, contato_emergencia2_parentesco = ?, contato_emergencia1_telefone = ?, contato_emergencia2_telefone = ? WHERE id = ?",
+    args: [mesclado.matricula ?? null, mesclado.contatoEmergencia1Nome ?? null, mesclado.contatoEmergencia1Parentesco ?? null, mesclado.contatoEmergencia2Nome ?? null, mesclado.contatoEmergencia2Parentesco ?? null, mesclado.contatoEmergencia1Telefone ?? null, mesclado.contatoEmergencia2Telefone ?? null, id],
   });
   return (await buscarColaborador(id))!;
 }

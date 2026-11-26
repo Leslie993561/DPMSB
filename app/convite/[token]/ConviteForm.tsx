@@ -99,6 +99,8 @@ interface DadosPessoais {
   contatoEmergencia1Parentesco: string | null;
   contatoEmergencia2Nome: string | null;
   contatoEmergencia2Parentesco: string | null;
+  contatoEmergencia1Telefone: string | null;
+  contatoEmergencia2Telefone: string | null;
 }
 
 function Secao({ titulo }: { titulo: string }) {
@@ -237,6 +239,8 @@ export function ConviteForm({ token }: { token: string }) {
   const [contatoEmergencia1Parentesco, setContatoEmergencia1Parentesco] = useState("");
   const [contatoEmergencia2Nome, setContatoEmergencia2Nome] = useState("");
   const [contatoEmergencia2Parentesco, setContatoEmergencia2Parentesco] = useState("");
+  const [contatoEmergencia1Telefone, setContatoEmergencia1Telefone] = useState("");
+  const [contatoEmergencia2Telefone, setContatoEmergencia2Telefone] = useState("");
   const [temDependente, setTemDependente] = useState(false);
   const [dependentes, setDependentes] = useState<DependenteForm[]>([]);
 
@@ -314,6 +318,8 @@ export function ConviteForm({ token }: { token: string }) {
         setContatoEmergencia1Parentesco(d.contatoEmergencia1Parentesco ?? "");
         setContatoEmergencia2Nome(d.contatoEmergencia2Nome ?? "");
         setContatoEmergencia2Parentesco(d.contatoEmergencia2Parentesco ?? "");
+        setContatoEmergencia1Telefone(d.contatoEmergencia1Telefone ?? "");
+        setContatoEmergencia2Telefone(d.contatoEmergencia2Telefone ?? "");
         setEstadoTela(data.etapa === "documentos" ? "documentos" : "formulario");
       })
       .catch(() => setEstadoTela("invalido"));
@@ -387,6 +393,8 @@ export function ConviteForm({ token }: { token: string }) {
         contatoEmergencia1Parentesco: contatoEmergencia1Parentesco.trim() || null,
         contatoEmergencia2Nome: contatoEmergencia2Nome.trim() || null,
         contatoEmergencia2Parentesco: contatoEmergencia2Parentesco.trim() || null,
+        contatoEmergencia1Telefone: contatoEmergencia1Telefone.trim() || null,
+        contatoEmergencia2Telefone: contatoEmergencia2Telefone.trim() || null,
         dependentesLista: temDependente
           ? dependentes.map((d) => ({
               nome: d.nome,
@@ -575,10 +583,12 @@ export function ConviteForm({ token }: { token: string }) {
       </div>
 
       <Secao titulo="Contatos de emergência" />
-      <div className="grid grid-cols-2 gap-2.5">
+      <div className="grid grid-cols-3 gap-2.5">
         <Campo label="Contato 1 · nome" value={contatoEmergencia1Nome} onChange={setContatoEmergencia1Nome} />
+        <Campo label="Contato 1 · número" value={contatoEmergencia1Telefone} onChange={(v) => setContatoEmergencia1Telefone(v.replace(/\D/g, ""))} />
         <Campo label="Grau de parentesco" value={contatoEmergencia1Parentesco} onChange={setContatoEmergencia1Parentesco} />
         <Campo label="Contato 2 · nome" value={contatoEmergencia2Nome} onChange={setContatoEmergencia2Nome} />
+        <Campo label="Contato 2 · número" value={contatoEmergencia2Telefone} onChange={(v) => setContatoEmergencia2Telefone(v.replace(/\D/g, ""))} />
         <Campo label="Grau de parentesco" value={contatoEmergencia2Parentesco} onChange={setContatoEmergencia2Parentesco} />
       </div>
 

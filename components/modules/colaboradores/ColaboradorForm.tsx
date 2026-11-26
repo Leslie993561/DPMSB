@@ -852,6 +852,8 @@ Tem certeza que deseja excluir mesmo assim?
   const [contatoEmergencia1Parentesco, setContatoEmergencia1Parentesco] = useState(editando?.contatoEmergencia1Parentesco ?? "");
   const [contatoEmergencia2Nome, setContatoEmergencia2Nome] = useState(editando?.contatoEmergencia2Nome ?? "");
   const [contatoEmergencia2Parentesco, setContatoEmergencia2Parentesco] = useState(editando?.contatoEmergencia2Parentesco ?? "");
+  const [contatoEmergencia1Telefone, setContatoEmergencia1Telefone] = useState(editando?.contatoEmergencia1Telefone ?? "");
+  const [contatoEmergencia2Telefone, setContatoEmergencia2Telefone] = useState(editando?.contatoEmergencia2Telefone ?? "");
 
   useEffect(() => {
     if (!editando) return;
@@ -951,6 +953,8 @@ Tem certeza que deseja excluir mesmo assim?
         contatoEmergencia1Parentesco: contatoEmergencia1Parentesco.trim() || null,
         contatoEmergencia2Nome: contatoEmergencia2Nome.trim() || null,
         contatoEmergencia2Parentesco: contatoEmergencia2Parentesco.trim() || null,
+        contatoEmergencia1Telefone: contatoEmergencia1Telefone.trim() || null,
+        contatoEmergencia2Telefone: contatoEmergencia2Telefone.trim() || null,
         gestorId: gestorId ? Number(gestorId) : null,
         salarioBase: Number(salarioBase),
         horario: horario || null,
@@ -1888,17 +1892,28 @@ Tem certeza que deseja excluir mesmo assim?
           <option key={g} value={g} />
         ))}
       </datalist>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         {(
           [
-            { n: "Contato 1", nome: contatoEmergencia1Nome, setNome: setContatoEmergencia1Nome, par: contatoEmergencia1Parentesco, setPar: setContatoEmergencia1Parentesco },
-            { n: "Contato 2", nome: contatoEmergencia2Nome, setNome: setContatoEmergencia2Nome, par: contatoEmergencia2Parentesco, setPar: setContatoEmergencia2Parentesco },
+            { n: "Contato 1", nome: contatoEmergencia1Nome, setNome: setContatoEmergencia1Nome, tel: contatoEmergencia1Telefone, setTel: setContatoEmergencia1Telefone, par: contatoEmergencia1Parentesco, setPar: setContatoEmergencia1Parentesco },
+            { n: "Contato 2", nome: contatoEmergencia2Nome, setNome: setContatoEmergencia2Nome, tel: contatoEmergencia2Telefone, setTel: setContatoEmergencia2Telefone, par: contatoEmergencia2Parentesco, setPar: setContatoEmergencia2Parentesco },
           ] as const
         ).map((c) => (
           <Fragment key={c.n}>
             <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
               {c.n} · nome
               <input value={c.nome} onChange={(e) => c.setNome(e.target.value)} disabled={bloqueado} className={INPUT_CLASS} />
+            </label>
+            <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+              {c.n} · número
+              <input
+                value={c.tel}
+                onChange={(e) => c.setTel(e.target.value.replace(/\D/g, ""))}
+                inputMode="numeric"
+                placeholder="DDD + número"
+                disabled={bloqueado}
+                className={INPUT_CLASS}
+              />
             </label>
             <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
               Grau de parentesco

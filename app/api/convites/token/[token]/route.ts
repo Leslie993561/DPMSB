@@ -69,6 +69,8 @@ const DADOS_VAZIOS = {
   contatoEmergencia1Parentesco: null,
   contatoEmergencia2Nome: null,
   contatoEmergencia2Parentesco: null,
+  contatoEmergencia1Telefone: null,
+  contatoEmergencia2Telefone: null,
 };
 
 /**
@@ -159,6 +161,8 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/convites/to
       contatoEmergencia1Parentesco: colaborador.contatoEmergencia1Parentesco,
       contatoEmergencia2Nome: colaborador.contatoEmergencia2Nome,
       contatoEmergencia2Parentesco: colaborador.contatoEmergencia2Parentesco,
+      contatoEmergencia1Telefone: colaborador.contatoEmergencia1Telefone,
+      contatoEmergencia2Telefone: colaborador.contatoEmergencia2Telefone,
     },
   });
 }
@@ -233,6 +237,8 @@ const schema = z.object({
   contatoEmergencia1Parentesco: z.string().nullable().optional(),
   contatoEmergencia2Nome: z.string().nullable().optional(),
   contatoEmergencia2Parentesco: z.string().nullable().optional(),
+  contatoEmergencia1Telefone: z.string().nullable().optional(),
+  contatoEmergencia2Telefone: z.string().nullable().optional(),
   dependentesLista: z.array(schemaDependente).optional(),
 });
 

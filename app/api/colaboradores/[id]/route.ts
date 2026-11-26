@@ -41,6 +41,8 @@ const schema = z.object({
   contatoEmergencia1Parentesco: z.string().nullable().optional(),
   contatoEmergencia2Nome: z.string().nullable().optional(),
   contatoEmergencia2Parentesco: z.string().nullable().optional(),
+  contatoEmergencia1Telefone: z.string().nullable().optional(),
+  contatoEmergencia2Telefone: z.string().nullable().optional(),
   agencia: z.string().nullable().optional(),
   conta: z.string().nullable().optional(),
   tipoTransporte: z.enum(["vt_diario", "vm_fixo"]).optional(),

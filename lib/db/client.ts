@@ -130,6 +130,8 @@ const MIGRACOES: { tabela: string; coluna: string; definicao: string }[] = [
   { tabela: "colaboradores", coluna: "contato_emergencia1_parentesco", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "contato_emergencia2_nome", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "contato_emergencia2_parentesco", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "contato_emergencia1_telefone", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "contato_emergencia2_telefone", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "agencia", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "conta", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "tipo_transporte", definicao: "TEXT NOT NULL DEFAULT 'vt_diario'" },
