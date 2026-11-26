@@ -423,7 +423,14 @@ export async function gerarBreakdown(
     const fgts = { valor: encargos?.fgts ?? 0 };
     const provisaoDecimoTerceiro = encargos?.provisaoDecimoTerceiro ?? 0;
     const override = overrides.get(c.id);
-    const diasDeFerias = diasUteisDeFeriasNoMes(competencia, feriasPorColaborador.get(c.id) ?? []);
+    // Feriado dentro das férias não abate duas vezes: já saiu da base do transporte
+    // (exceto mobilidade de valor fixo mensal, cuja base não tira feriado).
+    const vmFixoMensal = c.tipoTransporte === "vm_fixo" && !((c.valorTransporteDia ?? 0) > 0);
+    const diasDeFerias = diasUteisDeFeriasNoMes(
+      competencia,
+      feriasPorColaborador.get(c.id) ?? [],
+      vmFixoMensal ? [] : semExpediente,
+    );
 
     // Transporte: bruto (valor do vale), abatido pelos dias de férias. O
     // desconto de 6% do empregado NÃO entra aqui — o Rateio mostra o valor

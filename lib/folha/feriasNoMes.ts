@@ -40,8 +40,18 @@ function limitesDoMes(competencia: string): { inicio: Date; fim: Date } {
  * calendário só pode ser abatido uma vez, mesmo que apareça em dois
  * lançamentos.
  */
-export function diasUteisDeFeriasNoMes(competencia: string, janelas: JanelaDeFerias[]): number {
+export function diasUteisDeFeriasNoMes(
+  competencia: string,
+  janelas: JanelaDeFerias[],
+  /**
+   * Datas (AAAA-MM-DD) sem expediente — feriados. Esse dia já saiu da base de
+   * dias do transporte; se também fosse contado como férias, o benefício seria
+   * abatido duas vezes (ex.: férias em dezembro cobrindo o dia 25).
+   */
+  diasSemExpediente: string[] = [],
+): number {
   if (janelas.length === 0) return 0;
+  const feriados = new Set(diasSemExpediente);
   const { inicio: inicioMes, fim: fimMes } = limitesDoMes(competencia);
   const contados = new Set<string>();
 
@@ -55,7 +65,8 @@ export function diasUteisDeFeriasNoMes(competencia: string, janelas: JanelaDeFer
     const ate = fim < fimMes ? fim : fimMes;
 
     for (let d = new Date(de); d <= ate; d.setUTCDate(d.getUTCDate() + 1)) {
-      if (ehDiaUtil(d)) contados.add(d.toISOString().slice(0, 10));
+      const iso = d.toISOString().slice(0, 10);
+      if (ehDiaUtil(d) && !feriados.has(iso)) contados.add(iso);
     }
   }
 

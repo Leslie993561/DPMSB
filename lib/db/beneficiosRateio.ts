@@ -113,14 +113,14 @@ export async function gerarRateio(competencia: string): Promise<{ linhas: LinhaR
     .flatMap(({ c, periodo }) => (periodo ? [{ c, periodo, trabalho: diasUteisTrabalhados(periodo, competencia, diasUteis, semExpediente) }] : []));
 
   /** Dias úteis de todas as janelas, sem recorte de competência. */
-  const diasUteisDeTodoOGozo = (janelas: JanelaDeFerias[]): number =>
+  const diasUteisDeTodoOGozo = (janelas: JanelaDeFerias[], feriados: string[]): number =>
     janelas.reduce((soma, j) => {
       // Um mês por vez, para reusar a mesma contagem de dias úteis.
       const meses = new Set<string>();
       for (let d = new Date(`${j.inicio}T00:00:00Z`); d <= new Date(`${j.fim}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + 1)) {
         meses.add(d.toISOString().slice(0, 7));
       }
-      return soma + Array.from(meses).reduce((s, m) => s + diasUteisDeFeriasNoMes(m, [j]), 0);
+      return soma + Array.from(meses).reduce((s, m) => s + diasUteisDeFeriasNoMes(m, [j], feriados), 0);
     }, 0);
 
   const linhas: LinhaRateio[] = doMes.map(({ c, periodo, trabalho }) => {
@@ -132,7 +132,10 @@ export async function gerarRateio(competencia: string): Promise<{ linhas: LinhaR
     // Transporte e mobilidade pagam deslocamento: em dia de férias não há
     // deslocamento. Alimentação fica fora — o DP paga o mês cheio.
     const janelas = feriasPorColaborador.get(c.id) ?? [];
-    const diasDeFerias = diasUteisDeFeriasNoMes(competencia, janelas);
+    // Feriado dentro das férias não abate duas vezes: já saiu da base do transporte
+    // (exceto mobilidade de valor fixo mensal, cuja base não tira feriado).
+    const vmFixoMensal = c.tipoTransporte === "vm_fixo" && !((c.valorTransporteDia ?? 0) > 0);
+    const diasDeFerias = diasUteisDeFeriasNoMes(competencia, janelas, vmFixoMensal ? [] : semExpediente);
     const transporteDoPeriodo = trabalho.razao < 1 ? arredondar(transporte.bruto * trabalho.razao) : transporte.bruto;
     const transporteComFerias =
       diasDeFerias > 0
@@ -174,7 +177,10 @@ export async function gerarRateio(competencia: string): Promise<{ linhas: LinhaR
       // tinha 21 dias úteis fora da competência.
       feriasFora: Math.max(
         0,
-        diasUteisDeTodoOGozo(janelas.filter((j) => diasUteisDeFeriasNoMes(competencia, [j]) > 0)) - diasDeFerias,
+        diasUteisDeTodoOGozo(
+          janelas.filter((j) => diasUteisDeFeriasNoMes(competencia, [j]) > 0),
+          vmFixoMensal ? [] : semExpediente,
+        ) - diasDeFerias,
       ),
       // Desligado no mês: R$ 38,21 por dia útil trabalhado (corte no TRCT); admitido no mês: proporcional.
       valeAlimentacao:

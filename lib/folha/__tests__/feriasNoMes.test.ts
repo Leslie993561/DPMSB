@@ -26,6 +26,14 @@ describe("dias úteis de férias na competência", () => {
     ).toBe(7);
   });
 
+  it("não abate o feriado de novo quando cai dentro das férias", () => {
+    // Alice: férias 21/12/2026 a 04/01/2027; 25/12 (sexta) é feriado.
+    // Em dezembro: 21–24 e 28–31 = 8 dias úteis, fora o dia 25 (9 sem a regra).
+    const janela = [{ inicio: "2026-12-21", fim: "2027-01-04" }];
+    expect(diasUteisDeFeriasNoMes("2026-12", janela)).toBe(9);
+    expect(diasUteisDeFeriasNoMes("2026-12", janela, ["2026-12-25"])).toBe(8);
+  });
+
   it("é zero quando as férias não tocam o mês", () => {
     expect(diasUteisDeFeriasNoMes("2026-08", [{ inicio: "2026-10-01", fim: "2026-10-10" }])).toBe(0);
   });
