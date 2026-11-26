@@ -44,6 +44,7 @@ export async function GET() {
     sheet.addRow({
       nome: nomeParaPlanilha(c.nome),
       nomeAbreviado: abreviarNome(c.nome),
+      matricula: c.matricula ?? "",
       cpf: c.cpf ?? "",
       pis: c.pis ?? "",
       dataNascimento: c.dataNascimento ?? "",

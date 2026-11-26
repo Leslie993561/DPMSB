@@ -32,6 +32,8 @@ export interface Colaborador {
   auxilioEducacaoValor: number | null;
   dataNascimento: string | null;
   cbo: string | null;
+  /** Matrícula na empresa (número do registro do colaborador). */
+  matricula: string | null;
   agencia: string | null;
   conta: string | null;
   tipoTransporte: TipoTransporte;
@@ -133,6 +135,7 @@ export interface ColaboradorInput {
   auxilioEducacaoValor?: number | null;
   dataNascimento?: string | null;
   cbo?: string | null;
+  matricula?: string | null;
   agencia?: string | null;
   conta?: string | null;
   tipoTransporte?: TipoTransporte;
@@ -215,6 +218,7 @@ interface LinhaColaborador {
   auxilio_educacao_valor: number | null;
   data_nascimento: string | null;
   cbo: string | null;
+  matricula: string | null;
   agencia: string | null;
   conta: string | null;
   tipo_transporte: TipoTransporte;
@@ -298,6 +302,7 @@ function paraColaborador(linha: LinhaColaborador): Colaborador {
     auxilioEducacaoValor: linha.auxilio_educacao_valor,
     dataNascimento: linha.data_nascimento,
     cbo: linha.cbo,
+    matricula: linha.matricula ?? null,
     agencia: linha.agencia,
     conta: linha.conta,
     tipoTransporte: linha.tipo_transporte,
@@ -579,6 +584,9 @@ export async function criarColaborador(input: ColaboradorInput): Promise<Colabor
   if (input.dataFimContrato && (input.vinculo === "JÁ" || input.vinculo === "EST")) {
     await db.execute({ sql: "UPDATE colaboradores SET data_fim_contrato = ? WHERE id = ?", args: [input.dataFimContrato, novoId] });
   }
+  if (input.matricula) {
+    await db.execute({ sql: "UPDATE colaboradores SET matricula = ? WHERE id = ?", args: [input.matricula, novoId] });
+  }
   return (await buscarColaborador(novoId))!;
 }
 
@@ -604,6 +612,7 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
       input.auxilioEducacaoValor !== undefined ? input.auxilioEducacaoValor : atual.auxilioEducacaoValor,
     dataNascimento: input.dataNascimento !== undefined ? input.dataNascimento : atual.dataNascimento,
     cbo: input.cbo !== undefined ? input.cbo : atual.cbo,
+    matricula: input.matricula !== undefined ? input.matricula : atual.matricula,
     agencia: input.agencia !== undefined ? input.agencia : atual.agencia,
     conta: input.conta !== undefined ? input.conta : atual.conta,
     tipoTransporte: input.tipoTransporte ?? atual.tipoTransporte,
@@ -789,6 +798,7 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
       id,
     ],
   });
+  await db.execute({ sql: "UPDATE colaboradores SET matricula = ? WHERE id = ?", args: [mesclado.matricula ?? null, id] });
   return (await buscarColaborador(id))!;
 }
 

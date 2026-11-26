@@ -36,6 +36,7 @@ const schema = z.object({
   auxilioEducacaoValor: z.coerce.number().min(0).nullable().optional(),
   dataNascimento: z.iso.date().nullable().optional(),
   cbo: z.string().nullable().optional(),
+  matricula: z.string().nullable().optional(),
   agencia: z.string().nullable().optional(),
   conta: z.string().nullable().optional(),
   tipoTransporte: z.enum(["vt_diario", "vm_fixo"]).optional(),

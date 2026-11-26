@@ -130,7 +130,7 @@ export function ColaboradoresTable({
     return colaboradores.filter((c) => {
       if (filtros.vinculo && c.vinculo !== filtros.vinculo) return false;
       if (textoNorm) {
-        const alvo = `${c.nome} ${c.cargo ?? ""} ${c.departamento ?? ""}`.toLowerCase();
+        const alvo = `${c.nome} ${c.matricula ?? ""} ${c.cargo ?? ""} ${c.departamento ?? ""}`.toLowerCase();
         if (!alvo.includes(textoNorm)) return false;
       }
       if (liderNorm) {
@@ -157,7 +157,7 @@ export function ColaboradoresTable({
 
   const algumFiltroAtivo = Object.values(filtros).some(Boolean);
   // Some a coluna de aniversário (dado pessoal) quando é gestor vendo a equipe.
-  const totalColunas = (desligados ? 9 : 7) - (!desligados && somenteLeitura ? 1 : 0);
+  const totalColunas = (desligados ? 10 : 8) - (!desligados && somenteLeitura ? 1 : 0);
 
   if (colaboradores.length === 0) {
     return <p className="p-5 text-[12.5px] text-foreground-muted">Nenhum colaborador encontrado.</p>;
@@ -215,6 +215,8 @@ export function ColaboradoresTable({
                 placeholder="Buscar nome, cargo ou setor"
               />
             </CabecalhoFiltravel>
+
+            <th className="px-3 py-1">Matrícula</th>
 
             <CabecalhoFiltravel
               label="Líder direto"
@@ -363,6 +365,7 @@ export function ColaboradoresTable({
                     {c.cargo ?? "—"} · {c.departamento ?? "—"}
                   </div>
                 </td>
+                <td className="px-3 py-1 text-foreground-muted">{c.matricula ?? "—"}</td>
                 <td className="px-3 py-1 font-normal text-brand-primary-800 uppercase">
                   {c.gestorId ? (porId.get(c.gestorId)?.nome ?? "—") : (c.liderDiretoNome ?? "—")}
                 </td>

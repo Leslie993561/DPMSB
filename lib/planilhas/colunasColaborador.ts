@@ -39,6 +39,7 @@ export const COLUNAS_COLABORADOR = [
   // vazia como as demais, e um valor digitado aqui é ignorado, porque não há
   // campo correspondente no cadastro para gravar.
   { header: "Nome abreviado", key: "nomeAbreviado", width: 22 },
+  { header: "Matrícula", key: "matricula", width: 12 },
   { header: "E-mail profissional", key: "email", width: 28 },
   { header: "Cargo", key: "cargo", width: 20 },
   { header: "Departamento", key: "departamento", width: 22 },

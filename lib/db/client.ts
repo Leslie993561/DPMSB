@@ -125,6 +125,7 @@ const MIGRACOES: { tabela: string; coluna: string; definicao: string }[] = [
   { tabela: "colaboradores", coluna: "auxilio_educacao_valor", definicao: "REAL" },
   { tabela: "colaboradores", coluna: "data_nascimento", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "cbo", definicao: "TEXT" },
+  { tabela: "colaboradores", coluna: "matricula", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "agencia", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "conta", definicao: "TEXT" },
   { tabela: "colaboradores", coluna: "tipo_transporte", definicao: "TEXT NOT NULL DEFAULT 'vt_diario'" },

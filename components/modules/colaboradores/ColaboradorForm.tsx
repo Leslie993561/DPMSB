@@ -706,6 +706,7 @@ export function ColaboradorForm({ colaboradores, colaboradorEditando, onSalvo, o
   const [departamento, setDepartamento] = useState(editando?.departamento ?? "");
   const [vinculo, setVinculo] = useState<Vinculo | "">(editando?.vinculo ?? "CLT");
   const [cbo, setCbo] = useState(editando?.cbo ?? "");
+  const [matricula, setMatricula] = useState(editando?.matricula ?? "");
   const [gestorId, setGestorId] = useState(editando?.gestorId ? String(editando.gestorId) : "");
   const [salarioBase, setSalarioBase] = useState(editando ? String(editando.salarioBase) : "");
   const [horario, setHorario] = useState(editando?.horario ?? "");
@@ -941,6 +942,7 @@ Tem certeza que deseja excluir mesmo assim?
         departamento: departamento || null,
         vinculo: vinculo || null,
         cbo: cbo || null,
+        matricula: matricula.trim() || null,
         gestorId: gestorId ? Number(gestorId) : null,
         salarioBase: Number(salarioBase),
         horario: horario || null,
@@ -1874,16 +1876,27 @@ Tem certeza que deseja excluir mesmo assim?
 
       <Secao titulo="Dados profissionais" />
 
-      <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
-        Nome abreviado
-        <input
-          value={abreviarNome(nome)}
-          readOnly
-          disabled
-          title="Primeiro nome e último sobrenome — calculado a partir do nome completo"
-          className={INPUT_CLASS}
-        />
-      </label>
+      <div className="grid grid-cols-[1fr_110px] gap-2">
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Nome abreviado
+          <input
+            value={abreviarNome(nome)}
+            readOnly
+            disabled
+            title="Primeiro nome e último sobrenome — calculado a partir do nome completo"
+            className={INPUT_CLASS}
+          />
+        </label>
+        <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+          Matrícula
+          <input
+            value={matricula}
+            onChange={(e) => setMatricula(e.target.value)}
+            inputMode="numeric"
+            className={INPUT_CLASS}
+          />
+        </label>
+      </div>
 
       <div className="grid grid-cols-2 gap-2">
         <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
