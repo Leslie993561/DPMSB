@@ -34,6 +34,10 @@ export interface Colaborador {
   cbo: string | null;
   /** Matrícula na empresa (número do registro do colaborador). */
   matricula: string | null;
+  contatoEmergencia1Nome: string | null;
+  contatoEmergencia1Parentesco: string | null;
+  contatoEmergencia2Nome: string | null;
+  contatoEmergencia2Parentesco: string | null;
   agencia: string | null;
   conta: string | null;
   tipoTransporte: TipoTransporte;
@@ -136,6 +140,10 @@ export interface ColaboradorInput {
   dataNascimento?: string | null;
   cbo?: string | null;
   matricula?: string | null;
+  contatoEmergencia1Nome?: string | null;
+  contatoEmergencia1Parentesco?: string | null;
+  contatoEmergencia2Nome?: string | null;
+  contatoEmergencia2Parentesco?: string | null;
   agencia?: string | null;
   conta?: string | null;
   tipoTransporte?: TipoTransporte;
@@ -219,6 +227,10 @@ interface LinhaColaborador {
   data_nascimento: string | null;
   cbo: string | null;
   matricula: string | null;
+  contato_emergencia1_nome: string | null;
+  contato_emergencia1_parentesco: string | null;
+  contato_emergencia2_nome: string | null;
+  contato_emergencia2_parentesco: string | null;
   agencia: string | null;
   conta: string | null;
   tipo_transporte: TipoTransporte;
@@ -303,6 +315,10 @@ function paraColaborador(linha: LinhaColaborador): Colaborador {
     dataNascimento: linha.data_nascimento,
     cbo: linha.cbo,
     matricula: linha.matricula ?? null,
+    contatoEmergencia1Nome: linha.contato_emergencia1_nome ?? null,
+    contatoEmergencia1Parentesco: linha.contato_emergencia1_parentesco ?? null,
+    contatoEmergencia2Nome: linha.contato_emergencia2_nome ?? null,
+    contatoEmergencia2Parentesco: linha.contato_emergencia2_parentesco ?? null,
     agencia: linha.agencia,
     conta: linha.conta,
     tipoTransporte: linha.tipo_transporte,
@@ -584,9 +600,10 @@ export async function criarColaborador(input: ColaboradorInput): Promise<Colabor
   if (input.dataFimContrato && (input.vinculo === "JÁ" || input.vinculo === "EST")) {
     await db.execute({ sql: "UPDATE colaboradores SET data_fim_contrato = ? WHERE id = ?", args: [input.dataFimContrato, novoId] });
   }
-  if (input.matricula) {
-    await db.execute({ sql: "UPDATE colaboradores SET matricula = ? WHERE id = ?", args: [input.matricula, novoId] });
-  }
+  await db.execute({
+    sql: "UPDATE colaboradores SET matricula = ?, contato_emergencia1_nome = ?, contato_emergencia1_parentesco = ?, contato_emergencia2_nome = ?, contato_emergencia2_parentesco = ? WHERE id = ?",
+    args: [input.matricula ?? null, input.contatoEmergencia1Nome ?? null, input.contatoEmergencia1Parentesco ?? null, input.contatoEmergencia2Nome ?? null, input.contatoEmergencia2Parentesco ?? null, novoId],
+  });
   return (await buscarColaborador(novoId))!;
 }
 
@@ -613,6 +630,10 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
     dataNascimento: input.dataNascimento !== undefined ? input.dataNascimento : atual.dataNascimento,
     cbo: input.cbo !== undefined ? input.cbo : atual.cbo,
     matricula: input.matricula !== undefined ? input.matricula : atual.matricula,
+    contatoEmergencia1Nome: input.contatoEmergencia1Nome !== undefined ? input.contatoEmergencia1Nome : atual.contatoEmergencia1Nome,
+    contatoEmergencia1Parentesco: input.contatoEmergencia1Parentesco !== undefined ? input.contatoEmergencia1Parentesco : atual.contatoEmergencia1Parentesco,
+    contatoEmergencia2Nome: input.contatoEmergencia2Nome !== undefined ? input.contatoEmergencia2Nome : atual.contatoEmergencia2Nome,
+    contatoEmergencia2Parentesco: input.contatoEmergencia2Parentesco !== undefined ? input.contatoEmergencia2Parentesco : atual.contatoEmergencia2Parentesco,
     agencia: input.agencia !== undefined ? input.agencia : atual.agencia,
     conta: input.conta !== undefined ? input.conta : atual.conta,
     tipoTransporte: input.tipoTransporte ?? atual.tipoTransporte,
@@ -798,7 +819,10 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
       id,
     ],
   });
-  await db.execute({ sql: "UPDATE colaboradores SET matricula = ? WHERE id = ?", args: [mesclado.matricula ?? null, id] });
+  await db.execute({
+    sql: "UPDATE colaboradores SET matricula = ?, contato_emergencia1_nome = ?, contato_emergencia1_parentesco = ?, contato_emergencia2_nome = ?, contato_emergencia2_parentesco = ? WHERE id = ?",
+    args: [mesclado.matricula ?? null, mesclado.contatoEmergencia1Nome ?? null, mesclado.contatoEmergencia1Parentesco ?? null, mesclado.contatoEmergencia2Nome ?? null, mesclado.contatoEmergencia2Parentesco ?? null, id],
+  });
   return (await buscarColaborador(id))!;
 }
 

@@ -848,6 +848,11 @@ Tem certeza que deseja excluir mesmo assim?
   const bloqueado = Boolean(editando) && !modoEdicao;
   const [mostrarDocumentos, setMostrarDocumentos] = useState(false);
   const [mostrarChecklist, setMostrarChecklist] = useState(false);
+  const [mostrarEmergencia, setMostrarEmergencia] = useState(false);
+  const [contatoEmergencia1Nome, setContatoEmergencia1Nome] = useState(editando?.contatoEmergencia1Nome ?? "");
+  const [contatoEmergencia1Parentesco, setContatoEmergencia1Parentesco] = useState(editando?.contatoEmergencia1Parentesco ?? "");
+  const [contatoEmergencia2Nome, setContatoEmergencia2Nome] = useState(editando?.contatoEmergencia2Nome ?? "");
+  const [contatoEmergencia2Parentesco, setContatoEmergencia2Parentesco] = useState(editando?.contatoEmergencia2Parentesco ?? "");
 
   useEffect(() => {
     if (!editando) return;
@@ -943,6 +948,10 @@ Tem certeza que deseja excluir mesmo assim?
         vinculo: vinculo || null,
         cbo: cbo || null,
         matricula: matricula.trim() || null,
+        contatoEmergencia1Nome: contatoEmergencia1Nome.trim() || null,
+        contatoEmergencia1Parentesco: contatoEmergencia1Parentesco.trim() || null,
+        contatoEmergencia2Nome: contatoEmergencia2Nome.trim() || null,
+        contatoEmergencia2Parentesco: contatoEmergencia2Parentesco.trim() || null,
         gestorId: gestorId ? Number(gestorId) : null,
         salarioBase: Number(salarioBase),
         horario: horario || null,
@@ -1345,6 +1354,18 @@ Tem certeza que deseja excluir mesmo assim?
           </button>
           <button
             type="button"
+            onClick={() => setMostrarEmergencia((v) => !v)}
+            className={cn(
+              "flex-1 px-2 py-1 text-left text-[10.5px] font-medium transition-colors",
+              mostrarEmergencia
+                ? "bg-brand-primary-100 text-brand-primary-800"
+                : "text-foreground-muted hover:bg-background hover:text-brand-primary",
+            )}
+          >
+            🚨 Emergência
+          </button>
+          <button
+            type="button"
             onClick={() => setModoEdicao((v) => !v)}
             title={modoEdicao ? "Bloquear edição" : "Habilitar edição"}
             className={cn(
@@ -1377,6 +1398,41 @@ Tem certeza que deseja excluir mesmo assim?
           departamento={editando.departamento}
           dataAdmissao={editando.dataAdmissao}
         />
+      )}
+
+      {editando && mostrarEmergencia && (
+        <div className="flex flex-col gap-2 rounded border border-hairline bg-surface-page p-2 dark:border-brand-neutral/30">
+          <p className="text-[10px] font-semibold text-foreground-muted uppercase">Contatos de emergência</p>
+          <datalist id="graus-parentesco">
+            {["Mãe", "Pai", "Cônjuge", "Companheiro(a)", "Filho(a)", "Irmão(ã)", "Avó/Avô", "Tio(a)", "Amigo(a)"].map((g) => (
+              <option key={g} value={g} />
+            ))}
+          </datalist>
+          {(
+            [
+              { n: "Contato 1", nome: contatoEmergencia1Nome, setNome: setContatoEmergencia1Nome, par: contatoEmergencia1Parentesco, setPar: setContatoEmergencia1Parentesco },
+              { n: "Contato 2", nome: contatoEmergencia2Nome, setNome: setContatoEmergencia2Nome, par: contatoEmergencia2Parentesco, setPar: setContatoEmergencia2Parentesco },
+            ] as const
+          ).map((c) => (
+            <div key={c.n} className="grid grid-cols-[1fr_120px] gap-2">
+              <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+                {c.n} · nome
+                <input value={c.nome} onChange={(e) => c.setNome(e.target.value)} disabled={bloqueado} className={INPUT_CLASS} />
+              </label>
+              <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+                Grau de parentesco
+                <input
+                  value={c.par}
+                  onChange={(e) => c.setPar(e.target.value)}
+                  list="graus-parentesco"
+                  disabled={bloqueado}
+                  className={INPUT_CLASS}
+                />
+              </label>
+            </div>
+          ))}
+          <p className="text-[10px] text-foreground-muted">Clique no lápis para editar e salve no botão do formulário.</p>
+        </div>
       )}
 
       {!desligado && <EnviarConviteBox colaboradorId={editando ? editando.id : null} />}
