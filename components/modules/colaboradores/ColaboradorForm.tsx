@@ -419,6 +419,15 @@ function FichasExameDaAba({
  * são documentos — só leitura, o anexo fica lá no SST). Guardados no
  * Supabase Storage (bucket privado).
  */
+function formatarCnpjDigitado(valor: string): string {
+  const d = valor.replace(/\D/g, "").slice(0, 14);
+  return d
+    .replace(/^(\d{2})(\d)/, "$1.$2")
+    .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/\.(\d{3})(\d)/, ".$1/$2")
+    .replace(/(\d{4})(\d)/, "$1-$2");
+}
+
 function DocumentosColaboradorPanel({
   colaboradorId,
   nome,
@@ -854,6 +863,12 @@ Tem certeza que deseja excluir mesmo assim?
   const [contatoEmergencia2Parentesco, setContatoEmergencia2Parentesco] = useState(editando?.contatoEmergencia2Parentesco ?? "");
   const [contatoEmergencia1Telefone, setContatoEmergencia1Telefone] = useState(editando?.contatoEmergencia1Telefone ?? "");
   const [contatoEmergencia2Telefone, setContatoEmergencia2Telefone] = useState(editando?.contatoEmergencia2Telefone ?? "");
+  const [pjCnpj, setPjCnpj] = useState(editando?.pjCnpj ?? "");
+  const [pjNomeEmpresarial, setPjNomeEmpresarial] = useState(editando?.pjNomeEmpresarial ?? "");
+  const [pjTitulo, setPjTitulo] = useState(editando?.pjTitulo ?? "");
+  const [pjCodigoAtividade, setPjCodigoAtividade] = useState(editando?.pjCodigoAtividade ?? "");
+  const [pjDescricaoAtividade, setPjDescricaoAtividade] = useState(editando?.pjDescricaoAtividade ?? "");
+  const [pjDataInscricao, setPjDataInscricao] = useState(editando?.pjDataInscricao ?? "");
 
   useEffect(() => {
     if (!editando) return;
@@ -955,6 +970,12 @@ Tem certeza que deseja excluir mesmo assim?
         contatoEmergencia2Parentesco: contatoEmergencia2Parentesco.trim() || null,
         contatoEmergencia1Telefone: contatoEmergencia1Telefone.trim() || null,
         contatoEmergencia2Telefone: contatoEmergencia2Telefone.trim() || null,
+        pjCnpj: pjCnpj.trim() || null,
+        pjNomeEmpresarial: pjNomeEmpresarial.trim() || null,
+        pjTitulo: pjTitulo.trim() || null,
+        pjCodigoAtividade: pjCodigoAtividade.trim() || null,
+        pjDescricaoAtividade: pjDescricaoAtividade.trim() || null,
+        pjDataInscricao: pjDataInscricao.trim() || null,
         gestorId: gestorId ? Number(gestorId) : null,
         salarioBase: Number(salarioBase),
         horario: horario || null,
@@ -2110,6 +2131,45 @@ Tem certeza que deseja excluir mesmo assim?
           </select>
         </label>
       </div>
+
+      {vinculo === "PJ" && (
+        <>
+          <Secao titulo="Dados pessoa jurídica" />
+          <div className="grid grid-cols-2 gap-2">
+            <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+              CNPJ
+              <input
+                value={pjCnpj}
+                onChange={(e) => setPjCnpj(formatarCnpjDigitado(e.target.value))}
+                inputMode="numeric"
+                placeholder="00.000.000/0000-00"
+                disabled={bloqueado}
+                className={INPUT_CLASS}
+              />
+            </label>
+            <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+              Data de inscrição
+              <input type="date" value={pjDataInscricao} onChange={(e) => setPjDataInscricao(e.target.value)} disabled={bloqueado} className={INPUT_CLASS} />
+            </label>
+            <label className="col-span-2 flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+              Nome empresarial
+              <input value={pjNomeEmpresarial} onChange={(e) => setPjNomeEmpresarial(e.target.value)} disabled={bloqueado} className={INPUT_CLASS} />
+            </label>
+            <label className="col-span-2 flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+              Título
+              <input value={pjTitulo} onChange={(e) => setPjTitulo(e.target.value)} placeholder="Título do estabelecimento (nome de fantasia)" disabled={bloqueado} className={INPUT_CLASS} />
+            </label>
+            <label className="flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+              Código
+              <input value={pjCodigoAtividade} onChange={(e) => setPjCodigoAtividade(e.target.value)} placeholder="Código da atividade (CNAE)" disabled={bloqueado} className={INPUT_CLASS} />
+            </label>
+            <label className="col-span-2 flex flex-col gap-0 text-[10px] font-normal text-foreground-muted">
+              Descrição da atividade
+              <textarea value={pjDescricaoAtividade} onChange={(e) => setPjDescricaoAtividade(e.target.value)} rows={2} disabled={bloqueado} className={`${INPUT_CLASS} resize-none`} />
+            </label>
+          </div>
+        </>
+      )}
 
       <Secao titulo="Dados bancários" />
 

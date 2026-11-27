@@ -40,6 +40,12 @@ export interface Colaborador {
   contatoEmergencia2Parentesco: string | null;
   contatoEmergencia1Telefone: string | null;
   contatoEmergencia2Telefone: string | null;
+  pjCnpj: string | null;
+  pjNomeEmpresarial: string | null;
+  pjTitulo: string | null;
+  pjCodigoAtividade: string | null;
+  pjDescricaoAtividade: string | null;
+  pjDataInscricao: string | null;
   agencia: string | null;
   conta: string | null;
   tipoTransporte: TipoTransporte;
@@ -148,6 +154,12 @@ export interface ColaboradorInput {
   contatoEmergencia2Parentesco?: string | null;
   contatoEmergencia1Telefone?: string | null;
   contatoEmergencia2Telefone?: string | null;
+  pjCnpj?: string | null;
+  pjNomeEmpresarial?: string | null;
+  pjTitulo?: string | null;
+  pjCodigoAtividade?: string | null;
+  pjDescricaoAtividade?: string | null;
+  pjDataInscricao?: string | null;
   agencia?: string | null;
   conta?: string | null;
   tipoTransporte?: TipoTransporte;
@@ -237,6 +249,12 @@ interface LinhaColaborador {
   contato_emergencia2_parentesco: string | null;
   contato_emergencia1_telefone: string | null;
   contato_emergencia2_telefone: string | null;
+  pj_cnpj: string | null;
+  pj_nome_empresarial: string | null;
+  pj_titulo: string | null;
+  pj_codigo_atividade: string | null;
+  pj_descricao_atividade: string | null;
+  pj_data_inscricao: string | null;
   agencia: string | null;
   conta: string | null;
   tipo_transporte: TipoTransporte;
@@ -327,6 +345,12 @@ function paraColaborador(linha: LinhaColaborador): Colaborador {
     contatoEmergencia2Parentesco: linha.contato_emergencia2_parentesco ?? null,
     contatoEmergencia1Telefone: linha.contato_emergencia1_telefone ?? null,
     contatoEmergencia2Telefone: linha.contato_emergencia2_telefone ?? null,
+    pjCnpj: linha.pj_cnpj ?? null,
+    pjNomeEmpresarial: linha.pj_nome_empresarial ?? null,
+    pjTitulo: linha.pj_titulo ?? null,
+    pjCodigoAtividade: linha.pj_codigo_atividade ?? null,
+    pjDescricaoAtividade: linha.pj_descricao_atividade ?? null,
+    pjDataInscricao: linha.pj_data_inscricao ?? null,
     agencia: linha.agencia,
     conta: linha.conta,
     tipoTransporte: linha.tipo_transporte,
@@ -609,8 +633,8 @@ export async function criarColaborador(input: ColaboradorInput): Promise<Colabor
     await db.execute({ sql: "UPDATE colaboradores SET data_fim_contrato = ? WHERE id = ?", args: [input.dataFimContrato, novoId] });
   }
   await db.execute({
-    sql: "UPDATE colaboradores SET matricula = ?, contato_emergencia1_nome = ?, contato_emergencia1_parentesco = ?, contato_emergencia2_nome = ?, contato_emergencia2_parentesco = ?, contato_emergencia1_telefone = ?, contato_emergencia2_telefone = ? WHERE id = ?",
-    args: [input.matricula ?? null, input.contatoEmergencia1Nome ?? null, input.contatoEmergencia1Parentesco ?? null, input.contatoEmergencia2Nome ?? null, input.contatoEmergencia2Parentesco ?? null, input.contatoEmergencia1Telefone ?? null, input.contatoEmergencia2Telefone ?? null, novoId],
+    sql: "UPDATE colaboradores SET matricula = ?, contato_emergencia1_nome = ?, contato_emergencia1_parentesco = ?, contato_emergencia2_nome = ?, contato_emergencia2_parentesco = ?, contato_emergencia1_telefone = ?, contato_emergencia2_telefone = ?, pj_cnpj = ?, pj_nome_empresarial = ?, pj_titulo = ?, pj_codigo_atividade = ?, pj_descricao_atividade = ?, pj_data_inscricao = ? WHERE id = ?",
+    args: [input.matricula ?? null, input.contatoEmergencia1Nome ?? null, input.contatoEmergencia1Parentesco ?? null, input.contatoEmergencia2Nome ?? null, input.contatoEmergencia2Parentesco ?? null, input.contatoEmergencia1Telefone ?? null, input.contatoEmergencia2Telefone ?? null, input.pjCnpj ?? null, input.pjNomeEmpresarial ?? null, input.pjTitulo ?? null, input.pjCodigoAtividade ?? null, input.pjDescricaoAtividade ?? null, input.pjDataInscricao ?? null, novoId],
   });
   return (await buscarColaborador(novoId))!;
 }
@@ -644,6 +668,12 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
     contatoEmergencia2Parentesco: input.contatoEmergencia2Parentesco !== undefined ? input.contatoEmergencia2Parentesco : atual.contatoEmergencia2Parentesco,
     contatoEmergencia1Telefone: input.contatoEmergencia1Telefone !== undefined ? input.contatoEmergencia1Telefone : atual.contatoEmergencia1Telefone,
     contatoEmergencia2Telefone: input.contatoEmergencia2Telefone !== undefined ? input.contatoEmergencia2Telefone : atual.contatoEmergencia2Telefone,
+    pjCnpj: input.pjCnpj !== undefined ? input.pjCnpj : atual.pjCnpj,
+    pjNomeEmpresarial: input.pjNomeEmpresarial !== undefined ? input.pjNomeEmpresarial : atual.pjNomeEmpresarial,
+    pjTitulo: input.pjTitulo !== undefined ? input.pjTitulo : atual.pjTitulo,
+    pjCodigoAtividade: input.pjCodigoAtividade !== undefined ? input.pjCodigoAtividade : atual.pjCodigoAtividade,
+    pjDescricaoAtividade: input.pjDescricaoAtividade !== undefined ? input.pjDescricaoAtividade : atual.pjDescricaoAtividade,
+    pjDataInscricao: input.pjDataInscricao !== undefined ? input.pjDataInscricao : atual.pjDataInscricao,
     agencia: input.agencia !== undefined ? input.agencia : atual.agencia,
     conta: input.conta !== undefined ? input.conta : atual.conta,
     tipoTransporte: input.tipoTransporte ?? atual.tipoTransporte,
@@ -830,8 +860,8 @@ export async function atualizarColaborador(id: number, input: Partial<Colaborado
     ],
   });
   await db.execute({
-    sql: "UPDATE colaboradores SET matricula = ?, contato_emergencia1_nome = ?, contato_emergencia1_parentesco = ?, contato_emergencia2_nome = ?, contato_emergencia2_parentesco = ?, contato_emergencia1_telefone = ?, contato_emergencia2_telefone = ? WHERE id = ?",
-    args: [mesclado.matricula ?? null, mesclado.contatoEmergencia1Nome ?? null, mesclado.contatoEmergencia1Parentesco ?? null, mesclado.contatoEmergencia2Nome ?? null, mesclado.contatoEmergencia2Parentesco ?? null, mesclado.contatoEmergencia1Telefone ?? null, mesclado.contatoEmergencia2Telefone ?? null, id],
+    sql: "UPDATE colaboradores SET matricula = ?, contato_emergencia1_nome = ?, contato_emergencia1_parentesco = ?, contato_emergencia2_nome = ?, contato_emergencia2_parentesco = ?, contato_emergencia1_telefone = ?, contato_emergencia2_telefone = ?, pj_cnpj = ?, pj_nome_empresarial = ?, pj_titulo = ?, pj_codigo_atividade = ?, pj_descricao_atividade = ?, pj_data_inscricao = ? WHERE id = ?",
+    args: [mesclado.matricula ?? null, mesclado.contatoEmergencia1Nome ?? null, mesclado.contatoEmergencia1Parentesco ?? null, mesclado.contatoEmergencia2Nome ?? null, mesclado.contatoEmergencia2Parentesco ?? null, mesclado.contatoEmergencia1Telefone ?? null, mesclado.contatoEmergencia2Telefone ?? null, mesclado.pjCnpj ?? null, mesclado.pjNomeEmpresarial ?? null, mesclado.pjTitulo ?? null, mesclado.pjCodigoAtividade ?? null, mesclado.pjDescricaoAtividade ?? null, mesclado.pjDataInscricao ?? null, id],
   });
   return (await buscarColaborador(id))!;
 }
